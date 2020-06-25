@@ -1,6 +1,6 @@
 
-namespace engine {
-    class WindowsPlatform : public Platform {
+namespace foundation {
+    class WindowsPlatform : public PlatformInterface {
     public:
         WindowsPlatform();
         ~WindowsPlatform() override;
@@ -20,8 +20,8 @@ namespace engine {
         void hideKeyboard() override;
 
         EventHandlersToken addKeyboardEventHandlers(
-            std::function<void(const KeyboardEventArgs &)> &&down,
-            std::function<void(const KeyboardEventArgs &)> &&up
+            std::function<void(const PlatformKeyboardEventArgs &)> &&down,
+            std::function<void(const PlatformKeyboardEventArgs &)> &&up
         ) override;
 
         EventHandlersToken addInputEventHandlers(
@@ -30,20 +30,20 @@ namespace engine {
         ) override;
 
         EventHandlersToken addMouseEventHandlers(
-            std::function<void(const MouseEventArgs &)> &&press,
-            std::function<void(const MouseEventArgs &)> &&move,
-            std::function<void(const MouseEventArgs &)> &&release
+            std::function<void(const PlatformMouseEventArgs &)> &&press,
+            std::function<void(const PlatformMouseEventArgs &)> &&move,
+            std::function<void(const PlatformMouseEventArgs &)> &&release
         ) override;
 
         EventHandlersToken addTouchEventHandlers(
-            std::function<void(const TouchEventArgs &)> &&start,
-            std::function<void(const TouchEventArgs &)> &&move,
-            std::function<void(const TouchEventArgs &)> &&finish
+            std::function<void(const PlatformTouchEventArgs &)> &&start,
+            std::function<void(const PlatformTouchEventArgs &)> &&move,
+            std::function<void(const PlatformTouchEventArgs &)> &&finish
         ) override;
 
         EventHandlersToken addGamepadEventHandlers(
-            std::function<void(const GamepadEventArgs &)> &&buttonPress,
-            std::function<void(const GamepadEventArgs &)> &&buttonRelease
+            std::function<void(const PlatformGamepadEventArgs &)> &&buttonPress,
+            std::function<void(const PlatformGamepadEventArgs &)> &&buttonRelease
         ) override;
 
         void removeEventHandlers(EventHandlersToken token) override;

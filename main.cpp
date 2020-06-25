@@ -2,7 +2,7 @@
 #include "platform/interfaces.h"
 
 int main(int argc, const char * argv[]) {
-    auto platform = engine::Platform::instance();
+    auto platform = foundation::PlatformInterface::instance();
 
     platform->run([](float dtSec) {
 

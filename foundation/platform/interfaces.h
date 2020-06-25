@@ -5,44 +5,44 @@
 #include <vector>
 #include <functional>
 
-namespace engine {
-    enum class KeyboardKey {
-        A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
-        NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
-        LEFT, RIGHT, UP, DOWN,
-        SPACE, ENTER, TAB,
-        CTRL, SHIFT, ALT,
-        F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
-        _count
+namespace foundation {
+    struct PlatformKeyboardEventArgs {
+        enum class Key {
+            A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+            NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
+            LEFT, RIGHT, UP, DOWN,
+            SPACE, ENTER, TAB,
+            CTRL, SHIFT, ALT,
+            F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
+            _count
+        };
+
+        Key key;
     };
 
-    struct KeyboardEventArgs {
-        KeyboardKey key;
-    };
-
-    struct MouseEventArgs {
+    struct PlatformMouseEventArgs {
         mutable float coordinateX;
         mutable float coordinateY;
         bool  isLeftButtonPressed;
         bool  isRightButtonPressed;
     };
 
-    struct TouchEventArgs {
+    struct PlatformTouchEventArgs {
         float coordinateX;
         float coordinateY;
         std::size_t touchID;
     };
 
-    struct GamepadEventArgs {
+    struct PlatformGamepadEventArgs {
     };
 
     using EventHandlersToken = void *;
 
     // Interface provides low-level core methods
     //
-    class Platform {
+    class PlatformInterface {
     public:
-        static std::shared_ptr<Platform> instance();
+        static std::shared_ptr<PlatformInterface> instance();
 
     public:
         // Thread-safe logging
@@ -83,8 +83,8 @@ namespace engine {
         // @return nullptr if not supported
         //
         virtual EventHandlersToken addKeyboardEventHandlers(
-            std::function<void(const KeyboardEventArgs &)> &&down,
-            std::function<void(const KeyboardEventArgs &)> &&up
+            std::function<void(const PlatformKeyboardEventArgs &)> &&down,
+            std::function<void(const PlatformKeyboardEventArgs &)> &&up
         ) = 0;
 
         // Set handlers for User's input (physical or virtual keyboard)
@@ -96,30 +96,30 @@ namespace engine {
         ) = 0;
 
         // Set handlers for PC mouse
-        // coordinateX/coordinateY of MouseEventArgs struct can be replaced with user's value (Platform will set new pointer coordinates)
+        // coordinateX/coordinateY of PlatformMouseEventArgs struct can be replaced with user's value (PlatformInterface will set new pointer coordinates)
         // @return nullptr if not supported
         //
         virtual EventHandlersToken addMouseEventHandlers(
-            std::function<void(const MouseEventArgs &)> &&press,
-            std::function<void(const MouseEventArgs &)> &&move,
-            std::function<void(const MouseEventArgs &)> &&release
+            std::function<void(const PlatformMouseEventArgs &)> &&press,
+            std::function<void(const PlatformMouseEventArgs &)> &&move,
+            std::function<void(const PlatformMouseEventArgs &)> &&release
         ) = 0;
 
         // Set handlers for touch
         // @return nullptr if not supported
         //
         virtual EventHandlersToken addTouchEventHandlers(
-            std::function<void(const TouchEventArgs &)> &&start,
-            std::function<void(const TouchEventArgs &)> &&move,
-            std::function<void(const TouchEventArgs &)> &&finish
+            std::function<void(const PlatformTouchEventArgs &)> &&start,
+            std::function<void(const PlatformTouchEventArgs &)> &&move,
+            std::function<void(const PlatformTouchEventArgs &)> &&finish
         ) = 0;
 
         // Set handlers for gamepad
         // @return nullptr if not supported
         //
         virtual EventHandlersToken addGamepadEventHandlers(
-            std::function<void(const GamepadEventArgs &)> &&buttonPress,
-            std::function<void(const GamepadEventArgs &)> &&buttonRelease
+            std::function<void(const PlatformGamepadEventArgs &)> &&buttonPress,
+            std::function<void(const PlatformGamepadEventArgs &)> &&buttonRelease
         ) = 0;
 
         // Remove handlers of any type
@@ -137,6 +137,6 @@ namespace engine {
         virtual void exit() = 0;
 
     protected:
-        virtual ~Platform() = default;
+        virtual ~PlatformInterface() = default;
     };
 }

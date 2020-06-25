@@ -22,21 +22,21 @@
 namespace {
     struct KeyboardCallbacksEntry {
         const void *handle;
-        std::function<void(engine::KeyboardEventArgs &)> keyboardDown;
-        std::function<void(engine::KeyboardEventArgs &)> keyboardUp;
+        std::function<void(foundation::PlatformKeyboardEventArgs &)> keyboardDown;
+        std::function<void(foundation::PlatformKeyboardEventArgs &)> keyboardUp;
     };
 
     struct MouseCallbacksEntry {
         const void *handle;
-        std::function<void(engine::MouseEventArgs &)> mousePress;
-        std::function<void(engine::MouseEventArgs &)> mouseMove;
-        std::function<void(engine::MouseEventArgs &)> mouseRelease;
+        std::function<void(foundation::PlatformMouseEventArgs &)> mousePress;
+        std::function<void(foundation::PlatformMouseEventArgs &)> mouseMove;
+        std::function<void(foundation::PlatformMouseEventArgs &)> mouseRelease;
     };
 
     const unsigned APP_WIDTH = 1280;
     const unsigned APP_HEIGHT = 720;
 
-    std::weak_ptr<engine::Platform> g_instance;
+    std::weak_ptr<foundation::PlatformInterface> g_instance;
 
     HINSTANCE  g_hinst;
     HWND       g_window;
@@ -62,7 +62,7 @@ namespace {
             mouseCaptured = true;
             ::SetCapture(hwnd);
 
-            engine::MouseEventArgs mouseEvent;
+            foundation::PlatformMouseEventArgs mouseEvent;
 
             mouseEvent.coordinateX = float(short(LOWORD(lParam)));
             mouseEvent.coordinateY = float(short(HIWORD(lParam)));
@@ -76,7 +76,7 @@ namespace {
         if (uMsg == WM_LBUTTONUP) {
             mouseCaptured = false;
 
-            engine::MouseEventArgs mouseEvent;
+            foundation::PlatformMouseEventArgs mouseEvent;
 
             mouseEvent.coordinateX = float(short(LOWORD(lParam)));
             mouseEvent.coordinateY = float(short(HIWORD(lParam)));
@@ -91,7 +91,7 @@ namespace {
         }
         if (uMsg == WM_MOUSEMOVE) {
             if (mouseCaptured) {
-                engine::MouseEventArgs mouseEvent;
+                foundation::PlatformMouseEventArgs mouseEvent;
 
                 mouseEvent.coordinateX = float(short(LOWORD(lParam)));
                 mouseEvent.coordinateY = float(short(HIWORD(lParam)));
@@ -107,7 +107,7 @@ namespace {
     }
 }
 
-namespace engine {
+namespace foundation {
     WindowsPlatform::WindowsPlatform() {}
     WindowsPlatform::~WindowsPlatform() {}
 
@@ -178,8 +178,8 @@ namespace engine {
     void WindowsPlatform::hideKeyboard() {}
 
     EventHandlersToken WindowsPlatform::addKeyboardEventHandlers(
-        std::function<void(const KeyboardEventArgs &)> &&down,
-        std::function<void(const KeyboardEventArgs &)> &&up
+        std::function<void(const PlatformKeyboardEventArgs &)> &&down,
+        std::function<void(const PlatformKeyboardEventArgs &)> &&up
     ) {
         return nullptr;
     }
@@ -192,9 +192,9 @@ namespace engine {
     }
 
     EventHandlersToken WindowsPlatform::addMouseEventHandlers(
-        std::function<void(const MouseEventArgs &)> &&press,
-        std::function<void(const MouseEventArgs &)> &&move,
-        std::function<void(const MouseEventArgs &)> &&release
+        std::function<void(const PlatformMouseEventArgs &)> &&press,
+        std::function<void(const PlatformMouseEventArgs &)> &&move,
+        std::function<void(const PlatformMouseEventArgs &)> &&release
     ) {
         EventHandlersToken result{ reinterpret_cast<EventHandlersToken>(callbacksIdSource++) };
         g_mouseCallbacks.emplace_front(MouseCallbacksEntry{ result, std::move(press), std::move(move), std::move(release) });
@@ -202,16 +202,16 @@ namespace engine {
     }
 
     EventHandlersToken WindowsPlatform::addTouchEventHandlers(
-        std::function<void(const TouchEventArgs &)> &&start,
-        std::function<void(const TouchEventArgs &)> &&move,
-        std::function<void(const TouchEventArgs &)> &&finish
+        std::function<void(const PlatformTouchEventArgs &)> &&start,
+        std::function<void(const PlatformTouchEventArgs &)> &&move,
+        std::function<void(const PlatformTouchEventArgs &)> &&finish
     ) {
         return nullptr;
     }
 
     EventHandlersToken WindowsPlatform::addGamepadEventHandlers(
-        std::function<void(const GamepadEventArgs &)> &&buttonPress,
-        std::function<void(const GamepadEventArgs &)> &&buttonRelease
+        std::function<void(const PlatformGamepadEventArgs &)> &&buttonPress,
+        std::function<void(const PlatformGamepadEventArgs &)> &&buttonRelease
     ) {
         return nullptr;
     }
@@ -296,9 +296,11 @@ namespace engine {
 
         printf("%s\n", g_logMessageBuffer);
     }
+}
 
-    std::shared_ptr<Platform> Platform::instance() {
-        std::shared_ptr<Platform> result;
+namespace foundation {
+    std::shared_ptr<PlatformInterface> PlatformInterface::instance() {
+        std::shared_ptr<PlatformInterface> result;
 
         if (g_instance.use_count() == 0) {
             g_instance = result = std::make_shared<WindowsPlatform>();
@@ -306,5 +308,4 @@ namespace engine {
 
         return result;
     }
-
 }

@@ -10,7 +10,8 @@ project(workshop CXX)
 function(workshop)
 	get_filename_component(m_source_root "${PROJECT_SOURCE_DIR}" ABSOLUTE)
 
-	add_subdirectory("${m_source_root}/engine/platform")
+	add_subdirectory("${m_source_root}/foundation/platform")
+	add_subdirectory("${m_source_root}/foundation/rendering")
 
 	set(
 		m_sources_list
@@ -19,8 +20,10 @@ function(workshop)
 	source_group("" FILES ${m_sources_list})
 	add_executable(workshop ${m_sources_list})
 	
-	target_include_directories(workshop PRIVATE "${m_source_root}/engine")
+	target_include_directories(workshop PRIVATE "${m_source_root}/foundation")
+
 	target_link_libraries(workshop platform)
+	target_link_libraries(workshop rendering)
 endfunction()
 
 workshop()

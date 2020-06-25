@@ -13,7 +13,7 @@ function(platform)
 	source_group("" FILES ${m_sources_list})
 	add_library(platform ${m_sources_list})
 	
-	set_property(TARGET platform PROPERTY FOLDER "engine")
+	set_property(TARGET platform PROPERTY FOLDER "foundation")
 endfunction()
 
 platform()
