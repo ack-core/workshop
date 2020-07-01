@@ -6,6 +6,10 @@
 #include <iomanip>
 #include <algorithm>
 
+#include "interfaces.h"
+
+#ifdef PLATFORM_WINDOWS
+
 #define NOMINMAX
 
 #include <d3d11_1.h>
@@ -18,7 +22,6 @@
 
 using namespace Microsoft::WRL;
 
-#include "interfaces.h"
 #include "rendering_dx11.h"
 
 namespace {
@@ -74,3 +77,5 @@ namespace foundation {
         return std::make_shared<Direct3D11Rendering>(platform);
     }
 }
+
+#endif // PLATFORM_WINDOWS

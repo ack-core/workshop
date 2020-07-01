@@ -5,7 +5,8 @@
 // + file operations
 
 #include "interfaces.h"
-#include "platform_windows.h"
+
+#ifdef PLATFORM_WINDOWS
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -18,6 +19,8 @@
 #include <mutex>
 #include <algorithm>
 #include <fstream>
+
+#include "platform_windows.h"
 
 namespace {
     struct KeyboardCallbacksEntry {
@@ -309,3 +312,5 @@ namespace foundation {
         return result;
     }
 }
+
+#endif // PLATFORM_WINDOWS
