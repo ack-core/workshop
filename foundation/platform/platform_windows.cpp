@@ -6,8 +6,6 @@
 
 #include "interfaces.h"
 
-#ifdef PLATFORM_WINDOWS
-
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 
@@ -36,21 +34,20 @@ namespace {
         std::function<void(foundation::PlatformMouseEventArgs &)> mouseRelease;
     };
 
+    static wchar_t *APP_CLASS_NAME = L"Application";
+
     const unsigned APP_WIDTH = 1280;
     const unsigned APP_HEIGHT = 720;
 
+    bool g_killed = false;
+
     std::weak_ptr<foundation::PlatformInterface> g_instance;
+    std::mutex g_logMutex;
 
-    HINSTANCE  g_hinst;
-    HWND       g_window;
-    MSG        g_message;
-    bool       g_killed = false;
-
-    std::size_t callbacksIdSource = 0;
+    std::size_t g_callbacksIdSource = 0;
     std::list<KeyboardCallbacksEntry> g_keyboardCallbacks;
     std::list<MouseCallbacksEntry> g_mouseCallbacks;
 
-    std::mutex g_logMutex;
     char g_logMessageBuffer[65536];
 }
 
@@ -111,8 +108,38 @@ namespace {
 }
 
 namespace foundation {
-    WindowsPlatform::WindowsPlatform() {}
-    WindowsPlatform::~WindowsPlatform() {}
+    WindowsPlatform::WindowsPlatform() {
+        ::SetProcessDPIAware();
+        ::WNDCLASSW wc;
+
+        _hinst = ::GetModuleHandle(0);
+        wc.style = NULL;
+        wc.lpfnWndProc = (::WNDPROC)WndProc;
+        wc.cbClsExtra = 0;
+        wc.cbWndExtra = 0;
+        wc.hInstance = _hinst;
+        wc.hIcon = ::LoadIcon(0, NULL);
+        wc.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = (::HBRUSH)(COLOR_WINDOW + 0);
+        wc.lpszMenuName = NULL;
+        wc.lpszClassName = APP_CLASS_NAME;
+
+        int tmpstyle = (WS_SYSMENU | WS_MINIMIZEBOX);
+        int wndborderx = ::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER);
+        int wndbordery = ::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER);
+        int wndcaption = ::GetSystemMetrics(SM_CYCAPTION);
+
+        ::RegisterClassW(&wc);
+        _window = ::CreateWindowW(APP_CLASS_NAME, APP_CLASS_NAME, tmpstyle, CW_USEDEFAULT, CW_USEDEFAULT, APP_WIDTH + wndborderx * 2, APP_HEIGHT + wndcaption + wndbordery * 2, HWND_DESKTOP, NULL, _hinst, NULL);
+
+        ::ShowWindow(_window, SW_NORMAL);
+        ::UpdateWindow(_window);
+    }
+
+    WindowsPlatform::~WindowsPlatform() {
+        ::UnregisterClassW(APP_CLASS_NAME, _hinst);
+        ::DestroyWindow(_window);
+    }
 
     std::vector<std::string> WindowsPlatform::formFileList(const char *dirPath) {
         return {};
@@ -131,7 +158,7 @@ namespace foundation {
     void *WindowsPlatform::attachNativeRenderingContext(void *context) {
         IDXGISwapChain1 *swapChain = nullptr;
 
-        if (g_window != nullptr) {
+        if (_window != nullptr) {
             ID3D11Device1 *device = reinterpret_cast<ID3D11Device1 *>(context);
             IDXGIAdapter *adapter = nullptr;
             IDXGIDevice1 *dxgiDevice = nullptr;
@@ -158,7 +185,7 @@ namespace foundation {
             swapChainDesc.Scaling = DXGI_SCALING_NONE;
             swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
 
-            dxgiFactory->CreateSwapChainForHwnd(device, g_window, &swapChainDesc, nullptr, nullptr, &swapChain);
+            dxgiFactory->CreateSwapChainForHwnd(device, _window, &swapChainDesc, nullptr, nullptr, &swapChain);
             dxgiFactory->Release();
             dxgiDevice->Release();
         }
@@ -167,12 +194,12 @@ namespace foundation {
     }
 
     void WindowsPlatform::showCursor() {
-        if (g_window != nullptr) {
+        if (_window != nullptr) {
             ShowCursor(true);
         }
     }
     void WindowsPlatform::hideCursor() {
-        if (g_window != nullptr) {
+        if (_window != nullptr) {
             ShowCursor(false);
         }
     }
@@ -199,7 +226,7 @@ namespace foundation {
         std::function<void(const PlatformMouseEventArgs &)> &&move,
         std::function<void(const PlatformMouseEventArgs &)> &&release
     ) {
-        EventHandlersToken result{ reinterpret_cast<EventHandlersToken>(callbacksIdSource++) };
+        EventHandlersToken result{ reinterpret_cast<EventHandlersToken>(g_callbacksIdSource++) };
         g_mouseCallbacks.emplace_front(MouseCallbacksEntry{ result, std::move(press), std::move(move), std::move(release) });
         return result;
     }
@@ -236,40 +263,12 @@ namespace foundation {
     }
 
     void WindowsPlatform::run(std::function<void(float)> &&updateAndDraw) {
-        ::SetProcessDPIAware();
-        ::WNDCLASSW wc;
-
-        static wchar_t *szAppName = L"App";
-
-        g_hinst = ::GetModuleHandle(0);
-        wc.style = NULL;
-        wc.lpfnWndProc = (::WNDPROC)WndProc;
-        wc.cbClsExtra = 0;
-        wc.cbWndExtra = 0;
-        wc.hInstance = g_hinst;
-        wc.hIcon = ::LoadIcon(0, NULL);
-        wc.hCursor = ::LoadCursor(NULL, IDC_ARROW);
-        wc.hbrBackground = (::HBRUSH)(COLOR_WINDOW + 0);
-        wc.lpszMenuName = NULL;
-        wc.lpszClassName = szAppName;
-
-        int tmpstyle = (WS_SYSMENU | WS_MINIMIZEBOX);
-        int wndborderx = ::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER);
-        int wndbordery = ::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER);
-        int wndcaption = ::GetSystemMetrics(SM_CYCAPTION);
-
-        ::RegisterClassW(&wc);
-        g_window = ::CreateWindowW(szAppName, szAppName, tmpstyle, CW_USEDEFAULT, CW_USEDEFAULT, APP_WIDTH + wndborderx * 2, APP_HEIGHT + wndcaption + wndbordery * 2, HWND_DESKTOP, NULL, g_hinst, NULL);
-
-        ::ShowWindow(g_window, SW_NORMAL);
-        ::UpdateWindow(g_window);
-
         static std::chrono::time_point<std::chrono::high_resolution_clock> prevFrameTime = std::chrono::high_resolution_clock::now();
 
         while (!g_killed) {
-            while (::PeekMessage(&g_message, g_window, 0, 0, PM_REMOVE)) {
-                ::TranslateMessage(&g_message);
-                ::DispatchMessage(&g_message);
+            while (::PeekMessage(&_message, _window, 0, 0, PM_REMOVE)) {
+                ::TranslateMessage(&_message);
+                ::DispatchMessage(&_message);
             }
 
             auto curFrameTime = std::chrono::high_resolution_clock::now();
@@ -277,9 +276,6 @@ namespace foundation {
             updateAndDraw(dt);
             prevFrameTime = curFrameTime;
         }
-
-        ::UnregisterClassW(szAppName, g_hinst);
-        ::DestroyWindow(g_window);
     }
 
     void WindowsPlatform::exit() {
@@ -308,9 +304,10 @@ namespace foundation {
         if (g_instance.use_count() == 0) {
             g_instance = result = std::make_shared<WindowsPlatform>();
         }
+        else {
+            result = g_instance.lock();
+        }
 
         return result;
     }
 }
-
-#endif // PLATFORM_WINDOWS

@@ -2,18 +2,20 @@
 namespace foundation {
     class Direct3D11Shader : public RenderingShader {
     public:
+        Direct3D11Shader();
         ~Direct3D11Shader() override;
 
     private:
-        std::unique_ptr<ComPtr<ID3D11Buffer>[]> constants;
-        std::size_t constantCount = 0;
-        ComPtr<ID3D11InputLayout> layout;
-        ComPtr<ID3D11VertexShader> vshader;
-        ComPtr<ID3D11PixelShader> pshader;
+        std::unique_ptr<ComPtr<ID3D11Buffer>[]> _constants;
+        std::size_t _constantCount;
+        ComPtr<ID3D11InputLayout> _layout;
+        ComPtr<ID3D11VertexShader> _vshader;
+        ComPtr<ID3D11PixelShader> _pshader;
     };
 
     class Direct3D11Texture2D : public RenderingTexture2D {
     public:
+        Direct3D11Texture2D();
         ~Direct3D11Texture2D() override;
 
         std::uint32_t getWidth() const override;
@@ -24,27 +26,29 @@ namespace foundation {
     private:
         ComPtr<ID3D11Texture2D>  _texture;
         ComPtr<ID3D11ShaderResourceView> _shaderResourceView;
-        std::uint32_t width;
-        std::uint32_t height;
-        std::uint32_t mipCount;
+        RenderingTextureFormat _format;
+        std::uint32_t _width;
+        std::uint32_t _height;
+        std::uint32_t _mipCount;
     };
 
     class Direct3D11StructuredData : public RenderingStructuredData {
     public:
+        Direct3D11StructuredData();
         ~Direct3D11StructuredData() override;
 
         std::uint32_t getCount() const override;
         std::uint32_t getStride() const override;
     
     private:
-        ComPtr<ID3D11Buffer> buffer;
-        std::uint32_t stride;
-        std::uint32_t count;
+        ComPtr<ID3D11Buffer> _buffer;
+        std::uint32_t _stride;
+        std::uint32_t _count;
     };
 
     class Direct3D11Rendering final : public RenderingInterface {
     public:
-        Direct3D11Rendering(const std::shared_ptr<PlatformInterface> &platform);
+        Direct3D11Rendering(std::shared_ptr<PlatformInterface> &platform);
         ~Direct3D11Rendering() override;
 
         void updateCameraTransform(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) override;

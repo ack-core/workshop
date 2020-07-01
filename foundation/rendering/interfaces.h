@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -19,7 +21,7 @@ namespace foundation {
         _count
     };
 
-    enum class RenderingDataFormat {
+    enum class RenderingShaderInputFormat {
         VERTEX_ID = 0,
         HALF2, HALF4,
         FLOAT1, FLOAT2, FLOAT3, FLOAT4,
@@ -44,7 +46,7 @@ namespace foundation {
         //
         struct Input {
             const char *name;
-            RenderingDataFormat format;
+            RenderingShaderInputFormat format;
         };
 
     protected:
@@ -75,7 +77,7 @@ namespace foundation {
     //
     class RenderingInterface {
     public:
-        static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
+        static std::shared_ptr<RenderingInterface> instance(std::shared_ptr<PlatformInterface> &platform);
     
     public:
         // Update per frame global constants
