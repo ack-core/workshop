@@ -2,15 +2,21 @@
 namespace foundation {
     class Direct3D11Shader : public RenderingShader {
     public:
-        Direct3D11Shader();
+        Direct3D11Shader(const ComPtr<ID3D11InputLayout> &layout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &pb, std::size_t psz, const ComPtr<ID3D11Buffer> &cb, std::size_t csz);
         ~Direct3D11Shader() override;
 
+        void apply(ComPtr<ID3D11DeviceContext1> &context, const void *constants);
+
     private:
-        std::unique_ptr<ComPtr<ID3D11Buffer>[]> _constants;
-        std::size_t _constantCount;
         ComPtr<ID3D11InputLayout> _layout;
         ComPtr<ID3D11VertexShader> _vshader;
         ComPtr<ID3D11PixelShader> _pshader;
+
+        ComPtr<ID3D11Buffer> _prmntBuffer;
+        ComPtr<ID3D11Buffer> _constBuffer;
+
+        std::size_t _prmntSize;
+        std::size_t _constSize;
     };
 
     class Direct3D11Texture2D : public RenderingTexture2D {
@@ -53,7 +59,7 @@ namespace foundation {
 
         void updateCameraTransform(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) override;
 
-        std::shared_ptr<RenderingShader> createShader(const char *shadersrc, const std::initializer_list<RenderingShader::Input> &vertex, const std::initializer_list<RenderingShader::Input> &instance, const void *prmnt) override;
+        std::shared_ptr<RenderingShader> createShader(const char *name, const char *shadersrc, const std::initializer_list<RenderingShader::Input> &vertex, const std::initializer_list<RenderingShader::Input> &instance, const void *prmnt) override;
         std::shared_ptr<RenderingTexture2D> createTexture(RenderingTextureFormat format, std::uint32_t width, std::uint32_t height, const std::initializer_list<const std::uint8_t *> &mipsData) override;
         std::shared_ptr<RenderingStructuredData> createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
 
