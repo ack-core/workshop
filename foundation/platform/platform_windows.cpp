@@ -6,6 +6,8 @@
 
 #include "interfaces.h"
 
+#ifdef PLATFORM_WINDOWS
+
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 
@@ -311,3 +313,5 @@ namespace foundation {
         return result;
     }
 }
+
+#endif // PLATFORM_WINDOWS
