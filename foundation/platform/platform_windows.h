@@ -50,7 +50,9 @@ namespace foundation {
 
         void run(std::function<void(float)> &&updateAndDraw) override;
         void exit() override;
+
         void logMsg(const char *fmt, ...) override;
+        void logError(const char *fmt, ...) override;
 
     private:
         HINSTANCE _hinst;

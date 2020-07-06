@@ -49,6 +49,7 @@ namespace foundation {
     public:
         // Thread-safe logging
         virtual void logMsg(const char *fmt, ...) = 0;
+        virtual void logError(const char *fmt, ...) = 0;
 
         // Forms std::vector of file paths in @dirPath
         // @dirPath  - target directory. Example: "data/map1"

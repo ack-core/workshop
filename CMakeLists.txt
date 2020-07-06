@@ -31,9 +31,14 @@ function(workshop)
 
 	add_subdirectory("${m_source_root}/foundation/platform")
 	add_subdirectory("${m_source_root}/foundation/rendering")
+	add_subdirectory("${m_source_root}/voxel/meshes")
+	add_subdirectory("${m_source_root}/voxel/environment")
 
 	set(
 		m_sources_list
+		"${m_source_root}/math.h"
+		"${m_source_root}/camera.h"
+		"${m_source_root}/primitives.h"
 		"${m_source_root}/main.cpp"
 	)
 	source_group("" FILES ${m_sources_list})
@@ -43,6 +48,8 @@ function(workshop)
 
 	target_link_libraries(workshop platform)
 	target_link_libraries(workshop rendering)
+	target_link_libraries(workshop meshes)
+	target_link_libraries(workshop environment)
 endfunction()
 
 workshop()

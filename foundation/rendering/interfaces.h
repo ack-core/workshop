@@ -85,29 +85,31 @@ namespace foundation {
         virtual void updateCameraTransform(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) = 0;
 
         // Create shader from source text
+        // @name      - name that is used in error messages
         // @vertex    - input layout for vertex shader. All such variables have 'vertex_' prefix.
         // @instance  - input layout for vertex shader. All such variables have 'instance_' prefix.
-        // @prmnt     - pointer to data for the block of permanent constants. Can be nullptr if unused.
         // @shadersrc - generic shader source text. Example:
         //
         // Assume that @vertex = {{"position", ShaderInput::Format::FLOAT3}, {"color", ShaderInput::Format::BYTE4_NRM}}
         // So vertex shader has vertex_position and vertex_color input values.
         // s--------------------------------------
-        //     prmnt {                                       - block of permanent constants. Can be omitted if unused.
-        //         constName0 : float4                       - Constants of any type have names in code without prefixes
+        //     fixed {                                           - block of permanent constants. Can be omitted if unused.
+        //         constName0 : float4 = [1.0, -3.0, 0.0, 1.0] 
+        //         constNames0[2] : float4 = [1.0, 0.3, 0.6, 0.9][0.0, 0.1, 0.2, 0.3] 
+        //         constNameI : int2 = [1, -2] 
         //     }
-        //     const {                                       - block of per-apply constants. Can be omitted if unused.
-        //         constNames[16] : float4                   - spaces in/before array braces are not permitted
-        //         constName1 : float4                       
+        //     const {                                           - block of per-apply constants. Can be omitted if unused.
+        //         constName1 : float4                           - constants of any type have names in code without prefixes
+        //         constNames1[16] : float4                      - spaces in/before array braces are not permitted
         //     }
-        //     inter {                                       - vertex output and fragment input. Can be omitted if unused.
-        //         varName4 : float4                         - these variables have 'input_' prefix in vssrc and '_output' in fssrc
-        //     }                                             - vertex shader also has float4 'output_position' variable
+        //     cross {                                           - vertex output and fragment input. Can be omitted if unused.
+        //         varName4 : float4                             - these variables have 'input_' prefix in vssrc and '_output' in fssrc
+        //     }                                                 - vertex shader also has float4 'output_position' variable
         //     vssrc {
         //         output_varName4 = _lerp(vertex_color, constName0, constName1);
         //         out_position = _transform(float4(vertex_position, 1.0), _viewProjMatrix);
         //     }
-        //     fssrc {                                       - fragment shader has float4 'output_color' variable
+        //     fssrc {                                           - fragment shader has float4 'output_color' variable
         //         output_color = input_varName4;
         //     }
         // s--------------------------------------
@@ -129,8 +131,7 @@ namespace foundation {
             const char *name,
             const char *shadersrc,
             const std::initializer_list<RenderingShader::Input> &vertex,
-            const std::initializer_list<RenderingShader::Input> &instance = {},
-            const void *prmnt = nullptr
+            const std::initializer_list<RenderingShader::Input> &instance = {}
         ) = 0;
 
         // Create texture from binary data

@@ -297,6 +297,22 @@ namespace foundation {
 
         printf("%s\n", g_logMessageBuffer);
     }
+
+    void WindowsPlatform::logError(const char *fmt, ...) {
+        std::lock_guard<std::mutex> guard(g_logMutex);
+
+        va_list args;
+        va_start(args, fmt);
+        vsprintf_s(g_logMessageBuffer, fmt, args);
+        va_end(args);
+
+        OutputDebugStringA(g_logMessageBuffer);
+        OutputDebugStringA("\n");
+
+        printf("%s\n", g_logMessageBuffer);
+
+        DebugBreak();
+    }
 }
 
 namespace foundation {

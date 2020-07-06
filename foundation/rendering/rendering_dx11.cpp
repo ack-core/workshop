@@ -34,6 +34,27 @@ namespace {
         return expect<Chs...>(stream);
     }
 
+    struct braced {
+        explicit braced(std::string &out) : _out(out) {}
+
+        inline friend std::istream &operator >>(std::istream &stream, const braced &target) {
+            char dbg = (stream >> std::ws).peek();
+            (stream >> std::ws).peek() == '[' ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
+
+            while (stream.fail() == false && stream.peek() != ']') {
+                target._out.push_back(stream.get());
+            }
+            if (stream.fail() == false) {
+                (stream >> std::ws).peek() == ']' ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
+            }
+
+            return stream;
+        }
+
+    private:
+        std::string &_out;
+    };
+
     static const D3D_PRIMITIVE_TOPOLOGY g_topologies[] = {
         D3D_PRIMITIVE_TOPOLOGY_LINELIST,
         D3D_PRIMITIVE_TOPOLOGY_LINESTRIP,
@@ -43,12 +64,10 @@ namespace {
 }
 
 namespace foundation {
-    Direct3D11Shader::Direct3D11Shader(const ComPtr<ID3D11InputLayout> &layout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &pb, std::size_t psz, const ComPtr<ID3D11Buffer> &cb, std::size_t csz)
+    Direct3D11Shader::Direct3D11Shader(const ComPtr<ID3D11InputLayout> &layout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::size_t csz)
         : _layout(layout)
         , _vshader(vs)
         , _pshader(ps)
-        , _prmntBuffer(pb)
-        , _prmntSize(psz)
         , _constBuffer(cb)
         , _constSize(csz)
     {}
@@ -61,9 +80,13 @@ namespace foundation {
         context->IASetInputLayout(_layout.Get());
         context->VSSetShader(_vshader.Get(), nullptr, 0);
         context->PSSetShader(_pshader.Get(), nullptr, 0);
-        context->UpdateSubresource(_constBuffer.Get(), 0, nullptr, constants, 0, 0);
-        context->VSSetConstantBuffers(2, 1, _constBuffer.GetAddressOf());
-        context->PSSetConstantBuffers(2, 1, _constBuffer.GetAddressOf());
+
+        if (constants) {
+            context->UpdateSubresource(_constBuffer.Get(), 0, nullptr, constants, 0, 0);
+        }
+
+        context->VSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
+        context->PSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
     }
 
     Direct3D11Texture2D::Direct3D11Texture2D() {}
@@ -113,7 +136,7 @@ namespace foundation {
         ComPtr<ID3D11Device> tmpDevice;
 
         if ((hresult = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, features, 1, D3D11_SDK_VERSION, &tmpDevice, &featureLevel, &tmpContext)) != S_OK) {
-            _platform->logMsg("[RENDER] D3D11CreateDevice failed with result = %p", hresult);
+            _platform->logError("[RENDER] D3D11CreateDevice failed with result = %p", hresult);
             return;
         }
 
@@ -122,6 +145,9 @@ namespace foundation {
 
         unsigned width = unsigned(_platform->getNativeScreenWidth());
         unsigned height = unsigned(_platform->getNativeScreenHeight());
+
+        _frameConstantsData.renderTargetBounds[0] = _platform->getNativeScreenWidth();
+        _frameConstantsData.renderTargetBounds[1] = _platform->getNativeScreenHeight();
 
         _swapChain.Attach(reinterpret_cast<IDXGISwapChain1 *>(_platform->attachNativeRenderingContext(_device.Get())));
 
@@ -138,7 +164,7 @@ namespace foundation {
             _device->CreateRenderTargetView(defRTTexture.Get(), &renderTargetViewDesc, &_defaultRTView);
         }
         else {
-            _platform->logMsg("[RENDER] Swapchain attach failed");
+            _platform->logError("[RENDER] Swapchain attach failed");
             return;
         }
 
@@ -185,7 +211,7 @@ namespace foundation {
             _device->CreateShaderResourceView(defDepthTexture.Get(), &depthShaderViewDesc, &_defaultDepthShaderResourceView);
         }
         else {
-            _platform->logMsg("[RENDER] Default depth texture creation failed with result = %p", hresult);
+            _platform->logError("[RENDER] Default depth texture creation failed with result = %p", hresult);
             return;
         }
 
@@ -207,7 +233,7 @@ namespace foundation {
             _context->RSSetState(_defaultRasterState.Get());
         }
         else {
-            _platform->logMsg("[RENDER] Default rasterizer creation failed with result = %p", hresult);
+            _platform->logError("[RENDER] Default rasterizer creation failed with result = %p", hresult);
             return;
         }
 
@@ -229,7 +255,7 @@ namespace foundation {
             _context->OMSetBlendState(_defaultBlendState.Get(), nullptr, 0xffffffff);
         }
         else {
-            _platform->logMsg("[RENDER] Default blend state creation failed with result = %p", hresult);
+            _platform->logError("[RENDER] Default blend state creation failed with result = %p", hresult);
             return;
         }
 
@@ -251,7 +277,7 @@ namespace foundation {
             _context->OMSetDepthStencilState(_defaultDepthState.Get(), 0);
         }
         else {
-            _platform->logMsg("[RENDER] Default depth/stencil state creation failed with result = %p", hresult);
+            _platform->logError("[RENDER] Default depth/stencil state creation failed with result = %p", hresult);
             return;
         }
 
@@ -266,8 +292,11 @@ namespace foundation {
         bdsc.StructureByteStride = 0;
 
         if ((hresult = _device->CreateBuffer(&bdsc, nullptr, &_frameConstantsBuffer)) != S_OK) {
-            _platform->logMsg("[RENDER] Default frame constant buffer creation failed with result = %p", hresult);
+            _platform->logError("[RENDER] Default frame constant buffer creation failed with result = %p", hresult);
             return;
+        }
+        else {
+            _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstantsData, 0, 0);
         }
 
         // samplers
@@ -291,7 +320,7 @@ namespace foundation {
             _context->PSSetSamplers(0, 1, _defaultSamplerState.GetAddressOf());
         }
         else {
-            _platform->logMsg("[RENDER] Default sampler creation failed with result = %p", hresult);
+            _platform->logError("[RENDER] Default sampler creation failed with result = %p", hresult);
             return;
         }
 
@@ -306,18 +335,18 @@ namespace foundation {
         ::memcpy(_frameConstantsData.cameraDirection, camDir, 3 * sizeof(float));
 
         _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstantsData, 0, 0);
-        _context->VSSetConstantBuffers(0, 1, &_frameConstantsBuffer);
-        _context->PSSetConstantBuffers(0, 1, &_frameConstantsBuffer);
+        _context->VSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
+        _context->PSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
     }
 
-    std::shared_ptr<RenderingShader> Direct3D11Rendering::createShader(const char *name, const char *shadersrc, const std::initializer_list<RenderingShader::Input> &vertex, const std::initializer_list<RenderingShader::Input> &instance, const void *prmnt) {
+    std::shared_ptr<RenderingShader> Direct3D11Rendering::createShader(const char *name, const char *shadersrc, const std::initializer_list<RenderingShader::Input> &vertex, const std::initializer_list<RenderingShader::Input> &instance) {
         std::istringstream stream(shadersrc);
         std::string varname, arg;
 
         const std::string indent = "    ";
         bool error = false;
 
-        auto shaderGetTypeSize = [](const std::string &varname, const std::string &format, bool extended, std::string &outFormat) {
+        auto shaderGetTypeSize = [](const std::string &varname, const std::string &format, bool extended, std::string &outFormat, std::size_t *arrayCount = nullptr) {
             struct {
                 const char *inputFormat;
                 const char *outputFormat;
@@ -347,7 +376,7 @@ namespace foundation {
                 {"matrix4", "float4x4", 64},
             };
 
-            int  multiply = 1;
+            int multiply = 1;
             auto braceStart = varname.find('[');
             auto braceEnd = varname.rfind(']');
 
@@ -367,10 +396,76 @@ namespace foundation {
                 }
             }
 
+            if (arrayCount && multiply > 1) {
+                *arrayCount = multiply;
+            }
+
             return result;
         };
 
-        auto readVarsBlock = [&](const char *blockName, bool isCross, bool &isCreated, unsigned *bufferSize) {
+        auto readConstBlock = [&](const char *blockName, bool &isCreated) {
+            std::string result;
+            
+            if (isCreated == false) {
+                isCreated = true;
+
+                while (!error && stream >> varname && varname[0] != '}') {
+                    if (stream >> expect<':'> >> arg >> expect<'='>) {
+                        std::size_t arrayCount = 0;
+                        
+                        if (unsigned typeSize = shaderGetTypeSize(varname, arg, true, arg, &arrayCount)) {
+                            result += "static const " + arg + " " + varname;
+                            result += " = ";
+
+                            if (arrayCount) {
+                                result += "{\n";
+
+                                for (std::size_t i = 0; i < arrayCount; i++) {
+                                    result += indent + arg + "(";
+
+                                    if (stream >> braced(result)) {
+                                        result += "),\n";
+                                    }
+                                    else {
+                                        _platform->logError("[RENDER shader '%s'] Invalid constant '%s' initialization at '%s' block", name, varname.c_str(), blockName);
+                                        error = true;
+                                    }
+                                }
+
+                                result += "};\n";
+                            }
+                            else {
+                                result += arg + "(";
+
+                                if (stream >> braced(result)) {
+                                    result += ");\n";
+                                }
+                                else {
+                                    _platform->logError("[RENDER shader '%s'] Invalid constant '%s' initialization at '%s' block", name, varname.c_str(), blockName);
+                                    error = true;
+                                }
+                            }                            
+                        }
+                        else {
+                            _platform->logError("[RENDER shader '%s'] Unknown type of constant '%s' at '%s' block", name, varname.c_str(), blockName);
+                            error = true;
+                        }
+                    }
+                    else {
+                        _platform->logError("[RENDER shader '%s'] Constant block '%s' syntax error", name, blockName);
+                        error = true;
+                    }
+                }
+            }
+            else {
+                _platform->logError("[RENDER shader '%s'] Only one '%s' block is allowed", name, blockName);
+                error = true;
+            }
+
+            return result;
+        };
+
+        auto readVarsBlock = [&](const char *blockName, bool isInout, bool &isCreated, unsigned *bufferSize) {
             std::string result;
             unsigned counter = 0;
 
@@ -379,31 +474,31 @@ namespace foundation {
 
                 while (!error && stream >> varname && varname[0] != '}') {
                     if (stream >> expect<':'> >> arg) {
-                        if (unsigned typeSize = shaderGetTypeSize(varname, arg, isCross, arg)) {
+                        if (unsigned typeSize = shaderGetTypeSize(varname, arg, isInout, arg)) {
                             if (bufferSize) {
                                 *bufferSize += typeSize;
                             }
                             result += indent + arg + " " + varname;
                             
-                            if (isCross) {
+                            if (isInout) {
                                 result += ": TEXCOORD" + std::to_string(counter++);
                             }
 
                             result += ";\n";
                         }
                         else {
-                            _platform->logMsg("[RENDER shader '%s'] Unknown type of constant '%s' at '%s' block", name, varname.c_str(), blockName);
+                            _platform->logError("[RENDER shader '%s'] Unknown type of constant '%s' at '%s' block", name, varname.c_str(), blockName);
                             error = true;
                         }
                     }
                     else {
-                        _platform->logMsg("[RENDER shader '%s'] Constant block '%s' syntax error", name, blockName);
+                        _platform->logError("[RENDER shader '%s'] Constant block '%s' syntax error", name, blockName);
                         error = true;
                     }
                 }
             }
             else {
-                _platform->logMsg("[RENDER shader '%s'] Only one '%s' block is allowed", name, blockName);
+                _platform->logError("[RENDER shader '%s'] Only one '%s' block is allowed", name, blockName);
                 error = true;
             }
 
@@ -448,13 +543,13 @@ namespace foundation {
                     result = std::regex_replace(result, rgInstance, "$1input.");
                 }
                 else {
-                    _platform->logMsg("[RENDER shader '%s'] Block '%s' isn't complete", name, blockName);
+                    _platform->logError("[RENDER shader '%s'] Block '%s' isn't complete", name, blockName);
                     result.clear();
                     error = true;
                 }
             }
             else {
-                _platform->logMsg("[RENDER shader '%s'] Only one '%s' block is allowed", name, blockName);
+                _platform->logError("[RENDER shader '%s'] Only one '%s' block is allowed", name, blockName);
                 error = true;
             }
 
@@ -483,19 +578,23 @@ namespace foundation {
 
         std::string vshader =
             "#define _sign(a) sign(a)\n"
-            "#define _transform(a, b) mul(a, b)\n"
+            "#define _sin(a) sin(a)\n"
+            "#define _cos(a) cos(a)\n"
+            "#define _transform(a, b) mul(b, a)\n"
             "#define _dot(a, b) dot(a, b)\n"
             "#define _norm(a) normalize(a)\n"
             "#define _lerp(a, b, k) lerp(a, b, k)\n"
             "#define _tex2d(i, a) __t##i.Sample(__s##i, a)\n"
+            "\n";
+
+        std::string shaderConsts =
             "\n"
             "cbuffer _FrameData : register(b0) {\n"
             "    float4x4 _viewProjMatrix;\n"
             "    float4 _cameraPosition;\n"
             "    float4 _cameraDirection;\n"
             "    float4 _renderTargetBounds;\n"
-            "};\n"
-            "\n";
+            "};\n\n";
 
         std::string fshader = vshader;
         std::string textures =
@@ -509,37 +608,35 @@ namespace foundation {
             "Texture2D __t7 : register(t7); SamplerState __s7 : register(s7);\n"
             "\n";
 
-        std::string shaderConsts;
         std::string vsInput;
         std::string vsOutput = "struct _Out {\n    float4 position : SV_Position;\n";
-        std::string fsInput = "struct _In {\n";
+        std::string fsInput = "struct _In {\n    float4 position : SV_Position;\n";
         std::string fsOutput;
         std::string vsBlock;
         std::string fsBlock;
 
         std::vector<D3D11_INPUT_ELEMENT_DESC> layout;
-        unsigned shaderPrmntSize = 0;
         unsigned shaderConstSize = 0;
 
-        bool shaderPrmntCreated = false;
+        bool shaderFixedCreated = false;
         bool shaderConstCreated = false;
         bool shaderInterCreated = false;
         bool shaderVssrcCreated = false;
         bool shaderFssrcCreated = false;
 
         while (error == false && bool(stream >> arg >> expect<'{'>)) {
-            if (arg == "prmnt") {
-                shaderConsts += "cbuffer _Permanent : register(b1) {\n";
-                shaderConsts += readVarsBlock("prmnt", false, shaderPrmntCreated, &shaderPrmntSize);
-                shaderConsts += "};\n\n";
+            if (arg == "fixed") {
+                std::string block = readConstBlock("fixed", shaderFixedCreated);
+                vshader += block;
+                fshader += block;
             }
             else if (arg == "const") {
-                shaderConsts += "cbuffer _Constants : register(b2) {\n";
+                shaderConsts += "cbuffer _Constants : register(b1) {\n";
                 shaderConsts += readVarsBlock("const", false, shaderConstCreated, &shaderConstSize);
                 shaderConsts += "};\n\n";
             }
-            else if (arg == "cross") {
-                std::string block = readVarsBlock("cross", true, shaderInterCreated, nullptr);
+            else if (arg == "inout") {
+                std::string block = readVarsBlock("inout", true, shaderInterCreated, nullptr);
                 vsOutput += block;
                 fsInput += block;
             }
@@ -611,12 +708,12 @@ namespace foundation {
                 fsBlock = readCodeBlock("fssrc", shaderFssrcCreated);
 
                 if (fsBlock.empty() == false) {
-                    fsBlock = textures + "struct _PSOut {\n    float4 color : SV_Target;\n};\n\n_PSOut main(_In input) : SV_Target {\n    _PSOut output;\n" + fsBlock + "return output;\n}\n";
+                    fsBlock = textures + "struct _PSOut {\n    float4 color : SV_Target;\n};\n\n_PSOut main(_In input) {\n    _PSOut output;\n" + fsBlock + "return output;\n}\n";
                     fshader += shaderConsts + fsInput + fsOutput + fsBlock;
                 }
             }
             else {
-                _platform->logMsg("[RENDER shader '%s'] Undefined block", name);
+                _platform->logError("[RENDER shader '%s'] Undefined block", name);
                 break;
             }
         }
@@ -630,7 +727,6 @@ namespace foundation {
         ComPtr<ID3DBlob> pshaderBinary;
         ComPtr<ID3DBlob> errorBlob;
 
-        ComPtr<ID3D11Buffer> prmntBuffer;
         ComPtr<ID3D11Buffer> constBuffer;
 
         D3D11_BUFFER_DESC bdsc = {};
@@ -640,18 +736,11 @@ namespace foundation {
         bdsc.MiscFlags = 0;
         bdsc.StructureByteStride = 0;
 
-        if (shaderPrmntSize) {
-            bdsc.ByteWidth = shaderPrmntSize;
-
-            if ((hresult = _device->CreateBuffer(&bdsc, nullptr, &prmntBuffer)) != S_OK) {
-                _platform->logMsg("[RENDER shader '%s'] Permanent const buffer creation failed with result = %p", name, hresult);
-            }
-        }
         if (shaderConstSize) {
             bdsc.ByteWidth = shaderConstSize;
 
             if ((hresult = _device->CreateBuffer(&bdsc, nullptr, &constBuffer)) != S_OK) {
-                _platform->logMsg("[RENDER shader '%s'] Per-apply const buffer creation failed with result = %p", name, hresult);
+                _platform->logError("[RENDER shader '%s'] Per-apply const buffer creation failed with result = %p", name, hresult);
             }
         }
 
@@ -659,7 +748,7 @@ namespace foundation {
 
         if (layout.empty() == false) {
             if ((hresult = _device->CreateInputLayout(&layout[0], unsigned(layout.size()), vshaderBinary->GetBufferPointer(), vshaderBinary->GetBufferSize(), &inputLayout)) != S_OK) {
-                _platform->logMsg("[RENDER shader '%s'] Input layout creation failed with result = %p", name, hresult);
+                _platform->logError("[RENDER shader '%s'] Input layout creation failed with result = %p", name, hresult);
             }
         }
 
@@ -673,22 +762,22 @@ namespace foundation {
             if (D3DCompile(fshader.c_str(), fshader.length(), "ps", nullptr, nullptr, "main", "ps_4_0", D3DCOMPILE_DEBUG, 0, &pshaderBinary, &errorBlob) == S_OK) {
                 if ((hresult = _device->CreateVertexShader(vshaderBinary->GetBufferPointer(), vshaderBinary->GetBufferSize(), nullptr, &vertexShader)) == S_OK) {
                     if ((hresult = _device->CreatePixelShader(pshaderBinary->GetBufferPointer(), pshaderBinary->GetBufferSize(), nullptr, &pixelShader)) == S_OK) {
-                        result = std::make_shared<Direct3D11Shader>(inputLayout, vertexShader, pixelShader, prmntBuffer, shaderPrmntSize, constBuffer, shaderConstSize);
+                        result = std::make_shared<Direct3D11Shader>(inputLayout, vertexShader, pixelShader, constBuffer, shaderConstSize);
                     }
                     else {
-                        _platform->logMsg("[RENDER shader '%s'] Pixel shader creation failed with result = %p", name, hresult);
+                        _platform->logError("[RENDER shader '%s'] Pixel shader creation failed with result = %p", name, hresult);
                     }
                 }
                 else {
-                    _platform->logMsg("[RENDER shader '%s'] Vertex shader creation failed with result = %p", name, hresult);
+                    _platform->logError("[RENDER shader '%s'] Vertex shader creation failed with result = %p", name, hresult);
                 }
             }
             else {
-                _platform->logMsg("[RENDER shader '%s'] Fragment shader compilation error:\n%s\n%s\n", name, (const char *)errorBlob->GetBufferPointer(), fshader.data());
+                _platform->logError("[RENDER shader '%s'] Fragment shader compilation error:\n%s\n%s\n", name, (const char *)errorBlob->GetBufferPointer(), fshader.data());
             }
         }
         else {
-            _platform->logMsg("[RENDER shader '%s'] Vertex shader compilation error:\n%s\n%s\n", name, (const char *)errorBlob->GetBufferPointer(), vshader.data());
+            _platform->logError("[RENDER shader '%s'] Vertex shader compilation error:\n%s\n%s\n", name, (const char *)errorBlob->GetBufferPointer(), vshader.data());
         }
 
         return result;
@@ -704,6 +793,9 @@ namespace foundation {
 
     void Direct3D11Rendering::applyShader(const std::shared_ptr<RenderingShader> &shader, const void *constants) {
         std::static_pointer_cast<Direct3D11Shader>(shader)->apply(_context, constants);
+
+        _context->VSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
+        _context->PSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
     }
 
     void Direct3D11Rendering::applyTextures(const std::initializer_list<const RenderingTexture2D *> &textures) {}
