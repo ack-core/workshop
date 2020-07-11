@@ -50,7 +50,7 @@ namespace foundation {
 
     class Direct3D11Rendering final : public RenderingInterface {
     public:
-        Direct3D11Rendering(std::shared_ptr<PlatformInterface> &platform);
+        Direct3D11Rendering(const std::shared_ptr<PlatformInterface> &platform);
         ~Direct3D11Rendering() override;
 
         void updateCameraTransform(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) override;

@@ -88,7 +88,9 @@ namespace foundation {
         context->VSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
         context->PSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
     }
+}
 
+namespace foundation {
     Direct3D11Texture2D::Direct3D11Texture2D() {}
     Direct3D11Texture2D::~Direct3D11Texture2D() {}
 
@@ -107,7 +109,9 @@ namespace foundation {
     RenderingTextureFormat Direct3D11Texture2D::getFormat() const {
         return _format;
     }
+}
 
+namespace foundation {
     Direct3D11StructuredData::Direct3D11StructuredData() {}
     Direct3D11StructuredData::~Direct3D11StructuredData() {}
 
@@ -118,8 +122,10 @@ namespace foundation {
     std::uint32_t Direct3D11StructuredData::getStride() const {
         return _stride;
     }
+}
 
-    Direct3D11Rendering::Direct3D11Rendering(std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
+namespace foundation {
+    Direct3D11Rendering::Direct3D11Rendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
         _platform->logMsg("[RENDER] Initialization : D3D11");
 
         HRESULT hresult;
@@ -832,7 +838,7 @@ namespace foundation {
 }
 
 namespace foundation {
-    std::shared_ptr<RenderingInterface> RenderingInterface::instance(std::shared_ptr<PlatformInterface> &platform) {
+    std::shared_ptr<RenderingInterface> RenderingInterface::instance(const std::shared_ptr<PlatformInterface> &platform) {
         return std::make_shared<Direct3D11Rendering>(platform);
     }
 }

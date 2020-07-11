@@ -6,19 +6,19 @@
 
 #include "interfaces.h"
 
+#include <chrono>
+#include <list>
+#include <mutex>
+#include <algorithm>
+#include <fstream>
+#include <filesystem>
+
 #ifdef PLATFORM_WINDOWS
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 
 #include <d3d11_1.h>
-#include <codecvt>
-
-#include <chrono>
-#include <list>
-#include <mutex>
-#include <algorithm>
-#include <fstream>
 
 #include "platform_windows.h"
 
@@ -40,6 +40,7 @@ namespace {
 
     const unsigned APP_WIDTH = 1280;
     const unsigned APP_HEIGHT = 720;
+    const unsigned BUFFER_SIZE = 65536;
 
     bool g_killed = false;
 
@@ -50,7 +51,7 @@ namespace {
     std::list<KeyboardCallbacksEntry> g_keyboardCallbacks;
     std::list<MouseCallbacksEntry> g_mouseCallbacks;
 
-    char g_logMessageBuffer[65536];
+    char g_buffer[BUFFER_SIZE];
 }
 
 namespace {
@@ -114,6 +115,8 @@ namespace foundation {
         ::SetProcessDPIAware();
         ::WNDCLASSW wc;
 
+        _message = {};
+
         _hinst = ::GetModuleHandle(0);
         wc.style = NULL;
         wc.lpfnWndProc = (::WNDPROC)WndProc;
@@ -136,6 +139,12 @@ namespace foundation {
 
         ::ShowWindow(_window, SW_NORMAL);
         ::UpdateWindow(_window);
+
+        ::GetModuleFileNameA(nullptr, g_buffer, BUFFER_SIZE);
+        *(strrchr(g_buffer, '\\') + 1) = 0;
+        std::replace(std::begin(g_buffer), std::end(g_buffer), '\\', '/');
+
+        _executableDirectoryPath = g_buffer;
     }
 
     WindowsPlatform::~WindowsPlatform() {
@@ -144,9 +153,26 @@ namespace foundation {
     }
 
     std::vector<std::string> WindowsPlatform::formFileList(const char *dirPath) {
+        std::string fullPath = _executableDirectoryPath + dirPath;
+
+        for (auto &entry : std::filesystem::directory_iterator(fullPath)) {
+            printf("--->>> %s\n", entry.path().generic_u8string().data());
+        }
         return {};
     }
     bool WindowsPlatform::loadFile(const char *filePath, std::unique_ptr<unsigned char[]> &data, std::size_t &size) {
+        std::fstream fileStream(filePath, std::ios::binary | std::ios::in | std::ios::ate);
+
+        if (fileStream.is_open() && fileStream.good()) {
+            std::size_t fileSize = std::size_t(fileStream.tellg());
+            data = std::make_unique<unsigned char[]>(fileSize);
+            fileStream.seekg(0);
+            fileStream.read((char *)data.get(), fileSize);
+            size = fileSize;
+
+            return true;
+        }
+
         return false;
     }
 
@@ -289,13 +315,13 @@ namespace foundation {
 
         va_list args;
         va_start(args, fmt);
-        vsprintf_s(g_logMessageBuffer, fmt, args);
+        vsprintf_s(g_buffer, fmt, args);
         va_end(args);
 
-        OutputDebugStringA(g_logMessageBuffer);
+        OutputDebugStringA(g_buffer);
         OutputDebugStringA("\n");
 
-        printf("%s\n", g_logMessageBuffer);
+        printf("%s\n", g_buffer);
     }
 
     void WindowsPlatform::logError(const char *fmt, ...) {
@@ -303,13 +329,13 @@ namespace foundation {
 
         va_list args;
         va_start(args, fmt);
-        vsprintf_s(g_logMessageBuffer, fmt, args);
+        vsprintf_s(g_buffer, fmt, args);
         va_end(args);
 
-        OutputDebugStringA(g_logMessageBuffer);
+        OutputDebugStringA(g_buffer);
         OutputDebugStringA("\n");
 
-        printf("%s\n", g_logMessageBuffer);
+        printf("%s\n", g_buffer);
 
         DebugBreak();
     }

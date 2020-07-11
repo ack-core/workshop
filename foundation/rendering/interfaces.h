@@ -8,7 +8,7 @@
 #include <vector>
 #include <functional>
 
-#include "../platform/interfaces.h"
+#include "foundation/platform/interfaces.h"
 
 namespace foundation {
     // Topology of vertex data
@@ -77,7 +77,7 @@ namespace foundation {
     //
     class RenderingInterface {
     public:
-        static std::shared_ptr<RenderingInterface> instance(std::shared_ptr<PlatformInterface> &platform);
+        static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
     
     public:
         // Update per frame global constants

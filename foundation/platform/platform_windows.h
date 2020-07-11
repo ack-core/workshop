@@ -55,6 +55,8 @@ namespace foundation {
         void logError(const char *fmt, ...) override;
 
     private:
+        std::string _executableDirectoryPath;
+
         HINSTANCE _hinst;
         HWND _window;
         MSG _message;
