@@ -1,10 +1,10 @@
 
-#include "platform/interfaces.h"
-#include "rendering/interfaces.h"
+#include "foundation/platform/interfaces.h"
+#include "foundation/rendering/interfaces.h"
 
-#include "math.h"
-#include "camera.h"
-#include "primitives.h"
+#include "foundation/math.h"
+#include "foundation/camera.h"
+#include "foundation/primitives.h"
 
 const char *g_srcUI = R"(
         fixed {
@@ -32,6 +32,8 @@ const char *g_srcUI = R"(
 int main(int argc, const char * argv[]) {
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
+
+    auto files = platform->formFileList("");
 
     auto camera = std::make_unique<Camera>(platform);
     auto primitives = std::make_unique<Primitives>(rendering);
