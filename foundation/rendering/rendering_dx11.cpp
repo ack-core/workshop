@@ -91,8 +91,18 @@ namespace foundation {
 }
 
 namespace foundation {
-    Direct3D11Texture2D::Direct3D11Texture2D() {}
-    Direct3D11Texture2D::~Direct3D11Texture2D() {}
+    Direct3D11Texture2D::Direct3D11Texture2D(const ComPtr<ID3D11Texture2D> &tx, const ComPtr<ID3D11ShaderResourceView> &view, RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+        : _texture(tx)
+        , _shaderResourceView(view)
+        , _format(fmt)
+        , _width(w)
+        , _height(h)
+        , _mipCount(mipCount)
+    {}
+
+    Direct3D11Texture2D::~Direct3D11Texture2D() {
+    
+    }
 
     std::uint32_t Direct3D11Texture2D::getWidth() const {
         return _width;
@@ -108,6 +118,10 @@ namespace foundation {
 
     RenderingTextureFormat Direct3D11Texture2D::getFormat() const {
         return _format;
+    }
+
+    ID3D11ShaderResourceView *Direct3D11Texture2D::getSRV() const {
+        return _shaderResourceView.Get();
     }
 }
 
@@ -589,7 +603,7 @@ namespace foundation {
             "#define _transform(a, b) mul(b, a)\n"
             "#define _dot(a, b) dot(a, b)\n"
             "#define _norm(a) normalize(a)\n"
-            "#define _lerp(a, b, k) lerp(a, b, k)\n"
+            "#define _lerp(k, a, b) lerp(a, b, k)\n"
             "#define _tex2d(i, a) __t##i.Sample(__s##i, a)\n"
             "\n";
 
@@ -790,7 +804,71 @@ namespace foundation {
     }
 
     std::shared_ptr<RenderingTexture2D> Direct3D11Rendering::createTexture(RenderingTextureFormat format, std::uint32_t width, std::uint32_t height, const std::initializer_list<const std::uint8_t *> &mipsData) {
-        return {};
+        static DXGI_FORMAT nativeTextureFormat[] = { DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8_UNORM };
+        auto getTexture2DPitch = [](RenderingTextureFormat fmt, std::uint32_t width) {
+            switch (fmt) {
+            case RenderingTextureFormat::RGBA8UN:
+                return (width * 32 + 7) / 8;
+            case RenderingTextureFormat::R8UN:
+                return width;
+            }
+
+            return 0u;
+        };
+
+        HRESULT hresult;
+        std::shared_ptr<RenderingTexture2D> result;
+
+        D3D11_TEXTURE2D_DESC      texDesc = { 0 };
+        D3D11_SUBRESOURCE_DATA    subResData[64] = { 0 };
+        D3D11_SUBRESOURCE_DATA *subResDataPtr = nullptr;
+
+        texDesc.Width = width;
+        texDesc.Height = height;
+        texDesc.Format = nativeTextureFormat[std::size_t(format)];
+        texDesc.Usage = mipsData.size() ? D3D11_USAGE_IMMUTABLE : D3D11_USAGE_DEFAULT;
+        texDesc.CPUAccessFlags = 0;
+        texDesc.MiscFlags = 0;
+        texDesc.MipLevels = UINT(std::min(size_t(1), mipsData.size()));
+        texDesc.ArraySize = 1;
+        texDesc.SampleDesc.Count = 1;
+        texDesc.SampleDesc.Quality = 0;
+        texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+        if (mipsData.size()) {
+            unsigned counter = 0;
+
+            for (auto &item : mipsData) {
+                subResData[counter].pSysMem = item;
+                subResData[counter].SysMemPitch = getTexture2DPitch(format, width >> counter);
+                subResData[counter].SysMemSlicePitch = 0;
+                counter++;
+            }
+
+            subResDataPtr = subResData;
+        }
+
+        ComPtr<ID3D11Texture2D> texture;
+        ComPtr<ID3D11ShaderResourceView> view;
+
+        if ((hresult = _device->CreateTexture2D(&texDesc, subResDataPtr, texture.GetAddressOf())) == S_OK) {
+            D3D11_SHADER_RESOURCE_VIEW_DESC texViewDesc = { texDesc.Format };
+            texViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            texViewDesc.Texture2D.MipLevels = texDesc.MipLevels;
+            texViewDesc.Texture2D.MostDetailedMip = 0;
+
+            if ((hresult = _device->CreateShaderResourceView(texture.Get(), &texViewDesc, view.GetAddressOf())) == S_OK) {
+                result = std::make_shared<Direct3D11Texture2D>(texture, view, format, width, height, std::uint32_t(mipsData.size()));
+            }
+            else {
+                _platform->logError("[RENDER] 2d texture view creation failed with result = %p", hresult);
+            }
+        }
+        else {
+            _platform->logError("[RENDER] 2d texture creation failed with result = %p", hresult);
+        }
+
+        return result;
     }
 
     std::shared_ptr<RenderingStructuredData> Direct3D11Rendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
@@ -804,7 +882,19 @@ namespace foundation {
         _context->PSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
     }
 
-    void Direct3D11Rendering::applyTextures(const std::initializer_list<const RenderingTexture2D *> &textures) {}
+    void Direct3D11Rendering::applyTextures(const std::initializer_list<const RenderingTexture2D *> &textures) {
+        ID3D11ShaderResourceView *tmpShaderResViews[64];
+
+        for (std::size_t i = 0; i < textures.size(); i++) {
+            tmpShaderResViews[i] = nullptr;
+
+            if (auto *current = *(textures.begin() + i)) {
+                tmpShaderResViews[i] = static_cast<const Direct3D11Texture2D *>(current)->getSRV();
+            }
+        }
+
+        _context->PSSetShaderResources(0, std::uint32_t(textures.size()), tmpShaderResViews);
+    }
 
     void Direct3D11Rendering::drawGeometry(std::uint32_t vertexCount, RenderingTopology topology) {
         ID3D11Buffer *tmpBuffer = nullptr;

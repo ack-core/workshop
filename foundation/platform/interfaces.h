@@ -8,6 +8,11 @@
 #include <functional>
 
 namespace foundation {
+    struct FileEntry {
+        std::string fullPath;
+        bool isDirectory;
+    };
+
     struct PlatformKeyboardEventArgs {
         enum class Key {
             A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
@@ -53,9 +58,9 @@ namespace foundation {
 
         // Forms std::vector of file paths in @dirPath
         // @dirPath  - target directory. Example: "data/map1"
-        // @return   - vector of paths
+        // @return   - vector of entries
         //
-        virtual std::vector<std::string> formFileList(const char *dirPath) = 0;
+        virtual std::vector<FileEntry> formFileList(const char *dirPath) = 0;
 
         // Loads file to memory
         // @filePath - file path. Example: "data/map1/test.png"

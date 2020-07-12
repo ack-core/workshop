@@ -5,7 +5,7 @@ namespace foundation {
         WindowsPlatform();
         ~WindowsPlatform() override;
 
-        std::vector<std::string> formFileList(const char *dirPath) override;
+        std::vector<FileEntry> formFileList(const char *dirPath) override;
         bool loadFile(const char *filePath, std::unique_ptr<unsigned char[]> &data, std::size_t &size) override;
 
         float getNativeScreenWidth() const override;

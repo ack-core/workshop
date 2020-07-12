@@ -152,16 +152,19 @@ namespace foundation {
         ::DestroyWindow(_window);
     }
 
-    std::vector<std::string> WindowsPlatform::formFileList(const char *dirPath) {
+    std::vector<FileEntry> WindowsPlatform::formFileList(const char *dirPath) {
         std::string fullPath = _executableDirectoryPath + dirPath;
+        std::vector<FileEntry> result;
 
         for (auto &entry : std::filesystem::directory_iterator(fullPath)) {
-            printf("--->>> %s\n", entry.path().generic_u8string().data());
+            result.emplace_back(FileEntry{ entry.path().generic_u8string(), entry.is_directory()});
         }
-        return {};
+
+        return result;
     }
     bool WindowsPlatform::loadFile(const char *filePath, std::unique_ptr<unsigned char[]> &data, std::size_t &size) {
-        std::fstream fileStream(filePath, std::ios::binary | std::ios::in | std::ios::ate);
+        std::string fullPath = _executableDirectoryPath + filePath;
+        std::fstream fileStream(fullPath, std::ios::binary | std::ios::in | std::ios::ate);
 
         if (fileStream.is_open() && fileStream.good()) {
             std::size_t fileSize = std::size_t(fileStream.tellg());

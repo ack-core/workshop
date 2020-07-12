@@ -17,13 +17,15 @@ namespace foundation {
 
     class Direct3D11Texture2D : public RenderingTexture2D {
     public:
-        Direct3D11Texture2D();
+        Direct3D11Texture2D(const ComPtr<ID3D11Texture2D> &tx, const ComPtr<ID3D11ShaderResourceView> &view, RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
         ~Direct3D11Texture2D() override;
 
         std::uint32_t getWidth() const override;
         std::uint32_t getHeight() const override;
         std::uint32_t getMipCount() const override;
         RenderingTextureFormat getFormat() const override;
+
+        ID3D11ShaderResourceView *getSRV() const;
 
     private:
         ComPtr<ID3D11Texture2D>  _texture;
