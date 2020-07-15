@@ -35,7 +35,6 @@ namespace foundation {
 
     enum class RenderingTextureFormat {
         RGBA8UN = 0,   // rgba 1 byte per channel normalized to [0..1]
-        RGB8UN,        // rgb 1 byte per channel normalized to [0..1]
         R8UN,          // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         _count
     };
@@ -117,10 +116,10 @@ namespace foundation {
         //     matrix4, matrix3, float1, float2, float3, float4, int1, int2, int3, int4, uint1, uint2, uint3, uint4
         //
         // Per frame global constants:
-        //     _renderTargetBounds : float2 - render target size in pixels
-        //     _viewProjMatrix     : matrix - view * projection matrix
-        //     _cameraPosition     : float4 - camera position (w = 1)
-        //     _cameraDirection    : float4 - normalized camera direction (w = 0)
+        //     _renderTargetBounds : float2  - render target size in pixels
+        //     _viewProjMatrix     : matrix4 - view * projection matrix
+        //     _cameraPosition     : float4  - camera position (w = 1)
+        //     _cameraDirection    : float4  - normalized camera direction (w = 0)
         //
         // Textures. There 8 texture slots. Example of getting color from the last slot: float4 color = _tex2d(7, float2(0, 0));
         //

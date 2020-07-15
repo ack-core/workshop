@@ -76,7 +76,7 @@ namespace foundation {
 
     }
 
-    void Direct3D11Shader::apply(ComPtr<ID3D11DeviceContext1> &context, const void *constants) {
+    void Direct3D11Shader::apply(ComPtr<ID3D11DeviceContext1> &context, const void *constants) const {
         context->IASetInputLayout(_layout.Get());
         context->VSSetShader(_vshader.Get(), nullptr, 0);
         context->PSSetShader(_pshader.Get(), nullptr, 0);
@@ -126,8 +126,13 @@ namespace foundation {
 }
 
 namespace foundation {
-    Direct3D11StructuredData::Direct3D11StructuredData() {}
-    Direct3D11StructuredData::~Direct3D11StructuredData() {}
+    Direct3D11StructuredData::Direct3D11StructuredData(const ComPtr<ID3D11Buffer> &buffer, std::uint32_t count, std::uint32_t stride) : _buffer(buffer), _count(count), _stride(stride) {
+    
+    }
+
+    Direct3D11StructuredData::~Direct3D11StructuredData() {
+    
+    }
 
     std::uint32_t Direct3D11StructuredData::getCount() const {
         return _count;
@@ -136,6 +141,10 @@ namespace foundation {
     std::uint32_t Direct3D11StructuredData::getStride() const {
         return _stride;
     }
+
+    ID3D11Buffer *Direct3D11StructuredData::getBuffer() const {
+        return _buffer.Get();
+    }
 }
 
 namespace foundation {
@@ -143,7 +152,7 @@ namespace foundation {
         _platform->logMsg("[RENDER] Initialization : D3D11");
 
         HRESULT hresult;
-        unsigned flags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_SINGLETHREADED | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+        unsigned flags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_SINGLETHREADED;// | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 
         D3D_FEATURE_LEVEL features[] = {
             D3D_FEATURE_LEVEL_10_0,
@@ -177,7 +186,7 @@ namespace foundation {
             ComPtr<ID3D11Texture2D> defRTTexture;
             _swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void **>(defRTTexture.GetAddressOf()));
 
-            D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = { DXGI_FORMAT_B8G8R8A8_UNORM };
+            D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = { DXGI_FORMAT_R8G8B8A8_UNORM }; //
             renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
             renderTargetViewDesc.Texture2D.MipSlice = 0;
 
@@ -322,7 +331,7 @@ namespace foundation {
         // samplers
 
         D3D11_SAMPLER_DESC sdesc;
-        sdesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        sdesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
         sdesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
         sdesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
         sdesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -695,7 +704,6 @@ namespace foundation {
                     }
                     else {
                         vsInput += indent + formatTable[unsigned(item.format)].hlsl + std::string(" ") + item.name + " : VTX" + std::to_string(index) + ";\n";
-
                         unsigned align = index == 0 ? 0 : D3D11_APPEND_ALIGNED_ELEMENT;
                         layout.emplace_back(D3D11_INPUT_ELEMENT_DESC {"VTX", unsigned(index), formatTable[unsigned(item.format)].format, 0, align, D3D11_INPUT_PER_VERTEX_DATA, 0});
                     }
@@ -708,7 +716,8 @@ namespace foundation {
                 for (const auto &item : instance) {
                     if (item.format != RenderingShaderInputFormat::VERTEX_ID) {
                         vsInput += indent + formatTable[unsigned(item.format)].hlsl + std::string(" ") + item.name + " : INST" + std::to_string(index) + ";\n";
-                        layout.emplace_back(D3D11_INPUT_ELEMENT_DESC{ "INST", unsigned(index), formatTable[unsigned(item.format)].format, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 });
+                        unsigned align = index == 0 ? 0 : D3D11_APPEND_ALIGNED_ELEMENT;
+                        layout.emplace_back(D3D11_INPUT_ELEMENT_DESC{ "INST", unsigned(index), formatTable[unsigned(item.format)].format, 1, align, D3D11_INPUT_PER_INSTANCE_DATA, 1 });
                     }
 
                     index++;
@@ -765,14 +774,6 @@ namespace foundation {
         }
 
         ComPtr<ID3D11InputLayout> inputLayout;
-
-        if (layout.empty() == false) {
-            if ((hresult = _device->CreateInputLayout(&layout[0], unsigned(layout.size()), vshaderBinary->GetBufferPointer(), vshaderBinary->GetBufferSize(), &inputLayout)) != S_OK) {
-                _platform->logError("[RENDER shader '%s'] Input layout creation failed with result = %p", name, hresult);
-            }
-        }
-
-
         ComPtr<ID3D11VertexShader> vertexShader;
         ComPtr<ID3D11PixelShader> pixelShader;
 
@@ -781,6 +782,12 @@ namespace foundation {
         if (D3DCompile(vshader.c_str(), vshader.length(), "vs", nullptr, nullptr, "main", "vs_4_0", D3DCOMPILE_DEBUG, 0, &vshaderBinary, &errorBlob) == S_OK) {
             if (D3DCompile(fshader.c_str(), fshader.length(), "ps", nullptr, nullptr, "main", "ps_4_0", D3DCOMPILE_DEBUG, 0, &pshaderBinary, &errorBlob) == S_OK) {
                 if ((hresult = _device->CreateVertexShader(vshaderBinary->GetBufferPointer(), vshaderBinary->GetBufferSize(), nullptr, &vertexShader)) == S_OK) {
+                    if (layout.empty() == false) {
+                        if ((hresult = _device->CreateInputLayout(&layout[0], unsigned(layout.size()), vshaderBinary->GetBufferPointer(), vshaderBinary->GetBufferSize(), &inputLayout)) != S_OK) {
+                            _platform->logError("[RENDER shader '%s'] Input layout creation failed with result = %p", name, hresult);
+                        }
+                    }
+
                     if ((hresult = _device->CreatePixelShader(pshaderBinary->GetBufferPointer(), pshaderBinary->GetBufferSize(), nullptr, &pixelShader)) == S_OK) {
                         result = std::make_shared<Direct3D11Shader>(inputLayout, vertexShader, pixelShader, constBuffer, shaderConstSize);
                     }
@@ -872,11 +879,25 @@ namespace foundation {
     }
 
     std::shared_ptr<RenderingStructuredData> Direct3D11Rendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
-        return {};
+        std::shared_ptr<RenderingStructuredData> result;
+        HRESULT hresult;
+
+        ComPtr<ID3D11Buffer> buffer;
+        D3D11_BUFFER_DESC dsc{ count * stride, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, 0, 0, 0 };
+        D3D11_SUBRESOURCE_DATA resdata{ data, 0, 0 };
+        
+        if ((hresult = _device->CreateBuffer(&dsc, &resdata, buffer.GetAddressOf())) == S_OK) {
+            result = std::make_shared<Direct3D11StructuredData>(buffer, count, stride);
+        }
+        else {
+            _platform->logError("[RENDER] geometry buffer creation failed with result = %p", hresult);
+        }
+
+        return result;
     }
 
     void Direct3D11Rendering::applyShader(const std::shared_ptr<RenderingShader> &shader, const void *constants) {
-        std::static_pointer_cast<Direct3D11Shader>(shader)->apply(_context, constants);
+        static_cast<const Direct3D11Shader *>(shader.get())->apply(_context, constants);
 
         _context->VSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
         _context->PSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
@@ -906,7 +927,26 @@ namespace foundation {
         _context->Draw(unsigned(vertexCount), 0); //
     }
 
-    void Direct3D11Rendering::drawGeometry(const std::shared_ptr<RenderingStructuredData> &vertexData, const std::shared_ptr<RenderingStructuredData> &instanceData, std::uint32_t vertexCount, std::uint32_t instanceCount, RenderingTopology topology) {}
+    void Direct3D11Rendering::drawGeometry(const std::shared_ptr<RenderingStructuredData> &vertexData, const std::shared_ptr<RenderingStructuredData> &instanceData, std::uint32_t vertexCount, std::uint32_t instanceCount, RenderingTopology topology) {
+        ID3D11Buffer *buffers[2] = {};
+        std::uint32_t strides[2] = {};
+        std::uint32_t offsets[2] = {};
+
+        if (vertexData) {
+            auto nativeVertexData = static_cast<const Direct3D11StructuredData *>(vertexData.get());
+            buffers[0] = nativeVertexData->getBuffer();
+            strides[0] = nativeVertexData->getStride();
+        }
+        if (instanceData) {
+            auto nativeInstanceData = static_cast<const Direct3D11StructuredData *>(instanceData.get());
+            buffers[1] = nativeInstanceData->getBuffer();
+            strides[1] = nativeInstanceData->getStride();
+        }
+
+        _context->IASetPrimitiveTopology(g_topologies[unsigned(topology)]);
+        _context->IASetVertexBuffers(0, 2, buffers, strides, offsets);
+        _context->DrawInstanced(unsigned(vertexCount), unsigned(instanceCount), 0, 0); //    
+    }
 
     void Direct3D11Rendering::prepareFrame() {
         if (_context) {

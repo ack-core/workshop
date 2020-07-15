@@ -5,7 +5,7 @@ namespace foundation {
         Direct3D11Shader(const ComPtr<ID3D11InputLayout> &layout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::size_t csz);
         ~Direct3D11Shader() override;
 
-        void apply(ComPtr<ID3D11DeviceContext1> &context, const void *constants);
+        void apply(ComPtr<ID3D11DeviceContext1> &context, const void *constants) const;
 
     private:
         ComPtr<ID3D11InputLayout> _layout;
@@ -38,16 +38,18 @@ namespace foundation {
 
     class Direct3D11StructuredData : public RenderingStructuredData {
     public:
-        Direct3D11StructuredData();
+        Direct3D11StructuredData(const ComPtr<ID3D11Buffer> &buffer, std::uint32_t count, std::uint32_t stride);
         ~Direct3D11StructuredData() override;
 
         std::uint32_t getCount() const override;
         std::uint32_t getStride() const override;
+
+        ID3D11Buffer *getBuffer() const;
     
     private:
         ComPtr<ID3D11Buffer> _buffer;
-        std::uint32_t _stride;
         std::uint32_t _count;
+        std::uint32_t _stride;
     };
 
     class Direct3D11Rendering final : public RenderingInterface {
