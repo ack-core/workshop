@@ -67,7 +67,7 @@ namespace foundation {
         void applyTextures(const std::initializer_list<const RenderingTexture2D *> &textures) override;
 
         void drawGeometry(std::uint32_t vertexCount, RenderingTopology topology) override;
-        void drawGeometry( const std::shared_ptr<RenderingStructuredData> &vertexData, const std::shared_ptr<RenderingStructuredData> &instanceData, std::uint32_t vertexCount, std::uint32_t instanceCount, RenderingTopology topology) override;
+        void drawGeometry(const std::shared_ptr<RenderingStructuredData> &vdata, const std::shared_ptr<RenderingStructuredData> &idata, std::uint32_t vstart, std::uint32_t vcount, std::uint32_t istart, std::uint32_t icount, RenderingTopology topology) override;
 
         void prepareFrame() override;
         void presentFrame(float dt) override;

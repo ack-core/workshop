@@ -205,7 +205,7 @@ namespace foundation {
 
             swapChainDesc.Width = APP_WIDTH;
             swapChainDesc.Height = APP_HEIGHT;
-            swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             swapChainDesc.Stereo = false;
             swapChainDesc.SampleDesc.Count = 1;
             swapChainDesc.SampleDesc.Quality = 0;

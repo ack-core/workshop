@@ -175,7 +175,9 @@ namespace foundation {
         virtual void drawGeometry(
             const std::shared_ptr<RenderingStructuredData> &vertexData,
             const std::shared_ptr<RenderingStructuredData> &instanceData,
+            std::uint32_t vertexStartIndex,
             std::uint32_t vertexCount,
+            std::uint32_t instanceStartIndex,
             std::uint32_t instanceCount,
             RenderingTopology topology = RenderingTopology::TRIANGLES
         ) = 0;

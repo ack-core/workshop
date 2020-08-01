@@ -927,25 +927,25 @@ namespace foundation {
         _context->Draw(unsigned(vertexCount), 0); //
     }
 
-    void Direct3D11Rendering::drawGeometry(const std::shared_ptr<RenderingStructuredData> &vertexData, const std::shared_ptr<RenderingStructuredData> &instanceData, std::uint32_t vertexCount, std::uint32_t instanceCount, RenderingTopology topology) {
+    void Direct3D11Rendering::drawGeometry(const std::shared_ptr<RenderingStructuredData> &vdata, const std::shared_ptr<RenderingStructuredData> &idata, std::uint32_t vstart, std::uint32_t vcount, std::uint32_t istart, std::uint32_t icount, RenderingTopology topology) {
         ID3D11Buffer *buffers[2] = {};
         std::uint32_t strides[2] = {};
         std::uint32_t offsets[2] = {};
 
-        if (vertexData) {
-            auto nativeVertexData = static_cast<const Direct3D11StructuredData *>(vertexData.get());
+        if (vdata) {
+            auto nativeVertexData = static_cast<const Direct3D11StructuredData *>(vdata.get());
             buffers[0] = nativeVertexData->getBuffer();
             strides[0] = nativeVertexData->getStride();
         }
-        if (instanceData) {
-            auto nativeInstanceData = static_cast<const Direct3D11StructuredData *>(instanceData.get());
+        if (idata) {
+            auto nativeInstanceData = static_cast<const Direct3D11StructuredData *>(idata.get());
             buffers[1] = nativeInstanceData->getBuffer();
             strides[1] = nativeInstanceData->getStride();
         }
 
         _context->IASetPrimitiveTopology(g_topologies[unsigned(topology)]);
         _context->IASetVertexBuffers(0, 2, buffers, strides, offsets);
-        _context->DrawInstanced(unsigned(vertexCount), unsigned(instanceCount), 0, 0); //    
+        _context->DrawInstanced(unsigned(vcount), unsigned(icount), unsigned(vstart), unsigned(istart)); //    
     }
 
     void Direct3D11Rendering::prepareFrame() {
