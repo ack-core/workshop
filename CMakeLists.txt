@@ -57,6 +57,9 @@ function(resources)
 	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary" ABSOLUTE)
 
 	file(COPY "${m_resources_root}/system" DESTINATION "${m_binary_root}")
+	file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*.vox")
+	file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*.info")
+	file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*.png")
 endfunction()
 
 # application
