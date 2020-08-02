@@ -7,7 +7,7 @@
 class Camera {
 public:
     Camera(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform) {
-        setLookAtByRight({30.0f, 30.0f, 30.0f}, {0, 0, 0}, {1, 0, -1});
+        setLookAtByRight({100.0f, 100.0f, 100.0f}, {0, 0, 0}, {1, 0, -1});
     }
     
     void setLookAtByRight(const math::vector3f &position, const math::vector3f &target, const math::vector3f &right) {
@@ -80,7 +80,7 @@ protected:
     
     float _fov = 50.0f;
     float _zNear = 0.1f;
-    float _zFar = 100.0f;
+    float _zFar = 1000.0f;
     
     void _updateMatrix() {
         float aspect = _platform->getNativeScreenWidth() / _platform->getNativeScreenHeight();
