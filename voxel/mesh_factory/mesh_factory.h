@@ -1,22 +1,29 @@
 
 namespace voxel {
-    struct Voxel {
-        std::int16_t positionX, positionY, positionZ, reserved;
-        std::uint8_t sizeX, sizeY, sizeZ, colorIndex;
-    };
-    struct Frame {
+    struct Chunk {
         std::vector<Voxel> voxels;
     };
+    struct Model {
+        struct Frame {
+            std::uint32_t index;
+            std::uint32_t size;
+        };
+        struct Animation {
+            std::uint32_t firstFrame;
+            std::uint32_t lastFrame;
+            float frameRate;
+        };
 
-    std::vector<Frame> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, float offsetX, float offsetY, float offsetZ);
-    std::shared_ptr<foundation::RenderingTexture2D> loadPalette(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &renderingDevice, const char *fullPath);
+        std::shared_ptr<foundation::RenderingStructuredData> voxels;
+        std::unordered_map<std::string, Animation> animations;
+        std::vector<Frame> frames;
+    };
 
-    class StaticMeshImpl : StaticMesh {
+    class StaticMeshImpl : public StaticMesh {
     public:
-        StaticMeshImpl(std::shared_ptr<foundation::RenderingStructuredData> &&geometry);
+        StaticMeshImpl(const std::shared_ptr<foundation::RenderingStructuredData> &geometry);
         ~StaticMeshImpl() override;
 
-        void applyTransform(int x, int y, int z, Rotation rotation) override;
         const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const override;
 
     private:
@@ -25,21 +32,31 @@ namespace voxel {
 
     class DynamicMeshImpl : public DynamicMesh {
     public:
-        DynamicMeshImpl(std::shared_ptr<foundation::RenderingStructuredData> &&geometry);
+        DynamicMeshImpl(const std::shared_ptr<Model> &model);
         ~DynamicMeshImpl() override;
 
         void setTransform(const float(&position)[3], float rotationXZ) override;
-        void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished = nullptr, bool cycled = false) override;
-
+        void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished, bool cycled, bool resetAnimationTime) override;
         void update(float dtSec) override;
 
         const float(&getTransform() const)[16] override;
-        const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const;
+        const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const override;
+        const std::uint32_t getFrameStartIndex() const override;
+        const std::uint32_t getFrameSize() const override;
 
     private:
-        std::shared_ptr<foundation::RenderingStructuredData> _geometry;
+        std::shared_ptr<Model> _model;
+        Model::Animation *_currentAnimation = nullptr;
 
+        std::function<void(DynamicMesh &)> _finished;
+        
         float _transform[16];
+        float _time = 0.0f;
+        
+        bool _cycled = false;
+
+        std::uint32_t _lastFrame = 0;
+        std::uint32_t _currentFrame = 0;
     };
 
     class MeshFactoryImpl : public MeshFactory {
@@ -47,14 +64,15 @@ namespace voxel {
         MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering);
         ~MeshFactoryImpl() override;
 
-        std::shared_ptr<StaticMesh> createStaticMesh(const char *resourcePath) override;
-        std::shared_ptr<DynamicMesh> createDynamicMesh(const char *resourcePath) override;
+        bool loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) override;
 
-        std::shared_ptr<StaticMesh> mergeStaticMeshes(const std::vector<std::shared_ptr<StaticMesh>> &meshes) override;
+        std::shared_ptr<StaticMesh> createStaticMesh(const std::vector<Voxel> &voxels) override;
+        std::shared_ptr<DynamicMesh> createDynamicMesh(const char *resourcePath, const float(&position)[3], float rotationXZ) override;
 
     private:
         std::shared_ptr<foundation::PlatformInterface> _platform;
         std::shared_ptr<foundation::RenderingInterface> _rendering;
+        std::unordered_map<std::string, std::weak_ptr<Model>> _models;
     };
 }
 
