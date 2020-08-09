@@ -28,6 +28,7 @@ function(foundation)
 		"${m_source_root}/camera.h"
 		"${m_source_root}/primitives.h"
 		"${m_source_root}/parsing.h"
+		"${m_source_root}/orbit_camera_controller.h"
 	)
 	source_group("" FILES ${m_sources_list})
 	add_custom_target(gears SOURCES ${m_sources_list})
