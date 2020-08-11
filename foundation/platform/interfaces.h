@@ -10,7 +10,7 @@
 namespace foundation {
     struct FileEntry {
         std::string fullPath;
-        bool isDirectory;
+        bool isDirectory = false;
     };
 
     struct PlatformKeyboardEventArgs {
@@ -28,16 +28,17 @@ namespace foundation {
     };
 
     struct PlatformMouseEventArgs {
-        mutable float coordinateX;
-        mutable float coordinateY;
-        bool  isLeftButtonPressed;
-        bool  isRightButtonPressed;
+        mutable float coordinateX = 0.0f;
+        mutable float coordinateY = 0.0f;
+        bool  isLeftButtonPressed = false;
+        bool  isRightButtonPressed = false;
+        int   wheel = 0;
     };
 
     struct PlatformTouchEventArgs {
-        float coordinateX;
-        float coordinateY;
-        std::size_t touchID;
+        float coordinateX = 0.0f;
+        float coordinateY = 0.0f;
+        std::size_t touchID = std::size_t(-1);
     };
 
     struct PlatformGamepadEventArgs {

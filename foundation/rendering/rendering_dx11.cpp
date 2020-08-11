@@ -606,7 +606,7 @@ namespace foundation {
         };
 
         std::string vshader =
-            "#define _sign(a) sign(a)\n"
+            "#define _sign(a) (2*step(0, a) - 1)\n"
             "#define _sin(a) sin(a)\n"
             "#define _cos(a) cos(a)\n"
             "#define _transform(a, b) mul(b, a)\n"

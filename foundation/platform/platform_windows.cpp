@@ -57,6 +57,8 @@ namespace {
 namespace {
     LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         static bool mouseCaptured = false;
+        static float mouseLastX;
+        static float mouseLastY;
 
         if (uMsg == WM_CLOSE) {
             g_killed = true;
@@ -67,8 +69,8 @@ namespace {
 
             foundation::PlatformMouseEventArgs mouseEvent;
 
-            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
+            mouseLastX = mouseEvent.coordinateX = float(short(LOWORD(lParam)));
+            mouseLastY = mouseEvent.coordinateY = float(short(HIWORD(lParam)));
 
             for (const auto &entry : g_mouseCallbacks) {
                 if (entry.mousePress) {
@@ -81,8 +83,8 @@ namespace {
 
             foundation::PlatformMouseEventArgs mouseEvent;
 
-            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
+            mouseLastX = mouseEvent.coordinateX = float(short(LOWORD(lParam)));
+            mouseLastY = mouseEvent.coordinateY = float(short(HIWORD(lParam)));
 
             for (const auto &entry : g_mouseCallbacks) {
                 if (entry.mouseRelease) {
@@ -96,13 +98,26 @@ namespace {
             if (mouseCaptured) {
                 foundation::PlatformMouseEventArgs mouseEvent;
 
-                mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-                mouseEvent.coordinateY = float(short(HIWORD(lParam)));
+                mouseLastX = mouseEvent.coordinateX = float(short(LOWORD(lParam)));
+                mouseLastY = mouseEvent.coordinateY = float(short(HIWORD(lParam)));
 
                 for (const auto &entry : g_mouseCallbacks) {
                     if (entry.mouseMove) {
                         entry.mouseMove(mouseEvent);
                     }
+                }
+            }
+        }
+        if (uMsg == 0x020A) {
+            foundation::PlatformMouseEventArgs mouseEvent;
+
+            mouseEvent.coordinateX = mouseLastX;
+            mouseEvent.coordinateY = mouseLastY;
+            mouseEvent.wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1;
+
+            for (const auto &entry : g_mouseCallbacks) {
+                if (entry.mouseMove) {
+                    entry.mouseMove(mouseEvent);
                 }
             }
         }
