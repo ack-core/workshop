@@ -14,6 +14,10 @@
 namespace {
     const char *g_staticMeshShader = R"(
         fixed {
+            axis[3] : float4 = 
+                [0.0, 0.0, 1.0, 0.0]
+                [1.0, 0.0, 0.0, 0.0]
+                [0.0, 1.0, 0.0, 0.0]
             cube[12] : float4 = 
                 [-0.5, 0.5, 0.5, 1.0]
                 [-0.5, -0.5, 0.5, 1.0]
@@ -30,6 +34,7 @@ namespace {
         }
         inout {
             texcoord : float2
+            normal : float3
         }
         vssrc {
             float4 center = float4(instance_position.xyz, 1.0);
@@ -37,9 +42,11 @@ namespace {
             float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
             output_position = _transform(cube_position, _viewProjMatrix);
             output_texcoord = float2(instance_scale_color.w / 255.0, 0);
+            output_normal = camSign * axis[vertex_ID >> 2];
         }
         fssrc {
-            output_color = _tex2d(0, input_texcoord);
+            float light = 0.6 + 0.4 * _dot(input_normal, _norm(float3(1, 3, 2)));
+            output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
         }
     )";
 }
@@ -215,12 +222,13 @@ namespace voxel {
 
             if (selfType != params.neighborType) {
                 ::sprintf(name, "%s_%s_%s_%s.vox", _tileTypes[selfType].name.data(), _tileTypes[params.neighborType].name.data(), params.majorMask.bytes, params.minorMask.bytes);
+                rotation = params.rotation;
             }
             else {
                 ::sprintf(name, "%s.vox", selfName.data());
+                rotation = voxel::MeshFactory::Rotation(rand() % 4);
             }
 
-            rotation = params.rotation;
             return true;
         };
 
@@ -364,6 +372,9 @@ namespace voxel {
             else {
                 _platform->logError("[TiledWorld::loadSpace] '%s' not found", mapPath.data());
             }
+        }
+        else {
+            _platform->logError("[TiledWorld::loadSpace] '%s' not found", infoPath.data());
         }
 
         if (_chunk.mapSource) {

@@ -33,9 +33,9 @@ namespace voxel {
 
                 for (std::int32_t i = 0; i < modelCount; i++) {
                     if (memcmp(data, "SIZE", 4) == 0) {
-                        std::int8_t sizeZ = *(std::int8_t *)(data + 12);
-                        std::int8_t sizeX = *(std::int8_t *)(data + 16);
-                        std::int8_t sizeY = *(std::int8_t *)(data + 20);
+                        std::uint8_t sizeZ = *(std::uint8_t *)(data + 12);
+                        std::uint8_t sizeX = *(std::uint8_t *)(data + 16);
+                        std::uint8_t sizeY = *(std::uint8_t *)(data + 20);
 
                         std::int16_t centeringZ = 0;
                         std::int16_t centeringX = 0;
@@ -58,9 +58,9 @@ namespace voxel {
                             result[i].voxels.resize(voxelCount);
 
                             for (std::size_t c = 0; c < voxelCount; c++) {
-                                result[i].voxels[c].positionZ = *(std::int8_t *)(data + c * 4 + 0) - centeringZ + offset[2];
-                                result[i].voxels[c].positionX = *(std::int8_t *)(data + c * 4 + 1) - centeringX + offset[0];
-                                result[i].voxels[c].positionY = *(std::int8_t *)(data + c * 4 + 2) + offset[1];
+                                result[i].voxels[c].positionZ = std::int16_t(*(std::uint8_t *)(data + c * 4 + 0)) - centeringZ + offset[2];
+                                result[i].voxels[c].positionX = std::int16_t(*(std::uint8_t *)(data + c * 4 + 1)) - centeringX + offset[0];
+                                result[i].voxels[c].positionY = std::int16_t(*(std::uint8_t *)(data + c * 4 + 2)) + offset[1];
                                 result[i].voxels[c].colorIndex = *(std::uint8_t *)(data + c * 4 + 3) - 1;
 
                                 // TODO: voxel mesh optimization

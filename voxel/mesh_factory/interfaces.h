@@ -12,7 +12,6 @@ namespace voxel {
     struct Voxel {
         std::int16_t positionX, positionY, positionZ, reserved;
         std::uint8_t sizeX, sizeY, sizeZ, colorIndex;
-        //std::uint8_t colorIndex, darkness, metallicity;
     };
 
     class StaticMesh {

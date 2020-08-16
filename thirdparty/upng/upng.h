@@ -30,6 +30,8 @@ Warning: This version was modified. See original at https://github.com/elanthis/
 #if !defined(UPNG_H)
 #define UPNG_H
 
+#define UPNG_HEAD 0x474E5089
+
 typedef enum upng_error {
 	UPNG_EOK			= 0, /* success (no error) */
 	UPNG_ENOMEM			= 1, /* memory allocation failed */
