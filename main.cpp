@@ -5,6 +5,12 @@
 #include "foundation/math.h"
 #include "foundation/camera.h"
 #include "foundation/primitives.h"
+#include "foundation/orbit_camera_controller.h"
+
+#include "voxel/mesh_factory/interfaces.h"
+#include "voxel/environment/interfaces.h"
+
+#include "thirdparty/upng/upng.h"
 
 const char *g_srcUI = R"(
     fixed {
@@ -34,6 +40,59 @@ const char *g_srcUI = R"(
     }
 )";
 
+const char *g_staticMeshShader = R"(
+        const {
+            modelTransform : matrix4
+        }
+        inter {
+            texcoord : float2
+        }
+        vssrc {
+            float4 center = float4(instance_position.xyz, 1.0);
+            float3 camSign = _sign(_transform(modelTransform, float4(_cameraPosition.xyz - _transform(center, modelTransform).xyz, 0)).xyz);
+            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center;
+            out_position = _transform(cube_position, _viewProjMatrix * modelTransform);
+            inter.texcoord = float2(float(instance_scale_color.w) / 255.0, 0);
+        }
+        fssrc {
+            out_color = _tex2d(0, inter.texcoord);
+        }
+    )";
+
+const char *g_dynamicMeshShader = R"(
+        fixed {
+            cube[12] : float4 = 
+                [-0.5, 0.5, 0.5, 1.0]
+                [-0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [-0.5, 0.5, -0.5, 1.0]
+                [-0.5, 0.5, 0.5, 1.0]
+        }
+        const {
+            modelTransform : matrix4
+        }
+        inout {
+            texcoord : float2
+        }
+        vssrc {
+            float4 center = float4(instance_position.xyz, 1.0);
+            float3 camSign = _sign(_transform(modelTransform, float4(_cameraPosition.xyz - _transform(center, modelTransform).xyz, 0)).xyz);
+            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
+            output_position = _transform(cube_position, _transform(_viewProjMatrix, modelTransform));
+            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
+        }
+        fssrc {
+            output_color = _tex2d(0, input_texcoord);
+        }
+    )";
+
 const std::uint32_t tx[] = {
     0xff00ffff, 0xffffffff, 0xffffffff, 0xffff00ff,
     0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
@@ -48,22 +107,27 @@ int main(int argc, const char * argv[]) {
     auto texture = rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 4, 4, { (const std::uint8_t *)tx });
     auto files = platform->formFileList("");
     
-    std::unique_ptr<uint8_t[]> data;
-    std::size_t size;
-    platform->loadFile("system/pixelperfect.png", data, size);
+    auto camera = std::make_shared<gears::Camera>(platform);
+    auto orbitCameraController = std::make_unique<gears::OrbitCameraController>(platform, camera);
+    auto primitives = std::make_unique<gears::Primitives>(rendering);
 
-    auto camera = std::make_unique<Camera>(platform);
-    auto primitives = std::make_unique<Primitives>(rendering);
+    auto meshes = voxel::MeshFactory::instance(platform, rendering);
+    auto environment = voxel::TiledWorld::instance(platform, rendering, meshes);
 
-    auto shader = rendering->createShader("ui", g_srcUI, {
+    environment->loadSpace("space_3");
+
+    auto uiShader = rendering->createShader("ui", g_srcUI, {
         {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID},
     });
 
     struct {
-        float p[4] = {0, 0, 50.0, 50.0};
-        float t[4] = {0, 0, 1, 1};
+        float p[4] = { 0, 0, 50.0, 50.0 };
+        float t[4] = { 0, 0, 1, 1 };
     }
     uidata;
+
+    math::transform3f idtransform = math::transform3f::identity();
+
 
     platform->run([&](float dtSec) {
         rendering->updateCameraTransform(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
@@ -72,7 +136,13 @@ int main(int argc, const char * argv[]) {
         primitives->drawAxis();
         primitives->drawCircleXZ({}, 1.0f, { 1, 0, 0, 1 });
 
-        rendering->applyShader(shader, &uidata);
+        environment->updateAndDraw(dtSec);
+
+        //rendering->applyTextures({ palette.get() });
+        //rendering->applyShader(voxelShader, idtransform.flat16);
+        //rendering->drawGeometry(nullptr, mesh->getGeometry(), 0, 12, 0, mesh->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
+
+        rendering->applyShader(uiShader, &uidata);
         rendering->applyTextures({ texture.get() });
         rendering->drawGeometry(4, foundation::RenderingTopology::TRIANGLESTRIP);
 
