@@ -2,6 +2,7 @@
 namespace voxel {
     struct Chunk {
         std::vector<Voxel> voxels;
+        int16_t modelBounds[3];
     };
     struct Model {
         struct Frame {
@@ -73,6 +74,7 @@ namespace voxel {
         std::shared_ptr<foundation::PlatformInterface> _platform;
         std::shared_ptr<foundation::RenderingInterface> _rendering;
         std::unordered_map<std::string, std::weak_ptr<Model>> _models;
+        std::unordered_map<std::string, voxel::Chunk> _cache;
     };
 }
 

@@ -8,7 +8,7 @@
 #include <iomanip>
 
 namespace voxel {
-    std::vector<Chunk> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, const int16_t(&offset)[3], bool centered, int16_t(&modelBounds)[3]) {
+    std::vector<Chunk> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, const int16_t(&offset)[3], bool centered) {
         const std::int32_t version = 150;
 
         std::vector<Chunk> result;
@@ -40,9 +40,9 @@ namespace voxel {
                         std::int16_t centeringZ = 0;
                         std::int16_t centeringX = 0;
 
-                        modelBounds[0] = sizeX;
-                        modelBounds[1] = sizeY;
-                        modelBounds[2] = sizeZ;
+                        result[i].modelBounds[0] = sizeX;
+                        result[i].modelBounds[1] = sizeY;
+                        result[i].modelBounds[2] = sizeZ;
 
                         if (centered) {
                             centeringZ = sizeZ / 2;
@@ -206,61 +206,64 @@ namespace voxel {
 
     bool MeshFactoryImpl::loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) {
         std::string modelPath = voxFullPath;
+        voxel::Chunk chunk;
 
-        int16_t modelOffset[3] = { 0, 0, 0 };
-        int16_t modelBounds[3];
-
-        std::vector<voxel::Chunk> frames = voxel::loadModel(_platform, modelPath.data(), modelOffset, false, modelBounds);
-
-        if (frames.size()) {
-            unsigned totalVoxelCount = 0;
-            std::vector<Voxel> &voxels = frames[0].voxels;
-
-            void (*rotate[4])(Voxel & voxel, int16_t(&modelBounds)[3]) = {
-                [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-                },
-                [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-                    int16_t x = modelBounds[2] - voxel.positionZ - 1;
-                    int16_t z = voxel.positionX;
-
-                    voxel.positionX = x;
-                    voxel.positionZ = z;
-                },
-                [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-                    int16_t x = modelBounds[0] - voxel.positionX - 1;
-                    int16_t z = modelBounds[2] - voxel.positionZ - 1;
-
-                    voxel.positionX = x;
-                    voxel.positionZ = z;
-                },
-                [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-                    int16_t x = voxel.positionZ;
-                    int16_t z = modelBounds[0] - voxel.positionX - 1;
-
-                    voxel.positionX = x;
-                    voxel.positionZ = z;
-                },
-            };
-
-            for (auto &item : voxels) {
-                rotate[int(rotation)](item, modelBounds);
-                item.positionX += x;
-                item.positionY += y;
-                item.positionZ += z;
-            }
-
-            if (frames.size() > 1) {
-                _platform->logMsg("[MeshFactory::createStaticMesh] More than one frame loaded for '%s'. First one is used", modelPath.data());
-            }
-
-            out.insert(out.end(), voxels.begin(), voxels.end());
-            return true;
+        auto index = _cache.find(modelPath);
+        if (index != _cache.end()) {
+            chunk = index->second;
         }
         else {
-            _platform->logError("[MeshFactory::createStaticMesh] No frames loaded for '%s'", modelPath.data());
+            int16_t modelOffset[3] = { 0, 0, 0 };
+            std::vector<voxel::Chunk> frames = voxel::loadModel(_platform, modelPath.data(), modelOffset, false);
+
+            if (frames.size()) {
+                chunk = _cache.emplace(modelPath, std::move(frames[0])).first->second;
+
+                if (frames.size() > 1) {
+                    _platform->logMsg("[MeshFactory::createStaticMesh] More than one frame loaded for '%s'. First one is used", modelPath.data());
+                }
+            }
+            else {
+                _platform->logError("[MeshFactory::createStaticMesh] No frames loaded for '%s'", modelPath.data());
+                return false;
+            }
         }
 
-        return false;
+        void (*rotate[4])(Voxel & voxel, int16_t(&modelBounds)[3]) = {
+            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
+            },
+            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
+                int16_t x = modelBounds[2] - voxel.positionZ - 1;
+                int16_t z = voxel.positionX;
+
+                voxel.positionX = x;
+                voxel.positionZ = z;
+            },
+            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
+                int16_t x = modelBounds[0] - voxel.positionX - 1;
+                int16_t z = modelBounds[2] - voxel.positionZ - 1;
+
+                voxel.positionX = x;
+                voxel.positionZ = z;
+            },
+            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
+                int16_t x = voxel.positionZ;
+                int16_t z = modelBounds[0] - voxel.positionX - 1;
+
+                voxel.positionX = x;
+                voxel.positionZ = z;
+            },
+        };
+
+        for (auto &item : chunk.voxels) {
+            rotate[int(rotation)](item, chunk.modelBounds);
+            item.positionX += x;
+            item.positionY += y;
+            item.positionZ += z;
+        }
+
+        out.insert(out.end(), chunk.voxels.begin(), chunk.voxels.end());
+        return true;
     }
 
     std::shared_ptr<StaticMesh> MeshFactoryImpl::createStaticMesh(const std::vector<Voxel> &voxels) {
@@ -288,7 +291,6 @@ namespace voxel {
 
             if (_platform->loadFile(infoPath.data(), infoData, infoSize)) {
                 int16_t modelOffset[3] = {0, 0, 0};
-                int16_t modelBounds[3];
 
                 std::istringstream stream(std::string(reinterpret_cast<const char *>(infoData.get()), infoSize));
                 std::string keyword;
@@ -319,7 +321,7 @@ namespace voxel {
                     }
                 }
 
-                std::vector<voxel::Chunk> frames = voxel::loadModel(_platform, modelPath.data(), modelOffset, true, modelBounds);
+                std::vector<voxel::Chunk> frames = voxel::loadModel(_platform, modelPath.data(), modelOffset, true);
 
                 if (frames.size()) {
                     unsigned totalVoxelCount = 0;
