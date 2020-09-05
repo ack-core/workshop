@@ -45,7 +45,7 @@ namespace {
             output_normal = camSign * axis[vertex_ID >> 2];
         }
         fssrc {
-            float light = 0.6 + 0.4 * _dot(input_normal, _norm(float3(1, 3, 2)));
+            float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
             output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
         }
     )";
@@ -79,24 +79,7 @@ namespace voxel {
     }
 
     void TiledWorldImpl::loadSpace(const char *spaceDirectory) {
-        struct NeighborOffset {
-            int i;
-            int c;
-        };
-
-        struct NeighborParams {
-            union Mask {
-                char bytes[4];
-                std::uint32_t dword;
-            };
-
-            std::uint8_t neighborType;
-            voxel::MeshFactory::Rotation rotation;
-            Mask majorMask = { '0', '0', '0', '0' };
-            std::uint32_t majorZero = 0;
-            Mask minorMask = { '0', '0', '0', '0' };
-            std::uint32_t minorZero = 0;
-        };
+        _spaceDirectory = spaceDirectory;
 
         auto getIndexFromColor = [&](std::uint32_t color) {
             std::uint8_t index = NONEXIST_TILE;
@@ -110,131 +93,9 @@ namespace voxel {
             return index;
         };
 
-        auto getNeighborMin = [&](Chunk &chunk, int i, int c) {
-            NeighborOffset offsets[] = {
-                {-1, +1},
-                {-1,  0},
-                {-1, -1},
-                { 0, -1},
-                { 0, +1},
-                {+1,  0},
-                {+1, -1},
-                {+1, +1},
-            };
-
-            std::uint8_t result = chunk.mapSource[i][c];
-
-            for (int k = 0; k < 8; k++) {
-                std::uint8_t neighbor = chunk.mapSource[i + offsets[k].i][c + offsets[k].c];
-                
-                if (neighbor < result) {
-                    result = neighbor;
-                }
-            }
-
-            return result;
-        };
-
-        auto getNeighborParams = [&](Chunk &chunk, int i, int c) {
-            NeighborParams result {};
-            NeighborOffset majorOffsets[] = {
-                { 0, -1},
-                {+1,  0},
-                { 0, +1},
-                {-1,  0},
-            };
-            NeighborOffset minorOffsets[] = {
-                {+1, -1},
-                {+1, +1},
-                {-1, +1},
-                {-1, -1},
-            };
-
-            result.neighborType = chunk.mapSource[i][c];
-
-            for (int k = 0; k < 4; k++) {
-                std::uint8_t major = chunk.mapSource[i + majorOffsets[k].i][c + majorOffsets[k].c];
-                std::uint8_t minor = chunk.mapSource[i + minorOffsets[k].i][c + minorOffsets[k].c];
-
-                if (major == NONEXIST_TILE) {
-                    major = getNeighborMin(chunk, i + majorOffsets[k].i, c + majorOffsets[k].c);
-                }
-                if (minor == NONEXIST_TILE) {
-                    minor = getNeighborMin(chunk, i + minorOffsets[k].i, c + minorOffsets[k].c);
-                }
-
-                if (major > chunk.mapSource[i][c]) {
-                    result.neighborType = major;
-                    result.majorMask.bytes[k] = '1';
-                }
-                if (minor > chunk.mapSource[i][c]) {
-                    result.neighborType = minor;
-                    result.minorMask.bytes[k] = '1';
-                }
-            }
-
-            std::uint32_t major = result.majorMask.dword;
-            std::uint32_t minor = result.minorMask.dword;
-
-            for (int k = 0; k < 3; k++) {
-                std::uint32_t nextMajor = (major << 8) | (major >> 24);
-                std::uint32_t nextMinor = (minor << 8) | (minor >> 24);
-
-                bool isMajor = result.majorMask.dword != *(std::uint32_t *)"0000";
-
-                if ((isMajor && nextMajor > result.majorMask.dword) || (!isMajor && nextMinor > result.minorMask.dword)) {
-                    result.majorMask.dword = nextMajor;
-                    result.minorMask.dword = nextMinor;
-                    result.rotation = voxel::MeshFactory::Rotation(k + 1);
-                }
-
-                major = nextMajor;
-                minor = nextMinor;
-            }
-
-            if (result.majorMask.dword == *(std::uint32_t *)"0001") {
-                result.minorMask.bytes[3] = 'x';
-                result.minorMask.bytes[2] = 'x';
-            }
-            if (result.majorMask.dword == *(std::uint32_t *)"0011") {
-                result.minorMask.bytes[3] = 'x';
-                result.minorMask.bytes[2] = 'x';
-                result.minorMask.bytes[1] = 'x';
-            }
-            if (result.majorMask.dword == *(std::uint32_t *)"1111" || result.majorMask.dword == *(std::uint32_t *)"0111" || result.majorMask.dword == *(std::uint32_t *)"0101") {
-                result.minorMask.bytes[3] = 'x';
-                result.minorMask.bytes[2] = 'x';
-                result.minorMask.bytes[1] = 'x';
-                result.minorMask.bytes[0] = 'x';
-            }
-
-            result.majorMask.dword = (result.majorMask.dword << 24) | ((result.majorMask.dword & 0xff00) << 8) | ((result.majorMask.dword & 0xff0000) >> 8) | (result.majorMask.dword >> 24);
-            result.minorMask.dword = (result.minorMask.dword << 24) | ((result.minorMask.dword & 0xff00) << 8) | ((result.minorMask.dword & 0xff0000) >> 8) | (result.minorMask.dword >> 24);
-
-            return result;
-        };
-
-        auto getModelNameAndRotation = [&](Chunk &chunk, int i, int c, char *name, voxel::MeshFactory::Rotation &rotation) {
-            std::uint8_t selfType = chunk.mapSource[i][c];
-            std::string &selfName = _tileTypes[selfType].name;
-
-            NeighborParams params = getNeighborParams(chunk, i, c);
-
-            if (selfType != params.neighborType) {
-                ::sprintf(name, "%s_%s_%s_%s.vox", _tileTypes[selfType].name.data(), _tileTypes[params.neighborType].name.data(), params.majorMask.bytes, params.minorMask.bytes);
-                rotation = params.rotation;
-            }
-            else {
-                ::sprintf(name, "%s.vox", selfName.data());
-                rotation = voxel::MeshFactory::Rotation(rand() % 4);
-            }
-
-            return true;
-        };
-
-        std::string infoPath = std::string(spaceDirectory) + "/space.info";
-        std::string palettePath = std::string(spaceDirectory) + "/palette.png";
-        std::string mapPath = std::string(spaceDirectory) + "/map.png";
+        std::string infoPath = _spaceDirectory + "/space.info";
+        std::string palettePath = _spaceDirectory + "/palette.png";
+        std::string mapPath = _spaceDirectory + "/map.png";
 
         std::unique_ptr<uint8_t[]> infoData;
         std::size_t infoSize;
@@ -246,21 +107,21 @@ namespace voxel {
             // info
 
             while (stream >> keyword) {
-                if (keyword == "tilesize") {
+                if (keyword == "tileSize") {
                     if (bool(stream >> gears::expect<'='> >> _tileSize) != true) {
-                        _platform->logError("[TiledWorld::loadSpace] tilesize invalid value at '%s'", infoPath.data());
+                        _platform->logError("[TiledWorld::loadSpace] tileSize has invalid value at '%s'", infoPath.data());
                         break;
                     }
                 }
-                else if (keyword == "tileset") {
+                else if (keyword == "tileTypeCount") {
                     unsigned count = 0;
 
                     if (stream >> gears::expect<'='> >> count) {
-                        std::string name;
+                        std::string name, options;
                         std::uint32_t r, g, b;
 
                         for (unsigned i = 0; i < count; i++) {
-                            if (stream >> name >> gears::expect<'='> >> r >> g >> b) {
+                            if (stream >> name >> gears::expect<'='> >> r >> g >> b >> options) {
                                 _tileTypes.emplace_back(TileType{ std::move(name), std::uint32_t(0xFF000000) | (b << 16) | (g << 8) | r });
                             }
                             else {
@@ -275,7 +136,47 @@ namespace voxel {
                         }
                     }
                     else {
-                        _platform->logError("[TiledWorld::loadSpace] tileset invalid value at '%s'", infoPath.data());
+                        _platform->logError("[TiledWorld::loadSpace] tileTypeCount has invalid value at '%s'", infoPath.data());
+                        break;
+                    }
+                }
+                else if (keyword == "helperTypeCount") {
+                    unsigned typeCount = 0;
+
+                    if (stream >> gears::expect<'='> >> typeCount) {
+                        std::string name;
+                        unsigned helperCount = 0;
+
+                        for (unsigned i = 0; i < typeCount; i++) {
+                            if (stream >> name >> gears::expect<'='> >> helperCount) {
+                                std::vector<math::vector3f> offsets;
+
+                                for (unsigned c = 0; c < helperCount; c++) {
+                                    std::string options;
+                                    int h, v;
+
+                                    if (stream >> options >> h >> v) {
+                                        math::vector3f helperPosition = getTileCenterPosition(TileOffset{ h, v });
+
+                                        offsets.emplace_back(helperPosition);
+                                    }
+                                    else {
+                                        _platform->logError("[TiledWorld::loadSpace] helper '%s' %u-th coordinates has invalid value at '%s'", name.data(), c, infoPath.data());
+                                        i = unsigned(-1);
+                                        break;
+                                    }
+                                }
+
+                                _helpers.emplace(name, std::move(offsets));
+                            }
+                            else {
+                                _platform->logError("[TiledWorld::loadSpace] helper type '%s' has invalid value at '%s'", name.data(), infoPath.data());
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        _platform->logError("[TiledWorld::loadSpace] helperTypeCount has invalid value at '%s'", infoPath.data());
                         break;
                     }
                 }
@@ -379,6 +280,7 @@ namespace voxel {
 
         if (_chunk.mapSource) {
             // validation
+            // TODO: 
 
             for (size_t i = 0; i < _chunk.mapSize; i++) {
                 for (size_t c = 0; c < _chunk.mapSize; c++) {
@@ -386,37 +288,250 @@ namespace voxel {
                 }
             }
 
-            // baking
+            // geometry & baking
 
-            char model[256];
-            voxel::MeshFactory::Rotation rotation;
-            _chunk.voxels.clear();
-
-            int offset = ::sprintf(model, "%s/", spaceDirectory);
+            _chunk.geometry = new std::shared_ptr<voxel::StaticMesh> * [_chunk.drawSize];
 
             for (int i = 0; i < _chunk.drawSize; i++) {
+                _chunk.geometry[i] = new std::shared_ptr<voxel::StaticMesh> [_chunk.drawSize];
+
                 for (int c = 0; c < _chunk.drawSize; c++) {
                     if (_chunk.mapSource[i + 1][c + 1] != NONEXIST_TILE) {
-                        if (getModelNameAndRotation(_chunk, i + 1, c + 1, model + offset, rotation)) {
-                            int offx = (c - int(_chunk.drawSize / 2)) * _tileSize;
-                            int offz = (i - int(_chunk.drawSize / 2)) * _tileSize;
-
-                            if (_factory->loadVoxels(model, offx, 0, offz, rotation, _chunk.voxels) == false) {
-                                _platform->logError("[TiledWorld::loadSpace] voxels from '%s' aren't loaded", model);
-                            }
-                        }
+                        _updateTileGeometry(TileOffset{ c, i });
                     }
                 }
             }
-
-            _chunk.geometry = _factory->createStaticMesh(_chunk.voxels);
         }
+    }
+
+    bool TiledWorldImpl::setTileTypeIndex(const TileOffset &offset, std::uint8_t typeIndex) {
+        if (offset.h < 0 || offset.h >= _chunk.drawSize) {
+            if (offset.v < 0 || offset.v >= _chunk.drawSize) {
+                _platform->logError("[TiledWorld::setTileTypeIndex] no tile at {%d;%d}", offset.h, offset.v);
+                return false;
+            }
+        }
+
+        for (int i = offset.v; i <= offset.v + 2; i++) {
+            for (int c = offset.h; c <= offset.h + 2; c++) {
+                int diff = std::abs(int(_chunk.mapSource[i][c]) - int(typeIndex));
+
+                if (diff > 1) {
+                    _platform->logError("[TiledWorld::setTileTypeIndex] cannot change tile at {%d;%d}", offset.h, offset.v);
+                    return false;
+                }
+            }
+        }
+
+        _chunk.mapSource[offset.v + 1][offset.h + 1] = typeIndex;
+
+        //for (int i = offset.v - 1; i <= offset.v + 2; i++) {
+        //    for (int c = offset.h; c <= offset.h + 2; c++) {
+
+        //    }
+        //}
+        _updateTileGeometry(offset);
+
+        return true;
+    }
+
+    std::size_t TiledWorldImpl::getMapSize() const {
+        return _chunk.drawSize;
+    }
+
+    std::uint8_t TiledWorldImpl::getTileTypeIndex(const TileOffset &offset) const {
+        std::uint8_t result = NONEXIST_TILE;
+
+        if (offset.h >= 0 && offset.h < _chunk.drawSize) {
+            if (offset.v >= 0 && offset.v < _chunk.drawSize) {
+                result = _chunk.mapSource[offset.v + 1][offset.h + 1];
+            }
+        }
+
+        return result;
+    }
+
+    math::vector3f TiledWorldImpl::getTileCenterPosition(const TileOffset &offset) const {
+        float offx = float((offset.h - int(_chunk.drawSize / 2)) * _tileSize) + _tileSize * 0.5f;
+        float offz = float((offset.v - int(_chunk.drawSize / 2)) * _tileSize) + _tileSize * 0.5f;
+    
+        return {offx, 0, offz};
+    }
+
+    std::size_t TiledWorldImpl::getHelperCount(const char *name) const {
+        return 0;
+    }
+
+    bool TiledWorldImpl::getHelperPosition(const char *name, std::size_t index, math::vector3f &out) const {
+        return false;
     }
 
     void TiledWorldImpl::updateAndDraw(float dtSec) {
         _rendering->applyTextures({ _palette.get() });
         _rendering->applyShader(_shader);
-        _rendering->drawGeometry(nullptr, _chunk.geometry->getGeometry(), 0, 12, 0, _chunk.geometry->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
+
+        for (int i = 0; i < _chunk.drawSize; i++) {
+            for (int c = 0; c < _chunk.drawSize; c++) {
+                _rendering->drawGeometry(nullptr, _chunk.geometry[i][c]->getGeometry(), 0, 12, 0, _chunk.geometry[i][c]->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
+            }
+        }
+    }
+
+    void TiledWorldImpl::_updateTileGeometry(const TileOffset &offset) {
+        struct NeighborOffset {
+            int i;
+            int c;
+        };
+        struct NeighborParams {
+            union Mask {
+                char bytes[4];
+                std::uint32_t dword;
+            };
+
+            std::uint8_t neighborType;
+            voxel::MeshFactory::Rotation rotation;
+            Mask majorMask = { '0', '0', '0', '0' };
+            std::uint32_t majorZero = 0;
+            Mask minorMask = { '0', '0', '0', '0' };
+            std::uint32_t minorZero = 0;
+        };
+        auto getNeighborMin = [&](Chunk &chunk, int i, int c) {
+            static NeighborOffset offsets[] = {
+                {-1, +1},
+                {-1,  0},
+                {-1, -1},
+                { 0, -1},
+                { 0, +1},
+                {+1,  0},
+                {+1, -1},
+                {+1, +1},
+            };
+
+            std::uint8_t result = chunk.mapSource[i][c];
+
+            for (int k = 0; k < 8; k++) {
+                std::uint8_t neighbor = chunk.mapSource[i + offsets[k].i][c + offsets[k].c];
+
+                if (neighbor < result) {
+                    result = neighbor;
+                }
+            }
+
+            return result;
+        };
+        auto getNeighborParams = [&](Chunk &chunk, int i, int c) {
+            NeighborParams result{};
+            static NeighborOffset majorOffsets[] = {
+                { 0, -1},
+                {+1,  0},
+                { 0, +1},
+                {-1,  0},
+            };
+            static NeighborOffset minorOffsets[] = {
+                {+1, -1},
+                {+1, +1},
+                {-1, +1},
+                {-1, -1},
+            };
+
+            result.neighborType = chunk.mapSource[i][c];
+
+            for (int k = 0; k < 4; k++) {
+                std::uint8_t major = chunk.mapSource[i + majorOffsets[k].i][c + majorOffsets[k].c];
+                std::uint8_t minor = chunk.mapSource[i + minorOffsets[k].i][c + minorOffsets[k].c];
+
+                if (major == NONEXIST_TILE) {
+                    major = getNeighborMin(chunk, i + majorOffsets[k].i, c + majorOffsets[k].c);
+                }
+                if (minor == NONEXIST_TILE) {
+                    minor = getNeighborMin(chunk, i + minorOffsets[k].i, c + minorOffsets[k].c);
+                }
+
+                if (major > chunk.mapSource[i][c]) {
+                    result.neighborType = major;
+                    result.majorMask.bytes[k] = '1';
+                }
+                if (minor > chunk.mapSource[i][c]) {
+                    result.neighborType = minor;
+                    result.minorMask.bytes[k] = '1';
+                }
+            }
+
+            std::uint32_t major = result.majorMask.dword;
+            std::uint32_t minor = result.minorMask.dword;
+
+            for (int k = 0; k < 3; k++) {
+                std::uint32_t nextMajor = (major << 8) | (major >> 24);
+                std::uint32_t nextMinor = (minor << 8) | (minor >> 24);
+
+                bool isMajor = result.majorMask.dword != *(std::uint32_t *)"0000";
+
+                if ((isMajor && nextMajor > result.majorMask.dword) || (!isMajor && nextMinor > result.minorMask.dword)) {
+                    result.majorMask.dword = nextMajor;
+                    result.minorMask.dword = nextMinor;
+                    result.rotation = voxel::MeshFactory::Rotation(k + 1);
+                }
+
+                major = nextMajor;
+                minor = nextMinor;
+            }
+
+            if (result.majorMask.dword == *(std::uint32_t *)"0001") {
+                result.minorMask.bytes[3] = 'x';
+                result.minorMask.bytes[2] = 'x';
+            }
+            if (result.majorMask.dword == *(std::uint32_t *)"0011") {
+                result.minorMask.bytes[3] = 'x';
+                result.minorMask.bytes[2] = 'x';
+                result.minorMask.bytes[1] = 'x';
+            }
+            if (result.majorMask.dword == *(std::uint32_t *)"1111" || result.majorMask.dword == *(std::uint32_t *)"0111" || result.majorMask.dword == *(std::uint32_t *)"0101") {
+                result.minorMask.bytes[3] = 'x';
+                result.minorMask.bytes[2] = 'x';
+                result.minorMask.bytes[1] = 'x';
+                result.minorMask.bytes[0] = 'x';
+            }
+
+            result.majorMask.dword = (result.majorMask.dword << 24) | ((result.majorMask.dword & 0xff00) << 8) | ((result.majorMask.dword & 0xff0000) >> 8) | (result.majorMask.dword >> 24);
+            result.minorMask.dword = (result.minorMask.dword << 24) | ((result.minorMask.dword & 0xff00) << 8) | ((result.minorMask.dword & 0xff0000) >> 8) | (result.minorMask.dword >> 24);
+
+            return result;
+        };
+        auto getModelNameAndRotation = [&](Chunk &chunk, int i, int c, char *name, voxel::MeshFactory::Rotation &rotation) {
+            std::uint8_t selfType = chunk.mapSource[i][c];
+            std::string &selfName = _tileTypes[selfType].name;
+
+            NeighborParams params = getNeighborParams(chunk, i, c);
+
+            if (selfType != params.neighborType) {
+                ::sprintf(name, "%s_%s_%s_%s.vox", _tileTypes[selfType].name.data(), _tileTypes[params.neighborType].name.data(), params.majorMask.bytes, params.minorMask.bytes);
+                rotation = params.rotation;
+            }
+            else {
+                ::sprintf(name, "%s.vox", selfName.data());
+                rotation = voxel::MeshFactory::Rotation(rand() % 4);
+            }
+
+            return true;
+        };
+
+        char model[256];
+        voxel::MeshFactory::Rotation rotation;
+
+        int pathStart = ::sprintf(model, "%s/", _spaceDirectory.data());
+        if (getModelNameAndRotation(_chunk, offset.v + 1, offset.h + 1, model + pathStart, rotation)) {
+            int offx = (offset.h - int(_chunk.drawSize / 2)) * _tileSize;
+            int offz = (offset.v - int(_chunk.drawSize / 2)) * _tileSize;
+
+            std::vector<voxel::Voxel> voxels;
+
+            if (_factory->loadVoxels(model, offx, 0, offz, rotation, voxels)) {
+                _chunk.geometry[offset.v][offset.h] = _factory->createStaticMesh(voxels);
+            }
+            else {
+                _platform->logError("[TiledWorld::loadSpace] voxels from '%s' aren't loaded", model);
+            }
+        }
     }
 }
 
