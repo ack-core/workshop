@@ -71,11 +71,27 @@ namespace voxel {
     }
 
     TiledWorldImpl::~TiledWorldImpl() {
-
+        clear();
     }
 
     void TiledWorldImpl::clear() {
+        if (_chunk.mapSource) {
+            for (std::size_t i = 0; i < _chunk.mapSize; i++) {
+                delete[] _chunk.mapSource[i];
+            }
 
+            delete[] _chunk.mapSource;
+        }
+
+        if (_chunk.geometry) {
+            for (std::size_t i = 0; i < _chunk.drawSize; i++) {
+                delete[] _chunk.geometry[i];
+            }
+
+            delete[] _chunk.geometry;
+        }
+
+        _chunk = {};
     }
 
     void TiledWorldImpl::loadSpace(const char *spaceDirectory) {
@@ -149,16 +165,16 @@ namespace voxel {
 
                         for (unsigned i = 0; i < typeCount; i++) {
                             if (stream >> name >> gears::expect<'='> >> helperCount) {
-                                std::vector<math::vector3f> offsets;
+                                std::vector<Helper> helpers;
 
                                 for (unsigned c = 0; c < helperCount; c++) {
                                     std::string options;
-                                    int h, v;
+                                    TileOffset offset;
 
-                                    if (stream >> options >> h >> v) {
-                                        math::vector3f helperPosition = getTileCenterPosition(TileOffset{ h, v });
+                                    if (stream >> options >> offset.h >> offset.v) {
+                                        math::vector3f helperPosition = getTileCenterPosition(offset);
 
-                                        offsets.emplace_back(helperPosition);
+                                        helpers.emplace_back(Helper{ offset, helperPosition });
                                     }
                                     else {
                                         _platform->logError("[TiledWorld::loadSpace] helper '%s' %u-th coordinates has invalid value at '%s'", name.data(), c, infoPath.data());
@@ -167,7 +183,7 @@ namespace voxel {
                                     }
                                 }
 
-                                _helpers.emplace(name, std::move(offsets));
+                                _helpers.emplace(name, std::move(helpers));
                             }
                             else {
                                 _platform->logError("[TiledWorld::loadSpace] helper type '%s' has invalid value at '%s'", name.data(), infoPath.data());
@@ -304,12 +320,10 @@ namespace voxel {
         }
     }
 
-    bool TiledWorldImpl::setTileTypeIndex(const TileOffset &offset, std::uint8_t typeIndex) {
-        if (offset.h < 0 || offset.h >= _chunk.drawSize) {
-            if (offset.v < 0 || offset.v >= _chunk.drawSize) {
-                _platform->logError("[TiledWorld::setTileTypeIndex] no tile at {%d;%d}", offset.h, offset.v);
-                return false;
-            }
+    bool TiledWorldImpl::isTileTypeSuitable(const TileOffset &offset, std::uint8_t typeIndex) {
+        if (_isInChunk(_chunk, offset) == false) {
+            _platform->logError("[TiledWorld::setTileTypeIndex] no tile at {%d;%d}", offset.h, offset.v);
+            return false;
         }
 
         for (int i = offset.v; i <= offset.v + 2; i++) {
@@ -323,29 +337,32 @@ namespace voxel {
             }
         }
 
-        _chunk.mapSource[offset.v + 1][offset.h + 1] = typeIndex;
-
-        //for (int i = offset.v - 1; i <= offset.v + 2; i++) {
-        //    for (int c = offset.h; c <= offset.h + 2; c++) {
-
-        //    }
-        //}
-        _updateTileGeometry(offset);
-
         return true;
     }
 
-    std::size_t TiledWorldImpl::getMapSize() const {
-        return _chunk.drawSize;
+    bool TiledWorldImpl::setTileTypeIndex(const TileOffset &offset, std::uint8_t typeIndex, const char *postfix) {
+        if (isTileTypeSuitable(offset, typeIndex)) {
+            _chunk.mapSource[offset.v + 1][offset.h + 1] = typeIndex;
+
+            for (int v = offset.v - 1; v <= offset.v + 1; v++) {
+                for (int h = offset.h - 1; h <= offset.h + 1; h++) {
+                    if (_isInChunk(_chunk, TileOffset{h, v})) {
+                        _updateTileGeometry(TileOffset{h, v});
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     std::uint8_t TiledWorldImpl::getTileTypeIndex(const TileOffset &offset) const {
         std::uint8_t result = NONEXIST_TILE;
 
-        if (offset.h >= 0 && offset.h < _chunk.drawSize) {
-            if (offset.v >= 0 && offset.v < _chunk.drawSize) {
-                result = _chunk.mapSource[offset.v + 1][offset.h + 1];
-            }
+        if (_isInChunk(_chunk, offset)) {
+            result = _chunk.mapSource[offset.v + 1][offset.h + 1];
         }
 
         return result;
@@ -359,10 +376,35 @@ namespace voxel {
     }
 
     std::size_t TiledWorldImpl::getHelperCount(const char *name) const {
+        auto it = _helpers.find(name);
+        if (it != _helpers.end()) {
+            return it->second.size();
+        }
+
         return 0;
     }
 
     bool TiledWorldImpl::getHelperPosition(const char *name, std::size_t index, math::vector3f &out) const {
+        auto it = _helpers.find(name);
+        if (it != _helpers.end()) {
+            if (index < it->second.size()) {
+                out = it->second[index].position;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool TiledWorldImpl::getHelperTileOffset(const char *name, std::size_t index, TileOffset &out) const {
+        auto it = _helpers.find(name);
+        if (it != _helpers.end()) {
+            if (index < it->second.size()) {
+                out = it->second[index].offset;
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -375,6 +417,16 @@ namespace voxel {
                 _rendering->drawGeometry(nullptr, _chunk.geometry[i][c]->getGeometry(), 0, 12, 0, _chunk.geometry[i][c]->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
             }
         }
+    }
+
+    bool TiledWorldImpl::_isInChunk(const Chunk &chunk, const TileOffset &offset) const {
+        if (offset.h >= 0 && offset.h < chunk.drawSize) {
+            if (offset.v >= 0 && offset.v < chunk.drawSize) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     void TiledWorldImpl::_updateTileGeometry(const TileOffset &offset) {
