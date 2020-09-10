@@ -66,13 +66,25 @@ namespace datahub {
             _data.erase(id);
         }
 
-        T &operator[](Token id) {
-            return _data[id];
+        T *operator[](Token id) {
+            auto index = _data.find(id);
+            if (index != _data.end()) {
+                return &index->second;
+            }
+
+            return nullptr;
         }
 
         template<typename L, void(L:: *)(Token, T &) const = &L::operator()> void foreach(L &&functor) {
-            for (auto it = _data.begin(); it != _data.end(); ++it) {
-                functor(it->first, it->second);
+            for (auto index = _data.begin(); index != _data.end(); ++index) {
+                functor(index->first, index->second);
+            }
+        }
+
+        void clear() {
+            for (auto index = _data.begin(); index != _data.end(); ) {
+                onElementRemoving.call(index->first);
+                index = _data.erase(index);
             }
         }
 
@@ -108,11 +120,28 @@ namespace datahub {
         static_assert(std::is_base_of<::datahub::Scope, Scope>::value, "DataHub scopes must be derived from Scope");
 
     public:
-        template<typename T, typename = std::enable_if_t<std::is_same<T, Scope>::value>> T &get() {
+        //using DataHub<Scopes...>::get;
+
+        operator Scope &() {
             return _scope;
         }
 
-    protected:
-        Scope _scope = {};
+        //template<typename T> static T &scope;
+        //template<> static Scope &scope<Scope> = _scope;
+        //using DataHub<Scopes...>::get<>;
+
+        //template<typename T> T &get() {
+
+        //}
+        //template<> Scope &get<Scope>() {
+        //    return _scope;
+        //}
+
+        //template<typename T, typename = std::enable_if_t<std::is_same<T, Scope>::value>> T &get() {
+        //    return _scope;
+        //}
+
+    private:
+        Scope _scope;
     };
 }
