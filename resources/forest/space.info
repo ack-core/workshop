@@ -1,0 +1,14 @@
+tileSize = 16
+
+tileTypeCount = 3
+	castle = 255 255 255 default
+	land = 255 128 0 default
+	grass = 0 255 0 default
+
+helperTypeCount = 2
+	castle = 1
+		center	32	32
+	enemies = 3
+		center	1	1
+		center	63	1
+		center	63	63
