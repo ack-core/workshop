@@ -10,6 +10,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <queue>
 
 namespace {
     const char *g_staticMeshShader = R"(
@@ -52,10 +53,11 @@ namespace {
 }
 
 namespace voxel {
-    TiledWorldImpl::TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory)
+    TiledWorldImpl::TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives)
         : _platform(platform)
         , _rendering(rendering)
         , _factory(factory)
+        , _primitives(primitives)
     {
         _shader = rendering->createShader("static_voxel_mesh", g_staticMeshShader,
             // vertex
@@ -169,12 +171,12 @@ namespace voxel {
 
                                 for (unsigned c = 0; c < helperCount; c++) {
                                     std::string options;
-                                    TileOffset offset;
+                                    TileLocation location;
 
-                                    if (stream >> options >> offset.h >> offset.v) {
-                                        math::vector3f helperPosition = getTileCenterPosition(offset);
+                                    if (stream >> options >> location.h >> location.v) {
+                                        math::vector3f helperPosition = getTileCenterPosition(location);
 
-                                        helpers.emplace_back(Helper{ offset, helperPosition });
+                                        helpers.emplace_back(Helper{ location, helperPosition });
                                     }
                                     else {
                                         _platform->logError("[TiledWorld::loadSpace] helper '%s' %u-th coordinates has invalid value at '%s'", name.data(), c, infoPath.data());
@@ -313,25 +315,25 @@ namespace voxel {
 
                 for (int c = 0; c < _chunk.drawSize; c++) {
                     if (_chunk.mapSource[i + 1][c + 1] != NONEXIST_TILE) {
-                        _updateTileGeometry(TileOffset{ c, i });
+                        _updateTileGeometry(_chunk, TileLocation{ c, i });
                     }
                 }
             }
         }
     }
 
-    bool TiledWorldImpl::isTileTypeSuitable(const TileOffset &offset, std::uint8_t typeIndex) {
-        if (_isInChunk(_chunk, offset) == false) {
-            _platform->logError("[TiledWorld::setTileTypeIndex] no tile at {%d;%d}", offset.h, offset.v);
+    bool TiledWorldImpl::isTileTypeSuitable(const TileLocation &location, std::uint8_t typeIndex) {
+        if (_isInChunk(_chunk, location) == false) {
+            _platform->logError("[TiledWorld::setTileTypeIndex] no tile at {%d;%d}", location.h, location.v);
             return false;
         }
 
-        for (int i = offset.v; i <= offset.v + 2; i++) {
-            for (int c = offset.h; c <= offset.h + 2; c++) {
+        for (int i = location.v; i <= location.v + 2; i++) {
+            for (int c = location.h; c <= location.h + 2; c++) {
                 int diff = std::abs(int(_chunk.mapSource[i][c]) - int(typeIndex));
 
                 if (diff > 1) {
-                    _platform->logError("[TiledWorld::setTileTypeIndex] cannot change tile at {%d;%d}", offset.h, offset.v);
+                    _platform->logError("[TiledWorld::setTileTypeIndex] cannot change tile at {%d;%d}", location.h, location.v);
                     return false;
                 }
             }
@@ -340,14 +342,14 @@ namespace voxel {
         return true;
     }
 
-    bool TiledWorldImpl::setTileTypeIndex(const TileOffset &offset, std::uint8_t typeIndex, const char *postfix) {
-        if (isTileTypeSuitable(offset, typeIndex)) {
-            _chunk.mapSource[offset.v + 1][offset.h + 1] = typeIndex;
+    bool TiledWorldImpl::setTileTypeIndex(const TileLocation &location, std::uint8_t typeIndex, const char *postfix) {
+        if (isTileTypeSuitable(location, typeIndex)) {
+            _chunk.mapSource[location.v + 1][location.h + 1] = typeIndex;
 
-            for (int v = offset.v - 1; v <= offset.v + 1; v++) {
-                for (int h = offset.h - 1; h <= offset.h + 1; h++) {
-                    if (_isInChunk(_chunk, TileOffset{h, v})) {
-                        _updateTileGeometry(TileOffset{h, v});
+            for (int v = location.v - 1; v <= location.v + 1; v++) {
+                for (int h = location.h - 1; h <= location.h + 1; h++) {
+                    if (_isInChunk(_chunk, TileLocation{h, v})) {
+                        _updateTileGeometry(_chunk, TileLocation{h, v});
                     }
                 }
             }
@@ -358,19 +360,19 @@ namespace voxel {
         return false;
     }
 
-    std::uint8_t TiledWorldImpl::getTileTypeIndex(const TileOffset &offset) const {
+    std::uint8_t TiledWorldImpl::getTileTypeIndex(const TileLocation &location) const {
         std::uint8_t result = NONEXIST_TILE;
 
-        if (_isInChunk(_chunk, offset)) {
-            result = _chunk.mapSource[offset.v + 1][offset.h + 1];
+        if (_isInChunk(_chunk, location)) {
+            result = _chunk.mapSource[location.v + 1][location.h + 1];
         }
 
         return result;
     }
 
-    math::vector3f TiledWorldImpl::getTileCenterPosition(const TileOffset &offset) const {
-        float offx = float((offset.h - int(_chunk.drawSize / 2)) * _tileSize) + _tileSize * 0.5f;
-        float offz = float((offset.v - int(_chunk.drawSize / 2)) * _tileSize) + _tileSize * 0.5f;
+    math::vector3f TiledWorldImpl::getTileCenterPosition(const TileLocation &location) const {
+        float offx = float((location.h - int(_chunk.drawSize / 2)) * _tileSize) + _tileSize * 0.5f;
+        float offz = float((location.v - int(_chunk.drawSize / 2)) * _tileSize) + _tileSize * 0.5f;
     
         return {offx, 0, offz};
     }
@@ -396,16 +398,82 @@ namespace voxel {
         return false;
     }
 
-    bool TiledWorldImpl::getHelperTileOffset(const char *name, std::size_t index, TileOffset &out) const {
+    bool TiledWorldImpl::getHelperTileLocation(const char *name, std::size_t index, TileLocation &out) const {
         auto it = _helpers.find(name);
         if (it != _helpers.end()) {
             if (index < it->second.size()) {
-                out = it->second[index].offset;
+                out = it->second[index].location;
                 return true;
             }
         }
 
         return false;
+    }
+
+    std::vector<TileLocation> TiledWorldImpl::findPath(const TileLocation &from, const TileLocation &to, std::uint8_t minTypeIndex, std::uint8_t maxTypeIndex) const {
+        struct FrontlineElement {
+            TileLocation location = {};
+            float priority = 0;
+
+            bool operator >(const FrontlineElement &other) const {
+                return priority > other.priority;
+            }
+        };
+
+        struct Info {
+            TileLocation cameFrom = {};
+            int totalCost = 0;
+        };
+
+        struct hasher {
+            std::size_t operator()(const TileLocation &element) const
+            {
+                return std::hash<std::size_t>{}((std::size_t(element.v) << 32) | element.h);
+            }
+        };
+                
+        std::priority_queue<FrontlineElement, std::vector<FrontlineElement>, std::greater<FrontlineElement>> frontline; // lowest - first
+        std::unordered_map<TileLocation, Info, hasher> transitions;
+        TileLocation neighbors[8];
+
+        frontline.emplace(FrontlineElement{ from });
+        transitions.emplace(from, Info{ from, 0 });
+
+        while (frontline.empty() == false) {
+            auto current = frontline.top();
+            frontline.pop();
+
+            if (current.location == to) {
+                break;
+            }
+
+            std::size_t neighborCount = _getNeighbors(_chunk, current.location, minTypeIndex, maxTypeIndex, neighbors);
+
+            for (std::size_t i = 0; i < neighborCount; i++) {
+                int costToNeighbor = 1;
+                int newCost = transitions[current.location].totalCost + 1;
+
+                auto neighborInfo = transitions.find(neighbors[i]);
+                if (neighborInfo == transitions.end() || newCost < neighborInfo->second.totalCost) {
+                    transitions[neighbors[i]] = Info{ current.location, newCost };
+
+                    float priority = float(newCost) + getTileCenterPosition(neighbors[i]).xz.distanceTo(getTileCenterPosition(to).xz);
+                    frontline.push(FrontlineElement{ neighbors[i], priority });
+                }
+            }
+        }
+        
+        std::vector<TileLocation> result{ to };
+        TileLocation current = to;
+
+        do {
+            current = transitions[current].cameFrom;
+            result.push_back(current);
+        }
+        while (current != from);
+        std::reverse(result.begin(), result.end());
+
+        return result;
     }
 
     void TiledWorldImpl::updateAndDraw(float dtSec) {
@@ -417,11 +485,18 @@ namespace voxel {
                 _rendering->drawGeometry(nullptr, _chunk.geometry[i][c]->getGeometry(), 0, 12, 0, _chunk.geometry[i][c]->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
             }
         }
+
+        auto path = findPath({ 24, 24 }, { 34, 34 }, 1, 1);
+
+        for (std::size_t i = 0; i < path.size(); i++) {
+            auto center = getTileCenterPosition(path[i]);
+            _primitives->drawLine(center, center + math::vector3f(0, 10, 0), {1.0f, 1.0f, 1.0f, 1.0f});
+        }
     }
 
-    bool TiledWorldImpl::_isInChunk(const Chunk &chunk, const TileOffset &offset) const {
-        if (offset.h >= 0 && offset.h < chunk.drawSize) {
-            if (offset.v >= 0 && offset.v < chunk.drawSize) {
+    bool TiledWorldImpl::_isInChunk(const Chunk &chunk, const TileLocation &location) const {
+        if (location.h >= 0 && location.h < chunk.drawSize) {
+            if (location.v >= 0 && location.v < chunk.drawSize) {
                 return true;
             }
         }
@@ -429,7 +504,7 @@ namespace voxel {
         return false;
     }
 
-    void TiledWorldImpl::_updateTileGeometry(const TileOffset &offset) {
+    void TiledWorldImpl::_updateTileGeometry(Chunk &chunk, const TileLocation &location) {
         struct NeighborOffset {
             int i;
             int c;
@@ -571,24 +646,46 @@ namespace voxel {
         voxel::MeshFactory::Rotation rotation;
 
         int pathStart = ::sprintf(model, "%s/", _spaceDirectory.data());
-        if (getModelNameAndRotation(_chunk, offset.v + 1, offset.h + 1, model + pathStart, rotation)) {
-            int offx = (offset.h - int(_chunk.drawSize / 2)) * _tileSize;
-            int offz = (offset.v - int(_chunk.drawSize / 2)) * _tileSize;
+        if (getModelNameAndRotation(chunk, location.v + 1, location.h + 1, model + pathStart, rotation)) {
+            int offx = (location.h - int(chunk.drawSize / 2)) * _tileSize;
+            int offz = (location.v - int(chunk.drawSize / 2)) * _tileSize;
 
             std::vector<voxel::Voxel> voxels;
 
             if (_factory->loadVoxels(model, offx, 0, offz, rotation, voxels)) {
-                _chunk.geometry[offset.v][offset.h] = _factory->createStaticMesh(voxels);
+                chunk.geometry[location.v][location.h] = _factory->createStaticMesh(voxels);
             }
             else {
                 _platform->logError("[TiledWorld::loadSpace] voxels from '%s' aren't loaded", model);
             }
         }
     }
+
+    std::size_t TiledWorldImpl::_getNeighbors(const Chunk &chunk, const TileLocation &location, std::uint8_t minTypeIndex, std::uint8_t maxTypeIndex, TileLocation(&out)[8]) const {
+        std::size_t resultCount = 0;
+        
+        for (int i = location.v; i <= location.v + 2; i++) {
+            if (i > 0 && i < chunk.mapSize - 1) {
+                for (int c = location.h; c <= location.h + 2; c++) {
+                    if (c > 0 && c < chunk.mapSize - 1) {
+                        if (chunk.mapSource[i][c] >= minTypeIndex && chunk.mapSource[i][c] <= maxTypeIndex) {
+                            auto result = TileLocation{ c - 1, i - 1 };
+                            
+                            if (result != location) {
+                                out[resultCount++] = result;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return resultCount;
+    }
 }
 
 namespace voxel {
-    std::shared_ptr<TiledWorld> TiledWorld::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory) {
-        return std::make_shared<TiledWorldImpl>(platform, rendering, factory);
+    std::shared_ptr<TiledWorld> TiledWorld::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives) {
+        return std::make_shared<TiledWorldImpl>(platform, rendering, factory, primitives);
     }
 }
