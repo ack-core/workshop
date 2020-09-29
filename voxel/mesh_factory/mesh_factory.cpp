@@ -7,6 +7,52 @@
 #include <sstream>
 #include <iomanip>
 
+namespace {
+    const char *g_staticMeshShaderSrc = R"(
+        fixed {
+            axis[3] : float4 = 
+                [0.0, 0.0, 1.0, 0.0]
+                [1.0, 0.0, 0.0, 0.0]
+                [0.0, 1.0, 0.0, 0.0]
+            cube[12] : float4 = 
+                [-0.5, 0.5, 0.5, 1.0]
+                [-0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [-0.5, 0.5, -0.5, 1.0]
+                [-0.5, 0.5, 0.5, 1.0]
+        }
+        inout {
+            texcoord : float2
+            normal : float3
+        }
+        vssrc {
+            float4 center = float4(instance_position.xyz, 1.0);
+            float3 camSign = _sign(_cameraPosition.xyz - instance_position.xyz);
+            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
+            output_position = _transform(cube_position, _viewProjMatrix);
+            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
+            output_normal = camSign * axis[vertex_ID >> 2];
+        }
+        fssrc {
+            float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
+            output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
+        }
+    )";
+}
+
+namespace {
+    std::weak_ptr<voxel::MeshFactory> g_factory;
+    std::shared_ptr<foundation::RenderingShader> g_staticModelShaderPtr;
+    std::shared_ptr<foundation::RenderingShader> g_dynamicModelShaderPtr;
+}
+
 namespace voxel {
     std::vector<Chunk> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, const int16_t(&offset)[3], bool centered) {
         const std::int32_t version = 150;
@@ -95,7 +141,7 @@ namespace voxel {
 }
 
 namespace voxel {
-    StaticMeshImpl::StaticMeshImpl(const std::shared_ptr<foundation::RenderingStructuredData> &geometry) : _geometry(geometry) {
+    StaticMeshImpl::StaticMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<foundation::RenderingStructuredData> &geometry) : _factory(factory), _geometry(geometry) {
         
     }
 
@@ -103,14 +149,16 @@ namespace voxel {
 
     }
 
-    const std::shared_ptr<foundation::RenderingStructuredData> &StaticMeshImpl::getGeometry() const {
-        return _geometry;
+    void StaticMeshImpl::updateAndDraw(float dtSec) {
+        _factory->getRenderingInterface().applyShader(g_staticModelShaderPtr);
+        _factory->getRenderingInterface().drawGeometry(nullptr, _geometry, 0, 12, 0, _geometry->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
     }
 }
 
 namespace voxel {
-    DynamicMeshImpl::DynamicMeshImpl(const std::shared_ptr<Model> &model)
-        : _model(model)
+    DynamicMeshImpl::DynamicMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<Model> &model)
+        : _factory(factory)
+        , _model(model)
     {
         ::memset(_transform, 0, 16 * sizeof(float));
     }
@@ -142,7 +190,7 @@ namespace voxel {
         }
     }
 
-    void DynamicMeshImpl::update(float dtSec) {
+    void DynamicMeshImpl::updateAndDraw(float dtSec) {
         if (_currentAnimation) {
             std::uint32_t frame = std::uint32_t(_time * _currentAnimation->frameRate);
 
@@ -174,22 +222,6 @@ namespace voxel {
             _currentFrame = 0;
         }
     }
-
-    const float(&DynamicMeshImpl::getTransform() const)[16]{
-        return _transform;
-    }
-
-    const std::shared_ptr<foundation::RenderingStructuredData> &DynamicMeshImpl::getGeometry() const {
-        return _model->voxels;
-    }
-
-    const std::uint32_t DynamicMeshImpl::getFrameStartIndex() const {
-        return _model->frames[_currentFrame].index;
-    }
-
-    const std::uint32_t DynamicMeshImpl::getFrameSize() const {
-        return _model->frames[_currentFrame].size;
-    }
 }
 
 namespace voxel {
@@ -197,11 +229,21 @@ namespace voxel {
         : _platform(platform)
         , _rendering(rendering)
     {
-
+        g_staticModelShaderPtr = rendering->createShader("static_voxel_mesh", g_staticMeshShaderSrc,
+            // vertex
+            {
+                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
+            },
+            // instance
+            {
+                {"position", foundation::RenderingShaderInputFormat::SHORT4},
+                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
+            }
+        );
     }
 
     MeshFactoryImpl::~MeshFactoryImpl() {
-
+        g_staticModelShaderPtr = nullptr;
     }
 
     bool MeshFactoryImpl::loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) {
@@ -266,9 +308,9 @@ namespace voxel {
         return true;
     }
 
-    std::shared_ptr<StaticMesh> MeshFactoryImpl::createStaticMesh(const std::vector<Voxel> &voxels) {
-        std::shared_ptr<foundation::RenderingStructuredData> geometry = _rendering->createData(&voxels[0], uint32_t(voxels.size()), sizeof(Voxel));
-        std::shared_ptr<StaticMesh> result = std::make_shared<StaticMeshImpl>(geometry);
+    std::shared_ptr<StaticMesh> MeshFactoryImpl::createStaticMesh(const Voxel *voxels, std::size_t count) {
+        std::shared_ptr<foundation::RenderingStructuredData> geometry = _rendering->createData(voxels, uint32_t(count), sizeof(Voxel));
+        std::shared_ptr<StaticMesh> result = std::make_shared<StaticMeshImpl>(shared_from_this(), geometry);
         return result;
     }
 
@@ -278,7 +320,7 @@ namespace voxel {
 
         auto index = _models.find(resourcePath);
         if (index != _models.end() && (model = index->second.lock()) != nullptr) {
-            result = std::make_shared<DynamicMeshImpl>(model);
+            result = std::make_shared<DynamicMeshImpl>(shared_from_this(), model);
         }
         else {
             std::string infoPath = std::string(resourcePath) + ".info";
@@ -334,7 +376,7 @@ namespace voxel {
                     }
 
                     model->voxels = _rendering->createData(&voxels[0], totalVoxelCount, sizeof(Voxel));
-                    result = std::make_shared<DynamicMeshImpl>(model);
+                    result = std::make_shared<DynamicMeshImpl>(shared_from_this(), model);
                 }
                 else {
                     _platform->logError("[MeshFactory::createDynamicMesh] No frames loaded for '%s'", modelPath.data());
@@ -345,10 +387,18 @@ namespace voxel {
         result->setTransform(position, rotationXZ);
         return result;
     }
+
+    foundation::RenderingInterface &MeshFactoryImpl::getRenderingInterface() {
+        return *_rendering;
+    }
 }
 
 namespace voxel {
     std::shared_ptr<MeshFactory> MeshFactory::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering) {
-        return std::make_shared<MeshFactoryImpl>(platform, rendering);
+        std::shared_ptr<MeshFactory> factory = g_factory.lock();
+        if (!factory) {
+            g_factory = factory = std::make_shared<MeshFactoryImpl>(platform, rendering);
+        }
+        return factory;
     }
 }

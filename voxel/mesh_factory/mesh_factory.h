@@ -20,39 +20,39 @@ namespace voxel {
         std::vector<Frame> frames;
     };
 
+    class MeshFactoryImpl;
+
     class StaticMeshImpl : public StaticMesh {
     public:
-        StaticMeshImpl(const std::shared_ptr<foundation::RenderingStructuredData> &geometry);
+        StaticMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<foundation::RenderingStructuredData> &geometry);
         ~StaticMeshImpl() override;
 
-        const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const override;
+        void updateAndDraw(float dtSec) override;
 
     private:
+        std::shared_ptr<MeshFactoryImpl> _factory;
         std::shared_ptr<foundation::RenderingStructuredData> _geometry;
     };
 
     class DynamicMeshImpl : public DynamicMesh {
     public:
-        DynamicMeshImpl(const std::shared_ptr<Model> &model);
+        DynamicMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<Model> &model);
         ~DynamicMeshImpl() override;
 
         void setTransform(const float(&position)[3], float rotationXZ) override;
         void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished, bool cycled, bool resetAnimationTime) override;
-        void update(float dtSec) override;
 
-        const float(&getTransform() const)[16] override;
-        const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const override;
-        const std::uint32_t getFrameStartIndex() const override;
-        const std::uint32_t getFrameSize() const override;
+        void updateAndDraw(float dtSec) override;
 
     private:
+        std::shared_ptr<MeshFactoryImpl> _factory;
         std::shared_ptr<Model> _model;
-        Model::Animation *_currentAnimation = nullptr;
 
+        Model::Animation *_currentAnimation = nullptr;
         std::function<void(DynamicMesh &)> _finished;
-        
-        float _transform[16];
+
         float _time = 0.0f;
+        float _transform[16];
         
         bool _cycled = false;
 
@@ -60,15 +60,17 @@ namespace voxel {
         std::uint32_t _currentFrame = 0;
     };
 
-    class MeshFactoryImpl : public MeshFactory {
+    class MeshFactoryImpl : public std::enable_shared_from_this<MeshFactoryImpl>, public MeshFactory {
     public:
         MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering);
         ~MeshFactoryImpl() override;
 
         bool loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) override;
 
-        std::shared_ptr<StaticMesh> createStaticMesh(const std::vector<Voxel> &voxels) override;
+        std::shared_ptr<StaticMesh> createStaticMesh(const Voxel *voxels, std::size_t count) override;
         std::shared_ptr<DynamicMesh> createDynamicMesh(const char *resourcePath, const float(&position)[3], float rotationXZ) override;
+
+        foundation::RenderingInterface &getRenderingInterface();
 
     private:
         std::shared_ptr<foundation::PlatformInterface> _platform;
