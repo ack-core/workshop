@@ -12,46 +12,6 @@
 #include <iomanip>
 #include <queue>
 
-namespace {
-    const char *g_staticMeshShader = R"(
-        fixed {
-            axis[3] : float4 = 
-                [0.0, 0.0, 1.0, 0.0]
-                [1.0, 0.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0, 0.0]
-            cube[12] : float4 = 
-                [-0.5, 0.5, 0.5, 1.0]
-                [-0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [-0.5, 0.5, -0.5, 1.0]
-                [-0.5, 0.5, 0.5, 1.0]
-        }
-        inout {
-            texcoord : float2
-            normal : float3
-        }
-        vssrc {
-            float4 center = float4(instance_position.xyz, 1.0);
-            float3 camSign = _sign(_cameraPosition.xyz - instance_position.xyz);
-            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
-            output_position = _transform(cube_position, _viewProjMatrix);
-            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
-            output_normal = camSign * axis[vertex_ID >> 2];
-        }
-        fssrc {
-            float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
-            output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
-        }
-    )";
-}
-
 namespace voxel {
     TiledWorldImpl::TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives)
         : _platform(platform)
@@ -59,17 +19,7 @@ namespace voxel {
         , _factory(factory)
         , _primitives(primitives)
     {
-        _shader = rendering->createShader("static_voxel_mesh", g_staticMeshShader,
-            // vertex
-            {
-                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-            },
-            // instance
-            {
-                {"position", foundation::RenderingShaderInputFormat::SHORT4},
-                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
-            }
-        );
+
     }
 
     TiledWorldImpl::~TiledWorldImpl() {
@@ -478,11 +428,10 @@ namespace voxel {
 
     void TiledWorldImpl::updateAndDraw(float dtSec) {
         _rendering->applyTextures({ _palette.get() });
-        _rendering->applyShader(_shader);
 
         for (int i = 0; i < _chunk.drawSize; i++) {
             for (int c = 0; c < _chunk.drawSize; c++) {
-                _rendering->drawGeometry(nullptr, _chunk.geometry[i][c]->getGeometry(), 0, 12, 0, _chunk.geometry[i][c]->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
+                _chunk.geometry[i][c]->updateAndDraw(dtSec);
             }
         }
 
@@ -653,7 +602,7 @@ namespace voxel {
             std::vector<voxel::Voxel> voxels;
 
             if (_factory->loadVoxels(model, offx, 0, offz, rotation, voxels)) {
-                chunk.geometry[location.v][location.h] = _factory->createStaticMesh(voxels);
+                chunk.geometry[location.v][location.h] = _factory->createStaticMesh(&voxels[0], voxels.size());
             }
             else {
                 _platform->logError("[TiledWorld::loadSpace] voxels from '%s' aren't loaded", model);

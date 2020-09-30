@@ -26,7 +26,6 @@ namespace voxel {
         std::shared_ptr<foundation::PlatformInterface> _platform;
         std::shared_ptr<foundation::RenderingInterface> _rendering;
         std::shared_ptr<foundation::RenderingTexture2D> _palette;
-        std::shared_ptr<foundation::RenderingShader> _shader;
 
         std::shared_ptr<gears::Primitives> _primitives;
         std::shared_ptr<voxel::MeshFactory> _factory;
