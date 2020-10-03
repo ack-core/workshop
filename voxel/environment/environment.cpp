@@ -13,9 +13,8 @@
 #include <queue>
 
 namespace voxel {
-    TiledWorldImpl::TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives)
+    TiledWorldImpl::TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives)
         : _platform(platform)
-        , _rendering(rendering)
         , _factory(factory)
         , _primitives(primitives)
     {
@@ -154,34 +153,6 @@ namespace voxel {
                 }
             }
 
-            // palette
-
-            std::unique_ptr<std::uint8_t[]> paletteData;
-            std::size_t paletteSize;
-
-            if (_platform->loadFile(palettePath.data(), paletteData, paletteSize)) {
-                upng_t *upng = upng_new_from_bytes(paletteData.get(), unsigned long(paletteSize));
-
-                if (upng != nullptr) {
-                    if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-                        if (upng_get_format(upng) == UPNG_RGBA8 && upng_get_width(upng) == 256 && upng_get_height(upng) == 1) {
-                            _palette = _rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 256, 1, { upng_get_buffer(upng) });
-                        }
-                        else {
-                            _platform->logError("[TiledWorld::loadSpace] '%s' is not 256x1 RGBA png file", palettePath.data());
-                        }
-                    }
-                    else {
-                        _platform->logError("[TiledWorld::loadSpace] '%s' is not a valid png file", palettePath.data());
-                    }
-
-                    upng_free(upng);
-                }
-            }
-            else {
-                _platform->logError("[TiledWorld::loadSpace] '%s' not found", palettePath.data());
-            }
-
             // map
 
             std::unique_ptr<std::uint8_t[]> mapData;
@@ -191,7 +162,7 @@ namespace voxel {
                 upng_t *upng = upng_new_from_bytes(mapData.get(), unsigned long(mapSize));
 
                 if (upng != nullptr) {
-                    if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
+                    if (*reinterpret_cast<const unsigned *>(mapData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
                         if (upng_get_format(upng) == UPNG_RGBA8) {
                             if (upng_get_width(upng) == upng_get_height(upng)) {
                                 const std::uint32_t *pngmem = reinterpret_cast<const std::uint32_t *>(upng_get_buffer(upng));
@@ -427,8 +398,6 @@ namespace voxel {
     }
 
     void TiledWorldImpl::updateAndDraw(float dtSec) {
-        _rendering->applyTextures({ _palette.get() });
-
         for (int i = 0; i < _chunk.drawSize; i++) {
             for (int c = 0; c < _chunk.drawSize; c++) {
                 _chunk.geometry[i][c]->updateAndDraw(dtSec);
@@ -634,7 +603,7 @@ namespace voxel {
 }
 
 namespace voxel {
-    std::shared_ptr<TiledWorld> TiledWorld::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives) {
-        return std::make_shared<TiledWorldImpl>(platform, rendering, factory, primitives);
+    std::shared_ptr<TiledWorld> TiledWorld::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives) {
+        return std::make_shared<TiledWorldImpl>(platform, factory, primitives);
     }
 }

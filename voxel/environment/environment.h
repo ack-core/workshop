@@ -2,7 +2,7 @@
 namespace voxel {
     class TiledWorldImpl : public TiledWorld {
     public:
-        TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives);
+        TiledWorldImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives);
         ~TiledWorldImpl() override;
 
         void clear() override;
@@ -24,11 +24,8 @@ namespace voxel {
 
     private:
         std::shared_ptr<foundation::PlatformInterface> _platform;
-        std::shared_ptr<foundation::RenderingInterface> _rendering;
-        std::shared_ptr<foundation::RenderingTexture2D> _palette;
-
-        std::shared_ptr<gears::Primitives> _primitives;
         std::shared_ptr<voxel::MeshFactory> _factory;
+        std::shared_ptr<gears::Primitives> _primitives;
 
         std::string _spaceDirectory;
         int _tileSize = 0;

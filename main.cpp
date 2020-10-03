@@ -1,14 +1,14 @@
 
+#include <chrono>
+
 #include "foundation/platform/interfaces.h"
 #include "foundation/rendering/interfaces.h"
 
-#include "foundation/math.h"
-#include "foundation/camera.h"
-#include "foundation/primitives.h"
-#include "foundation/orbit_camera_controller.h"
+#include "game_castle/enemy_controller/interfaces.h"
+#include "game_castle/castle_controller/interfaces.h"
+#include "game_castle/projectiles/interfaces.h"
 
-#include "voxel/mesh_factory/interfaces.h"
-#include "voxel/environment/interfaces.h"
+#include "foundation/orbit_camera_controller.h"
 
 #include "thirdparty/upng/upng.h"
 
@@ -100,7 +100,19 @@ const std::uint32_t tx[] = {
     0xff00ffff, 0xffffffff, 0xffffffff, 0xffff00ff,
 };
 
+struct A : datahub::Scope {
+    int d = 100;
+};
+
+struct B : datahub::Scope {
+    int g = 999;
+};
+
+datahub::DataHub<game::CastleDataHub, game::EnemyDataHub> dh;
+
 int main(int argc, const char * argv[]) {
+    srand(unsigned(std::chrono::steady_clock::now().time_since_epoch().count()));
+
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
 
@@ -109,12 +121,16 @@ int main(int argc, const char * argv[]) {
     
     auto camera = std::make_shared<gears::Camera>(platform);
     auto orbitCameraController = std::make_unique<gears::OrbitCameraController>(platform, camera);
-    auto primitives = std::make_unique<gears::Primitives>(rendering);
+    auto primitives = std::make_shared<gears::Primitives>(rendering);
 
-    auto meshes = voxel::MeshFactory::instance(platform, rendering);
-    auto environment = voxel::TiledWorld::instance(platform, rendering, meshes);
+    auto meshes = voxel::MeshFactory::instance(platform, rendering, "palette.png");
+    auto environment = voxel::TiledWorld::instance(platform, meshes, primitives);
+    
+    //auto castleController = game::CastleController::instance(platform, rendering, environment, dh);
+    //auto enemyController = game::EnemyController::instance(platform, rendering, dh, dh);
 
-    environment->loadSpace("space_3");
+    environment->loadSpace("forest");
+    //castleController->startBattle();
 
     auto uiShader = rendering->createShader("ui", g_srcUI, {
         {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID},
@@ -128,13 +144,12 @@ int main(int argc, const char * argv[]) {
 
     math::transform3f idtransform = math::transform3f::identity();
 
-
     platform->run([&](float dtSec) {
         rendering->updateCameraTransform(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
         rendering->prepareFrame();
 
-        primitives->drawAxis();
-        primitives->drawCircleXZ({}, 1.0f, { 1, 0, 0, 1 });
+        //primitives->drawAxis();
+        //primitives->drawCircleXZ({}, 1.0f, { 1, 0, 0, 1 });
 
         environment->updateAndDraw(dtSec);
 

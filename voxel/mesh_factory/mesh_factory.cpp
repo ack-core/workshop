@@ -2,6 +2,8 @@
 #include "interfaces.h"
 #include "mesh_factory.h"
 
+#include "thirdparty/upng/upng.h"
+
 #include "foundation/parsing.h"
 
 #include <sstream>
@@ -51,6 +53,7 @@ namespace {
     std::weak_ptr<voxel::MeshFactory> g_factory;
     std::shared_ptr<foundation::RenderingShader> g_staticModelShaderPtr;
     std::shared_ptr<foundation::RenderingShader> g_dynamicModelShaderPtr;
+    std::shared_ptr<foundation::RenderingTexture2D> g_palette;
 }
 
 namespace voxel {
@@ -151,6 +154,7 @@ namespace voxel {
 
     void StaticMeshImpl::updateAndDraw(float dtSec) {
         _factory->getRenderingInterface().applyShader(g_staticModelShaderPtr);
+        _factory->getRenderingInterface().applyTextures({ g_palette.get() });
         _factory->getRenderingInterface().drawGeometry(nullptr, _geometry, 0, 12, 0, _geometry->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
     }
 }
@@ -225,7 +229,7 @@ namespace voxel {
 }
 
 namespace voxel {
-    MeshFactoryImpl::MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering)
+    MeshFactoryImpl::MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath)
         : _platform(platform)
         , _rendering(rendering)
     {
@@ -240,6 +244,32 @@ namespace voxel {
                 {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
             }
         );
+
+        std::unique_ptr<std::uint8_t[]> paletteData;
+        std::size_t paletteSize;
+
+        if (_platform->loadFile(palettePath, paletteData, paletteSize)) {
+            upng_t *upng = upng_new_from_bytes(paletteData.get(), unsigned long(paletteSize));
+
+            if (upng != nullptr) {
+                if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
+                    if (upng_get_format(upng) == UPNG_RGBA8 && upng_get_width(upng) == 256 && upng_get_height(upng) == 1) {
+                        g_palette = _rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 256, 1, { upng_get_buffer(upng) });
+                    }
+                    else {
+                        _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' is not 256x1 RGBA png file", palettePath);
+                    }
+                }
+                else {
+                    _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' is not a valid png file", palettePath);
+                }
+
+                upng_free(upng);
+            }
+        }
+        else {
+            _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' not found", palettePath);
+        }
     }
 
     MeshFactoryImpl::~MeshFactoryImpl() {
@@ -394,10 +424,10 @@ namespace voxel {
 }
 
 namespace voxel {
-    std::shared_ptr<MeshFactory> MeshFactory::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering) {
+    std::shared_ptr<MeshFactory> MeshFactory::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath) {
         std::shared_ptr<MeshFactory> factory = g_factory.lock();
         if (!factory) {
-            g_factory = factory = std::make_shared<MeshFactoryImpl>(platform, rendering);
+            g_factory = factory = std::make_shared<MeshFactoryImpl>(platform, rendering, palettePath);
         }
         return factory;
     }

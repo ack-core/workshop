@@ -16,7 +16,6 @@ namespace voxel {
 
     class StaticMesh {
     public:
-        //virtual const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const = 0;
         virtual void updateAndDraw(float dtSec) = 0;
 
     protected:
@@ -28,13 +27,7 @@ namespace voxel {
         virtual void setTransform(const float (&position)[3], float rotationXZ) = 0;
         virtual void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished = nullptr, bool cycled = false, bool resetAnimationTime = true) = 0;
 
-        //virtual void update(float dtSec) = 0;
         virtual void updateAndDraw(float dtSec) = 0;
-
-        //virtual const float(&getTransform() const)[16] = 0;
-        //virtual const std::shared_ptr<foundation::RenderingStructuredData> &getGeometry() const = 0;
-        //virtual const std::uint32_t getFrameStartIndex() const = 0;
-        //virtual const std::uint32_t getFrameSize() const = 0;
 
     protected:
         virtual ~DynamicMesh() = default;
@@ -42,7 +35,7 @@ namespace voxel {
 
     class MeshFactory {
     public:
-        static std::shared_ptr<MeshFactory> instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering);
+        static std::shared_ptr<MeshFactory> instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath);
 
     public:
         enum class Rotation : std::uint32_t {

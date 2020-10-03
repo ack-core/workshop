@@ -28,7 +28,7 @@ namespace voxel {
     class TiledWorld {
     public:
         static const std::uint8_t NONEXIST_TILE = 0xff;
-        static std::shared_ptr<TiledWorld> instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives);
+        static std::shared_ptr<TiledWorld> instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<voxel::MeshFactory> &factory, const std::shared_ptr<gears::Primitives> &primitives);
 
     public:
         virtual void clear() = 0;

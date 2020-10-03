@@ -62,7 +62,7 @@ namespace voxel {
 
     class MeshFactoryImpl : public std::enable_shared_from_this<MeshFactoryImpl>, public MeshFactory {
     public:
-        MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering);
+        MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath);
         ~MeshFactoryImpl() override;
 
         bool loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) override;
@@ -75,6 +75,7 @@ namespace voxel {
     private:
         std::shared_ptr<foundation::PlatformInterface> _platform;
         std::shared_ptr<foundation::RenderingInterface> _rendering;
+
         std::unordered_map<std::string, std::weak_ptr<Model>> _models;
         std::unordered_map<std::string, voxel::Chunk> _cache;
     };
