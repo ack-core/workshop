@@ -11,17 +11,17 @@ namespace gears {
 
         void drawLine(const math::vector3f &p1, const math::vector3f &p2, const math::color &rgba) {
             static const char *lineShader = R"(
-            const {
-                position[2] : float4
-                color : float4
-            }
-            vssrc {
-                output_position = _transform(position[vertex_ID], _viewProjMatrix);
-            }
-            fssrc {
-                output_color = color;
-            }
-        )";
+                const {
+                    position[2] : float4
+                    color : float4
+                }
+                vssrc {
+                    output_position = _transform(position[vertex_ID], _viewProjMatrix);
+                }
+                fssrc {
+                    output_color = color;
+                }
+            )";
 
             struct {
                 math::vector4f position1;
@@ -46,20 +46,20 @@ namespace gears {
 
         inline void drawCircleXZ(const math::vector3f &position, float radius, const math::color &rgba) {
             static const char *circleShader = R"(
-            const {
-                position_radius : float4
-                color : float4
-            }
-            vssrc {
-                float4 p = float4(position_radius.xyz, 1);
-                p.x = p.x + position_radius.w * _cos(6.2831853 * float(vertex_ID) / 36.0);
-                p.z = p.z + position_radius.w * _sin(6.2831853 * float(vertex_ID) / 36.0);
-                output_position = _transform(p, _viewProjMatrix);
-            }
-            fssrc {
-                output_color = color;
-            }
-        )";
+                const {
+                    position_radius : float4
+                    color : float4
+                }
+                vssrc {
+                    float4 p = float4(position_radius.xyz, 1);
+                    p.x = p.x + position_radius.w * _cos(6.2831853 * float(vertex_ID) / 36.0);
+                    p.z = p.z + position_radius.w * _sin(6.2831853 * float(vertex_ID) / 36.0);
+                    output_position = _transform(p, _viewProjMatrix);
+                }
+                fssrc {
+                    output_color = color;
+                }
+            )";
 
             struct {
                 math::vector4f positionRadius;
@@ -73,7 +73,7 @@ namespace gears {
             if (_circleShader == nullptr) {
                 _circleShader = _rendering->createShader("primitives_circle", circleShader, {
                     {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-                    });
+                });
             }
 
             _rendering->applyShader(_circleShader, &circleData);
@@ -90,32 +90,32 @@ namespace gears {
 
         void drawAxis() {
             static const char *axisShader = R"(
-            fixed {
-                coords[6] : float4 = 
-                    [0.0, 0.0, 0.0, 1.0][1000.0, 0.0, 0.0, 1.0]
-                    [0.0, 0.0, 0.0, 1.0][0.0, 1000.0, 0.0, 1.0]
-                    [0.0, 0.0, 0.0, 1.0][0.0, 0.0, 1000.0, 1.0]
-                colors[3] : float4 = 
-                    [1.0, 0.0, 0.0, 1.0]
-                    [0.0, 1.0, 0.0, 1.0]
-                    [0.0, 0.0, 1.0, 1.0]
-            }
-            inout {
-                color : float4
-            }
-            vssrc {
-                output_position = _transform(coords[vertex_ID], _viewProjMatrix);
-                output_color = colors[vertex_ID >> 1];
-            }
-            fssrc {
-                output_color = input_color;
-            }
-        )";
+                fixed {
+                    coords[6] : float4 = 
+                        [0.0, 0.0, 0.0, 1.0][1000.0, 0.0, 0.0, 1.0]
+                        [0.0, 0.0, 0.0, 1.0][0.0, 1000.0, 0.0, 1.0]
+                        [0.0, 0.0, 0.0, 1.0][0.0, 0.0, 1000.0, 1.0]
+                    colors[3] : float4 = 
+                        [1.0, 0.0, 0.0, 1.0]
+                        [0.0, 1.0, 0.0, 1.0]
+                        [0.0, 0.0, 1.0, 1.0]
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    output_position = _transform(coords[vertex_ID], _viewProjMatrix);
+                    output_color = colors[vertex_ID >> 1];
+                }
+                fssrc {
+                    output_color = input_color;
+                }
+            )";
 
             if (_axisShader == nullptr) {
                 _axisShader = _rendering->createShader("primitives_axis", axisShader, {
                     {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-                    });
+                });
             }
 
             _rendering->applyShader(_axisShader);

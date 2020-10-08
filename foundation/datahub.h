@@ -21,11 +21,11 @@ namespace datahub {
     public:
         template<typename L, void(L:: *)(Args...) const = &L::operator()> Token operator+=(L &&lambda) {
             Token token = reinterpret_cast<Token>(_uniqueid++);
-            return _handlers.emplace_back(token, std::move(lambda)), token;
+            return _handlers.emplace_back(std::move(token), std::move(lambda)), token;
         }
         void operator-=(Token id) {
             _handlers.erase(std::remove_if(std::begin(_handlers), std::end(_handlers), [id](const auto &item) {
-                return item.first == reinterpret_cast<std::size_t>(id);
+                return item.first == id;
             }), std::end(_handlers));
         }
 
@@ -37,7 +37,7 @@ namespace datahub {
         }
 
     private:
-        std::vector<std::pair<std::size_t, std::function<void(Args...)>>> _handlers;
+        std::vector<std::pair<Token, std::function<void(Args...)>>> _handlers;
         std::size_t _uniqueid = 0x1;
     };
 

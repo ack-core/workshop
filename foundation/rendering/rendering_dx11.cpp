@@ -186,7 +186,7 @@ namespace foundation {
             ComPtr<ID3D11Texture2D> defRTTexture;
             _swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void **>(defRTTexture.GetAddressOf()));
 
-            D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = { DXGI_FORMAT_R8G8B8A8_UNORM }; //
+            D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB }; //
             renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
             renderTargetViewDesc.Texture2D.MipSlice = 0;
 
