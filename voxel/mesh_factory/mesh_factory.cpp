@@ -4,6 +4,7 @@
 
 #include "thirdparty/upng/upng.h"
 
+#include "foundation/math.h"
 #include "foundation/parsing.h"
 
 #include <sstream>
@@ -39,6 +40,47 @@ namespace {
             float3 camSign = _sign(_cameraPosition.xyz - instance_position.xyz);
             float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
             output_position = _transform(cube_position, _viewProjMatrix);
+            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
+            output_normal = camSign * axis[vertex_ID >> 2];
+        }
+        fssrc {
+            float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
+            output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
+        }
+    )";
+
+    const char *g_dynamicMeshShaderSrc = R"(
+        fixed {
+            axis[3] : float4 = 
+                [0.0, 0.0, 1.0, 0.0]
+                [1.0, 0.0, 0.0, 0.0]
+                [0.0, 1.0, 0.0, 0.0]
+            cube[12] : float4 = 
+                [-0.5, 0.5, 0.5, 1.0]
+                [-0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [-0.5, 0.5, -0.5, 1.0]
+                [-0.5, 0.5, 0.5, 1.0]
+        }
+        const {
+            modelTransform : matrix4
+        }
+        inout {
+            texcoord : float2
+            normal : float3
+        }
+        vssrc {
+            float4 center = float4(instance_position.xyz, 1.0);
+            float3 camSign = _sign(_transform(modelTransform, float4(_cameraPosition.xyz - _transform(center, modelTransform).xyz, 0)).xyz);
+            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
+            output_position = _transform(_transform(cube_position, modelTransform), _viewProjMatrix);
             output_texcoord = float2(instance_scale_color.w / 255.0, 0);
             output_normal = camSign * axis[vertex_ID >> 2];
         }
@@ -164,7 +206,7 @@ namespace voxel {
         : _factory(factory)
         , _model(model)
     {
-        ::memset(_transform, 0, 16 * sizeof(float));
+        *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f::identity();
     }
 
     DynamicMeshImpl::~DynamicMeshImpl() {
@@ -172,7 +214,7 @@ namespace voxel {
     }
 
     void DynamicMeshImpl::setTransform(const float(&position)[3], float rotationXZ) {
-
+        *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f::transform3f({0, 1, 0}, rotationXZ).translated(*reinterpret_cast<const math::vector3f *>(position));
     }
 
     void DynamicMeshImpl::playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished, bool cycled, bool resetAnimationTime) {
@@ -225,6 +267,10 @@ namespace voxel {
         else {
             _currentFrame = 0;
         }
+
+        _factory->getRenderingInterface().applyShader(g_dynamicModelShaderPtr, _transform);
+        _factory->getRenderingInterface().applyTextures({ g_palette.get() });
+        _factory->getRenderingInterface().drawGeometry(nullptr, _model->voxels, 0, 12, 0, _model->voxels->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
     }
 }
 
@@ -234,6 +280,18 @@ namespace voxel {
         , _rendering(rendering)
     {
         g_staticModelShaderPtr = rendering->createShader("static_voxel_mesh", g_staticMeshShaderSrc,
+            // vertex
+            {
+                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
+            },
+            // instance
+            {
+                {"position", foundation::RenderingShaderInputFormat::SHORT4},
+                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
+            }
+        );
+
+        g_dynamicModelShaderPtr = rendering->createShader("dynamic_voxel_mesh", g_dynamicMeshShaderSrc,
             // vertex
             {
                 {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
@@ -274,6 +332,7 @@ namespace voxel {
 
     MeshFactoryImpl::~MeshFactoryImpl() {
         g_staticModelShaderPtr = nullptr;
+        g_dynamicModelShaderPtr = nullptr;
     }
 
     bool MeshFactoryImpl::loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) {
@@ -414,7 +473,10 @@ namespace voxel {
             }
         }
 
-        result->setTransform(position, rotationXZ);
+        if (result) {
+            result->setTransform(position, rotationXZ);
+        }
+
         return result;
     }
 
