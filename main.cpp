@@ -4,8 +4,8 @@
 #include "foundation/platform/interfaces.h"
 #include "foundation/rendering/interfaces.h"
 
-#include "game_castle/enemy_controller/interfaces.h"
 #include "game_castle/castle_controller/interfaces.h"
+#include "game_castle/creature_controller/interfaces.h"
 #include "game_castle/projectiles/interfaces.h"
 
 #include "foundation/orbit_camera_controller.h"
@@ -100,15 +100,7 @@ const std::uint32_t tx[] = {
     0xff00ffff, 0xffffffff, 0xffffffff, 0xffff00ff,
 };
 
-struct A : datahub::Scope {
-    int d = 100;
-};
-
-struct B : datahub::Scope {
-    int g = 999;
-};
-
-datahub::DataHub<game::CastleDataHub, game::EnemyDataHub> dh;
+datahub::DataHub<game::CastleDataHub, game::CreatureDataHub> dh;
 
 int main(int argc, const char * argv[]) {
     srand(unsigned(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -126,11 +118,19 @@ int main(int argc, const char * argv[]) {
     auto meshes = voxel::MeshFactory::instance(platform, rendering, "palette.png");
     auto environment = voxel::TiledWorld::instance(platform, meshes, primitives);
     
-    //auto castleController = game::CastleController::instance(platform, rendering, environment, dh);
-    //auto enemyController = game::EnemyController::instance(platform, rendering, dh, dh);
+    auto castleController = game::CastleController::instance(platform, environment, primitives, dh);
+    auto creatureController = game::CreatureController::instance(platform, meshes, environment, primitives, dh, dh);
 
     environment->loadSpace("forest");
-    //castleController->startBattle();
+    castleController->startBattle();
+    creatureController->startBattle();
+
+    {
+        ((game::CreatureDataHub &)dh).enemies.add([&](game::CreatureDataHub::Enemy &data) {
+            data.health = 10.0;
+            data.position = environment->getHelperPosition("enemies", 0);
+        });
+    }
 
     auto uiShader = rendering->createShader("ui", g_srcUI, {
         {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID},
@@ -148,9 +148,11 @@ int main(int argc, const char * argv[]) {
         rendering->updateCameraTransform(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
         rendering->prepareFrame();
 
-        //primitives->drawAxis();
+        primitives->drawAxis();
         //primitives->drawCircleXZ({}, 1.0f, { 1, 0, 0, 1 });
 
+        castleController->updateAndDraw(dtSec);
+        creatureController->updateAndDraw(dtSec);
         environment->updateAndDraw(dtSec);
 
         //rendering->applyTextures({ palette.get() });
@@ -163,6 +165,8 @@ int main(int argc, const char * argv[]) {
 
         rendering->presentFrame(dtSec);
     });
+
+    ((game::CreatureDataHub &)dh).enemies.clear();
 
     return 0;
 }

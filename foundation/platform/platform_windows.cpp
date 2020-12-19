@@ -318,7 +318,7 @@ namespace foundation {
             }
 
             auto curFrameTime = std::chrono::high_resolution_clock::now();
-            float dt = float(std::chrono::duration_cast<std::chrono::microseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
+            float dt = float(std::chrono::duration_cast<std::chrono::milliseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
             updateAndDraw(dt);
             prevFrameTime = curFrameTime;
         }
