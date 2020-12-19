@@ -52,6 +52,17 @@ function(workshop)
 	set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY_RELEASE "${m_source_root}/binary")
 endfunction()
 
+#game-specific
+
+function(game_specific)
+	get_filename_component(m_source_root "${PROJECT_SOURCE_DIR}" ABSOLUTE)
+	add_subdirectory("${m_source_root}/game_castle")
+	
+	target_link_libraries(workshop castle_controller)
+	target_link_libraries(workshop creature_controller)
+	target_link_libraries(workshop projectiles)
+endfunction()
+
 function(resources)
 	get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLUTE)
 	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary" ABSOLUTE)
@@ -67,6 +78,7 @@ endfunction()
 project(workshop CXX)
 
 workshop()
+game_specific()
 resources()
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT workshop)
