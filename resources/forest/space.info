@@ -9,6 +9,6 @@ helperTypeCount = 2
 	castle = 1
 		center	32	32
 	enemies = 3
-		center	1	1
+		center	2	5
 		center	63	1
 		center	63	63
