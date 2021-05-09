@@ -24,10 +24,11 @@ namespace foundation {
             _count
         };
 
-        Key key;
+        Key key = Key(0xFF);
     };
 
     struct PlatformMouseEventArgs {
+        bool captured = false;
         mutable float coordinateX = 0.0f;
         mutable float coordinateY = 0.0f;
         bool  isLeftButtonPressed = false;

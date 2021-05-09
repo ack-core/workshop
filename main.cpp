@@ -4,169 +4,145 @@
 #include "foundation/platform/interfaces.h"
 #include "foundation/rendering/interfaces.h"
 
-#include "game_castle/castle_controller/interfaces.h"
-#include "game_castle/creature_controller/interfaces.h"
-#include "game_castle/projectiles/interfaces.h"
-
+#include "foundation/primitives.h"
 #include "foundation/orbit_camera_controller.h"
+
+#include "voxel/mesh_factory/interfaces.h"
 
 #include "thirdparty/upng/upng.h"
 
-const char *g_srcUI = R"(
-    fixed {
-        test[3] : float4 = 
-            [1.0, 0.5, 0.25, 0.125]
-            [1.0, 0.5, 0.25, 0.125]
-            [1.0, 0.5, 0.25, 0.125]
+namespace {
+    math::vector2f wallA{ 1.0f, 2.0f };
+    math::vector2f wallB{ 3.0f, 2.0f };
+    math::vector2f wallC{ 3.0f, 5.0f };
+    math::vector3f position;
+    
+    int mx = 0, mz = 0;
+}
 
-        test1 : float3 = [1.0, 0.5, 0.25]
-    }
-    const {
-        position_size : float4
-        texcoord : float4
-    }
-    inout {
-        texcoord : float2
-    }
-    vssrc {
-        float2 screenTransform = float2(2.0, -2.0) / _renderTargetBounds.xy;
-        float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-        output_texcoord = _lerp(vertexCoord, texcoord.xy, texcoord.zw);
-        vertexCoord = vertexCoord * position_size.zw + position_size.xy;
-        output_position = float4(vertexCoord.xy * screenTransform + float2(-1.0, 1.0), 0.5, 1); //
-    }
-    fssrc {
-        output_color = _tex2d(0, input_texcoord);
-    }
-)";
+void restrictMovement(math::vector3f &movement, const math::vector3f& origin, float radius, const math::vector2f &wA, const math::vector2f &wB) {
+    const math::vector3f nextPosition = origin + movement;
+    const math::vector2f wallAB = wB - wA;
 
-const char *g_staticMeshShader = R"(
-        const {
-            modelTransform : matrix4
-        }
-        inter {
-            texcoord : float2
-        }
-        vssrc {
-            float4 center = float4(instance_position.xyz, 1.0);
-            float3 camSign = _sign(_transform(modelTransform, float4(_cameraPosition.xyz - _transform(center, modelTransform).xyz, 0)).xyz);
-            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center;
-            out_position = _transform(cube_position, _viewProjMatrix * modelTransform);
-            inter.texcoord = float2(float(instance_scale_color.w) / 255.0, 0);
-        }
-        fssrc {
-            out_color = _tex2d(0, inter.texcoord);
-        }
-    )";
+    float k = (nextPosition.xz - wA).dot(wallAB) / wallAB.lengthSq();
+    math::vector2f kpos;
 
-const char *g_dynamicMeshShader = R"(
-        fixed {
-            cube[12] : float4 = 
-                [-0.5, 0.5, 0.5, 1.0]
-                [-0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [-0.5, 0.5, -0.5, 1.0]
-                [-0.5, 0.5, 0.5, 1.0]
-        }
-        const {
-            modelTransform : matrix4
-        }
-        inout {
-            texcoord : float2
-        }
-        vssrc {
-            float4 center = float4(instance_position.xyz, 1.0);
-            float3 camSign = _sign(_transform(modelTransform, float4(_cameraPosition.xyz - _transform(center, modelTransform).xyz, 0)).xyz);
-            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
-            output_position = _transform(cube_position, _transform(_viewProjMatrix, modelTransform));
-            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
-        }
-        fssrc {
-            output_color = _tex2d(0, input_texcoord);
-        }
-    )";
+    if (k <= 0.0f) {
+        kpos = wA;
+    }
+    else if (k >= 1.0f) {
+        kpos = wB;
+    }
+    else {
+        kpos = wA + k * wallAB;
+    }
 
-const std::uint32_t tx[] = {
-    0xff00ffff, 0xffffffff, 0xffffffff, 0xffff00ff,
-    0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
-    0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
-    0xff00ffff, 0xffffffff, 0xffffffff, 0xffff00ff,
-};
-
-datahub::DataHub<game::CastleDataHub, game::CreatureDataHub> dh;
+    const math::vector3f pp = { nextPosition.x - kpos.x, 0.0f, nextPosition.z - kpos.y };
+    const float pplen = pp.length();
+    
+    if (radius > pplen) {
+        float ppkoeff = (radius - pplen) / pplen;
+        movement = movement + pp * ppkoeff;
+    }
+}
 
 int main(int argc, const char * argv[]) {
-    srand(unsigned(std::chrono::steady_clock::now().time_since_epoch().count()));
-
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
 
-    auto texture = rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 4, 4, { (const std::uint8_t *)tx });
-    auto files = platform->formFileList("");
-    
     auto camera = std::make_shared<gears::Camera>(platform);
-    auto orbitCameraController = std::make_unique<gears::OrbitCameraController>(platform, camera);
+
+    //auto orbitCameraController = std::make_unique<gears::OrbitCameraController>(platform, camera);
     auto primitives = std::make_shared<gears::Primitives>(rendering);
 
     auto meshes = voxel::MeshFactory::instance(platform, rendering, "palette.png");
-    auto environment = voxel::TiledWorld::instance(platform, meshes, primitives);
-    
-    auto castleController = game::CastleController::instance(platform, environment, primitives, dh);
-    auto creatureController = game::CreatureController::instance(platform, meshes, environment, primitives, dh, dh);
 
-    environment->loadSpace("forest");
-    castleController->startBattle();
-    creatureController->startBattle();
+    platform->addMouseEventHandlers(
+        [](const foundation::PlatformMouseEventArgs &args) {
 
-    {
-        ((game::CreatureDataHub &)dh).enemies.add([&](game::CreatureDataHub::Enemy &data) {
-            data.health = 10.0;
-            data.position = environment->getHelperPosition("enemies", 0);
-        });
-    }
+        },
+        [camera](const foundation::PlatformMouseEventArgs &args) {
+            const math::vector3f worldDir = camera->screenToWorld(math::vector2f(args.coordinateX, args.coordinateY));
+            math::scalar k = -camera->getPosition().y / worldDir.y;
 
-    auto uiShader = rendering->createShader("ui", g_srcUI, {
-        {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID},
-    });
+            if (k > 0)
+            {
+                const math::vector2f worldPos = { camera->getPosition().x + k * worldDir.x, camera->getPosition().z + k * worldDir.z };
+                const math::vector2f wallAB = wallB - wallA;
 
-    struct {
-        float p[4] = { 0, 0, 50.0, 50.0 };
-        float t[4] = { 0, 0, 1, 1 };
-    }
-    uidata;
+                float k = (worldPos - wallA).dot(wallAB) / wallAB.lengthSq();
+                math::vector2f pp;
 
-    math::transform3f idtransform = math::transform3f::identity();
+                if (k <= 0.0f) {
+                    pp = wallA;
+                }
+                else if (k >= 1.0f) {
+                    pp = wallB;
+                }
+                else {
+                    pp = wallA + k * wallAB;
+                }
+                
+                printf("-->> %2.2f %2.2f\n", pp.x, pp.y);
+            }
+
+        }, 
+        [](const foundation::PlatformMouseEventArgs &args) {
+        
+        }
+    );
+
+    platform->addKeyboardEventHandlers(
+        [](const foundation::PlatformKeyboardEventArgs &args) {
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::W) {
+                mz -= 1;
+            }
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::S) {
+                mz += 1;
+            }
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::A) {
+                mx -= 1;
+            }
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::D) {
+                mx += 1;
+            }
+        },
+        [](const foundation::PlatformKeyboardEventArgs &args) {
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::W) {
+                mz += 1;
+            }
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::S) {
+                mz -= 1;
+            }
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::A) {
+                mx += 1;
+            }
+            if (args.key == foundation::PlatformKeyboardEventArgs::Key::D) {
+                mx -= 1;
+            }
+        }
+    );
 
     platform->run([&](float dtSec) {
+        math::vector3f movement = math::vector3f(float(mx), 0.0f, float(mz)).normalized(4.0f * dtSec);
+
+        restrictMovement(movement, position, 0.5f, wallB, wallC);
+        restrictMovement(movement, position, 0.5f, wallA, wallB);
+
+        position.xz = position.xz + movement.xz;
+        camera->setLookAtByRight(position + math::vector3f{ 0.0f, 20.0f, 10.0f }, position, { 1, 0, 0 });
+
         rendering->updateCameraTransform(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
         rendering->prepareFrame();
 
         primitives->drawAxis();
-        //primitives->drawCircleXZ({}, 1.0f, { 1, 0, 0, 1 });
+        primitives->drawLine(math::vector3f(wallA.x, 0, wallA.y), math::vector3f(wallB.x, 0, wallB.y), math::color(1.0f, 1.0f, 1.0f, 1.0f));
+        primitives->drawLine(math::vector3f(wallB.x, 0, wallB.y), math::vector3f(wallC.x, 0, wallC.y), math::color(1.0f, 1.0f, 1.0f, 1.0f));
 
-        castleController->updateAndDraw(dtSec);
-        creatureController->updateAndDraw(dtSec);
-        environment->updateAndDraw(dtSec);
-
-        //rendering->applyTextures({ palette.get() });
-        //rendering->applyShader(voxelShader, idtransform.flat16);
-        //rendering->drawGeometry(nullptr, mesh->getGeometry(), 0, 12, 0, mesh->getGeometry()->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
-
-        rendering->applyShader(uiShader, &uidata);
-        rendering->applyTextures({ texture.get() });
-        rendering->drawGeometry(4, foundation::RenderingTopology::TRIANGLESTRIP);
+        primitives->drawCircleXZ(position, 0.5f, { 1, 0, 0, 1 });
 
         rendering->presentFrame(dtSec);
     });
-
-    ((game::CreatureDataHub &)dh).enemies.clear();
 
     return 0;
 }

@@ -57,11 +57,35 @@ namespace {
 namespace {
     LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
         static bool mouseCaptured = false;
-        static float mouseLastX;
-        static float mouseLastY;
 
         if (uMsg == WM_CLOSE) {
             g_killed = true;
+        }
+        if (uMsg == WM_KEYDOWN) {
+            if ((lParam & 0x40000000) == 0) {
+                if (wParam >= 'A' && wParam <= 'Z') {
+                    foundation::PlatformKeyboardEventArgs keyboardEvent;
+                    keyboardEvent.key = foundation::PlatformKeyboardEventArgs::Key(wParam - 'A');
+                    
+                    for (const auto &entry : g_keyboardCallbacks) {
+                        if (entry.keyboardDown) {
+                            entry.keyboardDown(keyboardEvent);
+                        }
+                    }
+                }
+            }
+        }
+        if (uMsg == WM_KEYUP) {
+            if (wParam >= 'A' && wParam <= 'Z') {
+                foundation::PlatformKeyboardEventArgs keyboardEvent;
+                keyboardEvent.key = foundation::PlatformKeyboardEventArgs::Key(wParam - 'A');
+
+                for (const auto &entry : g_keyboardCallbacks) {
+                    if (entry.keyboardUp) {
+                        entry.keyboardUp(keyboardEvent);
+                    }
+                }
+            }
         }
         if (uMsg == WM_LBUTTONDOWN) {
             mouseCaptured = true;
@@ -69,8 +93,8 @@ namespace {
 
             foundation::PlatformMouseEventArgs mouseEvent;
 
-            mouseLastX = mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseLastY = mouseEvent.coordinateY = float(short(HIWORD(lParam)));
+            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
+            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
 
             for (const auto &entry : g_mouseCallbacks) {
                 if (entry.mousePress) {
@@ -83,8 +107,8 @@ namespace {
 
             foundation::PlatformMouseEventArgs mouseEvent;
 
-            mouseLastX = mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseLastY = mouseEvent.coordinateY = float(short(HIWORD(lParam)));
+            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
+            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
 
             for (const auto &entry : g_mouseCallbacks) {
                 if (entry.mouseRelease) {
@@ -95,24 +119,27 @@ namespace {
             ::ReleaseCapture();
         }
         if (uMsg == WM_MOUSEMOVE) {
-            if (mouseCaptured) {
-                foundation::PlatformMouseEventArgs mouseEvent;
+            foundation::PlatformMouseEventArgs mouseEvent;
 
-                mouseLastX = mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-                mouseLastY = mouseEvent.coordinateY = float(short(HIWORD(lParam)));
+            mouseEvent.captured = mouseCaptured;
+            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
+            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
 
-                for (const auto &entry : g_mouseCallbacks) {
-                    if (entry.mouseMove) {
-                        entry.mouseMove(mouseEvent);
-                    }
+            for (const auto &entry : g_mouseCallbacks) {
+                if (entry.mouseMove) {
+                    entry.mouseMove(mouseEvent);
                 }
             }
         }
         if (uMsg == 0x020A) {
             foundation::PlatformMouseEventArgs mouseEvent;
 
-            mouseEvent.coordinateX = mouseLastX;
-            mouseEvent.coordinateY = mouseLastY;
+            POINT cursorPosition;
+            GetCursorPos(&cursorPosition);
+            ScreenToClient(hwnd, &cursorPosition);
+
+            mouseEvent.coordinateX = float(cursorPosition.x);
+            mouseEvent.coordinateY = float(cursorPosition.y);
             mouseEvent.wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1;
 
             for (const auto &entry : g_mouseCallbacks) {
@@ -257,7 +284,9 @@ namespace foundation {
         std::function<void(const PlatformKeyboardEventArgs &)> &&down,
         std::function<void(const PlatformKeyboardEventArgs &)> &&up
     ) {
-        return nullptr;
+        EventHandlersToken result{ reinterpret_cast<EventHandlersToken>(g_callbacksIdSource++) };
+        g_keyboardCallbacks.emplace_front(KeyboardCallbacksEntry{ result, std::move(down), std::move(up) });
+        return result;
     }
 
     EventHandlersToken WindowsPlatform::addInputEventHandlers(
