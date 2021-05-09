@@ -60,7 +60,17 @@ namespace gears {
         }
 
         math::vector3f screenToWorld(const math::vector2f &screenCoord) const {
-            return {};
+            math::transform3f tv = _viewMatrix;
+            tv._41 = 0.0f;
+            tv._42 = 0.0f;
+            tv._43 = 0.0f;
+
+            math::transform3f tvp = (tv * _projMatrix).inverted();
+            math::vector3f tcoord = math::vector3f(screenCoord, 0.0f);
+            tcoord.x = 2.0f * tcoord.x / _platform->getNativeScreenWidth() - 1.0f;
+            tcoord.y = 1.0f - 2.0f * tcoord.y / _platform->getNativeScreenHeight();
+            
+            return tcoord.transformed(tvp, true).normalized();
         }
 
         math::vector2f worldToScreen(const math::vector3f &pointInWorld) const {
