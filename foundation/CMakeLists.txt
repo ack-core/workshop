@@ -1,44 +1,46 @@
 
-function(foundation)
-	get_filename_component(m_source_root "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
+get_filename_component(m_source_root "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
-	set(
-		m_sources_list
-		"${m_source_root}/platform/interfaces.h"
-		"${m_source_root}/platform/platform_windows.h"
-		"${m_source_root}/platform/platform_windows.cpp"
-		"${m_source_root}/platform/platform_ios.h"
-		"${m_source_root}/platform/platform_ios.cpp"
-	)
-	source_group("" FILES ${m_sources_list})
-	add_library(platform ${m_sources_list})
-	
-	set(
-		m_sources_list
-		"${m_source_root}/rendering/interfaces.h"
-		"${m_source_root}/rendering/rendering_dx11.h"
-		"${m_source_root}/rendering/rendering_dx11.cpp"
-	)
-	source_group("" FILES ${m_sources_list})
-	add_library(rendering ${m_sources_list})	
+set(
+	m_sources_platform_list
+	"${m_source_root}/platform.h"
+	"${m_source_root}/platform_windows.h"
+	"${m_source_root}/platform_windows.cpp"
+	"${m_source_root}/platform_ios.h"
+	"${m_source_root}/platform_ios.cpp"
+)
+source_group("" FILES ${m_sources_platform_list})
 
-	set(
-		m_sources_list
-		"${m_source_root}/math.h"
-		"${m_source_root}/camera.h"
-		"${m_source_root}/primitives.h"
-		"${m_source_root}/parsing.h"
-		"${m_source_root}/orbit_camera_controller.h"
-		"${m_source_root}/datahub.h"
-		"${m_source_root}/fsm.h"
-	)
-	source_group("" FILES ${m_sources_list})
-	add_custom_target(gears SOURCES ${m_sources_list})
-	
-	set_property(TARGET platform PROPERTY FOLDER "foundation")
-	set_property(TARGET rendering PROPERTY FOLDER "foundation")
-	set_property(TARGET gears PROPERTY FOLDER "foundation")
+set(
+	m_sources_rendering_list
+	"${m_source_root}/rendering.h"
+	"${m_source_root}/rendering_dx11.h"
+	"${m_source_root}/rendering_dx11.cpp"
+)
+source_group("" FILES ${m_sources_rendering_list})
 
-endfunction()
+set(
+	m_sources_sound_list
+	"${m_source_root}/sound.h"
+)
+source_group("" FILES ${m_sources_sound_list})
 
-foundation()
+set(
+	m_sources_gears_list
+	"${m_source_root}/gears/math.h"
+	"${m_source_root}/gears/camera.h"
+	"${m_source_root}/gears/primitives.h"
+	"${m_source_root}/gears/parsing.h"
+	"${m_source_root}/gears/orbit_camera_controller.h"
+)
+source_group("gears" FILES ${m_sources_gears_list})
+
+add_library(foundation
+	${m_sources_platform_list}
+	${m_sources_rendering_list}
+	${m_sources_sound_list}
+	${m_sources_gears_list}
+)	
+
+set_property(TARGET foundation PROPERTY FOLDER "engine")
+
