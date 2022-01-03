@@ -4,7 +4,7 @@
 // + gamepad
 // + file operations
 
-#include "platform.h"
+#ifdef PLATFORM_WINDOWS
 
 #include <chrono>
 #include <list>
@@ -12,8 +12,6 @@
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
-
-#ifdef PLATFORM_WINDOWS
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN

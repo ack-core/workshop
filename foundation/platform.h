@@ -8,8 +8,10 @@
 #include <functional>
 
 namespace foundation {
+    using EventHandlerToken = void *;
+
     struct FileEntry {
-        std::string fullPath;
+        std::string name;
         bool isDirectory = false;
     };
 
@@ -23,29 +25,49 @@ namespace foundation {
             F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
             _count
         };
+        enum class EventType {
+            UNKNOWN,
+            PRESS,
+            RELEASE
+        };
 
+        EventType type = EventType::UNKNOWN;
         Key key = Key(0xFF);
     };
 
     struct PlatformMouseEventArgs {
-        bool captured = false;
+        enum class EventType {
+            UNKNOWN,
+            PRESS,
+            MOVE,
+            RELEASE
+        };
+    
+        EventType type = EventType::UNKNOWN;
         mutable float coordinateX = 0.0f;
         mutable float coordinateY = 0.0f;
-        bool  isLeftButtonPressed = false;
-        bool  isRightButtonPressed = false;
-        int   wheel = 0;
+        bool captured = false;
+        bool isLeftButton = false;
+        bool isRightButton = false;
+        int wheel = 0;
     };
 
     struct PlatformTouchEventArgs {
+        enum class EventType {
+            UNKNOWN,
+            START,
+            MOVE,
+            FINISH
+        };
+    
+        EventType type = EventType::UNKNOWN;
         float coordinateX = 0.0f;
         float coordinateY = 0.0f;
         std::size_t touchID = std::size_t(-1);
     };
 
-    struct PlatformGamepadEventArgs {
-    };
-
-    using EventHandlersToken = void *;
+    // TODO:
+    struct PlatformGamepadEventArgs {};
 
     // Interface provides low-level core methods
     //
@@ -54,7 +76,7 @@ namespace foundation {
         static std::shared_ptr<PlatformInterface> instance();
 
     public:
-        // Thread-safe logging
+        // Logging
         virtual void logMsg(const char *fmt, ...) = 0;
         virtual void logError(const char *fmt, ...) = 0;
 
@@ -72,8 +94,8 @@ namespace foundation {
 
         // Returns native screen size in pixels
         //
-        virtual float getNativeScreenWidth() const = 0;
-        virtual float getNativeScreenHeight() const = 0;
+        virtual float getScreenWidth() const = 0;
+        virtual float getScreenHeight() const = 0;
 
         // Connecting render with native window. Used by RenderingInterface implementation. Must be called before run()
         // @context  - platform-dependent handle (ID3D11Device * for windows, EAGLContext * for gles, etc)
@@ -92,49 +114,32 @@ namespace foundation {
         // Set handlers for keyboard
         // @return nullptr if not supported
         //
-        virtual EventHandlersToken addKeyboardEventHandlers(
-            std::function<void(const PlatformKeyboardEventArgs &)> &&down,
-            std::function<void(const PlatformKeyboardEventArgs &)> &&up
-        ) = 0;
+        virtual EventHandlerToken addKeyboardEventHandler(std::function<void(const PlatformKeyboardEventArgs &)> &&handler) = 0;
 
-        // Set handlers for User's input (physical or virtual keyboard)
+        // Set handlers for User's input (virtual keyboard)
         // @return nullptr if not supported
         //
-        virtual EventHandlersToken addInputEventHandlers(
-            std::function<void(const char(&utf8char)[4])> &&input,
-            std::function<void()> &&backspace
-        ) = 0;
+        virtual EventHandlerToken addInputEventHandler(std::function<void(const char(&utf8char)[4])> &&input, std::function<void()> &&backspace) = 0;
 
         // Set handlers for PC mouse
         // coordinateX/coordinateY of PlatformMouseEventArgs struct can be replaced with user's value (PlatformInterface will set new pointer coordinates)
         // @return nullptr if not supported
         //
-        virtual EventHandlersToken addMouseEventHandlers(
-            std::function<void(const PlatformMouseEventArgs &)> &&press,
-            std::function<void(const PlatformMouseEventArgs &)> &&move,
-            std::function<void(const PlatformMouseEventArgs &)> &&release
-        ) = 0;
+        virtual EventHandlerToken addMouseEventHandler(std::function<void(const PlatformMouseEventArgs &)> &&handler) = 0;
 
         // Set handlers for touch
         // @return nullptr if not supported
         //
-        virtual EventHandlersToken addTouchEventHandlers(
-            std::function<void(const PlatformTouchEventArgs &)> &&start,
-            std::function<void(const PlatformTouchEventArgs &)> &&move,
-            std::function<void(const PlatformTouchEventArgs &)> &&finish
-        ) = 0;
+        virtual EventHandlerToken addTouchEventHandler(std::function<void(const PlatformTouchEventArgs &)> &&handler) = 0;
 
         // Set handlers for gamepad
         // @return nullptr if not supported
         //
-        virtual EventHandlersToken addGamepadEventHandlers(
-            std::function<void(const PlatformGamepadEventArgs &)> &&buttonPress,
-            std::function<void(const PlatformGamepadEventArgs &)> &&buttonRelease
-        ) = 0;
+        virtual EventHandlerToken addGamepadEventHandler(std::function<void(const PlatformGamepadEventArgs &)> &&handler) = 0;
 
         // Remove handlers of any type
         //
-        virtual void removeEventHandlers(EventHandlersToken token) = 0;
+        virtual void removeEventHandler(EventHandlerToken token) = 0;
 
         // Start platform update cycle
         // This method blocks execution until application exited

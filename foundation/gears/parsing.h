@@ -7,7 +7,12 @@ namespace gears {
         return stream;
     }
     template <char Ch, char... Chs> std::istream &expect(std::istream &stream) {
-        (stream >> std::ws).peek() == Ch ? stream.ignore() : stream.setstate(std::ios_base::failbit);
+        if ((stream >> std::ws).peek() == Ch) {
+            stream.ignore();
+        }
+        else {
+            stream.setstate(std::ios_base::failbit);
+        }
         return expect<Chs...>(stream);
     }
 

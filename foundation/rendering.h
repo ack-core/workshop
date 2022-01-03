@@ -22,13 +22,12 @@ namespace foundation {
     };
 
     enum class RenderingShaderInputFormat {
-        VERTEX_ID = 0,
+        ID = 0,
         HALF2, HALF4,
         FLOAT1, FLOAT2, FLOAT3, FLOAT4,
         SHORT2, SHORT4,
         SHORT2_NRM, SHORT4_NRM,
-        BYTE4,
-        BYTE4_NRM,
+        BYTE4, BYTE4_NRM,
         INT1, INT2, INT3, INT4,
         _count
     };
@@ -47,7 +46,7 @@ namespace foundation {
             const char *name;
             RenderingShaderInputFormat format;
         };
-
+        
     protected:
         virtual ~RenderingShader() = default;
     };
@@ -63,14 +62,19 @@ namespace foundation {
         virtual ~RenderingTexture2D() = default;
     };
 
-    class RenderingStructuredData {
+    class RenderingData {
     public:
         virtual std::uint32_t getCount() const = 0;
         virtual std::uint32_t getStride() const = 0;
 
     protected:
-        virtual ~RenderingStructuredData() = default;
+        virtual ~RenderingData() = default;
     };
+    
+    using RenderingShaderInputDesc = std::initializer_list<RenderingShader::Input>;
+    using RenderingShaderPtr = std::shared_ptr<RenderingShader>;
+    using RenderingTexture2DPtr = std::shared_ptr<RenderingTexture2D>;
+    using RenderingDataPtr = std::shared_ptr<RenderingData>;
 
     // Interface provides 3D-visualization methods
     //
@@ -81,32 +85,32 @@ namespace foundation {
     public:
         // Update per frame global constants
         // 
-        virtual void updateCameraTransform(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) = 0;
+        virtual void updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) = 0;
 
         // Create shader from source text
         // @name      - name that is used in error messages
-        // @vertex    - input layout for vertex shader. All such variables have 'vertex_' prefix.
-        // @instance  - input layout for vertex shader. All such variables have 'instance_' prefix.
-        // @shadersrc - generic shader source text. Example:
+        // @vtx       - input layout for vertex shader. All such variables have 'vertex_' prefix.
+        // @itc       - input layout for vertex shader. All such variables have 'instance_' prefix.
+        // @src       - generic shader source text. Example:
         //
-        // Assume that @vertex = {{"position", ShaderInput::Format::FLOAT3}, {"color", ShaderInput::Format::BYTE4_NRM}}
+        // Assume that @vtx = {{"position", ShaderInput::Format::FLOAT3}, {"color", ShaderInput::Format::BYTE4_NRM}}
         // So vertex shader has vertex_position and vertex_color input values.
         // s--------------------------------------
         //     fixed {                                           - block of permanent constants. Can be omitted if unused.
-        //         constName0 : float4 = [1.0, -3.0, 0.0, 1.0] 
+        //         constName0 : float4 = [1.0, -3.0, 0.0, 1.0]   - in the code these constants have 'fixed_' prefix
         //         constNames0[2] : float4 = [1.0, 0.3, 0.6, 0.9][0.0, 0.1, 0.2, 0.3] 
         //         constNameI : int2 = [1, -2] 
         //     }
-        //     const {                                           - block of per-apply constants. Can be omitted if unused.
-        //         constName1 : float4                           - constants of any type have names in code without prefixes
+        //     const {                                           - block of per-pass constants. Can be omitted if unused.
+        //         constName1 : float4                           - these constants have 'const_' prefix in code
         //         constNames1[16] : float4                      - spaces in/before array braces are not permitted
         //     }
-        //     cross {                                           - vertex output and fragment input. Can be omitted if unused.
-        //         varName4 : float4                             - these variables have 'input_' prefix in vssrc and '_output' in fssrc
+        //     inout {                                           - vertex output and fragment input. Can be omitted if unused.
+        //         varName4 : float4                             - these variables have 'input_' prefix in vssrc and 'output_' in fssrc
         //     }                                                 - vertex shader also has float4 'output_position' variable
         //     vssrc {
-        //         output_varName4 = _lerp(vertex_color, constName0, constName1);
-        //         out_position = _transform(float4(vertex_position, 1.0), _viewProjMatrix);
+        //         output_varName4 = _lerp(vertex_color, const_constName0, const_constName1);
+        //         output_position = _transform(float4(vertex_position, 1.0), frame_viewProjMatrix);
         //     }
         //     fssrc {                                           - fragment shader has float4 'output_color' variable
         //         output_color = input_varName4;
@@ -116,33 +120,23 @@ namespace foundation {
         //     matrix4, matrix3, float1, float2, float3, float4, int1, int2, int3, int4, uint1, uint2, uint3, uint4
         //
         // Per frame global constants:
-        //     _renderTargetBounds : float2  - render target size in pixels
-        //     _viewProjMatrix     : matrix4 - view * projection matrix
-        //     _cameraPosition     : float4  - camera position (w = 1)
-        //     _cameraDirection    : float4  - normalized camera direction (w = 0)
+        //     frame_viewProjMatrix     : matrix4 - view * projection matrix
+        //     frame_cameraPosition     : float4  - camera position (w = 1)
+        //     frame_cameraDirection    : float4  - normalized camera direction (w = 0)
+        //     frame_screenBounds       : float4  - screen size in pixels (.rg)
         //
         // Textures. There 8 texture slots. Example of getting color from the last slot: float4 color = _tex2d(7, float2(0, 0));
         //
         // Global functions:
         //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(k, v, v), _tex2d(index, v)
         //
-        virtual std::shared_ptr<RenderingShader> createShader(
-            const char *name,
-            const char *shadersrc,
-            const std::initializer_list<RenderingShader::Input> &vertex,
-            const std::initializer_list<RenderingShader::Input> &instance = {}
-        ) = 0;
+        virtual RenderingShaderPtr createShader(const char *name, const char *src, const RenderingShaderInputDesc &vtx, const RenderingShaderInputDesc &itc = {}) = 0;
 
         // Create texture from binary data
         // @w and @h    - width and height of the 0th mip layer
-        // @imgMipsData - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr
+        // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr
         //
-        virtual std::shared_ptr<RenderingTexture2D> createTexture(
-            RenderingTextureFormat format,
-            std::uint32_t width,
-            std::uint32_t height,
-            const std::initializer_list<const std::uint8_t *> &mipsData = {}
-        ) = 0;
+        virtual RenderingTexture2DPtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips = nullptr, std::uint32_t mcount = 0) = 0;
 
         // Create geometry
         // @data        - pointer to data (array of structures)
@@ -150,42 +144,34 @@ namespace foundation {
         // @stride      - size of struture
         // @return      - handle
         //
-        virtual std::shared_ptr<RenderingStructuredData> createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
+        virtual RenderingDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
 
         // TODO: render states
         // TODO: render targets
 
-        // Apply shader
-        // @shader      - shader object.
-        // @constants   - pointer to data for 'const' block. Can be nullptr (constants will not be set)
+        // Pass is a rendering scope with shader, [TODO: render targets and states]
+        // @name        - unique constant name to associate parameters
+        // @shader      - shader object
+        // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Can be nullptr (constants will not be set).
         //
-        virtual void applyShader(const std::shared_ptr<RenderingShader> &shader, const void *constants = nullptr) = 0;
+        virtual void beginPass(const char *name, const RenderingShaderPtr &shader, const void *constants) = 0;
 
-        // Apply textures. textures[i] can be nullptr (texture will not be set)
+        // Apply textures
+        // @textures    - textures[i] can be nullptr (texture and sampler at i-th position will not be set)
+        virtual void applyTextures(const RenderingTexture2D * const * textures, std::uint32_t tcount) = 0;
+        
+        // Draw vertexes from RenderingData
+        // @vertexData has layout set by current shader. Can be nullptr
         //
-        virtual void applyTextures(const std::initializer_list<const RenderingTexture2D *> &textures) = 0;
+        virtual void drawGeometry(const RenderingDataPtr &vertexData, std::uint32_t vcount, RenderingTopology topology) = 0;
 
-        // Draw vertexes without geometry
-        //
-        virtual void drawGeometry(std::uint32_t vertexCount, RenderingTopology topology = RenderingTopology::TRIANGLES) = 0;
-
-        // Draw vertexes from StructuredData
+        // Draw instanced vertexes from RenderingData
         // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //
-        virtual void drawGeometry(
-            const std::shared_ptr<RenderingStructuredData> &vertexData,
-            const std::shared_ptr<RenderingStructuredData> &instanceData,
-            std::uint32_t vertexStartIndex,
-            std::uint32_t vertexCount,
-            std::uint32_t instanceStartIndex,
-            std::uint32_t instanceCount,
-            RenderingTopology topology = RenderingTopology::TRIANGLES
-        ) = 0;
+        virtual void drawGeometry(const RenderingDataPtr &vertexData, const RenderingDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderingTopology topology) = 0;
 
-        // TODO: draw indexed geometry
-
-        virtual void prepareFrame() = 0;
-        virtual void presentFrame(float dtSec) = 0;
+        virtual void endPass() = 0;
+        virtual void presentFrame() = 0;
 
         // Get last rendered frame as a bitmap in memory
         // @imgFrame - array of size = PlatformInterface::getNativeScreenWidth * PlatformInterface::getNativeScreenHeight * 4

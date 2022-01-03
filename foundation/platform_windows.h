@@ -1,4 +1,6 @@
 
+#include "platform.h"
+
 namespace foundation {
     class WindowsPlatform : public PlatformInterface {
     public:

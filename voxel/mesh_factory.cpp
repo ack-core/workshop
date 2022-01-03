@@ -6,6 +6,8 @@
 #include "foundation/gears/math.h"
 #include "foundation/gears/parsing.h"
 
+#include <unordered_map>
+
 namespace {
     const char *g_staticMeshShaderSrc = R"(
         fixed {
@@ -287,7 +289,7 @@ namespace voxel {
         }
 
         void setTransform(const float(&position)[3], float rotationXZ) override {
-            *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f::transform3f({ 0, 1, 0 }, rotationXZ).translated(*reinterpret_cast<const math::vector3f *>(position));
+            *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f({ 0, 1, 0 }, rotationXZ).translated(*reinterpret_cast<const math::vector3f *>(position));
         }
 
         void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished, bool cycled, bool resetAnimationTime) override {
@@ -357,7 +359,7 @@ namespace voxel {
         std::size_t paletteSize;
 
         if (_platform->loadFile(palettePath, paletteData, paletteSize)) {
-            upng_t *upng = upng_new_from_bytes(paletteData.get(), unsigned long(paletteSize));
+            upng_t *upng = upng_new_from_bytes(paletteData.get(), (unsigned long)(paletteSize));
 
             if (upng != nullptr) {
                 if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {

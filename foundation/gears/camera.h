@@ -8,7 +8,7 @@ namespace gears {
     class Camera {
     public:
         Camera(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform) {
-            setLookAtByRight({ 0.0f, 60.0f, 120.0f }, { 0.0f, 0, 60.0f }, { 1, 0, 0 });
+            setLookAtByRight({ 10.0f, 10.0f, 10.0f }, { 0.0f, 0, 0.0f }, { 1, 0, -1 });
         }
 
         void setLookAtByRight(const math::vector3f &position, const math::vector3f &target, const math::vector3f &right) {
@@ -21,14 +21,14 @@ namespace gears {
             _up = nrmright.cross(nrmlook);
             _forward = nrmlook;
             _right = nrmright;
-            _updateMatrix();
+            _outdated = true;
         }
 
         void setPerspectiveProj(float fovY, float zNear, float zFar) {
             _fov = fovY;
             _zNear = zNear;
             _zFar = zFar;
-            _updateMatrix();
+            _outdated = true;
         }
 
         const math::vector3f &getPosition() const {
@@ -55,7 +55,11 @@ namespace gears {
             return _zFar;
         }
 
-        math::transform3f getVPMatrix() const {
+        math::transform3f getVPMatrix() {
+            if (_outdated) {
+                _outdated = false;
+                _updateMatrices();
+            }
             return _viewMatrix * _projMatrix;
         }
 
@@ -67,8 +71,8 @@ namespace gears {
 
             math::transform3f tvp = (tv * _projMatrix).inverted();
             math::vector3f tcoord = math::vector3f(screenCoord, 0.0f);
-            tcoord.x = 2.0f * tcoord.x / _platform->getNativeScreenWidth() - 1.0f;
-            tcoord.y = 1.0f - 2.0f * tcoord.y / _platform->getNativeScreenHeight();
+            tcoord.x = 2.0f * tcoord.x / _platform->getScreenWidth() - 1.0f;
+            tcoord.y = 1.0f - 2.0f * tcoord.y / _platform->getScreenHeight();
             
             return tcoord.transformed(tvp, true).normalized();
         }
@@ -92,10 +96,11 @@ namespace gears {
         float _fov = 50.0f;
         float _zNear = 0.1f;
         float _zFar = 10000.0f;
-
-        void _updateMatrix() {
-            float aspect = _platform->getNativeScreenWidth() / _platform->getNativeScreenHeight();
-
+        
+        bool _outdated = true;
+        void _updateMatrices() {
+            float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
+            
             _viewMatrix = math::transform3f::lookAtRH(_position, _target, _up);
             _projMatrix = math::transform3f::perspectiveFovRH(_fov / 180.0f * float(3.14159f), aspect, _zNear, _zFar);
         }
