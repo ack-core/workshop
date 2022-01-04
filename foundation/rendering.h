@@ -37,7 +37,7 @@ namespace foundation {
         R8UN,          // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         _count
     };
-
+    
     class RenderingShader {
     public:
         // Field description for Vertex Shader input struct
@@ -51,7 +51,7 @@ namespace foundation {
         virtual ~RenderingShader() = default;
     };
 
-    class RenderingTexture2D {
+    class RenderingTexture {
     public:
         virtual std::uint32_t getWidth() const = 0;
         virtual std::uint32_t getHeight() const = 0;
@@ -59,7 +59,7 @@ namespace foundation {
         virtual RenderingTextureFormat getFormat() const = 0;
 
     protected:
-        virtual ~RenderingTexture2D() = default;
+        virtual ~RenderingTexture() = default;
     };
 
     class RenderingData {
@@ -73,8 +73,19 @@ namespace foundation {
     
     using RenderingShaderInputDesc = std::initializer_list<RenderingShader::Input>;
     using RenderingShaderPtr = std::shared_ptr<RenderingShader>;
-    using RenderingTexture2DPtr = std::shared_ptr<RenderingTexture2D>;
+    using RenderingTexturePtr = std::shared_ptr<RenderingTexture>;
     using RenderingDataPtr = std::shared_ptr<RenderingData>;
+
+    // Render targets decription that is passed to 'beginPass'
+    //
+    struct RenderingPassConfig {
+        RenderingTexturePtr target = nullptr;
+        float clear[4] = {0.0f};
+    
+        RenderingPassConfig() {} // change nothing
+        RenderingPassConfig(float r, float g, float b) : clear{r, g, b, 1.0f} {} // set default RT and crear it
+        RenderingPassConfig(float r, float g, float b, const RenderingTexturePtr &rt) : clear{r, g, b, 1.0f}, target(rt) {} // set rt-texture and clear it
+    };
 
     // Interface provides 3D-visualization methods
     //
@@ -136,7 +147,7 @@ namespace foundation {
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr
         //
-        virtual RenderingTexture2DPtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips = nullptr, std::uint32_t mcount = 0) = 0;
+        virtual RenderingTexturePtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips = nullptr, std::uint32_t mcount = 0) = 0;
 
         // Create geometry
         // @data        - pointer to data (array of structures)
@@ -152,14 +163,17 @@ namespace foundation {
         // Pass is a rendering scope with shader, [TODO: render targets and states]
         // @name        - unique constant name to associate parameters
         // @shader      - shader object
-        // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Can be nullptr (constants will not be set).
         //
-        virtual void beginPass(const char *name, const RenderingShaderPtr &shader, const void *constants) = 0;
+        virtual void beginPass(const char *name, const RenderingShaderPtr &shader, const RenderingPassConfig &cfg = {}) = 0;
 
         // Apply textures
         // @textures    - textures[i] can be nullptr (texture and sampler at i-th position will not be set)
-        virtual void applyTextures(const RenderingTexture2D * const * textures, std::uint32_t tcount) = 0;
-        
+        virtual void applyTextures(const RenderingTexture * const * textures, std::uint32_t tcount) = 0;
+
+        // Update constant buffer of the current shader
+        // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
+        virtual void applyShaderConstants(const void *constants) = 0;
+
         // Draw vertexes from RenderingData
         // @vertexData has layout set by current shader. Can be nullptr
         //

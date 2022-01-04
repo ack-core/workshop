@@ -85,30 +85,30 @@ namespace foundation {
 }
 
 namespace foundation {
-    MetalTexture2D::MetalTexture2D(RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+    MetalTexture::MetalTexture(RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
         : _format(fmt)
         , _width(w)
         , _height(h)
         , _mipCount(mipCount)
     {}
 
-    MetalTexture2D::~MetalTexture2D() {
+    MetalTexture::~MetalTexture() {
     
     }
 
-    std::uint32_t MetalTexture2D::getWidth() const {
+    std::uint32_t MetalTexture::getWidth() const {
         return _width;
     }
 
-    std::uint32_t MetalTexture2D::getHeight() const {
+    std::uint32_t MetalTexture::getHeight() const {
         return _height;
     }
 
-    std::uint32_t MetalTexture2D::getMipCount() const {
+    std::uint32_t MetalTexture::getMipCount() const {
         return _mipCount;
     }
 
-    RenderingTextureFormat MetalTexture2D::getFormat() const {
+    RenderingTextureFormat MetalTexture::getFormat() const {
         return _format;
     }
 }
@@ -157,71 +157,33 @@ namespace foundation {
         frameConstants->screenBounds[1] = _platform->getScreenHeight();
     }
 
-    static const char *sh = R"(
-        using namespace metal;
-        
-        struct _FrameData {
-            float4x4 viewProjMatrix;
-            float4 cameraPosition;
-            float4 cameraDirection;
-            float4 renderTargetBounds;
-        };
-        constant float4 const_multiplier[3] = {
-            float4(0.3f, 0.3f, 0.3f, 1.0f),
-            float4(0.3f, 0.3f, 0.3f, 1.0f),
-            float4(0.3f, 0.3f, 0.3f, 1.0f),
-        };
-        constant float4 const_mul00000 = {
-            float4(0.3f, 0.3f, 0.3f, 1.0f),
-        };
-        struct _Constants {
-            float4 tmp;
-        };
-        struct _VSIn {
-            float3 position [[attribute(0)]];
-            float4 color [[attribute(1)]];
-        };
-        struct _InOut {
-            float4 position [[position]];
-            float4 color;
-        };
-        vertex _InOut main_vertex(unsigned int vid [[vertex_id]], _VSIn input [[stage_in]], constant _FrameData &framedata [[buffer(2)]], constant _Constants &constants [[buffer(3)]]) {
-            _InOut result;
-            result.position = framedata.viewProjMatrix * float4(input.position, 1.0);
-            result.color = input.color + const_multiplier[vid >> 1];
-            return result;
-        }
-        fragment float4 main_fragment(_InOut input [[stage_in]]) {
-            return input.color;
-        }
-    )";
-
     RenderingShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const RenderingShaderInputDesc &vertex, const RenderingShaderInputDesc &instance) {
         std::shared_ptr<RenderingShader> result;
         std::istringstream input(shadersrc);
         const std::string indent = "    ";
         
-        auto shaderGetTypeSize = [](const std::string &varname, const std::string &typeName, std::string &nativeTypeName, std::size_t &elementSize, std::size_t &elementCount) {
+        auto shaderGetTypeSize = [](const std::string &varname, const std::string &typeName, bool packed, std::string &nativeTypeName, std::size_t &size, std::size_t &count) {
             struct {
                 const char *typeName;
                 const char *nativeTypeName;
-                std::size_t size;
+                const char *nativeTypeNamePacked;
+                std::size_t packedSize;
             }
             typeSizeTable[] = {
-                {"float1",  "float",           4},
-                {"float2",  "packed_float2",   8},
-                {"float3",  "packed_float3",   12},
-                {"float4",  "float4",          16},
-                {"int1",    "int",             4},
-                {"int2",    "packed_int2",     8},
-                {"int3",    "packed_int3",     12},
-                {"int4",    "int4",            16},
-                {"uint1",   "uint",            4},
-                {"uint2",   "packed_uint2",    8},
-                {"uint3",   "packed_uint3",    12},
-                {"uint4",   "uint4",           16},
-                {"matrix3", "packed_float3x3", 36},
-                {"matrix4", "float4x4",        64},
+                {"float1",  "float",    "float",           4},
+                {"float2",  "float2",   "packed_float2",   8},
+                {"float3",  "float3",   "packed_float3",   12},
+                {"float4",  "float4",   "float4",          16},
+                {"int1",    "int",      "int",             4},
+                {"int2",    "int2",     "packed_int2",     8},
+                {"int3",    "int3",     "packed_int3",     12},
+                {"int4",    "int4",     "int4",            16},
+                {"uint1",   "uint",     "uint",            4},
+                {"uint2",   "uint2",    "packed_uint2",    8},
+                {"uint3",   "uint3",    "packed_uint3",    12},
+                {"uint4",   "uint4",    "uint4",           16},
+                {"matrix3", "float3x3", "packed_float3x3", 36},
+                {"matrix4", "float4x4", "float4x4",        64},
             };
             
             int  multiply = 1;
@@ -234,9 +196,9 @@ namespace foundation {
 
             for (auto index = std::begin(typeSizeTable); index != std::end(typeSizeTable); ++index) {
                 if (index->typeName == typeName) {
-                    nativeTypeName = index->nativeTypeName;
-                    elementSize = index->size;
-                    elementCount = multiply;
+                    nativeTypeName = packed ? index->nativeTypeNamePacked : index->nativeTypeName;
+                    size = index->packedSize;
+                    count = multiply;
                     return true;
                 }
             }
@@ -252,7 +214,7 @@ namespace foundation {
                     std::size_t elementSize, elementCount;
                     std::string nativeTypeName;
                     
-                    if (shaderGetTypeSize(varname, arg, nativeTypeName, elementSize, elementCount)) {
+                    if (shaderGetTypeSize(varname, arg, false, nativeTypeName, elementSize, elementCount)) {
                         output += "constant " + nativeTypeName + " fixed_" + varname + " = {\n";
                         for (std::size_t i = 0; i < elementCount; i++) {
                             output += indent + nativeTypeName + "(";
@@ -274,7 +236,7 @@ namespace foundation {
             return true;
         };
 
-        auto formVarsBlock = [&shaderGetTypeSize, &indent](std::istringstream &stream, std::string &output) {
+        auto formVarsBlock = [&shaderGetTypeSize, &indent](std::istringstream &stream, std::string &output, bool packed) {
             std::string varname, arg;
             std::uint32_t totalLength = 0;
             
@@ -283,7 +245,7 @@ namespace foundation {
                     std::size_t elementSize, elementCount;
                     std::string nativeTypeName;
                     
-                    if (shaderGetTypeSize(varname, arg, nativeTypeName, elementSize, elementCount)) {
+                    if (shaderGetTypeSize(varname, arg, packed, nativeTypeName, elementSize, elementCount)) {
                         output += indent + nativeTypeName + " " + varname + ";\n";
                         totalLength += elementSize * elementCount;
                         continue;
@@ -348,6 +310,7 @@ namespace foundation {
         std::string nativeShader =
             "using namespace metal;\n"
             "\n"
+            "#define _sign(a) (2.0 * step(0.0, a) - 1.0)\n"
             "#define _sin(a) sin(a)\n"
             "#define _cos(a) cos(a)\n"
             "#define _transform(a, b) (b * a)\n"
@@ -383,7 +346,7 @@ namespace foundation {
             if (constBlockDone == false && blockName == "const") {
                 nativeShader += "struct _Constants {\n";
                 
-                if ((constBlockLength = formVarsBlock(input, nativeShader)) == 0) {
+                if ((constBlockLength = formVarsBlock(input, nativeShader, true)) == 0) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'const' block\n", name);
                     completed = false;
                     break;
@@ -395,7 +358,7 @@ namespace foundation {
             if (inoutBlockDone == false && blockName == "inout") {
                 nativeShader += "struct _InOut {\n    float4 position [[position]];\n";
                 
-                if (formVarsBlock(input, nativeShader) == 0) {
+                if (formVarsBlock(input, nativeShader, false) == 0) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'inout' block\n", name);
                     completed = false;
                     break;
@@ -486,7 +449,7 @@ namespace foundation {
                 if (instanceIDName.length()) {
                     nativeShader += "    unsigned int " + instanceIDName + " [[instance_id]],\n";
                 }
-                if (vdesc.layouts[0].stride) { // if there is something but vertex_id
+                if (vdesc.layouts[0].stride || vdesc.layouts[1].stride) { // if there is something but vertex_id/instance_id
                     nativeShader += "    _VSIn input [[stage_in]],\n";
                 }
                 if (constBlockLength) {
@@ -546,7 +509,7 @@ namespace foundation {
         }
         
         nativeShader = makeLines(nativeShader);
-        printf("----------\n%s\n------------\n", nativeShader.data());
+        //printf("----------\n%s\n------------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -580,8 +543,8 @@ namespace foundation {
         return result;
     }
 
-    RenderingTexture2DPtr MetalRendering::createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips, std::uint32_t mcount) {
-        std::shared_ptr<RenderingTexture2D> result;
+    RenderingTexturePtr MetalRendering::createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips, std::uint32_t mcount) {
+        std::shared_ptr<RenderingTexture> result;
 
         return result;
     }
@@ -591,7 +554,7 @@ namespace foundation {
         return std::make_shared<MetalData>(buffer, count, stride);
     }
     
-    void MetalRendering::beginPass(const char *name, const RenderingShaderPtr &shader, const void *constants) {
+    void MetalRendering::beginPass(const char *name, const RenderingShaderPtr &shader, const RenderingPassConfig &cfg) {
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
         }
@@ -602,9 +565,13 @@ namespace foundation {
             
             _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
-            //_currentPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-            _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.7, 0.7, 0.7, 1.0);
+
+            if (cfg.clear[3] > 0.1f) { // alpha is 1.0f if RenderingPassConfig is non-default constructed
+                _currentPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+                _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.clear[0], cfg.clear[1], cfg.clear[2], cfg.clear[3]);
+            }
+
             _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
             
             const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
@@ -635,12 +602,6 @@ namespace foundation {
                 }
                 
                 if (state) {
-                    id<MTLBuffer> constantBuffer = platformShader->getConstantBuffer();
-                    
-                    if (constantBuffer && constants) {
-                        std::memcpy([constantBuffer contents], constants, constantBuffer.length);
-                    }
-                    
                     [_currentCommandEncoder setRenderPipelineState:state];
                     _currentShader = shader;
                 }
@@ -648,7 +609,19 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::applyTextures(const RenderingTexture2D * const * textures, std::uint32_t tcount) {
+    void MetalRendering::applyShaderConstants(const void *constants) {
+        const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
+        
+        if (platformShader) {
+            id<MTLBuffer> constantBuffer = platformShader->getConstantBuffer();
+            
+            if (constantBuffer && constants) {
+                std::memcpy([constantBuffer contents], constants, constantBuffer.length);
+            }
+        }
+    }
+    
+    void MetalRendering::applyTextures(const RenderingTexture * const * textures, std::uint32_t tcount) {
     
     }
     

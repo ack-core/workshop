@@ -20,10 +20,10 @@ namespace foundation {
         MTLVertexDescriptor *_vdesc;
     };
 
-    class MetalTexture2D : public RenderingTexture2D {
+    class MetalTexture : public RenderingTexture {
     public:
-        MetalTexture2D(RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
-        ~MetalTexture2D() override;
+        MetalTexture(RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        ~MetalTexture() override;
 
         std::uint32_t getWidth() const override;
         std::uint32_t getHeight() const override;
@@ -60,11 +60,12 @@ namespace foundation {
         void updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) override;
 
         RenderingShaderPtr createShader(const char *name, const char *src, const RenderingShaderInputDesc &vtx, const RenderingShaderInputDesc &itc) override;
-        RenderingTexture2DPtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips, std::uint32_t mcount) override;
+        RenderingTexturePtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips, std::uint32_t mcount) override;
         RenderingDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
 
-        void beginPass(const char *name, const RenderingShaderPtr &shader, const void *constants) override;
-        void applyTextures(const RenderingTexture2D * const * textures, std::uint32_t tcount) override;
+        void beginPass(const char *name, const RenderingShaderPtr &shader, const RenderingPassConfig &cfg) override;
+        void applyShaderConstants(const void *constants) override;
+        void applyTextures(const RenderingTexture * const * textures, std::uint32_t tcount) override;
 
         void drawGeometry(const RenderingDataPtr &vertexData, std::uint32_t vcount, RenderingTopology topology) override;
         void drawGeometry(const RenderingDataPtr &vertexData, const RenderingDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderingTopology topology) override;

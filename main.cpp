@@ -151,20 +151,93 @@ int main(int argc, const char * argv[]) {
 
     auto geometry = rendering->createData(triangle, 9, sizeof(Vertex));
     
+
+    const char *meshShaderSrc = R"(
+        fixed {
+            axis[3] : float4 =
+                [0.0, 0.0, 1.0, 0.0]
+                [1.0, 0.0, 0.0, 0.0]
+                [0.0, 1.0, 0.0, 0.0]
+            cube[12] : float4 =
+                [-0.5, 0.5, 0.5, 1.0]
+                [-0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0]
+                [-0.5, 0.5, -0.5, 1.0]
+                [-0.5, 0.5, 0.5, 1.0]
+        }
+        const {
+            modelTransform : matrix4
+        }
+        inout {
+            texcoord : float2
+            normal : float3
+        }
+        vssrc {
+            float4 center = float4(float3(instance_position.xyz), 1.0);
+            float4 toCamera = float4(frame_cameraPosition.xyz - _transform(center, const_modelTransform).xyz, 0);
+            float3 camSign = _sign(_transform(const_modelTransform, toCamera).xyz);
+            float4 cubeVertexPosition = float4(camSign, 0.0) * fixed_cube[vertex_ID] + center; //
+            output_position = _transform(_transform(cubeVertexPosition, const_modelTransform), frame_viewProjMatrix);
+            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
+            output_normal = camSign * fixed_axis[vertex_ID >> 2].xyz;
+        }
+        fssrc {
+            //float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
+            output_color = float4(0.0, 0.0, 1.0, 1.0); //float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
+        }
+    )";
+    
+    auto meshShader = rendering->createShader("dynamic_voxel_mesh", meshShaderSrc,
+        { // vertex
+            {"ID", foundation::RenderingShaderInputFormat::ID}
+        },
+        { // instance
+            {"position", foundation::RenderingShaderInputFormat::SHORT4},
+            {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
+        }
+    );
+    
+    struct Voxel {
+        std::int16_t positionX, positionY, positionZ, reserved;
+        std::uint8_t sizeX, sizeY, sizeZ, colorIndex;
+    }
+    voxels[] = {
+        {0,3,0,0, 0,0,0,1},
+        {0,5,0,0, 0,0,0,1},
+        {2,3,0,0, 0,0,0,1},
+        {0,3,2,0, 0,0,0,1},
+    };
+    
+    auto voxconst = math::transform3f::identity().translated({0, 0, -3}).rotated({0, 1, 0}, math::PI_6);
+    auto voxdata = rendering->createData(voxels, 4, sizeof(Voxel));
+    
     platform->run([&](float dtSec) {
         rendering->updateFrameConstants(camera.getPosition().flat3, camera.getForwardDirection().flat3, camera.getVPMatrix().flat16);
-        rendering->beginPass("axis", axisShader, nullptr);
+        rendering->beginPass("axis", axisShader, foundation::RenderingPassConfig(0.8f, 0.775f, 0.75f));
         rendering->drawGeometry(nullptr, 6, foundation::RenderingTopology::LINES);
         rendering->endPass();
 
-        rendering->beginPass("circle", circleShader, &circleData);
+        rendering->beginPass("circle", circleShader);
+        rendering->applyShaderConstants(&circleData);
         rendering->drawGeometry(nullptr, 37, foundation::RenderingTopology::LINESTRIP);
         rendering->endPass();
 
-        rendering->beginPass("test", testShader, nullptr);
+        rendering->beginPass("test", testShader);
         rendering->drawGeometry(geometry, nullptr, 9, 3, foundation::RenderingTopology::TRIANGLES);
         rendering->endPass();
 
+        rendering->beginPass("vox", meshShader);
+        rendering->applyShaderConstants(&voxconst);
+        rendering->drawGeometry(nullptr, voxdata, 12, 4, foundation::RenderingTopology::TRIANGLESTRIP);
+        rendering->endPass();
+        
         rendering->presentFrame();
     });
 
