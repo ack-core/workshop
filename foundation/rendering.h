@@ -29,6 +29,7 @@ namespace foundation {
         SHORT2_NRM, SHORT4_NRM,
         BYTE4, BYTE4_NRM,
         INT1, INT2, INT3, INT4,
+        UINT1, UINT2, UINT3, UINT4,
         _count
     };
 
@@ -79,12 +80,15 @@ namespace foundation {
     // Render targets decription that is passed to 'beginPass'
     //
     struct RenderingPassConfig {
+        bool clearColor = false;
+        bool clearDepth = false;
+
         RenderingTexturePtr target = nullptr;
         float clear[4] = {0.0f};
     
         RenderingPassConfig() {} // change nothing
-        RenderingPassConfig(float r, float g, float b) : clear{r, g, b, 1.0f} {} // set default RT and crear it
-        RenderingPassConfig(float r, float g, float b, const RenderingTexturePtr &rt) : clear{r, g, b, 1.0f}, target(rt) {} // set rt-texture and clear it
+        RenderingPassConfig(float r, float g, float b) : clearColor(true), clearDepth(true), clear{r, g, b, 1.0f} {} // set default RT and crear it
+        RenderingPassConfig(float r, float g, float b, const RenderingTexturePtr &rt) : clearColor(true), clearDepth(true), clear{r, g, b, 1.0f}, target(rt) {} // set rt-texture and clear it
     };
 
     // Interface provides 3D-visualization methods
@@ -195,4 +199,6 @@ namespace foundation {
     protected:
         virtual ~RenderingInterface() = default;
     };
+    
+    using RenderingInterfacePtr = std::shared_ptr<RenderingInterface>;    
 }

@@ -9,52 +9,39 @@
 #include "foundation/rendering.h"
 
 namespace voxel {
-    enum class Rotation {
-        Rotate0,
-        Rotate90,
-        Rotate180,
-        Rotate270,
-    };
-
     struct Voxel {
-        std::int16_t positionX, positionY, positionZ, reserved;
-        std::uint8_t sizeX, sizeY, sizeZ, colorIndex;
+        std::int16_t positionX, positionY, positionZ, colorIndex;
+        std::uint8_t lightFaceNX[4], lightFacePX[4]; // XFace Indeces : [-y-z, -y+z, +y-z, +y+z]
+        std::uint8_t lightFaceNY[4], lightFacePY[4]; // YFace Indeces : [-z-x, -z+x, +z-x, +z+x]
+        std::uint8_t lightFaceNZ[4], lightFacePZ[4]; // ZFace Indeces : [-y-x, -y+x, +y-x, +y+x]
     };
-
-    class StaticMesh {
-    public:
-        virtual void updateAndDraw(float dtSec) = 0;
-
-    protected:
-        virtual ~StaticMesh() = default;
-    };
-
-    class DynamicMesh {
-    public:
-        virtual void updateAndDraw(float dtSec) = 0;
-        virtual void setTransform(const float(&position)[3], float rotationXZ) = 0;
-        virtual void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished = nullptr, bool cycled = false, bool resetAnimationTime = true) = 0;
-
-    protected:
-        virtual ~DynamicMesh() = default;
+    
+    struct Mesh {
+        struct Frame {
+            std::unique_ptr<Voxel[]> voxels;
+            std::uint16_t voxelCount;
+        };
+        
+        std::unique_ptr<Frame[]> frames;
+        std::uint16_t frameCount;
     };
 
     class MeshFactory {
     public:
-        static std::shared_ptr<MeshFactory> instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath);
+        static std::shared_ptr<MeshFactory> instance(const foundation::PlatformInterfacePtr &platform);
 
     public:
-        virtual bool appendVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &target) = 0;
-
-        virtual std::shared_ptr<StaticMesh> createStaticMesh(std::vector<Voxel> &voxels) = 0;
-        virtual std::shared_ptr<DynamicMesh> createDynamicMesh(const char *resourcePath, const float(&position)[3], float rotationXZ) = 0;
+        // Load voxels from file and fill 'output' Mesh with loaded data
+        // @voxPath - absolute path to '.vox' file
+        // @offset  - values to be added to voxel position
+        // Notice: voxels on borders arent part of the mesh. They are needed to correct lighting
+        //
+        virtual bool createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) = 0;
 
     protected:
         virtual ~MeshFactory() = default;
     };
 
     using MeshFactoryPtr = std::shared_ptr<MeshFactory>;
-    using StaticMeshPtr = std::shared_ptr<StaticMesh>;
-    using DynamicMeshPtr = std::shared_ptr<DynamicMesh>;
 }
 

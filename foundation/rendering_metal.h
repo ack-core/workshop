@@ -95,7 +95,8 @@ namespace foundation {
         id<MTLCommandBuffer> _currentCommandBuffer = nil;
         id<MTLRenderCommandEncoder> _currentCommandEncoder = nil;
         MTLRenderPassDescriptor *_currentPassDescriptor = nil;
-
+        
+        id<MTLDepthStencilState> _defaultDepthStencilState = nil;
         id<MTLBuffer> _frameConstantsBuffer;
     };
 }

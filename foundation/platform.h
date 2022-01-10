@@ -8,7 +8,7 @@
 #include <functional>
 
 namespace foundation {
-    using EventHandlerToken = void *;
+    using EventHandlerToken = unsigned char *;
 
     struct FileEntry {
         std::string name;
@@ -57,7 +57,8 @@ namespace foundation {
             UNKNOWN,
             START,
             MOVE,
-            FINISH
+            FINISH,
+            CANCEL
         };
     
         EventType type = EventType::UNKNOWN;
@@ -154,4 +155,6 @@ namespace foundation {
     protected:
         virtual ~PlatformInterface() = default;
     };
+    
+    using PlatformInterfacePtr = std::shared_ptr<PlatformInterface>;    
 }

@@ -7,6 +7,7 @@
 #include <mutex>
 #include <fstream>
 #include <filesystem>
+#include <unordered_map>
 
 #include <UIKit/UIKit.h>
 #include <MetalKit/MetalKit.h>
@@ -21,8 +22,12 @@ namespace {
     
     float g_nativeScreenWidth = 1.0f;
     float g_nativeScreenHeight = 1.0f;
+    float g_nativeScreenScale = 1.0f;
     
     MTKView *g_mtkView = nil;
+    
+    foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
+    std::unordered_map<foundation::EventHandlerToken, std::function<void(const foundation::PlatformTouchEventArgs &)>> g_touchHandlers;
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
@@ -55,10 +60,10 @@ namespace {
         _window.rootViewController = _controller;
         
         CGRect frame = UIScreen.mainScreen.bounds;
-        float nativeScale = UIScreen.mainScreen.nativeScale;
-
-        g_nativeScreenWidth = frame.size.width * nativeScale;
-        g_nativeScreenHeight = frame.size.height * nativeScale;
+        
+        g_nativeScreenScale = UIScreen.mainScreen.nativeScale;
+        g_nativeScreenWidth = frame.size.width * g_nativeScreenScale;
+        g_nativeScreenHeight = frame.size.height * g_nativeScreenScale;
         
         [_window makeKeyAndVisible];
     }
@@ -113,8 +118,10 @@ namespace {
 	g_mtkView.preferredFramesPerSecond = 30;
     g_mtkView.autoResizeDrawable = NO;
 	g_mtkView.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
-	g_mtkView.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
-	g_mtkView.sampleCount = 1;
+    g_mtkView.depthStencilAttachmentTextureUsage = MTLTextureUsageRenderTarget;
+	g_mtkView.colorPixelFormat = MTLPixelFormatBGRA8Unorm_sRGB;
+    g_mtkView.clearDepth = 0.0f;
+    g_mtkView.sampleCount = 1;
 	g_mtkView.delegate = _delegate;
 }
 - (BOOL)hasText { return NO; }
@@ -129,25 +136,57 @@ namespace {
 - (BOOL)prefersStatusBarHidden { return YES; }
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-
+        foundation::PlatformTouchEventArgs args;
+        args.type = foundation::PlatformTouchEventArgs::EventType::START;
+        args.touchID = std::size_t(item);
+        args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
+        args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
+        
+        for (auto &index : g_touchHandlers) {
+            index.second(args);
+        }
     }
 }
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-
+        foundation::PlatformTouchEventArgs args;
+        args.type = foundation::PlatformTouchEventArgs::EventType::MOVE;
+        args.touchID = std::size_t(item);
+        args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
+        args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
+        
+        for (auto &index : g_touchHandlers) {
+            index.second(args);
+        }
     }
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-
+        foundation::PlatformTouchEventArgs args;
+        args.type = foundation::PlatformTouchEventArgs::EventType::FINISH;
+        args.touchID = std::size_t(item);
+        args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
+        args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
+        
+        for (auto &index : g_touchHandlers) {
+            index.second(args);
+        }
     }
 }
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-
+        foundation::PlatformTouchEventArgs args;
+        args.type = foundation::PlatformTouchEventArgs::EventType::CANCEL;
+        args.touchID = std::size_t(item);
+        args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
+        args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
+        
+        for (auto &index : g_touchHandlers) {
+            index.second(args);
+        }
     }
 }
 @end
@@ -222,6 +261,8 @@ namespace foundation {
     }
     
     EventHandlerToken IOSPlatform::addTouchEventHandler(std::function<void(const PlatformTouchEventArgs &)> &&handler) {
+        EventHandlerToken token = g_tokenCounter++;
+        g_touchHandlers.emplace(token, std::move(handler));
         return nullptr;
     }
     
@@ -230,7 +271,7 @@ namespace foundation {
     }
 
     void IOSPlatform::removeEventHandler(EventHandlerToken token) {
-    
+        g_touchHandlers.erase(token);
     }
 
     void IOSPlatform::run(std::function<void(float)> &&updateAndDraw) {

@@ -20,51 +20,39 @@ namespace gears {
 
         void setEnabled(bool enabled) {
             if (enabled) {
-                _mouseEventHandlersToken = _platform->addMouseEventHandlers(
-                    [this](const foundation::PlatformMouseEventArgs &args) {
-                        _mouseLocked = true;
-                        _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
-                        return true;
-                    },
-                    [this](const foundation::PlatformMouseEventArgs &args) {
-                        if (_mouseLocked) {
-                            float dx = args.coordinateX - _lockedMouseCoordinates.x;
-                            float dy = args.coordinateY - _lockedMouseCoordinates.y;
-
-                            _orbit.xz = _orbit.xz.rotated(dx / 100.0f);
-
-                            math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit);
-                            math::vector3f rotatedOrbit = _orbit.rotated(right, dy / 100.0f);
-
-                            if (fabs(math::vector3f(0, 1, 0).dot(rotatedOrbit.normalized())) < 0.96f) {
-                                _orbit = rotatedOrbit;
-                            }
-
-                            _camera->setLookAtByRight(_center + _orbit, _center, right);
+                _mouseEventHandlerToken = _platform->addTouchEventHandler(
+                    [this](const foundation::PlatformTouchEventArgs &args) {
+                        if (args.type == foundation::PlatformTouchEventArgs::EventType::START) {
+                            _mouseLocked = true;
                             _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
-
-                            return true;
                         }
-                        else if (args.wheel != 0) {
-                            float multiplier = args.wheel > 0 ? 0.9f : 1.1f;
+                        if (args.type == foundation::PlatformTouchEventArgs::EventType::MOVE) {
+                            if (_mouseLocked) {
+                                float dx = args.coordinateX - _lockedMouseCoordinates.x;
+                                float dy = args.coordinateY - _lockedMouseCoordinates.y;
 
-                            math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit);
-                            _orbit = _orbit.normalized(_orbit.length() * multiplier);
-                            _camera->setLookAtByRight(_center + _orbit, _center, right);
-                            return true;
+                                _orbit.xz = _orbit.xz.rotated(dx / 100.0f);
+
+                                math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit);
+                                math::vector3f rotatedOrbit = _orbit.rotated(right, dy / 100.0f);
+
+                                if (fabs(math::vector3f(0, 1, 0).dot(rotatedOrbit.normalized())) < 0.96f) {
+                                    _orbit = rotatedOrbit;
+                                }
+
+                                _camera->setLookAtByRight(_center + _orbit, _center, right);
+                                _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
+                            }
                         }
-
-                        return false;
-                    },
-                    [this](const foundation::PlatformMouseEventArgs &args) {
-                        _mouseLocked = false;
-                        return true;
+                        if (args.type == foundation::PlatformTouchEventArgs::EventType::FINISH) {
+                            _mouseLocked = false;
+                        }
                     }
                 );
             }
             else {
-                _platform->removeEventHandlers(_mouseEventHandlersToken);
-                _mouseEventHandlersToken = {};
+                _platform->removeEventHandler(_mouseEventHandlerToken);
+                _mouseEventHandlerToken = {};
             }
         }
 
@@ -76,8 +64,8 @@ namespace gears {
         math::vector2f _lockedMouseCoordinates;
 
         math::vector3f _center = { 0, 0, 0 };
-        math::vector3f _orbit = { 50, 20, 50 };
+        math::vector3f _orbit = { 12, 2, 12 };
 
-        foundation::EventHandlersToken _mouseEventHandlersToken;
+        foundation::EventHandlerToken _mouseEventHandlerToken;
     };
 }

@@ -137,13 +137,20 @@ namespace foundation {
 
 namespace foundation {
     MetalRendering::MetalRendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
-        _platform->logMsg("[RENDER] Initialization : Metal");
+        @autoreleasepool {
+            _platform->logMsg("[RENDER] Initialization : Metal");
 
-        _device = MTLCreateSystemDefaultDevice();
-        _commandQueue = [_device newCommandQueue];
+            _device = MTLCreateSystemDefaultDevice();
+            _commandQueue = [_device newCommandQueue];
 
-        _frameConstantsBuffer = [_device newBufferWithLength:sizeof(FrameConstants) options:MTLResourceStorageModeShared];
-        _platform->logMsg("[RENDER] Initialization : complete");
+            _frameConstantsBuffer = [_device newBufferWithLength:sizeof(FrameConstants) options:MTLResourceStorageModeShared];
+            _platform->logMsg("[RENDER] Initialization : complete");
+            
+            MTLDepthStencilDescriptor *desc = [MTLDepthStencilDescriptor new];
+            desc.depthCompareFunction = MTLCompareFunctionGreater;
+            desc.depthWriteEnabled = YES;
+            _defaultDepthStencilState = [_device newDepthStencilStateWithDescriptor:desc];
+        }
     }
 
     MetalRendering::~MetalRendering() {}
@@ -162,7 +169,19 @@ namespace foundation {
         std::istringstream input(shadersrc);
         const std::string indent = "    ";
         
-        auto shaderGetTypeSize = [](const std::string &varname, const std::string &typeName, bool packed, std::string &nativeTypeName, std::size_t &size, std::size_t &count) {
+        auto getArrayMultiply = [](const std::string &varname) {
+            int  multiply = 1;
+            auto braceStart = varname.find('[');
+            auto braceEnd = varname.rfind(']');
+
+            if (braceStart != std::string::npos && braceEnd != std::string::npos) {
+                multiply = std::max(std::stoi(varname.substr(braceStart + 1, braceEnd - braceStart - 1)), multiply);
+            }
+            
+            return multiply;
+        };
+        
+        auto shaderGetTypeSize = [&getArrayMultiply](const std::string &varname, const std::string &typeName, bool packed, std::string &nativeTypeName, std::size_t &size, std::size_t &count) {
             struct {
                 const char *typeName;
                 const char *nativeTypeName;
@@ -186,13 +205,13 @@ namespace foundation {
                 {"matrix4", "float4x4", "float4x4",        64},
             };
             
-            int  multiply = 1;
-            auto braceStart = varname.find('[');
-            auto braceEnd = varname.rfind(']');
-
-            if (braceStart != std::string::npos && braceEnd != std::string::npos) {
-                multiply = std::max(std::stoi(varname.substr(braceStart + 1, braceEnd - braceStart - 1)), multiply);
-            }
+            int  multiply = getArrayMultiply(varname);//1;
+//            auto braceStart = varname.find('[');
+//            auto braceEnd = varname.rfind(']');
+//
+//            if (braceStart != std::string::npos && braceEnd != std::string::npos) {
+//                multiply = std::max(std::stoi(varname.substr(braceStart + 1, braceEnd - braceStart - 1)), multiply);
+//            }
 
             for (auto index = std::begin(typeSizeTable); index != std::end(typeSizeTable); ++index) {
                 if (index->typeName == typeName) {
@@ -393,10 +412,14 @@ namespace foundation {
                     {"float4", 8,  MTLVertexFormatShort4Normalized},
                     {"uint4",  4,  MTLVertexFormatUChar4},
                     {"float4", 4,  MTLVertexFormatUChar4Normalized},
-                    {"int1",   4,  MTLVertexFormatUInt},
-                    {"int2",   8,  MTLVertexFormatUInt2},
-                    {"int3",   12, MTLVertexFormatUInt3},
-                    {"int4",   16, MTLVertexFormatUInt4}
+                    {"int1",   4,  MTLVertexFormatInt},
+                    {"int2",   8,  MTLVertexFormatInt2},
+                    {"int3",   12, MTLVertexFormatInt3},
+                    {"int4",   16, MTLVertexFormatInt4},
+                    {"uint1",   4,  MTLVertexFormatUInt},
+                    {"uint2",   8,  MTLVertexFormatUInt2},
+                    {"uint3",   12, MTLVertexFormatUInt3},
+                    {"uint4",   16, MTLVertexFormatUInt4}
                 };
 
                 std::string vertexIDName;
@@ -404,42 +427,33 @@ namespace foundation {
                 std::size_t index = 0;
                 std::uint32_t offset = 0;
                 
-                for (const auto &item : vertex) {
-                    if (item.format == RenderingShaderInputFormat::ID) {
-                        vertexIDName = std::string("vertex_") + item.name;
+                auto formInput = [&](const RenderingShaderInputDesc &desc, const std::string &prefix, std::uint32_t bufferIndex, std::string &idout, std::string &output) {
+                    offset = 0;
+                                
+                    for (const auto &item : desc) {
+                        if (item.format == RenderingShaderInputFormat::ID) {
+                            idout = prefix + item.name;
+                        }
+                        else {
+                            NativeFormat &fmt = formatTable[int(item.format)];
+                            vdesc.attributes[index].bufferIndex = bufferIndex;
+                            vdesc.attributes[index].offset = offset;
+                            vdesc.attributes[index].format = fmt.nativeFormat;
+                            
+                            output += indent + fmt.nativeTypeName + " " + item.name + " [[attribute(" + std::to_string(index) + ")]];\n";
+                            offset += fmt.size;
+                            index++;
+                        }
                     }
-                    else {
-                        NativeFormat &fmt = formatTable[int(item.format)];
-                        vdesc.attributes[index].bufferIndex = 0;
-                        vdesc.attributes[index].offset = offset;
-                        vdesc.attributes[index].format = fmt.nativeFormat;
-                        nativeShader += indent + fmt.nativeTypeName + " " + item.name + " [[attribute(" + std::to_string(index) + ")]];\n";
-                        index++;
-                        offset += fmt.size;
-                    }
-                }
-                vdesc.layouts[0].stride = offset;
-                vdesc.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
-                vdesc.layouts[0].stepRate = 1;;
-                offset = 0;
+                    vdesc.layouts[bufferIndex].stride = offset;
+                    vdesc.layouts[bufferIndex].stepRate = 1;
+                };
                 
-                for (const auto &item : instance) {
-                    if (item.format == RenderingShaderInputFormat::ID) {
-                        instanceIDName = std::string("instance_") + item.name;
-                    }
-                    else {
-                        NativeFormat &fmt = formatTable[int(item.format)];
-                        vdesc.attributes[index].bufferIndex = 1;
-                        vdesc.attributes[index].offset = offset;
-                        vdesc.attributes[index].format = fmt.nativeFormat;
-                        nativeShader += indent + fmt.nativeTypeName + " " + item.name + " [[attribute(" + std::to_string(index) + ")]];\n";
-                        index++;
-                        offset += fmt.size;
-                    }
-                }
-                vdesc.layouts[1].stride = offset;
+                formInput(vertex, "vertex_", 0, vertexIDName, nativeShader);
+                formInput(instance, "instance_", 1, instanceIDName, nativeShader);
+
+                vdesc.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
                 vdesc.layouts[1].stepFunction = MTLVertexStepFunctionPerInstance;
-                vdesc.layouts[1].stepRate = 1;
 
                 nativeShader += "};\nvertex _InOut main_vertex(\n";
 
@@ -509,7 +523,7 @@ namespace foundation {
         }
         
         nativeShader = makeLines(nativeShader);
-        //printf("----------\n%s\n------------\n", nativeShader.data());
+        printf("----------\n%s\n------------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -550,13 +564,16 @@ namespace foundation {
     }
 
     RenderingDataPtr MetalRendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
-        id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * stride) options:MTLResourceStorageModeShared];
-        return std::make_shared<MetalData>(buffer, count, stride);
+        @autoreleasepool {
+            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * stride) options:MTLResourceStorageModeShared];
+            return std::make_shared<MetalData>(buffer, count, stride);
+        }
     }
     
     void MetalRendering::beginPass(const char *name, const RenderingShaderPtr &shader, const RenderingPassConfig &cfg) {
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
+            
         }
         if (_view) {
             if (_currentCommandBuffer == nil) {
@@ -566,12 +583,18 @@ namespace foundation {
             _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+            _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
+            _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionDontCare;
 
-            if (cfg.clear[3] > 0.1f) { // alpha is 1.0f if RenderingPassConfig is non-default constructed
+            if (cfg.clearColor) {
                 _currentPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
                 _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.clear[0], cfg.clear[1], cfg.clear[2], cfg.clear[3]);
             }
-
+            if (cfg.clearDepth) {
+                _currentPassDescriptor.depthAttachment.clearDepth = 0.0f;
+                _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
+            }
+            
             _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
             
             const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
@@ -586,7 +609,8 @@ namespace foundation {
                     desc.vertexFunction = platformShader->getVertexShader();
                     desc.vertexDescriptor = platformShader->getVertexDesc();
                     desc.fragmentFunction = platformShader->getFragmentShader();
-                    desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+                    desc.colorAttachments[0].pixelFormat = _view.colorPixelFormat;
+                    desc.depthAttachmentPixelFormat = _view.depthStencilPixelFormat;
                     
                     state = [_device newRenderPipelineStateWithDescriptor:desc error:&error];
                     
@@ -603,6 +627,7 @@ namespace foundation {
                 
                 if (state) {
                     [_currentCommandEncoder setRenderPipelineState:state];
+                    [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
                     _currentShader = shader;
                 }
             }

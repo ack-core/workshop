@@ -2,100 +2,137 @@
 #include "mesh_factory.h"
 
 #include "thirdparty/upng/upng.h"
-
-#include "foundation/gears/math.h"
 #include "foundation/gears/parsing.h"
 
-#include <unordered_map>
-
 namespace {
-    const char *g_staticMeshShaderSrc = R"(
-        fixed {
-            axis[3] : float4 = 
-                [0.0, 0.0, 1.0, 0.0]
-                [1.0, 0.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0, 0.0]
-            cube[12] : float4 = 
-                [-0.5, 0.5, 0.5, 1.0]
-                [-0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [-0.5, 0.5, -0.5, 1.0]
-                [-0.5, 0.5, 0.5, 1.0]
-        }
-        inout {
-            texcoord : float2
-            normal : float3
-        }
-        vssrc {
-            float4 center = float4(instance_position.xyz, 1.0);
-            float3 camSign = _sign(_cameraPosition.xyz - instance_position.xyz);
-            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
-            output_position = _transform(cube_position, _viewProjMatrix);
-            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
-            output_normal = camSign * axis[vertex_ID >> 2];
-        }
-        fssrc {
-            float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
-            output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
-        }
-    )";
-
-    const char *g_dynamicMeshShaderSrc = R"(
-        fixed {
-            axis[3] : float4 = 
-                [0.0, 0.0, 1.0, 0.0]
-                [1.0, 0.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0, 0.0]
-            cube[12] : float4 = 
-                [-0.5, 0.5, 0.5, 1.0]
-                [-0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0]
-                [-0.5, 0.5, -0.5, 1.0]
-                [-0.5, 0.5, 0.5, 1.0]
-        }
-        const {
-            modelTransform : matrix4
-        }
-        inout {
-            texcoord : float2
-            normal : float3
-        }
-        vssrc {
-            float4 center = float4(instance_position.xyz, 1.0);
-            float3 camSign = _sign(_transform(modelTransform, float4(_cameraPosition.xyz - _transform(center, modelTransform).xyz, 0)).xyz);
-            float4 cube_position = float4(camSign, 0.0) * cube[vertex_ID] + center; //
-            output_position = _transform(_transform(cube_position, modelTransform), _viewProjMatrix);
-            output_texcoord = float2(instance_scale_color.w / 255.0, 0);
-            output_normal = camSign * axis[vertex_ID >> 2];
-        }
-        fssrc {
-            float light = 0.7 + 0.3 * _dot(input_normal, _norm(float3(0.1, 2.0, 0.3)));
-            output_color = float4(_tex2d(0, input_texcoord).xyz * light * light, 1.0);
-        }
-    )";
+    // XFace Indeces : [-y-z, -y+z, +y-z, +y+z]
+    // YFace Indeces : [-z-x, -z+x, +z-x, +z+x]
+    // ZFace Indeces : [-y-x, -y+x, +y-x, +y+x]
+//    const char *g_staticMeshShaderSrc = R"(
+//        fixed {
+//            axis[3] : float4 =
+//                [0.0, 0.0, 1.0, 0.0]
+//                [1.0, 0.0, 0.0, 0.0]
+//                [0.0, 1.0, 0.0, 0.0]
+//
+//            cube[12] : float4 =
+//                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+//                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+//                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+//
+//            faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+//        }
+//        inout {
+//            texcoord : float2
+//            koeff : float4
+//        }
+//        vssrc {
+//            float3 cubeCenter = float3(instance_position_color.xyz);
+//            float3 toCamera = frame_cameraPosition.xyz - cubeCenter;
+//            float3 toCamSign = _sign(toCamera);
+//            float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
+//            float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
+//            float3 faceNormal = toCamSign * fixed_axis[vertex_ID >> 2].xyz;
+//
+//            int3 faceIndeces = int3(float3(2.0, 2.0, 2.0) * step(0.0, relVertexPos.yzy) + step(0.0, relVertexPos.zxx));
+//
+//            float4 koeff = float4(0.0, 0.0, 0.0, 0.0);
+//            koeff = koeff + step(0.5, -faceNormal.x) * instance_lightFaceNX;
+//            koeff = koeff + step(0.5,  faceNormal.x) * instance_lightFacePX;
+//            koeff = koeff + step(0.5, -faceNormal.y) * instance_lightFaceNY;
+//            koeff = koeff + step(0.5,  faceNormal.y) * instance_lightFacePY;
+//            koeff = koeff + step(0.5, -faceNormal.z) * instance_lightFaceNZ;
+//            koeff = koeff + step(0.5,  faceNormal.z) * instance_lightFacePZ;
+//
+//            float2 texcoord = float2(0.0, 0.0);
+//            texcoord = texcoord + step(0.5, abs(faceNormal.x)) * fixed_faceUV[faceIndeces.x];
+//            texcoord = texcoord + step(0.5, abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
+//            texcoord = texcoord + step(0.5, abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
+//
+//            output_position = _transform(absVertexPos, frame_viewProjMatrix);
+//            output_texcoord = texcoord;
+//            output_koeff = koeff;
+//        }
+//        fssrc {
+//            float m0 = mix(input_koeff[0], input_koeff[1], input_texcoord.x);
+//            float m1 = mix(input_koeff[2], input_koeff[3], input_texcoord.x);
+//            float k = mix(m0, m1, input_texcoord.y);
+//            output_color = float4(k, k, k, 1.0);
+//        }
+//    )";
+//
+//    // XFace Indeces : [-y-z, -y+z, +y-z, +y+z]
+//    // YFace Indeces : [-z-x, -z+x, +z-x, +z+x]
+//    // ZFace Indeces : [-y-x, -y+x, +y-x, +y+x]
+//    const char *g_dynamicMeshShaderSrc = R"(
+//        fixed {
+//            axis[3] : float4 =
+//                [0.0, 0.0, 1.0, 0.0]
+//                [1.0, 0.0, 0.0, 0.0]
+//                [0.0, 1.0, 0.0, 0.0]
+//
+//            cube[12] : float4 =
+//                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+//                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+//                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+//
+//            faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+//        }
+//        const {
+//            modelTransform : matrix4
+//        }
+//        inout {
+//            texcoord : float2
+//            koeff : float4
+//        }
+//        vssrc {
+//            float3 cubeCenter = float3(instance_position_color.xyz);
+//            float3 toCamera = frame_cameraPosition.xyz - _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
+//            float3 toCamSign = _sign(_transform(const_modelTransform, float4(toCamera, 0.0)).xyz);
+//            float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
+//            float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
+//            float3 faceNormal = toCamSign * fixed_axis[vertex_ID >> 2].xyz;
+//
+//            int3 faceIndeces = int3(float3(2.0, 2.0, 2.0) * step(0.0, relVertexPos.yzy) + step(0.0, relVertexPos.zxx));
+//
+//            //int xFaceIndex = int(2.0 * step(0.0, relVertexPos.y) + step(0.0, relVertexPos.z));
+//            //int yFaceIndex = int(2.0 * step(0.0, relVertexPos.z) + step(0.0, relVertexPos.x));
+//            //int zFaceIndex = int(2.0 * step(0.0, relVertexPos.y) + step(0.0, relVertexPos.x));
+//
+//            float4 koeff = float4(0.0, 0.0, 0.0, 0.0);
+//            koeff = koeff + step(0.5, -faceNormal.x) * instance_lightFaceNX;
+//            koeff = koeff + step(0.5,  faceNormal.x) * instance_lightFacePX;
+//            koeff = koeff + step(0.5, -faceNormal.y) * instance_lightFaceNY;
+//            koeff = koeff + step(0.5,  faceNormal.y) * instance_lightFacePY;
+//            koeff = koeff + step(0.5, -faceNormal.z) * instance_lightFaceNZ;
+//            koeff = koeff + step(0.5,  faceNormal.z) * instance_lightFacePZ;
+//
+//            float2 texcoord = float2(0.0, 0.0);
+//            texcoord = texcoord + step(0.5, abs(faceNormal.x)) * fixed_faceUV[faceIndeces.x];
+//            texcoord = texcoord + step(0.5, abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
+//            texcoord = texcoord + step(0.5, abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
+//
+//            output_position = _transform(_transform(absVertexPos, const_modelTransform), frame_viewProjMatrix);
+//            output_texcoord = texcoord;
+//            output_koeff = koeff;
+//        }
+//        fssrc {
+//            float m0 = mix(input_koeff[0], input_koeff[1], input_texcoord.x);
+//            float m1 = mix(input_koeff[2], input_koeff[3], input_texcoord.x);
+//            float k = mix(m0, m1, input_texcoord.y);
+//            output_color = float4(k, k, k, 1.0);
+//        }
+//    )";
 }
 
 namespace voxel {
+/*
     struct Chunk {
         std::vector<Voxel> voxels;
-        int16_t modelBounds[3];
+        uint16_t modelBounds[3];
     };
 
-    std::vector<Chunk> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, const int16_t(&offset)[3], bool centered) {
+    std::vector<Chunk> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, const int16_t(&offset)[3]) {
         const std::int32_t version = 150;
 
         std::vector<Chunk> result;
@@ -124,17 +161,9 @@ namespace voxel {
                         std::uint8_t sizeX = *(std::uint8_t *)(data + 16);
                         std::uint8_t sizeY = *(std::uint8_t *)(data + 20);
 
-                        std::int16_t centeringZ = 0;
-                        std::int16_t centeringX = 0;
-
                         result[i].modelBounds[0] = sizeX;
                         result[i].modelBounds[1] = sizeY;
                         result[i].modelBounds[2] = sizeZ;
-
-                        if (centered) {
-                            centeringZ = sizeZ / 2;
-                            centeringX = sizeX / 2;
-                        }
 
                         data += 24;
 
@@ -145,15 +174,10 @@ namespace voxel {
                             result[i].voxels.resize(voxelCount);
 
                             for (std::size_t c = 0; c < voxelCount; c++) {
-                                result[i].voxels[c].positionZ = std::int16_t(*(std::uint8_t *)(data + c * 4 + 0)) - centeringZ + offset[2];
-                                result[i].voxels[c].positionX = std::int16_t(*(std::uint8_t *)(data + c * 4 + 1)) - centeringX + offset[0];
+                                result[i].voxels[c].positionZ = std::int16_t(*(std::uint8_t *)(data + c * 4 + 0)) - offset[2];
+                                result[i].voxels[c].positionX = std::int16_t(*(std::uint8_t *)(data + c * 4 + 1)) - offset[0];
                                 result[i].voxels[c].positionY = std::int16_t(*(std::uint8_t *)(data + c * 4 + 2)) + offset[1];
                                 result[i].voxels[c].colorIndex = *(std::uint8_t *)(data + c * 4 + 3) - 1;
-
-                                // TODO: voxel mesh optimization
-                                result[i].voxels[c].sizeX = 1;
-                                result[i].voxels[c].sizeY = 1;
-                                result[i].voxels[c].sizeZ = 1;
                             }
 
                             data += voxelCount * 4;
@@ -179,611 +203,172 @@ namespace voxel {
 
         return result;
     }
+    */
 }
 
 namespace voxel {
-    struct Model {
-        struct Frame {
-            std::uint32_t index;
-            std::uint32_t size;
-        };
-        struct Animation {
-            std::uint32_t firstFrame;
-            std::uint32_t lastFrame;
-            float frameRate;
-        };
-
-        std::shared_ptr<foundation::RenderingStructuredData> voxels;
-        std::unordered_map<std::string, Animation> animations;
-        std::vector<Frame> frames;
-    };
-
     class MeshFactoryImpl : public std::enable_shared_from_this<MeshFactoryImpl>, public MeshFactory {
     public:
-        MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath);
+        MeshFactoryImpl(const foundation::PlatformInterfacePtr &platform);
         ~MeshFactoryImpl() override;
-
-        bool appendVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &target) override;
-        std::shared_ptr<StaticMesh> createStaticMesh(std::vector<Voxel> &voxels) override;
-        std::shared_ptr<DynamicMesh> createDynamicMesh(const char *resourcePath, const float(&position)[3], float rotationXZ) override;
-        void drawDynamicMesh(const std::shared_ptr<Model> &model, const float(&transform)[16]);
-
+        
+        bool createMesh(const char *resourcePath, const int16_t(&offset)[3], Mesh &output) override;
+        
     private:
         std::shared_ptr<foundation::PlatformInterface> _platform;
-        std::shared_ptr<foundation::RenderingInterface> _rendering;
-
-        std::shared_ptr<foundation::RenderingShader> _staticModelShader;
-        std::shared_ptr<foundation::RenderingShader> _dynamicModelShader;
-        std::shared_ptr<foundation::RenderingTexture2D> _palette;
-
-        std::unordered_map<std::string, std::weak_ptr<Model>> _models;
-        std::unordered_map<std::string, voxel::Chunk> _cache;
     };
+    
+    MeshFactoryImpl::MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform) {
 
-    class StaticMeshImpl : public StaticMesh {
-    public:
-        StaticMeshImpl(const std::shared_ptr<foundation::RenderingStructuredData> &geometry) : _geometry(geometry) {
-
-        }
-
-        ~StaticMeshImpl() override {
-
-        }
-
-        void updateAndDraw(float dtSec) override {
-
-        }
-
-    private:
-        std::shared_ptr<foundation::RenderingInterface> _rendering;
-        std::shared_ptr<foundation::RenderingStructuredData> _geometry;
-    };
-
-    class DynamicMeshImpl : public DynamicMesh {
-    public:
-        DynamicMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<Model> &model) : _factory(factory), _model(model) {
-            *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f::identity();
-        }
-
-        ~DynamicMeshImpl() override {
-
-        }
-
-        void updateAndDraw(float dtSec) override {
-            if (_currentAnimation) {
-                std::uint32_t frame = std::uint32_t(_time * _currentAnimation->frameRate);
-
-                if (frame != _lastFrame) {
-                    if (_currentFrame == _currentAnimation->lastFrame) {
-                        _currentFrame = _currentAnimation->firstFrame;
-
-                        if (_finished) {
-                            _finished(*this);
-                        };
-
-                        _time -= float(_currentAnimation->lastFrame - _currentAnimation->firstFrame + 1) / _currentAnimation->frameRate;
-                        frame = std::uint32_t(_time * _currentAnimation->frameRate);
-
-                        if (_cycled == false) {
-                            _currentAnimation = nullptr;
-                        }
-                    }
-                    else {
-                        _currentFrame++;
-                    }
-
-                    _lastFrame = frame;
-                }
-
-                _time += dtSec;
-            }
-            else {
-                _currentFrame = 0;
-            }
-
-            _factory->drawDynamicMesh(_model, _transform);
-
-            //_factory->getRenderingInterface().applyShader(g_dynamicModelShaderPtr, _transform);
-            //_factory->getRenderingInterface().applyTextures({ g_palette.get() });
-            //_factory->getRenderingInterface().drawGeometry(nullptr, _model->voxels, 0, 12, 0, _model->voxels->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
-        }
-
-        void setTransform(const float(&position)[3], float rotationXZ) override {
-            *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f({ 0, 1, 0 }, rotationXZ).translated(*reinterpret_cast<const math::vector3f *>(position));
-        }
-
-        void playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished, bool cycled, bool resetAnimationTime) override {
-            auto index = _model->animations.find(name);
-
-            if (index != _model->animations.end()) {
-                _currentAnimation = &index->second;
-                _currentFrame = _currentAnimation->firstFrame;
-                _lastFrame = 0;
-                _finished = std::move(finished);
-                _cycled = cycled;
-
-                if (resetAnimationTime) {
-                    _time = 0.0f;
-                }
-            }
-            else {
-                _currentAnimation = nullptr;
-            }
-        }
-
-    private:
-        std::shared_ptr<MeshFactoryImpl> _factory;
-        std::shared_ptr<Model> _model;
-
-        Model::Animation *_currentAnimation = nullptr;
-        std::function<void(DynamicMesh &)> _finished;
-
-        float _time = 0.0f;
-        float _transform[16];
-
-        bool _cycled = false;
-
-        std::uint32_t _lastFrame = 0;
-        std::uint32_t _currentFrame = 0;
-    };
-
-    MeshFactoryImpl::MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath)
-        : _platform(platform)
-        , _rendering(rendering)
-    {
-        _staticModelShader = rendering->createShader("static_voxel_mesh", g_staticMeshShaderSrc,
-            // vertex
-            {
-                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-            },
-            // instance
-            {
-                {"position", foundation::RenderingShaderInputFormat::SHORT4},
-                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
-            }
-        );
-
-        _dynamicModelShader = rendering->createShader("dynamic_voxel_mesh", g_dynamicMeshShaderSrc,
-            // vertex
-            {
-                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-            },
-            // instance
-            {
-                {"position", foundation::RenderingShaderInputFormat::SHORT4},
-                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
-            }
-        );
-
-        std::unique_ptr<std::uint8_t[]> paletteData;
-        std::size_t paletteSize;
-
-        if (_platform->loadFile(palettePath, paletteData, paletteSize)) {
-            upng_t *upng = upng_new_from_bytes(paletteData.get(), (unsigned long)(paletteSize));
-
-            if (upng != nullptr) {
-                if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-                    if (upng_get_format(upng) == UPNG_RGBA8 && upng_get_width(upng) == 256 && upng_get_height(upng) == 1) {
-                        _palette = _rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 256, 1, { upng_get_buffer(upng) });
-                    }
-                    else {
-                        _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' is not 256x1 RGBA png file", palettePath);
-                    }
-                }
-                else {
-                    _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' is not a valid png file", palettePath);
-                }
-
-                upng_free(upng);
-            }
-        }
-        else {
-            _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' not found", palettePath);
-        }
     }
-
+    
     MeshFactoryImpl::~MeshFactoryImpl() {
 
     }
+    
+    bool MeshFactoryImpl::createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) {
+        const std::int32_t version = 150;
 
-    bool MeshFactoryImpl::appendVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &target) {
-        return false;
-    }
+        std::unique_ptr<std::uint8_t[]> voxData;
+        std::size_t voxSize = 0;
 
-    std::shared_ptr<StaticMesh> MeshFactoryImpl::createStaticMesh(std::vector<Voxel> &voxels) {
-        return {};
-    }
+        if (_platform->loadFile(voxPath, voxData, voxSize)) {
+            std::uint8_t *data = voxData.get();
 
-    std::shared_ptr<DynamicMesh> MeshFactoryImpl::createDynamicMesh(const char *resourcePath, const float(&position)[3], float rotationXZ) {
-        std::shared_ptr<DynamicMesh> result;
-        std::shared_ptr<Model> model;
+            if (memcmp(data, "VOX ", 4) == 0 && *(std::int32_t *)(data + 4) == version) {
+                // skip bytes of main chunk to start of the first child ('PACK')
+                data += 20;
+                std::int32_t frameCount = 1;
 
-        auto index = _models.find(resourcePath);
-        if (index != _models.end() && (model = index->second.lock()) != nullptr) {
-            result = std::make_shared<DynamicMeshImpl>(shared_from_this(), model);
-        }
-        else {
-            std::string infoPath = std::string(resourcePath) + ".info";
-            std::string modelPath = std::string(resourcePath) + ".vox";
+                if (memcmp(data, "PACK", 4) == 0) {
+                    frameCount = *(std::int32_t *)(data + 12);
+                    data += 16;
+                }
 
-            std::unique_ptr<uint8_t[]> infoData;
-            std::size_t infoSize;
+                output.frames = std::make_unique<Mesh::Frame[]>(frameCount);
+                output.frameCount = frameCount;
+                
+                for (std::int32_t i = 0; i < frameCount; i++) {
+                    if (memcmp(data, "SIZE", 4) == 0) {
+                        std::uint8_t sizeZ = *(std::uint8_t *)(data + 12);
+                        std::uint8_t sizeX = *(std::uint8_t *)(data + 16);
+                        std::uint8_t sizeY = *(std::uint8_t *)(data + 20);
+                        
+                        struct InterVoxel {
+                            std::uint8_t isExist : 1;
+                            std::uint8_t isMesh : 1;
+                        };
+                        
+                        std::unique_ptr<InterVoxel[]> voxelArray = std::make_unique<InterVoxel[]>(sizeX * sizeY * sizeZ);
+                        std::fill_n(voxelArray.get(), sizeX * sizeY * sizeZ, InterVoxel{0});
+                        auto arrayIndex = [&](std::uint8_t x, std::uint8_t y, std::uint8_t z) {
+                            return x + y * sizeX + z * sizeY * sizeX;
+                        };
 
-            model = std::make_shared<Model>();
-            int16_t modelOffset[3] = { 0, 0, 0 };
+                        data += 24;
 
-            if (_platform->loadFile(infoPath.data(), infoData, infoSize)) {
-                std::istringstream stream(std::string(reinterpret_cast<const char *>(infoData.get()), infoSize));
-                std::string keyword;
+                        if (memcmp(data, "XYZI", 4) == 0) {
+                            std::size_t voxelCount = *(std::uint32_t *)(data + 12);
 
-                while (stream >> keyword) {
-                    if (keyword == "animation") {
-                        std::string animationName;
-                        std::uint32_t firstFrame, lastFrame;
-                        float frameRate;
+                            data += 16;
+                            std::uint16_t meshVoxelCount = 0;
+                            
+                            for (std::size_t c = 0; c < voxelCount; c++) {
+                                std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
+                                std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
+                                std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
+                                
+                                voxelArray[arrayIndex(x, y, z)].isExist = 1;
+                                
+                                // TODO: remove invisible voxels
+                                
+                                if (x > 0 && x < sizeX - 1 && y > 0 && y < sizeY - 1 && z > 0 && z < sizeZ - 1) {
+                                    voxelArray[arrayIndex(x, y, z)].isMesh = 1;
+                                    meshVoxelCount++;
+                                }
+                            }
 
-                        if (stream >> gears::expect<'='> >> gears::quoted(animationName) >> firstFrame >> lastFrame >> frameRate) {
-                            model->animations.emplace(std::move(animationName), Model::Animation{ firstFrame, lastFrame, frameRate });
+                            output.frames[i].voxels = std::make_unique<Voxel[]>(meshVoxelCount);
+                            output.frames[i].voxelCount = meshVoxelCount;
+
+                            for (std::size_t c = 0, k = 0; c < voxelCount; c++) {
+                                std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
+                                std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
+                                std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
+                                
+                                if (voxelArray[arrayIndex(x, y, z)].isMesh) {
+                                    Voxel &targetVoxel = output.frames[i].voxels[k++];
+                                    
+                                    targetVoxel.positionZ = std::int16_t(z) + offset[2] - 1;
+                                    targetVoxel.positionX = std::int16_t(x) + offset[0] - 1;
+                                    targetVoxel.positionY = std::int16_t(y) + offset[1] - 1;
+                                    targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3) - 1;
+                                    std::fill_n(targetVoxel.lightFaceNX, 24, 0xFF);
+                                    
+                                    struct MultiplySign {
+                                        std::int8_t a, b;
+                                    };
+                                    
+                                    MultiplySign offsets[] = {{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}};
+                                    std::int8_t faceSign[] = {-1, 1};
+                                    
+                                    const std::uint8_t STEP = 72;
+                                    
+                                    for (std::size_t s = 0; s < 2; s++) {
+                                        std::uint8_t *lightFaceX = targetVoxel.lightFaceNX + s * 4;
+                                        std::uint8_t *lightFaceY = targetVoxel.lightFaceNY + s * 4;
+                                        std::uint8_t *lightFaceZ = targetVoxel.lightFaceNZ + s * 4;
+                                        
+                                        for (std::size_t f = 0; f < 4; f++) {
+                                            std::uint8_t reducedLight = 0;
+                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) reducedLight += STEP;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 0 * offsets[f].b)].isExist) reducedLight += STEP;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) reducedLight = std::max(STEP, reducedLight);
+                                            lightFaceY[f] -= reducedLight;
+
+                                            reducedLight = 0;
+                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) reducedLight += STEP;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 0 * offsets[f].b, z + faceSign[s])].isExist) reducedLight += STEP;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) reducedLight = std::max(STEP, reducedLight);
+                                            lightFaceZ[f] -= reducedLight;
+
+                                            reducedLight = 0;
+                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 0 * offsets[f].b, z + 1 * offsets[f].a)].isExist) reducedLight += STEP;
+                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 0 * offsets[f].a)].isExist) reducedLight += STEP;
+                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 1 * offsets[f].a)].isExist) reducedLight = std::max(STEP, reducedLight);
+                                            lightFaceX[f] -= reducedLight;
+                                        }
+                                    }
+                                }
+                            }
+
+                            data += voxelCount * 4;
                         }
                         else {
-                            _platform->logError("[MeshFactory::createDynamicMesh] Invalid animation arguments in '%s'", infoPath.data());
-                            break;
-                        }
-                    }
-                    else if (keyword == "offset") {
-                        if (bool(stream >> gears::expect<'='> >> modelOffset[0] >> modelOffset[1] >> modelOffset[2]) == false) {
-                            _platform->logError("[MeshFactory::createDynamicMesh] Invalid offset arguments in '%s'", infoPath.data());
+                            _platform->logError("[voxel::createMesh] XYZI[%d] chunk is not found in '%s'", i, voxPath);
                             break;
                         }
                     }
                     else {
-                        _platform->logError("[MeshFactory::createDynamicMesh] Unreconized keyword '%s' in '%s'", keyword.data(), infoPath.data());
+                        _platform->logError("[voxel::createMesh] SIZE[%d] chunk is not found in '%s'", i, voxPath);
                         break;
                     }
                 }
             }
-
-            std::vector<voxel::Chunk> frames = loadModel(_platform, modelPath.data(), modelOffset, true);
-
-            if (frames.size()) {
-                unsigned totalVoxelCount = 0;
-                std::vector<Voxel> voxels;
-
-                for (auto &item : frames) {
-                    model->frames.emplace_back(Model::Frame{ totalVoxelCount, unsigned(item.voxels.size()) });
-                    totalVoxelCount += unsigned(item.voxels.size());
-                    voxels.insert(voxels.end(), item.voxels.begin(), item.voxels.end());
-                }
-
-                model->voxels = _rendering->createData(&voxels[0], totalVoxelCount, sizeof(Voxel));
-                result = std::make_shared<DynamicMeshImpl>(shared_from_this(), model);
-            }
             else {
-                _platform->logError("[MeshFactory::createDynamicMesh] No frames loaded for '%s'", modelPath.data());
+                _platform->logError("[voxel::createMesh] Incorrect vox-header in '%s'", voxPath);
             }
         }
-
-        if (result) {
-            result->setTransform(position, rotationXZ);
+        else {
+            _platform->logError("[voxel::createMesh] Unable to find file '%s'", voxPath);
         }
 
-        return result;
-    }
-
-    void MeshFactoryImpl::drawDynamicMesh(const std::shared_ptr<Model> &model, const float (&transform)[16]) {
-        _rendering->applyShader(_dynamicModelShader, transform);
-        _rendering->applyTextures({ _palette.get() });
-        _rendering->drawGeometry(nullptr, model->voxels, 0, 12, 0, model->voxels->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
+        return false;
     }
 }
 
-
-
-//namespace voxel {
-//    StaticMeshImpl::StaticMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<foundation::RenderingStructuredData> &geometry) : _factory(factory), _geometry(geometry) {
-//        
-//    }
-//
-//    StaticMeshImpl::~StaticMeshImpl() {
-//
-//    }
-//
-//    void StaticMeshImpl::updateAndDraw(float dtSec) {
-//        _factory->getRenderingInterface().applyShader(g_staticModelShaderPtr);
-//        _factory->getRenderingInterface().applyTextures({ g_palette.get() });
-//        _factory->getRenderingInterface().drawGeometry(nullptr, _geometry, 0, 12, 0, _geometry->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
-//    }
-//}
-
-//namespace voxel {
-//    DynamicMeshImpl::DynamicMeshImpl(const std::shared_ptr<MeshFactoryImpl> &factory, const std::shared_ptr<Model> &model)
-//        : _factory(factory)
-//        , _model(model)
-//    {
-//        *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f::identity();
-//    }
-//
-//    DynamicMeshImpl::~DynamicMeshImpl() {
-//
-//    }
-//
-//    void DynamicMeshImpl::setTransform(const float(&position)[3], float rotationXZ) {
-//        *reinterpret_cast<math::transform3f *>(_transform) = math::transform3f::transform3f({0, 1, 0}, rotationXZ).translated(*reinterpret_cast<const math::vector3f *>(position));
-//    }
-//
-//    void DynamicMeshImpl::playAnimation(const char *name, std::function<void(DynamicMesh &)> &&finished, bool cycled, bool resetAnimationTime) {
-//        auto index = _model->animations.find(name);
-//
-//        if (index != _model->animations.end()) {
-//            _currentAnimation = &index->second;
-//            _currentFrame = _currentAnimation->firstFrame;
-//            _lastFrame = 0;
-//            _finished = std::move(finished);
-//            _cycled = cycled;
-//
-//            if (resetAnimationTime) {
-//                _time = 0.0f;
-//            }
-//        }
-//        else {
-//            _currentAnimation = nullptr;
-//        }
-//    }
-//
-//    void DynamicMeshImpl::updateAndDraw(float dtSec) {
-//        if (_currentAnimation) {
-//            std::uint32_t frame = std::uint32_t(_time * _currentAnimation->frameRate);
-//
-//            if (frame != _lastFrame) {
-//                if (_currentFrame == _currentAnimation->lastFrame) {
-//                    _currentFrame = _currentAnimation->firstFrame;
-//
-//                    if (_finished) {
-//                        _finished(*this);
-//                    };
-//
-//                    _time -= float(_currentAnimation->lastFrame - _currentAnimation->firstFrame + 1) / _currentAnimation->frameRate;
-//                    frame = std::uint32_t(_time * _currentAnimation->frameRate);
-//
-//                    if (_cycled == false) {
-//                        _currentAnimation = nullptr;
-//                    }
-//                }
-//                else {
-//                    _currentFrame++;
-//                }
-//
-//                _lastFrame = frame;
-//            }
-//
-//            _time += dtSec;
-//        }
-//        else {
-//            _currentFrame = 0;
-//        }
-//
-//        _factory->getRenderingInterface().applyShader(g_dynamicModelShaderPtr, _transform);
-//        _factory->getRenderingInterface().applyTextures({ g_palette.get() });
-//        _factory->getRenderingInterface().drawGeometry(nullptr, _model->voxels, 0, 12, 0, _model->voxels->getCount(), foundation::RenderingTopology::TRIANGLESTRIP);
-//    }
-//}
-
-//namespace voxel {
-//    MeshFactoryImpl::MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath)
-//        : _platform(platform)
-//        , _rendering(rendering)
-//    {
-//        g_staticModelShaderPtr = rendering->createShader("static_voxel_mesh", g_staticMeshShaderSrc,
-//            // vertex
-//            {
-//                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-//            },
-//            // instance
-//            {
-//                {"position", foundation::RenderingShaderInputFormat::SHORT4},
-//                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
-//            }
-//        );
-//
-//        g_dynamicModelShaderPtr = rendering->createShader("dynamic_voxel_mesh", g_dynamicMeshShaderSrc,
-//            // vertex
-//            {
-//                {"ID", foundation::RenderingShaderInputFormat::VERTEX_ID}
-//            },
-//            // instance
-//            {
-//                {"position", foundation::RenderingShaderInputFormat::SHORT4},
-//                {"scale_color", foundation::RenderingShaderInputFormat::BYTE4}
-//            }
-//        );
-//
-//        std::unique_ptr<std::uint8_t[]> paletteData;
-//        std::size_t paletteSize;
-//
-//        if (_platform->loadFile(palettePath, paletteData, paletteSize)) {
-//            upng_t *upng = upng_new_from_bytes(paletteData.get(), unsigned long(paletteSize));
-//
-//            if (upng != nullptr) {
-//                if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-//                    if (upng_get_format(upng) == UPNG_RGBA8 && upng_get_width(upng) == 256 && upng_get_height(upng) == 1) {
-//                        g_palette = _rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 256, 1, { upng_get_buffer(upng) });
-//                    }
-//                    else {
-//                        _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' is not 256x1 RGBA png file", palettePath);
-//                    }
-//                }
-//                else {
-//                    _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' is not a valid png file", palettePath);
-//                }
-//
-//                upng_free(upng);
-//            }
-//        }
-//        else {
-//            _platform->logError("[MeshFactoryImpl::MeshFactoryImpl] '%s' not found", palettePath);
-//        }
-//    }
-//
-//    MeshFactoryImpl::~MeshFactoryImpl() {
-//        g_staticModelShaderPtr = nullptr;
-//        g_dynamicModelShaderPtr = nullptr;
-//    }
-//
-//    bool MeshFactoryImpl::loadVoxels(const char *voxFullPath, int x, int y, int z, Rotation rotation, std::vector<Voxel> &out) {
-//        std::string modelPath = voxFullPath;
-//        voxel::Chunk chunk;
-//
-//        auto index = _cache.find(modelPath);
-//        if (index != _cache.end()) {
-//            chunk = index->second;
-//        }
-//        else {
-//            int16_t modelOffset[3] = { 0, 0, 0 };
-//            std::vector<voxel::Chunk> frames = voxel::loadModel(_platform, modelPath.data(), modelOffset, false);
-//
-//            if (frames.size()) {
-//                chunk = _cache.emplace(modelPath, std::move(frames[0])).first->second;
-//
-//                if (frames.size() > 1) {
-//                    _platform->logMsg("[MeshFactory::createStaticMesh] More than one frame loaded for '%s'. First one is used", modelPath.data());
-//                }
-//            }
-//            else {
-//                _platform->logError("[MeshFactory::createStaticMesh] No frames loaded for '%s'", modelPath.data());
-//                return false;
-//            }
-//        }
-//
-//        void (*rotate[4])(Voxel & voxel, int16_t(&modelBounds)[3]) = {
-//            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-//            },
-//            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-//                int16_t x = modelBounds[2] - voxel.positionZ - 1;
-//                int16_t z = voxel.positionX;
-//
-//                voxel.positionX = x;
-//                voxel.positionZ = z;
-//            },
-//            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-//                int16_t x = modelBounds[0] - voxel.positionX - 1;
-//                int16_t z = modelBounds[2] - voxel.positionZ - 1;
-//
-//                voxel.positionX = x;
-//                voxel.positionZ = z;
-//            },
-//            [](Voxel &voxel, int16_t(&modelBounds)[3]) {
-//                int16_t x = voxel.positionZ;
-//                int16_t z = modelBounds[0] - voxel.positionX - 1;
-//
-//                voxel.positionX = x;
-//                voxel.positionZ = z;
-//            },
-//        };
-//
-//        for (auto &item : chunk.voxels) {
-//            rotate[int(rotation)](item, chunk.modelBounds);
-//            item.positionX += x;
-//            item.positionY += y;
-//            item.positionZ += z;
-//        }
-//
-//        out.insert(out.end(), chunk.voxels.begin(), chunk.voxels.end());
-//        return true;
-//    }
-//
-//    std::shared_ptr<StaticMesh> MeshFactoryImpl::createStaticMesh(const Voxel *voxels, std::size_t count) {
-//        std::shared_ptr<foundation::RenderingStructuredData> geometry = _rendering->createData(voxels, uint32_t(count), sizeof(Voxel));
-//        std::shared_ptr<StaticMesh> result = std::make_shared<StaticMeshImpl>(shared_from_this(), geometry);
-//        return result;
-//    }
-//
-//    std::shared_ptr<DynamicMesh> MeshFactoryImpl::createDynamicMesh(const char *resourcePath, const float(&position)[3], float rotationXZ) {
-//        std::shared_ptr<DynamicMesh> result;
-//        std::shared_ptr<Model> model;
-//
-//        auto index = _models.find(resourcePath);
-//        if (index != _models.end() && (model = index->second.lock()) != nullptr) {
-//            result = std::make_shared<DynamicMeshImpl>(shared_from_this(), model);
-//        }
-//        else {
-//            std::string infoPath = std::string(resourcePath) + ".info";
-//            std::string modelPath = std::string(resourcePath) + ".vox";
-//
-//            std::unique_ptr<uint8_t[]> infoData;
-//            std::size_t infoSize;
-//            
-//            model = std::make_shared<Model>();
-//
-//            if (_platform->loadFile(infoPath.data(), infoData, infoSize)) {
-//                int16_t modelOffset[3] = {0, 0, 0};
-//
-//                std::istringstream stream(std::string(reinterpret_cast<const char *>(infoData.get()), infoSize));
-//                std::string keyword;
-//
-//                while (stream >> keyword) {
-//                    if (keyword == "animation") {
-//                        std::string animationName;
-//                        std::uint32_t firstFrame, lastFrame;
-//                        float frameRate;
-//
-//                        if (stream >> gears::expect<'='> >> gears::quoted(animationName) >> firstFrame >> lastFrame >> frameRate) {
-//                            model->animations.emplace(std::move(animationName), Model::Animation{ firstFrame, lastFrame, frameRate });
-//                        }
-//                        else {
-//                            _platform->logError("[MeshFactory::createDynamicMesh] Invalid animation arguments in '%s'", infoPath.data());
-//                            break;
-//                        }
-//                    }
-//                    else if (keyword == "offset") {
-//                        if (bool(stream >> gears::expect<'='> >> modelOffset[0] >> modelOffset[1] >> modelOffset[2]) == false) {
-//                            _platform->logError("[MeshFactory::createDynamicMesh] Invalid offset arguments in '%s'", infoPath.data());
-//                            break;
-//                        }
-//                    }
-//                    else {
-//                        _platform->logError("[MeshFactory::createDynamicMesh] Unreconized keyword '%s' in '%s'", keyword.data(), infoPath.data());
-//                        break;
-//                    }
-//                }
-//
-//                std::vector<voxel::Chunk> frames = voxel::loadModel(_platform, modelPath.data(), modelOffset, true);
-//
-//                if (frames.size()) {
-//                    unsigned totalVoxelCount = 0;
-//                    std::vector<Voxel> voxels;
-//
-//                    for (auto &item : frames) {
-//                        model->frames.emplace_back(Model::Frame{ totalVoxelCount, unsigned(item.voxels.size()) });
-//                        totalVoxelCount += unsigned(item.voxels.size());
-//                        voxels.insert(voxels.end(), item.voxels.begin(), item.voxels.end());
-//                    }
-//
-//                    model->voxels = _rendering->createData(&voxels[0], totalVoxelCount, sizeof(Voxel));
-//                    result = std::make_shared<DynamicMeshImpl>(shared_from_this(), model);
-//                }
-//                else {
-//                    _platform->logError("[MeshFactory::createDynamicMesh] No frames loaded for '%s'", modelPath.data());
-//                }
-//            }
-//            else {
-//                _platform->logError("[MeshFactory::createDynamicMesh] '%s' not found", infoPath.data());
-//            }
-//        }
-//
-//        if (result) {
-//            result->setTransform(position, rotationXZ);
-//        }
-//
-//        return result;
-//    }
-//
-//    foundation::RenderingInterface &MeshFactoryImpl::getRenderingInterface() {
-//        return *_rendering;
-//    }
-//}
-//
 namespace voxel {
-    std::shared_ptr<MeshFactory> MeshFactory::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const std::shared_ptr<foundation::RenderingInterface> &rendering, const char *palettePath) {
-        return std::make_shared<MeshFactoryImpl>(platform, rendering, palettePath);
+    std::shared_ptr<MeshFactory> MeshFactory::instance(const std::shared_ptr<foundation::PlatformInterface> &platform) {
+        return std::make_shared<MeshFactoryImpl>(platform);
     }
 }
