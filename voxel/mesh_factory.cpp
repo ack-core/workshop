@@ -312,7 +312,7 @@ namespace voxel {
                                     MultiplySign offsets[] = {{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}};
                                     std::int8_t faceSign[] = {-1, 1};
                                     
-                                    const std::uint8_t STEP = 72;
+                                    const std::uint8_t CORNER_EXIST = 0x80;
                                     
                                     for (std::size_t s = 0; s < 2; s++) {
                                         std::uint8_t *lightFaceX = targetVoxel.lightFaceNX + s * 4;
@@ -320,23 +320,32 @@ namespace voxel {
                                         std::uint8_t *lightFaceZ = targetVoxel.lightFaceNZ + s * 4;
                                         
                                         for (std::size_t f = 0; f < 4; f++) {
-                                            std::uint8_t reducedLight = 0;
-                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) reducedLight += STEP;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 0 * offsets[f].b)].isExist) reducedLight += STEP;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) reducedLight = std::max(STEP, reducedLight);
-                                            lightFaceY[f] -= reducedLight;
+                                            std::uint8_t config = 0;
+                                            
+                                            auto evalReducedLight = [](std::uint8_t config) {
+                                                std::uint8_t reducedLight = 0;
+                                                if ((config & 0xf) > 1) reducedLight = 200;
+                                                else if ((config & 0xf) && (config & CORNER_EXIST)) reducedLight = 160;
+                                                else if (config == 1 || config == CORNER_EXIST) reducedLight = 130;
+                                                return reducedLight;
+                                            };
+                                            
+                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) config++;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 0 * offsets[f].b)].isExist) config++;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) config |= CORNER_EXIST;
+                                            lightFaceY[f] -= evalReducedLight(config);
 
-                                            reducedLight = 0;
-                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) reducedLight += STEP;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 0 * offsets[f].b, z + faceSign[s])].isExist) reducedLight += STEP;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) reducedLight = std::max(STEP, reducedLight);
-                                            lightFaceZ[f] -= reducedLight;
+                                            config = 0;
+                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) config++;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 0 * offsets[f].b, z + faceSign[s])].isExist) config++;
+                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) config |= CORNER_EXIST;
+                                            lightFaceZ[f] -= evalReducedLight(config);
 
-                                            reducedLight = 0;
-                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 0 * offsets[f].b, z + 1 * offsets[f].a)].isExist) reducedLight += STEP;
-                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 0 * offsets[f].a)].isExist) reducedLight += STEP;
-                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 1 * offsets[f].a)].isExist) reducedLight = std::max(STEP, reducedLight);
-                                            lightFaceX[f] -= reducedLight;
+                                            config = 0;
+                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 0 * offsets[f].b, z + 1 * offsets[f].a)].isExist) config++;
+                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 0 * offsets[f].a)].isExist) config++;
+                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 1 * offsets[f].a)].isExist) config |= CORNER_EXIST;
+                                            lightFaceX[f] -= evalReducedLight(config);
                                         }
                                     }
                                 }

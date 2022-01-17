@@ -6,7 +6,6 @@
 #include <memory>
 
 #include "foundation/platform.h"
-#include "foundation/rendering.h"
 
 namespace voxel {
     struct Voxel {

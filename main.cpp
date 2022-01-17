@@ -94,7 +94,7 @@ const char *meshShaderSrc = R"(
     fssrc {
         float m0 = mix(input_koeff[0], input_koeff[1], input_texcoord.x);
         float m1 = mix(input_koeff[2], input_koeff[3], input_texcoord.x);
-        float k = pow(mix(m0, m1, input_texcoord.y), 0.5);
+        float k = pow(smoothstep(0, 1, mix(m0, m1, input_texcoord.y)), 0.5);
         output_color = float4(k, k, k, 1.0);
     }
 )";
