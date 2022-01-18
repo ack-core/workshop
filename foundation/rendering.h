@@ -34,8 +34,10 @@ namespace foundation {
     };
 
     enum class RenderingTextureFormat {
-        RGBA8UN = 0,   // rgba 1 byte per channel normalized to [0..1]
-        R8UN,          // 1 byte grayscale normalized to [0..1]. In shader .r component is used
+        R8UN = 0, // 1 byte grayscale normalized to [0..1]. In shader .r component is used
+        R32F,     // float grayscale In shader .r component is used
+        RGBA8UN,  // rgba 1 byte per channel normalized to [0..1]
+        RGBA32F,  // 32-bit float per component
         _count
     };
     
@@ -138,7 +140,7 @@ namespace foundation {
         //     frame_viewProjMatrix     : matrix4 - view * projection matrix
         //     frame_cameraPosition     : float4  - camera position (w = 1)
         //     frame_cameraDirection    : float4  - normalized camera direction (w = 0)
-        //     frame_screenBounds       : float4  - screen size in pixels (.rg)
+        //     frame_rtBounds           : float4  - render target size in pixels (.rg)
         //
         // Textures. There 8 texture slots. Example of getting color from the last slot: float4 color = _tex2d(7, float2(0, 0));
         //
@@ -151,7 +153,12 @@ namespace foundation {
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr
         //
-        virtual RenderingTexturePtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips = nullptr, std::uint32_t mcount = 0) = 0;
+        virtual RenderingTexturePtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
+
+        // Create render target texture
+        // @w and @h    - width and height
+        //
+        virtual RenderingTexturePtr createRenderTarget(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h) = 0;
 
         // Create geometry
         // @data        - pointer to data (array of structures)
@@ -172,7 +179,7 @@ namespace foundation {
 
         // Apply textures
         // @textures    - textures[i] can be nullptr (texture and sampler at i-th position will not be set)
-        virtual void applyTextures(const RenderingTexture * const * textures, std::uint32_t tcount) = 0;
+        virtual void applyTextures(const std::initializer_list<const RenderingTexturePtr> &textures) = 0;
 
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
@@ -191,14 +198,9 @@ namespace foundation {
         virtual void endPass() = 0;
         virtual void presentFrame() = 0;
 
-        // Get last rendered frame as a bitmap in memory
-        // @imgFrame - array of size = PlatformInterface::getNativeScreenWidth * PlatformInterface::getNativeScreenHeight * 4
-        //
-        virtual void getFrameBufferData(std::uint8_t *imgFrame) = 0;
-
     protected:
         virtual ~RenderingInterface() = default;
     };
     
-    using RenderingInterfacePtr = std::shared_ptr<RenderingInterface>;    
+    using RenderingInterfacePtr = std::shared_ptr<RenderingInterface>;
 }

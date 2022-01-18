@@ -57,6 +57,8 @@ namespace {
         MTLPrimitiveTypeTriangle,
         MTLPrimitiveTypeTriangleStrip,
     };
+    
+    static const std::size_t MAX_TEXTURES = 4;
 }
 
 namespace foundation {
@@ -85,15 +87,16 @@ namespace foundation {
 }
 
 namespace foundation {
-    MetalTexture::MetalTexture(RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
-        : _format(fmt)
+    MetalTexture::MetalTexture(id<MTLTexture> texture, RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+        : _texture(texture)
+        , _format(fmt)
         , _width(w)
         , _height(h)
         , _mipCount(mipCount)
     {}
 
     MetalTexture::~MetalTexture() {
-    
+        _texture = nil;
     }
 
     std::uint32_t MetalTexture::getWidth() const {
@@ -110,6 +113,10 @@ namespace foundation {
 
     RenderingTextureFormat MetalTexture::getFormat() const {
         return _format;
+    }
+
+    id<MTLTexture> MetalTexture::get() const {
+        return _texture;
     }
 }
 
@@ -160,8 +167,8 @@ namespace foundation {
         ::memcpy(frameConstants->vewProjMatrix, camVP, 16 * sizeof(float));
         ::memcpy(frameConstants->cameraPosition, camPos, 3 * sizeof(float));
         ::memcpy(frameConstants->cameraDirection, camDir, 3 * sizeof(float));
-        frameConstants->screenBounds[0] = _platform->getScreenWidth();
-        frameConstants->screenBounds[1] = _platform->getScreenHeight();
+        frameConstants->rtBounds[0] = _platform->getScreenWidth();
+        frameConstants->rtBounds[1] = _platform->getScreenHeight();
     }
 
     RenderingShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const RenderingShaderInputDesc &vertex, const RenderingShaderInputDesc &instance) {
@@ -205,14 +212,7 @@ namespace foundation {
                 {"matrix4", "float4x4", "float4x4",        64},
             };
             
-            int  multiply = getArrayMultiply(varname);//1;
-//            auto braceStart = varname.find('[');
-//            auto braceEnd = varname.rfind(']');
-//
-//            if (braceStart != std::string::npos && braceEnd != std::string::npos) {
-//                multiply = std::max(std::stoi(varname.substr(braceStart + 1, braceEnd - braceStart - 1)), multiply);
-//            }
-
+            int  multiply = getArrayMultiply(varname);
             for (auto index = std::begin(typeSizeTable); index != std::end(typeSizeTable); ++index) {
                 if (index->typeName == typeName) {
                     nativeTypeName = packed ? index->nativeTypeNamePacked : index->nativeTypeName;
@@ -327,18 +327,30 @@ namespace foundation {
 
         MTLVertexDescriptor *vdesc = [MTLVertexDescriptor vertexDescriptor];
         std::string nativeShader =
+            "#include <metal_stdlib>\n"
             "using namespace metal;\n"
             "\n"
             "#define _sign(a) (2.0 * step(0.0, a) - 1.0)\n"
             "#define _sin(a) sin(a)\n"
             "#define _cos(a) cos(a)\n"
+            "#define _abs(a) abs(a)\n"
             "#define _transform(a, b) (b * a)\n"
+            "#define _dot(a, b) dot(a, b)\n"
+            "#define _cross(a, b) cross(a, b)\n"
+            "#define _pow(a, b) pow(a, b)\n"
+            "#define _norm(a) normalize(a)\n"
+            "#define _lerp(a, b, k) mix(a, b, k)\n"
+            "#define _step(k, a) step(k, a)\n"
+            "#define _smooth(a, b, k) smoothstep(a, b, k)\n"
+            "#define _tex2d(i, a) _texture##i.sample(_defaultSampler, a)\n"
+            "\n"
+            "const sampler _defaultSampler(mag_filter::linear, min_filter::linear);"
             "\n"
             "struct _FrameData {\n"
             "    float4x4 viewProjMatrix;\n"
             "    float4 cameraPosition;\n"
             "    float4 cameraDirection;\n"
-            "    float4 screenBounds;\n"
+            "    float4 rtBounds;\n"
             "};\n";
         
         std::string blockName;
@@ -495,7 +507,14 @@ namespace foundation {
                     completed = false;
                     break;
                 }
-                nativeShader += "fragment float4 main_fragment(\n    _InOut input [[stage_in]],\n";
+                nativeShader +=
+                    "fragment float4 main_fragment(\n    "
+                    "_InOut input [[stage_in]],\n    "
+                    "texture2d<float> _texture0 [[texture(0)]],\n    "
+                    "texture2d<float> _texture1 [[texture(1)]],\n    "
+                    "texture2d<float> _texture2 [[texture(2)]],\n    "
+                    "texture2d<float> _texture3 [[texture(3)]],\n    "
+                    "";
                 
                 if (constBlockLength) {
                     nativeShader += "    constant _Constants &constants [[buffer(0)]],\n";
@@ -557,10 +576,40 @@ namespace foundation {
         return result;
     }
 
-    RenderingTexturePtr MetalRendering::createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::uint8_t * const *mips, std::uint32_t mcount) {
-        std::shared_ptr<RenderingTexture> result;
+    RenderingTexturePtr MetalRendering::createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) {
+        static MTLPixelFormat nativeTextureFormat[] = { MTLPixelFormatR8Unorm, MTLPixelFormatR32Float, MTLPixelFormatRGBA8Unorm, MTLPixelFormatRGBA32Float };
+        auto getTexture2DPitch = [](RenderingTextureFormat fmt, std::size_t width) {
+            switch (fmt) {
+            case RenderingTextureFormat::R8UN:
+                return width;
+            case RenderingTextureFormat::R32F:
+                return width * sizeof(float);
+            case RenderingTextureFormat::RGBA8UN:
+                return width * 4;
+            case RenderingTextureFormat::RGBA32F:
+                return width * 4 * sizeof(float);
+            default:
+                return std::size_t(0);
+            }
+        };
 
-        return result;
+        @autoreleasepool {
+            MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
+            desc.pixelFormat = nativeTextureFormat[int(format)];
+            desc.width = w;
+            desc.height = h;
+            desc.mipmapLevelCount = mipsData.size();
+            desc.usage = MTLTextureUsageShaderRead;
+            id<MTLTexture> texture = [_device newTextureWithDescriptor:desc];
+
+            unsigned counter = 0;
+            for (auto &item : mipsData) {
+                MTLRegion region = {{ 0, 0, 0 }, {w >> counter, h >> counter, 1}};
+                [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, w)];
+            }
+            
+            return std::make_shared<MetalTexture>(texture, format, w, h, mipsData.size());
+        }
     }
 
     RenderingDataPtr MetalRendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
@@ -646,42 +695,61 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::applyTextures(const RenderingTexture * const * textures, std::uint32_t tcount) {
-    
+    void MetalRendering::applyTextures(const std::initializer_list<const RenderingTexturePtr> &textures) {
+        if (_currentCommandEncoder) {
+            if (textures.size() < MAX_TEXTURES) {
+                NSRange range {0, textures.size()};
+                id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
+                std::size_t counter = 0;
+                
+                for (auto &item : textures) {
+                    texarray[counter++] = static_cast<const MetalTexture *>(item.get())->get();
+                }
+                
+                [_currentCommandEncoder setFragmentTextures:texarray withRange:range];
+            }
+        }
     }
     
     void MetalRendering::drawGeometry(const RenderingDataPtr &vertexData, std::uint32_t vcount, RenderingTopology topology) {
-        id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
-        const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
-        
-        id<MTLBuffer> buffers[4] = {nativeVertexData, nullptr, platformShader->getConstantBuffer(), _frameConstantsBuffer};
-        NSUInteger offsets[4] = {0, 0, 0, 0};
-        NSRange vrange {0, 4};
-        NSRange frange {0, 2};
-        
-        [_currentCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-        [_currentCommandEncoder setFragmentBuffers:buffers + 2 offsets:offsets withRange:frange];
-        [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount];
+        if (_currentCommandEncoder) {
+            id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
+            const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
+            
+            id<MTLBuffer> buffers[4] = {nativeVertexData, nullptr, platformShader->getConstantBuffer(), _frameConstantsBuffer};
+            NSUInteger offsets[4] = {0, 0, 0, 0};
+            NSRange vrange {0, 4};
+            NSRange frange {0, 2};
+            
+            [_currentCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+            [_currentCommandEncoder setFragmentBuffers:buffers + 2 offsets:offsets withRange:frange];
+            [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount];
+        }
     }
 
     void MetalRendering::drawGeometry(const RenderingDataPtr &vertexData, const RenderingDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderingTopology topology) {
-        id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
-        id<MTLBuffer> nativeInstanceData = instanceData ? static_cast<const MetalData *>(instanceData.get())->get() : nullptr;
-        const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
-        
-        id<MTLBuffer> buffers[4] = {nativeVertexData, nativeInstanceData, platformShader->getConstantBuffer(), _frameConstantsBuffer};
-        NSUInteger offsets[4] = {0, 0, 0, 0};
-        NSRange vrange {0, 4};
-        NSRange frange {0, 2};
-        
-        [_currentCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-        [_currentCommandEncoder setFragmentBuffers:buffers + 2 offsets:offsets withRange:frange];
-        [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
+        if (_currentCommandEncoder) {
+            id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
+            id<MTLBuffer> nativeInstanceData = instanceData ? static_cast<const MetalData *>(instanceData.get())->get() : nullptr;
+            const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
+            
+            id<MTLBuffer> buffers[4] = {nativeVertexData, nativeInstanceData, platformShader->getConstantBuffer(), _frameConstantsBuffer};
+            NSUInteger offsets[4] = {0, 0, 0, 0};
+            NSRange vrange {0, 4};
+            NSRange frange {0, 2};
+            
+            [_currentCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+            [_currentCommandEncoder setFragmentBuffers:buffers + 2 offsets:offsets withRange:frange];
+            [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
+        }
     }
 
     void MetalRendering::endPass() {
-        [_currentCommandEncoder endEncoding];
-        _currentShader = nullptr;
+        if (_currentCommandEncoder) {
+            [_currentCommandEncoder endEncoding];
+            _currentCommandEncoder = nil;
+            _currentShader = nullptr;
+        }
     }
     
     void MetalRendering::presentFrame() {
@@ -691,8 +759,6 @@ namespace foundation {
             _currentCommandBuffer = nil;
         }
     }
-
-    void MetalRendering::getFrameBufferData(std::uint8_t *imgFrame) {}
 }
 
 namespace foundation {
