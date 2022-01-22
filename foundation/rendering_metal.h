@@ -4,46 +4,53 @@
 #include <unordered_map>
 
 namespace foundation {
-    class MetalShader : public RenderingShader {
+    class MetalShader : public RenderShader {
     public:
-        MetalShader(id<MTLLibrary> library, MTLVertexDescriptor *vdesc, id<MTLBuffer> constBuffer);
+        MetalShader(id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength);
         ~MetalShader() override;
         
         id<MTLFunction> getVertexShader() const;
         id<MTLFunction> getFragmentShader() const;
-        id<MTLBuffer> getConstantBuffer() const;
         MTLVertexDescriptor *getVertexDesc() const;
+        std::uint32_t getConstBufferLength() const;
         
     private:
         id<MTLLibrary> _library;
-        id<MTLBuffer> _constBuffer;
         MTLVertexDescriptor *_vdesc;
+        std::uint32_t _constBufferLength;
     };
-
-    class MetalTexture : public RenderingTexture {
+    
+    class MetalTexture : public RenderTexture {
     public:
-        MetalTexture(id<MTLTexture> texture, RenderingTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        MetalTexture(id<MTLTexture> texture, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
         ~MetalTexture() override;
-
+        
+        void replace(id<MTLTexture> texture);
+        
         std::uint32_t getWidth() const override;
         std::uint32_t getHeight() const override;
         std::uint32_t getMipCount() const override;
-        RenderingTextureFormat getFormat() const override;
-        id<MTLTexture> get() const;
-
+        RenderTextureFormat getFormat() const override;
+        
+        id<MTLTexture> getColor() const;
+        id<MTLTexture> getDepth() const;
+        
     private:
+        RenderTextureFormat _format;
+
         id<MTLTexture> _texture;
-        RenderingTextureFormat _format;
+        id<MTLTexture> _depth;
+
         std::uint32_t _width;
         std::uint32_t _height;
         std::uint32_t _mipCount;
     };
 
-    class MetalData : public RenderingData {
+    class MetalData : public RenderData {
     public:
         MetalData(id<MTLBuffer> buffer, std::uint32_t count, std::uint32_t stride);
         ~MetalData() override;
-
+        
         std::uint32_t getCount() const override;
         std::uint32_t getStride() const override;
         id<MTLBuffer> get() const;
@@ -53,50 +60,60 @@ namespace foundation {
         std::uint32_t _count;
         std::uint32_t _stride;
     };
-
+    
     class MetalRendering final : public RenderingInterface {
     public:
         MetalRendering(const std::shared_ptr<PlatformInterface> &platform);
         ~MetalRendering() override;
-
+        
         void updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) override;
-
-        RenderingShaderPtr createShader(const char *name, const char *src, const RenderingShaderInputDesc &vtx, const RenderingShaderInputDesc &itc) override;
-        RenderingTexturePtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
-        RenderingDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
-
-        void beginPass(const char *name, const RenderingShaderPtr &shader, const RenderingPassConfig &cfg) override;
+        
+        RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
+        RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
+        RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h) override;
+        RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
+        
+        void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
+        
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const std::initializer_list<const RenderingTexturePtr> &textures) override;
-
-        void drawGeometry(const RenderingDataPtr &vertexData, std::uint32_t vcount, RenderingTopology topology) override;
-        void drawGeometry(const RenderingDataPtr &vertexData, const RenderingDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderingTopology topology) override;
-
+        void applyTextures(const std::initializer_list<const RenderTexturePtr> &textures) override;
+        
+        void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) override;
+        void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) override;
+        
         void endPass() override;
         void presentFrame() override;
-
+        
     private:
+        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
+        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 2 * 1024;
+        
         struct FrameConstants {
             float vewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view * proj matrix
             float cameraPosition[4] = {0, 0, 0, 1};
             float cameraDirection[4] = {1, 0, 0, 1};
             float rtBounds[4] = {0, 0, 0, 0};
-        };
+        }
+        _frameConstants;
         
         std::shared_ptr<PlatformInterface> _platform;
-
         MTKView *_view = nil;
+        
         id<MTLDevice> _device = nil;
         id<MTLCommandQueue> _commandQueue = nil;
         
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _pipelineStates;
-        std::shared_ptr<RenderingShader> _currentShader;
-
+        std::shared_ptr<RenderShader> _currentShader;
+        
         id<MTLCommandBuffer> _currentCommandBuffer = nil;
         id<MTLRenderCommandEncoder> _currentCommandEncoder = nil;
         MTLRenderPassDescriptor *_currentPassDescriptor = nil;
         
         id<MTLDepthStencilState> _defaultDepthStencilState = nil;
-        id<MTLBuffer> _frameConstantsBuffer;
+        
+        bool _constantsBuffersInUse[CONSTANT_BUFFER_FRAMES_MAX] = {false};
+        id<MTLBuffer> _constantsBuffers[CONSTANT_BUFFER_FRAMES_MAX];
+        std::uint32_t _constantsBuffersIndex = 0;
+        std::uint32_t _constantsBufferOffset = 0;
     };
 }

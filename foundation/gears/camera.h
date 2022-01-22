@@ -1,14 +1,18 @@
 
 #pragma once
-
 #include "math.h"
-#include "foundation/platform.h"
 
 namespace gears {
     class Camera {
     public:
-        Camera(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform) {
+        Camera(float viewWidth, float viewHeight) : _viewWidth(viewWidth), _viewHeight(viewHeight) {
             setLookAtByRight({ 10.0f, 10.0f, 10.0f }, { 0.0f, 0, 0.0f }, { 1, 0, -1 });
+        }
+        
+        void setViewSize(float w, float h) {
+            _viewWidth = w;
+            _viewHeight = h;
+            _outdated = true;
         }
 
         void setLookAtByRight(const math::vector3f &position, const math::vector3f &target, const math::vector3f &right) {
@@ -71,8 +75,8 @@ namespace gears {
 
             math::transform3f tvp = (tv * _projMatrix).inverted();
             math::vector3f tcoord = math::vector3f(screenCoord, 0.0f);
-            tcoord.x = 2.0f * tcoord.x / _platform->getScreenWidth() - 1.0f;
-            tcoord.y = 1.0f - 2.0f * tcoord.y / _platform->getScreenHeight();
+            tcoord.x = 2.0f * tcoord.x / _viewWidth - 1.0f;
+            tcoord.y = 1.0f - 2.0f * tcoord.y / _viewHeight;
             
             return tcoord.transformed(tvp, true).normalized();
         }
@@ -82,7 +86,8 @@ namespace gears {
         }
 
     protected:
-        std::shared_ptr<foundation::PlatformInterface> _platform;
+        float _viewWidth;
+        float _viewHeight;
 
         math::transform3f _viewMatrix;
         math::transform3f _projMatrix;
@@ -99,8 +104,7 @@ namespace gears {
         
         bool _outdated = true;
         void _updateMatrices() {
-            float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
-            
+            float aspect = _viewWidth / _viewHeight;
             _viewMatrix = math::transform3f::lookAtRH(_position, _target, _up);
             _projMatrix = math::transform3f::perspectiveFovRH(_fov / 180.0f * float(3.14159f), aspect, _zNear, _zFar);
         }

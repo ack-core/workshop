@@ -125,34 +125,35 @@ std::uint32_t textureData[] = {
 int main(int argc, const char * argv[]) {
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
-    auto camera = std::make_shared<gears::Camera>(platform);
+    auto camera = std::make_shared<gears::Camera>(platform->getScreenWidth(), platform->getScreenHeight());
     auto meshFactory = voxel::MeshFactory::instance(platform);
     
     gears::OrbitCameraController cameraController (platform, camera);
     cameraController.setEnabled(true);
 
     auto axisShader = rendering->createShader("primitives_axis", axisShaderSrc, {
-        {"ID", foundation::RenderingShaderInputFormat::ID}
+        {"ID", foundation::RenderShaderInputFormat::ID}
     });
     auto imageShader = rendering->createShader("uiimage", imageShaderSource, {
-        {"ID", foundation::RenderingShaderInputFormat::ID}
+        {"ID", foundation::RenderShaderInputFormat::ID}
     });
-    auto imageTexture = rendering->createTexture(foundation::RenderingTextureFormat::RGBA8UN, 4, 4, {&textureData});
+    auto imageTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {&textureData});
+    auto rt0 = rendering->createRenderTarget(foundation::RenderTextureFormat::R8UN, 256, 256);
     
     voxel::Mesh voxelMesh;
     bool loadResult = meshFactory->createMesh("8x8x8.vox", {-8, -4, -8}, voxelMesh);
     auto meshShader = rendering->createShader("dynamic_voxel_mesh", meshShaderSrc,
         { // vertex
-            {"ID", foundation::RenderingShaderInputFormat::ID}
+            {"ID", foundation::RenderShaderInputFormat::ID}
         },
         { // instance
-            {"position_color", foundation::RenderingShaderInputFormat::SHORT4},
-            {"lightFaceNX", foundation::RenderingShaderInputFormat::BYTE4_NRM},
-            {"lightFacePX", foundation::RenderingShaderInputFormat::BYTE4_NRM},
-            {"lightFaceNY", foundation::RenderingShaderInputFormat::BYTE4_NRM},
-            {"lightFacePY", foundation::RenderingShaderInputFormat::BYTE4_NRM},
-            {"lightFaceNZ", foundation::RenderingShaderInputFormat::BYTE4_NRM},
-            {"lightFacePZ", foundation::RenderingShaderInputFormat::BYTE4_NRM},
+            {"position_color", foundation::RenderShaderInputFormat::SHORT4},
+            {"lightFaceNX", foundation::RenderShaderInputFormat::BYTE4_NRM},
+            {"lightFacePX", foundation::RenderShaderInputFormat::BYTE4_NRM},
+            {"lightFaceNY", foundation::RenderShaderInputFormat::BYTE4_NRM},
+            {"lightFacePY", foundation::RenderShaderInputFormat::BYTE4_NRM},
+            {"lightFaceNZ", foundation::RenderShaderInputFormat::BYTE4_NRM},
+            {"lightFacePZ", foundation::RenderShaderInputFormat::BYTE4_NRM},
         }
     );
 
@@ -165,25 +166,29 @@ int main(int argc, const char * argv[]) {
         math::vector2f texcoord0;
         math::vector2f texcoord1;
     }
-    imgconst = {{0, 0}, {100, 50}, {0, 0}, {1, 1}};
+    imgconst = {{0, 0}, {500, 500}, {0, 0}, {1, 1}};
     
     platform->run([&](float dtSec) {
+        camera->setViewSize(256, 256);
         rendering->updateFrameConstants(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
-        rendering->beginPass("axis", axisShader, foundation::RenderingPassConfig(0.8f, 0.775f, 0.75f));
-        rendering->drawGeometry(nullptr, 10, foundation::RenderingTopology::LINES);
+
+        rendering->beginPass("vox", meshShader, foundation::RenderPassConfig(rt0, 0.8f, 0.775f, 0.75f));
+        rendering->applyShaderConstants(&voxconst);
+        rendering->drawGeometry(nullptr, voxdata, 12, voxelMesh.frames[0].voxelCount, foundation::RenderTopology::TRIANGLESTRIP);
+        rendering->endPass();
+
+        camera->setViewSize(platform->getScreenWidth(), platform->getScreenHeight());
+        rendering->updateFrameConstants(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
+
+        rendering->beginPass("axis", axisShader, foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
+        rendering->drawGeometry(nullptr, 10, foundation::RenderTopology::LINES);
         rendering->endPass();
         
-        rendering->beginPass("vox", meshShader);
-        rendering->applyShaderConstants(&voxconst);
-        rendering->drawGeometry(nullptr, voxdata, 12, voxelMesh.frames[0].voxelCount, foundation::RenderingTopology::TRIANGLESTRIP);
-        rendering->endPass();
-
         rendering->beginPass("img", imageShader);
         rendering->applyShaderConstants(&imgconst);
-        rendering->applyTextures({imageTexture});
-        rendering->drawGeometry(nullptr, 4, foundation::RenderingTopology::TRIANGLESTRIP);
+        rendering->applyTextures({rt0});
+        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
         rendering->endPass();
-
 
         rendering->presentFrame();
     });

@@ -13,7 +13,7 @@
 namespace foundation {
     // Topology of vertex data
     //
-    enum class RenderingTopology {
+    enum class RenderTopology {
         LINES = 0,
         LINESTRIP,
         TRIANGLES,
@@ -21,7 +21,7 @@ namespace foundation {
         _count
     };
 
-    enum class RenderingShaderInputFormat {
+    enum class RenderShaderInputFormat {
         ID = 0,
         HALF2, HALF4,
         FLOAT1, FLOAT2, FLOAT3, FLOAT4,
@@ -33,7 +33,7 @@ namespace foundation {
         _count
     };
 
-    enum class RenderingTextureFormat {
+    enum class RenderTextureFormat {
         R8UN = 0, // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         R32F,     // float grayscale In shader .r component is used
         RGBA8UN,  // rgba 1 byte per channel normalized to [0..1]
@@ -41,56 +41,58 @@ namespace foundation {
         _count
     };
     
-    class RenderingShader {
+    class RenderShader {
     public:
         // Field description for Vertex Shader input struct
         //
         struct Input {
             const char *name;
-            RenderingShaderInputFormat format;
+            RenderShaderInputFormat format;
         };
         
     protected:
-        virtual ~RenderingShader() = default;
+        virtual ~RenderShader() = default;
     };
 
-    class RenderingTexture {
+    class RenderTexture {
     public:
         virtual std::uint32_t getWidth() const = 0;
         virtual std::uint32_t getHeight() const = 0;
         virtual std::uint32_t getMipCount() const = 0;
-        virtual RenderingTextureFormat getFormat() const = 0;
+        virtual RenderTextureFormat getFormat() const = 0;
 
     protected:
-        virtual ~RenderingTexture() = default;
+        virtual ~RenderTexture() = default;
     };
 
-    class RenderingData {
+    class RenderData {
     public:
         virtual std::uint32_t getCount() const = 0;
         virtual std::uint32_t getStride() const = 0;
 
     protected:
-        virtual ~RenderingData() = default;
+        virtual ~RenderData() = default;
     };
     
-    using RenderingShaderInputDesc = std::initializer_list<RenderingShader::Input>;
-    using RenderingShaderPtr = std::shared_ptr<RenderingShader>;
-    using RenderingTexturePtr = std::shared_ptr<RenderingTexture>;
-    using RenderingDataPtr = std::shared_ptr<RenderingData>;
+    using RenderShaderInputDesc = std::initializer_list<RenderShader::Input>;
+    using RenderShaderPtr = std::shared_ptr<RenderShader>;
+    using RenderTexturePtr = std::shared_ptr<RenderTexture>;
+    using RenderDataPtr = std::shared_ptr<RenderData>;
 
     // Render targets decription that is passed to 'beginPass'
     //
-    struct RenderingPassConfig {
+    struct RenderPassConfig {
+        RenderTexturePtr target = nullptr;
+
         bool clearColor = false;
         bool clearDepth = false;
 
-        RenderingTexturePtr target = nullptr;
         float clear[4] = {0.0f};
+        float depth = 0.0f;
     
-        RenderingPassConfig() {} // change nothing
-        RenderingPassConfig(float r, float g, float b) : clearColor(true), clearDepth(true), clear{r, g, b, 1.0f} {} // set default RT and crear it
-        RenderingPassConfig(float r, float g, float b, const RenderingTexturePtr &rt) : clearColor(true), clearDepth(true), clear{r, g, b, 1.0f}, target(rt) {} // set rt-texture and clear it
+        RenderPassConfig() {} // change nothing
+        RenderPassConfig(float r, float g, float b, float depth = 0.0f) : clearColor(true), clearDepth(true), clear{r, g, b, 1.0f}, depth(depth) {}
+        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float depth = 0.0f) : target(rt), clearColor(true), clearDepth(true), clear{r, g, b, 1.0f}, depth(depth) {}
     };
 
     // Interface provides 3D-visualization methods
@@ -100,10 +102,10 @@ namespace foundation {
         static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
     
     public:
-        // Update per frame global constants
-        // 
+        // Set global per-frame constants, available from shaders
+        //
         virtual void updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) = 0;
-
+        
         // Create shader from source text
         // @name      - name that is used in error messages
         // @vtx       - input layout for vertex shader. All such variables have 'vertex_' prefix.
@@ -147,18 +149,18 @@ namespace foundation {
         // Global functions:
         //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(k, v, v), _tex2d(index, v)
         //
-        virtual RenderingShaderPtr createShader(const char *name, const char *src, const RenderingShaderInputDesc &vtx, const RenderingShaderInputDesc &itc = {}) = 0;
+        virtual RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc = {}) = 0;
 
         // Create texture from binary data
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr
         //
-        virtual RenderingTexturePtr createTexture(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
+        virtual RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
 
         // Create render target texture
         // @w and @h    - width and height
         //
-        virtual RenderingTexturePtr createRenderTarget(RenderingTextureFormat format, std::uint32_t w, std::uint32_t h) = 0;
+        virtual RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h) = 0;
 
         // Create geometry
         // @data        - pointer to data (array of structures)
@@ -166,34 +168,34 @@ namespace foundation {
         // @stride      - size of struture
         // @return      - handle
         //
-        virtual RenderingDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
+        virtual RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
 
         // TODO: render states
-        // TODO: render targets
-
-        // Pass is a rendering scope with shader, [TODO: render targets and states]
+        // Pass is a rendering scope with shader, [TODO: blending+rasterizer states]
         // @name        - unique constant name to associate parameters
         // @shader      - shader object
         //
-        virtual void beginPass(const char *name, const RenderingShaderPtr &shader, const RenderingPassConfig &cfg = {}) = 0;
+        virtual void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg = {}) = 0;
 
         // Apply textures
         // @textures    - textures[i] can be nullptr (texture and sampler at i-th position will not be set)
-        virtual void applyTextures(const std::initializer_list<const RenderingTexturePtr> &textures) = 0;
+        //
+        virtual void applyTextures(const std::initializer_list<const RenderTexturePtr> &textures) = 0;
 
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
+        //
         virtual void applyShaderConstants(const void *constants) = 0;
 
-        // Draw vertexes from RenderingData
+        // Draw vertexes from RenderData
         // @vertexData has layout set by current shader. Can be nullptr
         //
-        virtual void drawGeometry(const RenderingDataPtr &vertexData, std::uint32_t vcount, RenderingTopology topology) = 0;
+        virtual void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) = 0;
 
-        // Draw instanced vertexes from RenderingData
+        // Draw instanced vertexes from RenderData
         // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //
-        virtual void drawGeometry(const RenderingDataPtr &vertexData, const RenderingDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderingTopology topology) = 0;
+        virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) = 0;
 
         virtual void endPass() = 0;
         virtual void presentFrame() = 0;
