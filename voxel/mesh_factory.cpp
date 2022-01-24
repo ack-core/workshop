@@ -125,86 +125,6 @@ namespace {
 //    )";
 }
 
-namespace voxel {
-/*
-    struct Chunk {
-        std::vector<Voxel> voxels;
-        uint16_t modelBounds[3];
-    };
-
-    std::vector<Chunk> loadModel(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *fullPath, const int16_t(&offset)[3]) {
-        const std::int32_t version = 150;
-
-        std::vector<Chunk> result;
-        std::unique_ptr<std::uint8_t[]> voxData;
-        std::size_t voxSize = 0;
-
-        if (platform->loadFile(fullPath, voxData, voxSize)) {
-            std::uint8_t *data = voxData.get();
-
-            if (memcmp(data, "VOX ", 4) == 0 && *(std::int32_t *)(data + 4) == version) {
-                // skip bytes of main chunk to start of the first child ('PACK')
-                data += 20;
-                std::int32_t modelCount = 1;
-
-                if (memcmp(data, "PACK", 4) == 0) {
-                    std::int32_t modelCount = *(std::int32_t *)(data + 12);
-
-                    data += 16;
-                }
-
-                result.resize(modelCount);
-
-                for (std::int32_t i = 0; i < modelCount; i++) {
-                    if (memcmp(data, "SIZE", 4) == 0) {
-                        std::uint8_t sizeZ = *(std::uint8_t *)(data + 12);
-                        std::uint8_t sizeX = *(std::uint8_t *)(data + 16);
-                        std::uint8_t sizeY = *(std::uint8_t *)(data + 20);
-
-                        result[i].modelBounds[0] = sizeX;
-                        result[i].modelBounds[1] = sizeY;
-                        result[i].modelBounds[2] = sizeZ;
-
-                        data += 24;
-
-                        if (memcmp(data, "XYZI", 4) == 0) {
-                            std::size_t voxelCount = *(std::uint32_t *)(data + 12);
-
-                            data += 16;
-                            result[i].voxels.resize(voxelCount);
-
-                            for (std::size_t c = 0; c < voxelCount; c++) {
-                                result[i].voxels[c].positionZ = std::int16_t(*(std::uint8_t *)(data + c * 4 + 0)) - offset[2];
-                                result[i].voxels[c].positionX = std::int16_t(*(std::uint8_t *)(data + c * 4 + 1)) - offset[0];
-                                result[i].voxels[c].positionY = std::int16_t(*(std::uint8_t *)(data + c * 4 + 2)) + offset[1];
-                                result[i].voxels[c].colorIndex = *(std::uint8_t *)(data + c * 4 + 3) - 1;
-                            }
-
-                            data += voxelCount * 4;
-                        }
-                        else {
-                            platform->logError("[voxel::loadModel] XYZI[%d] chunk is not found in '%s'", i, fullPath);
-                            break;
-                        }
-                    }
-                    else {
-                        platform->logError("[voxel::loadModel] SIZE[%d] chunk is not found in '%s'", i, fullPath);
-                        break;
-                    }
-                }
-            }
-            else {
-                platform->logError("[voxel::loadModel] Incorrect vox-header in '%s'", fullPath);
-            }
-        }
-        else {
-            platform->logError("[voxel::loadModel] Unable to find file '%s'", fullPath);
-        }
-
-        return result;
-    }
-    */
-}
 
 namespace voxel {
     class MeshFactoryImpl : public std::enable_shared_from_this<MeshFactoryImpl>, public MeshFactory {
@@ -288,7 +208,8 @@ namespace voxel {
                                 }
                             }
 
-                            output.frames[i].voxels = std::make_unique<Voxel[]>(meshVoxelCount);
+                            output.frames[i].positions = std::make_unique<VoxelPosition[]>(meshVoxelCount);
+                            output.frames[i].voxels = std::make_unique<VoxelInfo[]>(meshVoxelCount);
                             output.frames[i].voxelCount = meshVoxelCount;
 
                             for (std::size_t c = 0, k = 0; c < voxelCount; c++) {
@@ -297,13 +218,18 @@ namespace voxel {
                                 std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
                                 
                                 if (voxelArray[arrayIndex(x, y, z)].isMesh) {
-                                    Voxel &targetVoxel = output.frames[i].voxels[k++];
+                                    VoxelPosition &targetPosition = output.frames[i].positions[k];
+                                    VoxelInfo &targetVoxel = output.frames[i].voxels[k++];
                                     
                                     targetVoxel.positionZ = std::int16_t(z) + offset[2] - 1;
                                     targetVoxel.positionX = std::int16_t(x) + offset[0] - 1;
                                     targetVoxel.positionY = std::int16_t(y) + offset[1] - 1;
                                     targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3) - 1;
                                     std::fill_n(targetVoxel.lightFaceNX, 24, 0xFF);
+                                    
+                                    targetPosition.positionX = targetVoxel.positionX;
+                                    targetPosition.positionY = targetVoxel.positionY;
+                                    targetPosition.positionZ = targetVoxel.positionZ;
                                     
                                     struct MultiplySign {
                                         std::int8_t a, b;
@@ -352,6 +278,7 @@ namespace voxel {
                             }
 
                             data += voxelCount * 4;
+                            return true;
                         }
                         else {
                             _platform->logError("[voxel::createMesh] XYZI[%d] chunk is not found in '%s'", i, voxPath);

@@ -60,7 +60,6 @@ namespace {
         _window.rootViewController = _controller;
         
         CGRect frame = UIScreen.mainScreen.bounds;
-        
         g_nativeScreenScale = UIScreen.mainScreen.nativeScale;
         g_nativeScreenWidth = frame.size.width * g_nativeScreenScale;
         g_nativeScreenHeight = frame.size.height * g_nativeScreenScale;
@@ -196,6 +195,11 @@ namespace {
 namespace foundation {
     IOSPlatform::IOSPlatform() {
     	@autoreleasepool {
+            CGRect frame = UIScreen.mainScreen.bounds;
+            g_nativeScreenScale = UIScreen.mainScreen.nativeScale;
+            g_nativeScreenWidth = frame.size.height * g_nativeScreenScale; // at this time screen orientation isn't applied
+            g_nativeScreenHeight = frame.size.width * g_nativeScreenScale;
+            
             _executableDirectoryPath = [[[NSBundle mainBundle] bundlePath] cStringUsingEncoding:NSUTF8StringEncoding];
         }
     }

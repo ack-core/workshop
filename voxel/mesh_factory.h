@@ -8,7 +8,10 @@
 #include "foundation/platform.h"
 
 namespace voxel {
-    struct Voxel {
+    struct VoxelPosition {
+        std::int16_t positionX, positionY, positionZ, reserved;
+    };
+    struct VoxelInfo {
         std::int16_t positionX, positionY, positionZ, colorIndex;
         std::uint8_t lightFaceNX[4], lightFacePX[4]; // XFace Indeces : [-y-z, -y+z, +y-z, +y+z]
         std::uint8_t lightFaceNY[4], lightFacePY[4]; // YFace Indeces : [-z-x, -z+x, +z-x, +z+x]
@@ -17,7 +20,8 @@ namespace voxel {
     
     struct Mesh {
         struct Frame {
-            std::unique_ptr<Voxel[]> voxels;
+            std::unique_ptr<VoxelPosition[]> positions;
+            std::unique_ptr<VoxelInfo[]> voxels;
             std::uint16_t voxelCount;
         };
         

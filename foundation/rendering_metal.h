@@ -30,13 +30,16 @@ namespace foundation {
         std::uint32_t getWidth() const override;
         std::uint32_t getHeight() const override;
         std::uint32_t getMipCount() const override;
+        
         RenderTextureFormat getFormat() const override;
+        MTLPixelFormat getDepthFormat() const;
         
         id<MTLTexture> getColor() const;
         id<MTLTexture> getDepth() const;
         
     private:
         RenderTextureFormat _format;
+        MTLPixelFormat _depthFormat;
 
         id<MTLTexture> _texture;
         id<MTLTexture> _depth;
@@ -70,7 +73,7 @@ namespace foundation {
         
         RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
-        RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h) override;
+        RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
         
         void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
@@ -85,7 +88,7 @@ namespace foundation {
         void presentFrame() override;
         
     private:
-        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
+        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 1;
         static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 2 * 1024;
         
         struct FrameConstants {

@@ -52,6 +52,7 @@ namespace {
     };
     
     static const MTLPrimitiveType g_topologies[] = {
+        MTLPrimitiveTypePoint,
         MTLPrimitiveTypeLine,
         MTLPrimitiveTypeLineStrip,
         MTLPrimitiveTypeTriangle,
@@ -95,10 +96,12 @@ namespace foundation {
         : _texture(texture)
         , _depth(depth)
         , _format(fmt)
+        , _depthFormat(depth ? depth.pixelFormat : MTLPixelFormatInvalid)
         , _width(w)
         , _height(h)
         , _mipCount(mipCount)
-    {}
+    {
+    }
     
     MetalTexture::~MetalTexture() {
         _texture = nil;
@@ -119,7 +122,11 @@ namespace foundation {
     RenderTextureFormat MetalTexture::getFormat() const {
         return _format;
     }
-    
+
+    MTLPixelFormat MetalTexture::getDepthFormat() const {
+        return _depthFormat;
+    }
+
     id<MTLTexture> MetalTexture::getColor() const {
         return _texture;
     }
@@ -159,15 +166,15 @@ namespace foundation {
             _device = MTLCreateSystemDefaultDevice();
             _commandQueue = [_device newCommandQueue];
 
-            MTLDepthStencilDescriptor *desc = [MTLDepthStencilDescriptor new];
-            desc.depthCompareFunction = MTLCompareFunctionGreater;
-            desc.depthWriteEnabled = YES;
-            _defaultDepthStencilState = [_device newDepthStencilStateWithDescriptor:desc];
+            MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
+            depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
+            depthDesc.depthWriteEnabled = YES;
+            _defaultDepthStencilState = [_device newDepthStencilStateWithDescriptor:depthDesc];
 
             for (std::uint32_t i = 0; i < CONSTANT_BUFFER_FRAMES_MAX; i++) {
                 _constantsBuffers[i] = [_device newBufferWithLength:CONSTANT_BUFFER_OFFSET_MAX options:MTLResourceStorageModeShared];
             }
-
+            
             _platform->logMsg("[RENDER] Initialization : complete");
         }
     }
@@ -522,7 +529,7 @@ namespace foundation {
                     "texture2d<float> _texture0 [[texture(0)]],\n    "
                     "texture2d<float> _texture1 [[texture(1)]],\n    "
                     "texture2d<float> _texture2 [[texture(2)]],\n    "
-                    "texture2d<float> _texture3 [[texture(3)]],\n    "
+                    "texture2d<float> _texture3 [[texture(3)]],\n"
                     "";
                 
                 if (constBlockLength) {
@@ -620,7 +627,7 @@ namespace foundation {
         }
     }
     
-    RenderTexturePtr MetalRendering::createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h) {
+    RenderTexturePtr MetalRendering::createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
         @autoreleasepool {
             MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
             
@@ -630,12 +637,15 @@ namespace foundation {
             desc.mipmapLevelCount = 1;
             desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
             id<MTLTexture> texture = [_device newTextureWithDescriptor:desc];
+            id<MTLTexture> depth = nil;
             
-            desc.pixelFormat = MTLPixelFormatDepth32Float;
-            desc.usage = MTLTextureUsageRenderTarget;
-            desc.storageMode = MTLStorageModeMemoryless;
-            id<MTLTexture> depth = [_device newTextureWithDescriptor:desc];
-
+            if (withZBuffer) {
+                desc.pixelFormat = MTLPixelFormatDepth32Float;
+                desc.usage = MTLTextureUsageRenderTarget;
+                desc.storageMode = MTLStorageModeMemoryless;
+                depth = [_device newTextureWithDescriptor:desc];
+            }
+            
             return std::make_shared<MetalTexture>(texture, depth, format, w, h, 1);
         }
     }
@@ -656,7 +666,9 @@ namespace foundation {
                 _currentCommandBuffer = [_commandQueue commandBuffer];
             }
             
-            MTLPixelFormat rtFormat = _view.colorPixelFormat;
+            MTLPixelFormat rtColorFormat = _view.colorPixelFormat;
+            MTLPixelFormat rtDepthFormat = _view.depthStencilPixelFormat;
+
             double rtWidth = _view.currentDrawable.texture.width;
             double rtHeight = _view.currentDrawable.texture.height;
             const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
@@ -667,9 +679,10 @@ namespace foundation {
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
             _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionDontCare;
-                        
+            
             if (cfg.target) {
-                rtFormat = nativeTextureFormat[int(platformRT->getFormat())];
+                rtColorFormat = nativeTextureFormat[int(platformRT->getFormat())];
+                rtDepthFormat = platformRT->getDepthFormat();
                 rtWidth = double(platformRT->getWidth());
                 rtHeight = double(platformRT->getHeight());
                 
@@ -688,18 +701,19 @@ namespace foundation {
             _frameConstants.rtBounds[0] = rtWidth;
             _frameConstants.rtBounds[1] = rtHeight;
             
+            id<MTLRenderPipelineState> state = nil;
+            
             if (platformShader) {
-                id<MTLRenderPipelineState> state = nil;
                 auto index = _pipelineStates.find(name);
                 if (index == _pipelineStates.end()) {
                     NSError *error;
                     MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
-
+                    
                     desc.vertexFunction = platformShader->getVertexShader();
                     desc.vertexDescriptor = platformShader->getVertexDesc();
                     desc.fragmentFunction = platformShader->getFragmentShader();
-                    desc.colorAttachments[0].pixelFormat = rtFormat;
-                    desc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+                    desc.colorAttachments[0].pixelFormat = rtColorFormat;
+                    desc.depthAttachmentPixelFormat = rtDepthFormat;
                     
                     if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
                         _pipelineStates.emplace(name, state);
@@ -711,35 +725,41 @@ namespace foundation {
                 else {
                     state = index->second;
                 }
+            }
+            
+            if (state) {
+                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
                 
-                if (state) {
-                    _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+                if (_constantsBufferOffset + sizeof(FrameConstants) < CONSTANT_BUFFER_OFFSET_MAX) {
+                    std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
+                    std::memcpy(constantsMemory + _constantsBufferOffset, &_frameConstants, sizeof(FrameConstants));
                     
-                    if (_constantsBufferOffset + sizeof(FrameConstants) < CONSTANT_BUFFER_OFFSET_MAX) {
-                        std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
-                        std::memcpy(constantsMemory + _constantsBufferOffset, &_frameConstants, sizeof(FrameConstants));
-                        
-                        [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:3];
-                        [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:1];
-                        
-                        _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
-                    }
-                    else {
-                        _platform->logError("[MetalRendering::beginPass] out of constants buffer length\n");
-                    }
+                    [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:3];
+                    [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:1];
                     
-                    MTLViewport viewPort {0.0f};
-                    viewPort.znear = 0.0f;
-                    viewPort.zfar = 1.0f;
-                    viewPort.width = rtWidth;
-                    viewPort.height = rtHeight;
-                    
-                    [_currentCommandEncoder setRenderPipelineState:state];
-                    [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
-                    [_currentCommandEncoder setViewport:viewPort];
-                    
-                    _currentShader = shader;
+                    _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
                 }
+                else {
+                    _platform->logError("[MetalRendering::beginPass] Out of constants buffer length\n");
+                }
+                
+                MTLViewport viewPort {0.0f};
+                viewPort.znear = 0.0f;
+                viewPort.zfar = 1.0f;
+                viewPort.width = rtWidth;
+                viewPort.height = rtHeight;
+                
+                [_currentCommandEncoder setRenderPipelineState:state];
+                [_currentCommandEncoder setViewport:viewPort];
+                
+                if (rtDepthFormat != MTLPixelFormatInvalid) {
+                    [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
+                }
+                
+                _currentShader = shader;
+            }
+            else {
+                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
             }
         }
     }
@@ -761,14 +781,14 @@ namespace foundation {
                     _constantsBufferOffset += roundTo256(platformShader->getConstBufferLength());
                 }
                 else {
-                    _platform->logError("[MetalRendering::applyShaderConstants] out of constants buffer length\n");
+                    _platform->logError("[MetalRendering::applyShaderConstants] Out of constants buffer length\n");
                 }
             }
         }
     }
     
     void MetalRendering::applyTextures(const std::initializer_list<const RenderTexturePtr> &textures) {
-        if (_currentCommandEncoder) {
+        if (_currentCommandEncoder && _currentShader) {
             if (textures.size() < MAX_TEXTURES) {
                 NSRange range {0, textures.size()};
                 id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
@@ -784,7 +804,7 @@ namespace foundation {
     }
     
     void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) {
-        if (_currentCommandEncoder) {
+        if (_currentCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
             const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
             
@@ -798,7 +818,7 @@ namespace foundation {
     }
 
     void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) {
-        if (_currentCommandEncoder) {
+        if (_currentCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
             id<MTLBuffer> nativeInstanceData = instanceData ? static_cast<const MetalData *>(instanceData.get())->get() : nullptr;
             

@@ -6,114 +6,10 @@
 #include "foundation/gears/math.h"
 #include "foundation/gears/camera.h"
 #include "foundation/gears/orbit_camera_controller.h"
+#include "foundation/gears/primitives.h"
 
 #include "voxel/mesh_factory.h"
-
-static const char *imageShaderSource = R"(
-    const {
-        position_size : float4
-        texcoord : float4
-    }
-    inout {
-        texcoord : float2
-    }
-    vssrc {
-        float2 screenTransform = float2(2.0, -2.0) / frame_rtBounds.xy;
-        float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-        output_texcoord = mix(const_texcoord.xy, const_texcoord.zw, vertexCoord);
-        vertexCoord = vertexCoord * const_position_size.zw + const_position_size.xy; //
-        output_position = float4(vertexCoord.xy * screenTransform + float2(-1.0, 1.0), 0.5, 1);
-    }
-    fssrc {
-        output_color = _tex2d(0, input_texcoord);
-    }
-)";
-
-static const char *axisShaderSrc = R"(
-    fixed {
-        coords[10] : float4 =
-            [0.0, 0.0, 0.0, 1.0][1000.0, 0.0, 0.0, 1.0]
-            [0.0, 0.0, 0.0, 1.0][0.0, 1000.0, 0.0, 1.0]
-            [0.0, 0.0, 0.0, 1.0][0.0, 0.0, 1000.0, 1.0]
-            [1.0, 0.0, 0.0, 1.0][1.0, 0.0, 1.0, 1.0]
-            [0.0, 0.0, 1.0, 1.0][1.0, 0.0, 1.0, 1.0]
-        colors[5] : float4 =
-            [1.0, 0.0, 0.0, 1.0]
-            [0.0, 1.0, 0.0, 1.0]
-            [0.0, 0.0, 1.0, 1.0]
-            [0.5, 0.5, 0.5, 1.0]
-            [0.5, 0.5, 0.5, 1.0]
-    }
-    inout {
-        color : float4
-    }
-    vssrc {
-        output_position = _transform(fixed_coords[vertex_ID], frame_viewProjMatrix);
-        output_color = fixed_colors[vertex_ID >> 1];
-    }
-    fssrc {
-        output_color = input_color;
-    }
-)";
-
-// XFace Indeces : [-y-z, -y+z, +y-z, +y+z]
-// YFace Indeces : [-z-x, -z+x, +z-x, +z+x]
-// ZFace Indeces : [-y-x, -y+x, +y-x, +y+x]
-const char *meshShaderSrc = R"(
-    fixed {
-        axis[3] : float4 =
-            [0.0, 0.0, 1.0, 0.0]
-            [1.0, 0.0, 0.0, 0.0]
-            [0.0, 1.0, 0.0, 0.0]
-            
-        cube[12] : float4 =
-            [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
-            [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
-            [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
-
-        faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
-    }
-    const {
-        modelTransform : matrix4
-    }
-    inout {
-        texcoord : float2
-        koeff : float4
-    }
-    vssrc {
-        float3 cubeCenter = float3(instance_position_color.xyz);
-        float3 toCamera = frame_cameraPosition.xyz - _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
-        float3 toCamSign = _sign(_transform(const_modelTransform, float4(toCamera, 0.0)).xyz);
-        float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
-        float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
-        float3 faceNormal = toCamSign * fixed_axis[vertex_ID >> 2].xyz;
-
-        int3 faceIndeces = int3(float3(2.0, 2.0, 2.0) * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
-        
-        float4 koeff = float4(0.0, 0.0, 0.0, 0.0);
-        koeff = koeff + _step(0.5, -faceNormal.x) * instance_lightFaceNX;
-        koeff = koeff + _step(0.5,  faceNormal.x) * instance_lightFacePX;
-        koeff = koeff + _step(0.5, -faceNormal.y) * instance_lightFaceNY;
-        koeff = koeff + _step(0.5,  faceNormal.y) * instance_lightFacePY;
-        koeff = koeff + _step(0.5, -faceNormal.z) * instance_lightFaceNZ;
-        koeff = koeff + _step(0.5,  faceNormal.z) * instance_lightFacePZ;
-        
-        float2 texcoord = float2(0.0, 0.0);
-        texcoord = texcoord + _step(0.5, _abs(faceNormal.x)) * fixed_faceUV[faceIndeces.x];
-        texcoord = texcoord + _step(0.5, _abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
-        texcoord = texcoord + _step(0.5, _abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
-
-        output_position = _transform(_transform(absVertexPos, const_modelTransform), frame_viewProjMatrix);
-        output_texcoord = texcoord;
-        output_koeff = koeff;
-    }
-    fssrc {
-        float m0 = _lerp(input_koeff[0], input_koeff[1], input_texcoord.x);
-        float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord.x);
-        float k = _pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5);
-        output_color = float4(k, k, k, 1.0);
-    }
-)";
+#include "voxel/scene.h"
 
 std::uint32_t textureData[] = {
     0xff0000ff, 0xff0000ff, 0xffffffff, 0xffffffff,
@@ -122,73 +18,131 @@ std::uint32_t textureData[] = {
     0xffffffff, 0xffffffff, 0xffff0000, 0xffff0000,
 };
 
+//const char *voxShaderSrc = R"(
+//    fixed {
+//        cube[12] : float4 =
+//            [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+//            [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+//            [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+//    }
+//    const {
+//        lightPosition : float3
+//        lightRadius : float1
+//    }
+//    inout {
+//        direction : float3
+//    }
+//    vssrc {
+//        //float3 cubeCenter = float3(instance_position.xyz);
+//        //float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
+//        //float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
+//        //float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
+//
+//        float3 toLight = _norm(const_lightPosition - float3(instance_position.xyz));
+//        float3 toLightSign = _sign(toLight);
+//
+//        float3 octahedron = toLight / _dot(toLight, toLightSign);
+//        octahedron.xz = octahedron.y <= 0.0 ? toLightSign.xz * (float2(1.0, 1.0) - _abs(octahedron.zx)) : octahedron.xz;
+//
+//        output_position = float4((octahedron.x + octahedron.z), (octahedron.x - octahedron.z), 0.5, 1);
+//        output_direction = toLight;
+//    }
+//    fssrc {
+//        output_color = float4(input_direction.x, input_direction.y, input_direction.z, 1);
+//    }
+//)";
+
+
+const char *voxShaderSrc = R"(
+    fixed {
+        cube[12] : float4 =
+            [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+            [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+            [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+    }
+    const {
+        lightPosition : float3
+        lightRadius : float1
+    }
+    inout {
+        dist : float1
+    }
+    vssrc {
+        float3 cubeCenter = float3(instance_position.xyz);
+        float3 toLightSign = _sign(const_lightPosition - float3(instance_position.xyz));
+        float4 relVertexPos = float4(toLightSign, 1.0) * fixed_cube[vertex_ID];
+        float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
+        
+        float3 vToLight = const_lightPosition - absVertexPos.xyz;
+        float3 vToLightNrm = _norm(vToLight);
+        float3 vToLightSign = _sign(vToLight);
+        
+        float3 octahedron = vToLightNrm / _dot(vToLightNrm, vToLightSign);
+        octahedron.xz = octahedron.y <= 0.0 ? vToLightSign.xz * (float2(1.0, 1.0) - _abs(octahedron.zx)) : octahedron.xz;
+        
+        output_dist = clamp((length(vToLight) / const_lightRadius), 0.0, 1.0);
+        output_position = float4((octahedron.x + octahedron.z), (octahedron.x - octahedron.z), 0.5, 1);
+    }
+    fssrc {
+        output_color = float4(input_dist, 0, 0, 1);
+    }
+)";
+
 int main(int argc, const char * argv[]) {
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
+    
     auto camera = std::make_shared<gears::Camera>(platform->getScreenWidth(), platform->getScreenHeight());
+    auto primitives = std::make_shared<gears::Primitives>(rendering);
+    
     auto meshFactory = voxel::MeshFactory::instance(platform);
+    auto scene = voxel::Scene::instance(meshFactory, rendering, "");
+    scene->addStaticModel("walls.vox", {-36, -16, -36});
     
     gears::OrbitCameraController cameraController (platform, camera);
     cameraController.setEnabled(true);
-
-    auto axisShader = rendering->createShader("primitives_axis", axisShaderSrc, {
-        {"ID", foundation::RenderShaderInputFormat::ID}
-    });
-    auto imageShader = rendering->createShader("uiimage", imageShaderSource, {
-        {"ID", foundation::RenderShaderInputFormat::ID}
-    });
-    auto imageTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {&textureData});
-    auto rt0 = rendering->createRenderTarget(foundation::RenderTextureFormat::R8UN, 256, 256);
     
-    voxel::Mesh voxelMesh;
-    bool loadResult = meshFactory->createMesh("8x8x8.vox", {-8, -4, -8}, voxelMesh);
-    auto meshShader = rendering->createShader("dynamic_voxel_mesh", meshShaderSrc,
+    auto voxShader = rendering->createShader("vox", voxShaderSrc,
         { // vertex
             {"ID", foundation::RenderShaderInputFormat::ID}
         },
         { // instance
-            {"position_color", foundation::RenderShaderInputFormat::SHORT4},
-            {"lightFaceNX", foundation::RenderShaderInputFormat::BYTE4_NRM},
-            {"lightFacePX", foundation::RenderShaderInputFormat::BYTE4_NRM},
-            {"lightFaceNY", foundation::RenderShaderInputFormat::BYTE4_NRM},
-            {"lightFacePY", foundation::RenderShaderInputFormat::BYTE4_NRM},
-            {"lightFaceNZ", foundation::RenderShaderInputFormat::BYTE4_NRM},
-            {"lightFacePZ", foundation::RenderShaderInputFormat::BYTE4_NRM},
+            {"position", foundation::RenderShaderInputFormat::SHORT4},
         }
     );
-
-    auto voxconst = math::transform3f::identity(); //.translated({0, 0, -3}).rotated({0, 1, 0}, math::PI_6);
-    auto voxdata = rendering->createData(voxelMesh.frames[0].voxels.get(), voxelMesh.frames[0].voxelCount, sizeof(voxel::Voxel));
+//    voxel::VoxelPosition positions[] = {
+//        {1, -1, 1, 0},
+//        {2, -1, 1, 0}
+//    };
     
-    struct ImgConst {
-        math::vector2f position;
-        math::vector2f size;
-        math::vector2f texcoord0;
-        math::vector2f texcoord1;
+    struct Light {
+        math::vector3f position;
+        float radius;
     }
-    imgconst = {{0, 0}, {500, 500}, {0, 0}, {1, 1}};
+    light {
+        {0.0f, 0.0f, 0.0f}, 30.0f
+    };
+    
+    auto imageTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {&textureData});
+    auto rt0 = rendering->createRenderTarget(foundation::RenderTextureFormat::R32F, 256, 256, false);
+    //auto voxData = rendering->createData(&positions, 2, sizeof(voxel::VoxelPosition));
     
     platform->run([&](float dtSec) {
-        camera->setViewSize(256, 256);
         rendering->updateFrameConstants(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
+        primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
 
-        rendering->beginPass("vox", meshShader, foundation::RenderPassConfig(rt0, 0.8f, 0.775f, 0.75f));
-        rendering->applyShaderConstants(&voxconst);
-        rendering->drawGeometry(nullptr, voxdata, 12, voxelMesh.frames[0].voxelCount, foundation::RenderTopology::TRIANGLESTRIP);
+        rendering->beginPass("vox", voxShader, foundation::RenderPassConfig(rt0, 1.0f, 1.0f, 1.0f)); //
+        rendering->applyShaderConstants(&light);
+        rendering->drawGeometry(nullptr, scene->getPositions(), 12, scene->getPositions()->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
         rendering->endPass();
 
-        camera->setViewSize(platform->getScreenWidth(), platform->getScreenHeight());
-        rendering->updateFrameConstants(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
-
-        rendering->beginPass("axis", axisShader, foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
-        rendering->drawGeometry(nullptr, 10, foundation::RenderTopology::LINES);
-        rendering->endPass();
         
-        rendering->beginPass("img", imageShader);
-        rendering->applyShaderConstants(&imgconst);
-        rendering->applyTextures({rt0});
-        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
-        rendering->endPass();
+        
+        scene->updateAndDraw(dtSec);
+        //primitives->drawSphere({}, 1.0f);
+        primitives->drawTexturedRectangle(0, 0, 512, 512, rt0);
+        
+        
 
         rendering->presentFrame();
     });

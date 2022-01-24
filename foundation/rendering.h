@@ -14,7 +14,8 @@ namespace foundation {
     // Topology of vertex data
     //
     enum class RenderTopology {
-        LINES = 0,
+        POINTS = 0,
+        LINES,
         LINESTRIP,
         TRIANGLES,
         TRIANGLESTRIP,
@@ -160,7 +161,7 @@ namespace foundation {
         // Create render target texture
         // @w and @h    - width and height
         //
-        virtual RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h) = 0;
+        virtual RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) = 0;
 
         // Create geometry
         // @data        - pointer to data (array of structures)
