@@ -18,10 +18,12 @@ namespace {
                 [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
 
             faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+            lightPosition : float3 = [0, 0, 0]
         }
         inout {
             texcoord : float2
             koeff : float4
+            vpos : float4
         }
         vssrc {
             float3 cubeCenter = float3(instance_position_color.xyz);
@@ -46,14 +48,23 @@ namespace {
             texcoord = texcoord + _step(0.5, _abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
             texcoord = texcoord + _step(0.5, _abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
 
+            output_vpos = float4(absVertexPos.xyz, _step(cubeCenter.y, fixed_lightPosition.y));
             output_position = _transform(absVertexPos, frame_viewProjMatrix);
             output_texcoord = texcoord;
             output_koeff = koeff;
         }
         fssrc {
+            float3 toLight = fixed_lightPosition - input_vpos.xyz;
+            float3 toLightNrm = _norm(toLight);
+            float3 toLightSign = _sign(toLight);
+            float3 octahedron = toLightNrm / _dot(toLightNrm, toLightSign);
+            float  dist = (length(toLight) / 60.0f);
+            float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
+            float  shm = _tex2d(0, coord)[int(input_vpos.w)];
+
             float m0 = _lerp(input_koeff[0], input_koeff[1], input_texcoord.x);
             float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord.x);
-            float k = _pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5);
+            float k = _pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5) * step(0.96 * dist, shm);
             output_color = float4(k, k, k, 1.0);
         }
     )";
@@ -133,7 +144,7 @@ namespace voxel {
         SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) override;
         SceneObjectToken addLightSource(const math::vector3f &position, float intensivity, const math::color &rgba) override;
         
-        void updateAndDraw(float dtSec) override;
+        void updateAndDraw(const foundation::RenderTexturePtr &shadow, float dtSec) override;
         
         const foundation::RenderDataPtr &getPositions() const override {
             return _singleModel.positionBuffer;
@@ -186,8 +197,9 @@ namespace voxel {
         return nullptr;
     }
     
-    void SceneImpl::updateAndDraw(float dtSec) {
+    void SceneImpl::updateAndDraw(const foundation::RenderTexturePtr &shadow, float dtSec) {
         _rendering->beginPass("static_voxel_model", _staticMeshShader); //, foundation::RenderPassConfig(0.8f, 0.775f, 0.75f)
+        _rendering->applyTextures({shadow});
         _rendering->drawGeometry(nullptr, _singleModel.voxelBuffer, 12, _singleModel.mesh.frames[0].voxelCount, foundation::RenderTopology::TRIANGLESTRIP);
         _rendering->endPass();
     }

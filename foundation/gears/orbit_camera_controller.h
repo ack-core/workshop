@@ -64,7 +64,7 @@ namespace gears {
         math::vector2f _lockedMouseCoordinates;
 
         math::vector3f _center = { 0, 0, 0 };
-        math::vector3f _orbit = { 32, 0, 32 };
+        math::vector3f _orbit = { 32, 32, 32 };
 
         foundation::EventHandlerToken _mouseEventHandlerToken;
     };

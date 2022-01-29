@@ -21,7 +21,7 @@ namespace voxel {
     public:
         virtual SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) = 0;
         virtual SceneObjectToken addLightSource(const math::vector3f &position, float intensivity, const math::color &rgba) = 0;
-        virtual void updateAndDraw(float dtSec) = 0;
+        virtual void updateAndDraw(const foundation::RenderTexturePtr &shadow, float dtSec) = 0;
         
         virtual const foundation::RenderDataPtr &getPositions() const = 0;
         

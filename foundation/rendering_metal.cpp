@@ -358,6 +358,8 @@ namespace foundation {
             "#define _lerp(a, b, k) mix(a, b, k)\n"
             "#define _step(k, a) step(k, a)\n"
             "#define _smooth(a, b, k) smoothstep(a, b, k)\n"
+            "#define _min(a, b) min(a, b)\n"
+            "#define _max(a, b) max(a, b)\n"
             "#define _tex2d(i, a) _texture##i.sample(_defaultSampler, a)\n"
             "\n"
             "const sampler _defaultSampler(mag_filter::linear, min_filter::linear);"
@@ -714,6 +716,46 @@ namespace foundation {
                     desc.fragmentFunction = platformShader->getFragmentShader();
                     desc.colorAttachments[0].pixelFormat = rtColorFormat;
                     desc.depthAttachmentPixelFormat = rtDepthFormat;
+                    
+                    if (cfg.blendType == BlendType::DISABLED) {
+                        desc.colorAttachments[0].blendingEnabled = false;
+                    }
+                    else if (cfg.blendType == BlendType::MIXING) {
+                        desc.colorAttachments[0].blendingEnabled = true;
+                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                    }
+                    else if (cfg.blendType == BlendType::ADDITIVE) {
+                        desc.colorAttachments[0].blendingEnabled = YES;
+                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+                    }
+                    else if (cfg.blendType == BlendType::MAXVALUE) {
+                        desc.colorAttachments[0].blendingEnabled = YES;
+                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMax;
+                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMax;
+                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+                    }
+                    else if (cfg.blendType == BlendType::MINVALUE) {
+                        desc.colorAttachments[0].blendingEnabled = YES;
+                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMin;
+                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMin;
+                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+                    }
                     
                     if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
                         _pipelineStates.emplace(name, state);

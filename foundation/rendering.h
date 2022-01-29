@@ -11,8 +11,6 @@
 #include "platform.h"
 
 namespace foundation {
-    // Topology of vertex data
-    //
     enum class RenderTopology {
         POINTS = 0,
         LINES,
@@ -21,7 +19,15 @@ namespace foundation {
         TRIANGLESTRIP,
         _count
     };
-
+    
+    enum class BlendType {
+        DISABLED,
+        MIXING,
+        ADDITIVE,
+        MINVALUE,
+        MAXVALUE
+    };
+    
     enum class RenderShaderInputFormat {
         ID = 0,
         HALF2, HALF4,
@@ -33,7 +39,7 @@ namespace foundation {
         UINT1, UINT2, UINT3, UINT4,
         _count
     };
-
+    
     enum class RenderTextureFormat {
         R8UN = 0, // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         R32F,     // float grayscale In shader .r component is used
@@ -54,23 +60,23 @@ namespace foundation {
     protected:
         virtual ~RenderShader() = default;
     };
-
+    
     class RenderTexture {
     public:
         virtual std::uint32_t getWidth() const = 0;
         virtual std::uint32_t getHeight() const = 0;
         virtual std::uint32_t getMipCount() const = 0;
         virtual RenderTextureFormat getFormat() const = 0;
-
+        
     protected:
         virtual ~RenderTexture() = default;
     };
-
+    
     class RenderData {
     public:
         virtual std::uint32_t getCount() const = 0;
         virtual std::uint32_t getStride() const = 0;
-
+        
     protected:
         virtual ~RenderData() = default;
     };
@@ -79,21 +85,39 @@ namespace foundation {
     using RenderShaderPtr = std::shared_ptr<RenderShader>;
     using RenderTexturePtr = std::shared_ptr<RenderTexture>;
     using RenderDataPtr = std::shared_ptr<RenderData>;
-
+    
     // Render targets decription that is passed to 'beginPass'
     //
     struct RenderPassConfig {
         RenderTexturePtr target = nullptr;
-
+        
         bool clearColor = false;
         bool clearDepth = false;
-
+        
         float clear[4] = {0.0f};
         float depth = 0.0f;
-    
+        
+        BlendType blendType = BlendType::DISABLED;
+        
         RenderPassConfig() {} // change nothing
-        RenderPassConfig(float r, float g, float b, float depth = 0.0f) : clearColor(true), clearDepth(true), clear{r, g, b, 1.0f}, depth(depth) {}
-        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float depth = 0.0f) : target(rt), clearColor(true), clearDepth(true), clear{r, g, b, 1.0f}, depth(depth) {}
+        RenderPassConfig(float r, float g, float b, float d = 0.0f) : clear{r, g, b, 1.0f} {
+            clearColor = true;
+            clearDepth = true;
+            depth = d;
+        }
+        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float d = 0.0f) : clear{r, g, b, 1.0f} {
+            target = rt;
+            clearColor = true;
+            clearDepth = true;
+            depth = d;
+        }
+        RenderPassConfig(const RenderTexturePtr &rt, BlendType bType, float r, float g, float b, float d = 0.0f) : clear{r, g, b, 1.0f} {
+            target = rt;
+            clearColor = true;
+            clearDepth = true;
+            blendType = bType;
+            depth = d;
+        }
     };
 
     // Interface provides 3D-visualization methods
