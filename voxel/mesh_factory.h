@@ -22,11 +22,11 @@ namespace voxel {
         struct Frame {
             std::unique_ptr<VoxelPosition[]> positions;
             std::unique_ptr<VoxelInfo[]> voxels;
-            std::uint16_t voxelCount;
+            std::uint16_t voxelCount = 0;
         };
         
         std::unique_ptr<Frame[]> frames;
-        std::uint16_t frameCount;
+        std::uint16_t frameCount = 0;
     };
 
     class MeshFactory {
@@ -37,7 +37,7 @@ namespace voxel {
         // Load voxels from file and fill 'output' Mesh with loaded data
         // @voxPath - absolute path to '.vox' file
         // @offset  - values to be added to voxel position
-        // Notice: voxels on borders arent part of the mesh. They are needed to correct lighting
+        // Notice: voxels on borders arent a part of the mesh. They are needed to correct lighting
         //
         virtual bool createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) = 0;
 

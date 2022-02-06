@@ -11,12 +11,12 @@
 #include "voxel/mesh_factory.h"
 #include "voxel/scene.h"
 
-std::uint32_t textureData[] = {
-    0xff0000ff, 0xff0000ff, 0xffffffff, 0xffffffff,
-    0xff0000ff, 0xffffffff, 0xffffffff, 0xffffffff,
-    0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000,
-    0xffffffff, 0xffffffff, 0xffff0000, 0xffff0000,
-};
+//std::uint32_t textureData[] = {
+//    0xff0000ff, 0xff0000ff, 0xffffffff, 0xffffffff,
+//    0xff0000ff, 0xffffffff, 0xffffffff, 0xffffffff,
+//    0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000,
+//    0xffffffff, 0xffffffff, 0xffff0000, 0xffff0000,
+//};
 
 //const char *voxShaderSrc = R"(
 //    fixed {
@@ -56,47 +56,65 @@ std::uint32_t textureData[] = {
 //            [0.5, -0.5, 0.5][0.5, 0.5, 0.5][0.5, -0.5, -0.5][0.5, 0.5, -0.5]
 //            [0.5, 0.5, -0.5][0.5, 0.5, 0.5][-0.5, 0.5, -0.5][-0.5, 0.5, 0.5]
 
-const char *voxShaderSrc = R"(
-    fixed {
-        cube[36] : float4 =
-            [-0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, 0.5, -1]
-            [0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, -0.5, -1]
-            [0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][-0.5, 0.5, 0.5, -1]
-            [-0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, 0.5, +1]
-            [0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, -0.5, +1]
-            [0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][-0.5, 0.5, 0.5, +1]
-    }
-    const {
-        lightPosition : float3
-        lightRadius : float1
-    }
+//const char *voxShaderSrc = R"(
+//    fixed {
+//        cube[36] : float4 =
+//            [-0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, 0.5, -1]
+//            [0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, -0.5, -1]
+//            [0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][-0.5, 0.5, 0.5, -1]
+//            [-0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, 0.5, +1]
+//            [0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, -0.5, +1]
+//            [0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][-0.5, 0.5, 0.5, +1]
+//    }
+//    const {
+//        lightPosition : float3
+//        lightRadius : float1
+//    }
+//    inout {
+//        dist : float4
+//    }
+//    vssrc {
+//        float3 cubeCenter = float3(instance_position.xyz);
+//        float3 toLight = const_lightPosition - cubeCenter;
+//        float3 toLightSign = _sign(toLight);
+//
+//        float4 cubeConst = fixed_cube[vertex_ID];
+//        float3 relVertexPos = toLightSign * cubeConst.xyz;
+//        float3 absVertexPos = cubeCenter + relVertexPos;
+//
+//        float3 vToLight = const_lightPosition - absVertexPos;
+//        float3 vToLightNrm = _norm(vToLight);
+//        float3 vToLightSign = _sign(vToLight);
+//
+//        float3 octahedron = vToLightNrm / _dot(vToLightNrm, vToLightSign);
+//        octahedron.xz = cubeConst.w * octahedron.y <= 0.0 ? vToLightSign.xz * (float2(1.0, 1.0) - _abs(octahedron.zx)) : octahedron.xz;
+//
+//        output_dist = float4(1, 1, 1, 1);
+//        output_dist[int(cubeConst.w * 0.5 + 0.5)] = _lerp(1.0, length(vToLight) / const_lightRadius, _step(0, cubeConst.w * (toLight.y) + 1.0));
+//        output_position = float4((octahedron.x + octahedron.z), (octahedron.z - octahedron.x), 0.5, 1);
+//    }
+//    fssrc {
+//        output_color = float4(input_dist.x, input_dist.y, 1, 1);
+//    }
+//)";
+
+static const char *g_billShaderSrc = R"(
     inout {
-        dist : float4
+        texcoord : float2
     }
     vssrc {
-        float3 cubeCenter = float3(instance_position.xyz);
-        float3 toLight = const_lightPosition - cubeCenter;
-        float3 toLightSign = _sign(toLight);
-        
-        float4 cubeConst = fixed_cube[vertex_ID];
-        float3 relVertexPos = toLightSign * cubeConst.xyz;
-        float3 absVertexPos = cubeCenter + relVertexPos;
-        
-        float3 vToLight = const_lightPosition - absVertexPos;
-        float3 vToLightNrm = _norm(vToLight);
-        float3 vToLightSign = _sign(vToLight);
-        
-        float3 octahedron = vToLightNrm / _dot(vToLightNrm, vToLightSign);
-        octahedron.xz = cubeConst.w * octahedron.y <= 0.0 ? vToLightSign.xz * (float2(1.0, 1.0) - _abs(octahedron.zx)) : octahedron.xz;
-        
-        output_dist = float4(1, 1, 1, 1);
-        output_dist[int(cubeConst.w * 0.5 + 0.5)] = _lerp(1.0, length(vToLight) / const_lightRadius, _step(0, cubeConst.w * (toLight.y) + 1.0));
-        output_position = float4((octahedron.x + octahedron.z), (octahedron.z - octahedron.x), 0.5, 1);
+        float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
+        float4 billPos = float4(vertexCoord.xy * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 0.0);
+        float4 viewPos = _transform(float4(20, 0, 0, 1), frame_viewMatrix) + billPos * 20.0;
+        output_position = _transform(viewPos, frame_projMatrix);
+        output_texcoord = vertexCoord;
     }
     fssrc {
-        output_color = float4(input_dist.x, input_dist.y, 1, 1);
+        output_color = float4(fragment_coord, 0, 1);
     }
 )";
+
+
 
 int main(int argc, const char * argv[]) {
     auto platform = foundation::PlatformInterface::instance();
@@ -107,52 +125,69 @@ int main(int argc, const char * argv[]) {
     
     auto meshFactory = voxel::MeshFactory::instance(platform);
     auto scene = voxel::Scene::instance(meshFactory, rendering, "");
+
     scene->addStaticModel("walls.vox", {-30, -16, -30});
+    scene->addLightSource({0, 0, 0}, 50.0f, math::color(1.0, 1.0, 1.0, 1.0));
     
     gears::OrbitCameraController cameraController (platform, camera);
     cameraController.setEnabled(true);
     
-    auto voxShader = rendering->createShader("vox", voxShaderSrc,
-        { // vertex
-            {"ID", foundation::RenderShaderInputFormat::ID}
-        },
-        { // instance
-            {"position", foundation::RenderShaderInputFormat::SHORT4},
-        }
-    );
-    voxel::VoxelPosition positions[] = {
-        {1, -1, 1, 0},
-        {1, 1, 1, 0}
-    };
+    auto billShader = rendering->createShader("bill", g_billShaderSrc, {
+        {"ID", foundation::RenderShaderInputFormat::ID}
+    });
     
-    struct Light {
-        math::vector3f position;
-        float radius;
-    }
-    light {
-        {0.0f, 0.0f, 0.0f}, 60.0f
-    };
+//    auto voxShader = rendering->createShader("vox", voxShaderSrc,
+//        { // vertex
+//            {"ID", foundation::RenderShaderInputFormat::ID}
+//        },
+//        { // instance
+//            {"position", foundation::RenderShaderInputFormat::SHORT4},
+//        }
+//    );
+//    voxel::VoxelPosition positions[] = {
+//        {1, -1, 1, 0},
+//        {1, 1, 1, 0}
+//    };
     
-    auto imageTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {&textureData});
-    auto rt0 = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA32F, 512, 512, false);
-    auto voxData = rendering->createData(&positions, 2, sizeof(voxel::VoxelPosition));
+//    struct Light {
+//        math::vector3f position;
+//        float radius;
+//    }
+//    light {
+//        {0.0f, 0.0f, 0.0f}, 50.0f
+//    };
+    
+    //auto imageTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {&textureData});
+    //auto rt0 = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 512, 512, false);
+    //auto voxData = rendering->createData(&positions, 2, sizeof(voxel::VoxelPosition));
     
     platform->run([&](float dtSec) {
-        rendering->updateFrameConstants(camera->getPosition().flat3, camera->getForwardDirection().flat3, camera->getVPMatrix().flat16);
+        rendering->updateFrameConstants(
+            camera->getVPMatrix().flat16,
+            camera->getInvViewProjMatrix().flat16,
+            camera->getViewMatrix().flat16,
+            camera->getProjMatrix().flat16,
+            camera->getPosition().flat3,
+            camera->getForwardDirection().flat3
+        );
         primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
-
-        //rendering->beginPass("vox", voxShader); //
-        rendering->beginPass("vox", voxShader, foundation::RenderPassConfig(rt0, foundation::BlendType::MINVALUE, 1.0f, 1.0f, 1.0f)); //
-        rendering->applyShaderConstants(&light);
-        //rendering->drawGeometry(nullptr, voxData, 24, 2, foundation::RenderTopology::TRIANGLESTRIP);
-        rendering->drawGeometry(nullptr, scene->getPositions(), 36, scene->getPositions()->getCount(), foundation::RenderTopology::TRIANGLES);
+        
+        rendering->beginPass("bill", billShader);
+        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
         rendering->endPass();
+        
+        //rendering->beginPass("vox", voxShader); //
+        //rendering->beginPass("vox", voxShader, foundation::RenderPassConfig(rt0, foundation::BlendType::MINVALUE, 1.0f, 1.0f, 1.0f)); //
+        //rendering->applyShaderConstants(&light);
+        //rendering->drawGeometry(nullptr, voxData, 24, 2, foundation::RenderTopology::TRIANGLESTRIP);
+        //rendering->drawGeometry(nullptr, scene->getPositions(), 36, scene->getPositions()->getCount(), foundation::RenderTopology::TRIANGLES);
+        //rendering->endPass();
 
         
         
-        scene->updateAndDraw(rt0, dtSec);
+        //scene->updateAndDraw(dtSec);
         //primitives->drawSphere({}, 1.0f);
-        primitives->drawTexturedRectangle(16, 16, 512, 512, rt0);
+        //primitives->drawTexturedRectangle(16, 16, 128, 128, rt0);
         
         
 

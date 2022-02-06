@@ -128,8 +128,11 @@ namespace foundation {
     
     public:
         // Set global per-frame constants, available from shaders
+        // @viewProj - view * proj matrix
+        // @invProj  - inverted proj matrix
+        // @invView  - inverted view matrix
         //
-        virtual void updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) = 0;
+        virtual void updateFrameConstants(const float(&VP)[16], const float(&invVP)[16], const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) = 0;
         
         // Create shader from source text
         // @name      - name that is used in error messages
@@ -157,7 +160,7 @@ namespace foundation {
         //         output_position = _transform(float4(vertex_position, 1.0), frame_viewProjMatrix);
         //     }
         //     fssrc {                                           - fragment shader has float4 'output_color' variable
-        //         output_color = input_varName4;
+        //         output_color = input_varName4;                - fragment shader has float2 'fragment_coord' variable with range 0.0 <= x, y <= 1.0
         //     }
         // s--------------------------------------
         // Types:
@@ -195,6 +198,9 @@ namespace foundation {
         //
         virtual RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
 
+        virtual float getBackBufferWidth() const = 0;
+        virtual float getBackBufferHeight() const = 0;
+
         // TODO: render states
         // Pass is a rendering scope with shader, [TODO: blending+rasterizer states]
         // @name        - unique constant name to associate parameters
@@ -203,9 +209,10 @@ namespace foundation {
         virtual void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg = {}) = 0;
 
         // Apply textures
-        // @textures    - textures[i] can be nullptr (texture and sampler at i-th position will not be set)
+        // @textures    - textures[i] can be nullptr (texture at i-th position will not be set)
+        // @count       - number of textures
         //
-        virtual void applyTextures(const std::initializer_list<const RenderTexturePtr> &textures) = 0;
+        virtual void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) = 0;
 
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null

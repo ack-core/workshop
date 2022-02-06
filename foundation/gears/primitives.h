@@ -127,7 +127,7 @@ namespace gears {
             
             _rendering->beginPass("primitives_txrect", _texturedRectangleShader);
             _rendering->applyShaderConstants(&imgconst);
-            _rendering->applyTextures({texture});
+            _rendering->applyTextures(&texture, 1);
             _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
             _rendering->endPass();
         }

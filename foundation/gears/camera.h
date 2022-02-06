@@ -67,6 +67,18 @@ namespace gears {
             return _viewMatrix * _projMatrix;
         }
 
+        math::transform3f getInvViewProjMatrix() {
+            return (_viewMatrix * _projMatrix).inverted();
+        }
+        
+        math::transform3f getViewMatrix() {
+            return _viewMatrix;
+        }
+
+        math::transform3f getProjMatrix() {
+            return _projMatrix;
+        }
+
         math::vector3f screenToWorld(const math::vector2f &screenCoord) const {
             math::transform3f tv = _viewMatrix;
             tv._41 = 0.0f;

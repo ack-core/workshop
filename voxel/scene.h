@@ -12,7 +12,8 @@
 #include "mesh_factory.h"
 
 namespace voxel {
-    using SceneObjectToken = void *;
+    using SceneObjectToken = std::uint64_t;
+    static const SceneObjectToken INVALID_TOKEN = std::uint64_t(-1);
     
     class Scene {
     public:
@@ -20,10 +21,12 @@ namespace voxel {
 
     public:
         virtual SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) = 0;
-        virtual SceneObjectToken addLightSource(const math::vector3f &position, float intensivity, const math::color &rgba) = 0;
-        virtual void updateAndDraw(const foundation::RenderTexturePtr &shadow, float dtSec) = 0;
+        virtual SceneObjectToken addLightSource(const math::vector3f &position, float radius, const math::color &rgba) = 0;
         
-        virtual const foundation::RenderDataPtr &getPositions() const = 0;
+        virtual void removeStaticModel(SceneObjectToken token) = 0;
+        virtual void removeLightSource(SceneObjectToken token) = 0;
+        
+        virtual void updateAndDraw(float dtSec) = 0;
         
     protected:
         virtual ~Scene() = default;

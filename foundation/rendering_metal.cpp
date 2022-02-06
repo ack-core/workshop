@@ -59,7 +59,7 @@ namespace {
         MTLPrimitiveTypeTriangleStrip,
     };
     
-    static const std::size_t MAX_TEXTURES = 4;
+    static const std::uint32_t MAX_TEXTURES = 4;
     
     std::uint32_t roundTo256(std::uint32_t value) {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
@@ -181,8 +181,11 @@ namespace foundation {
 
     MetalRendering::~MetalRendering() {}
 
-    void MetalRendering::updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) {
-        ::memcpy(_frameConstants.vewProjMatrix, camVP, 16 * sizeof(float));
+    void MetalRendering::updateFrameConstants(const float(&VP)[16], const float(&invVP)[16], const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
+        ::memcpy(_frameConstants.vewProjMatrix, VP, 16 * sizeof(float));
+        ::memcpy(_frameConstants.invVewProjMatrix, invVP, 16 * sizeof(float));
+        ::memcpy(_frameConstants.viewMatrix, view, 16 * sizeof(float));
+        ::memcpy(_frameConstants.projMatrix, proj, 16 * sizeof(float));
         ::memcpy(_frameConstants.cameraPosition, camPos, 3 * sizeof(float));
         ::memcpy(_frameConstants.cameraDirection, camDir, 3 * sizeof(float));
     }
@@ -366,6 +369,9 @@ namespace foundation {
             "\n"
             "struct _FrameData {\n"
             "    float4x4 viewProjMatrix;\n"
+            "    float4x4 invViewProjMatrix;\n"
+            "    float4x4 viewMatrix;\n"
+            "    float4x4 projMatrix;\n"
             "    float4 cameraPosition;\n"
             "    float4 cameraDirection;\n"
             "    float4 rtBounds;\n"
@@ -500,7 +506,13 @@ namespace foundation {
                     nativeShader += "    constant _Constants &constants [[buffer(2)]],\n";
                 }
                     
-                nativeShader += "    constant _FrameData &framedata [[buffer(3)]])\n{\n    _InOut output;\n";
+                nativeShader += "    constant _FrameData &framedata [[buffer(3)]],\n    ";
+                nativeShader +=
+                    "texture2d<float> _texture0 [[texture(0)]],\n    "
+                    "texture2d<float> _texture1 [[texture(1)]],\n    "
+                    "texture2d<float> _texture2 [[texture(2)]],\n    "
+                    "texture2d<float> _texture3 [[texture(3)]])\n{\n    _InOut output;\n";
+
                 std::string codeBlock;
                 
                 if (formCodeBlock(input, codeBlock) == false) {
@@ -538,7 +550,10 @@ namespace foundation {
                     nativeShader += "    constant _Constants &constants [[buffer(0)]],\n";
                 }
                 
-                nativeShader += "    constant _FrameData &framedata [[buffer(1)]])\n{\n    float4 output_color;\n";
+                nativeShader += "    constant _FrameData &framedata [[buffer(1)]])\n{\n    ";
+                nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
+                nativeShader += "float4 output_color;\n";
+                
                 std::string codeBlock;
 
                 if (formCodeBlock(input, codeBlock) == false) {
@@ -659,6 +674,18 @@ namespace foundation {
         }
     }
     
+    float MetalRendering::getBackBufferWidth() const {
+        return _platform->getScreenWidth();
+    }
+    
+    float MetalRendering::getBackBufferHeight() const {
+        return _platform->getScreenHeight();
+    }
+    
+    // TODO:
+    // autogenerate name + get shader name + error in rendering if shader is created with name that is already used
+    // const_ to shader unpacked only
+    // !!!
     void MetalRendering::beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
@@ -667,7 +694,7 @@ namespace foundation {
             if (_currentCommandBuffer == nil) {
                 _currentCommandBuffer = [_commandQueue commandBuffer];
             }
-            
+
             MTLPixelFormat rtColorFormat = _view.colorPixelFormat;
             MTLPixelFormat rtDepthFormat = _view.depthStencilPixelFormat;
 
@@ -678,7 +705,7 @@ namespace foundation {
             
             _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
-            _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+            _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionDontCare;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
             _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionDontCare;
             
@@ -695,7 +722,7 @@ namespace foundation {
                 _currentPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
                 _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.clear[0], cfg.clear[1], cfg.clear[2], cfg.clear[3]);
             }
-            if (cfg.clearDepth) {
+            if (cfg.clearDepth && rtDepthFormat != MTLPixelFormatInvalid) {
                 _currentPassDescriptor.depthAttachment.clearDepth = 0.0f;
                 _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
             }
@@ -772,6 +799,7 @@ namespace foundation {
             if (state) {
                 _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
                 
+                // TODO: copypasta
                 if (_constantsBufferOffset + sizeof(FrameConstants) < CONSTANT_BUFFER_OFFSET_MAX) {
                     std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
                     std::memcpy(constantsMemory + _constantsBufferOffset, &_frameConstants, sizeof(FrameConstants));
@@ -806,6 +834,7 @@ namespace foundation {
         }
     }
     
+    // TODO: copypasta
     void MetalRendering::applyShaderConstants(const void *constants) {
         if (_currentCommandEncoder) {
             const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
@@ -829,18 +858,18 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::applyTextures(const std::initializer_list<const RenderTexturePtr> &textures) {
+    void MetalRendering::applyTextures(const RenderTexturePtr *textures, std::uint32_t count) {
         if (_currentCommandEncoder && _currentShader) {
-            if (textures.size() < MAX_TEXTURES) {
-                NSRange range {0, textures.size()};
+            if (count < MAX_TEXTURES) {
+                NSRange range {0, count};
                 id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
-                std::size_t counter = 0;
                 
-                for (auto &item : textures) {
-                    texarray[counter++] = static_cast<const MetalTexture *>(item.get())->getColor();
+                for (std::uint32_t i = 0; i < count; i++) {
+                    texarray[i] = static_cast<const MetalTexture *>(textures[i].get())->getColor();
                 }
                 
                 [_currentCommandEncoder setFragmentTextures:texarray withRange:range];
+                [_currentCommandEncoder setVertexTextures:texarray withRange:range];
             }
         }
     }

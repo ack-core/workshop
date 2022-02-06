@@ -69,17 +69,20 @@ namespace foundation {
         MetalRendering(const std::shared_ptr<PlatformInterface> &platform);
         ~MetalRendering() override;
         
-        void updateFrameConstants(const float(&camPos)[3], const float(&camDir)[3], const float(&camVP)[16]) override;
+        void updateFrameConstants(const float(&VP)[16], const float(&invVP)[16], const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) override;
         
         RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
         
+        float getBackBufferWidth() const override;
+        float getBackBufferHeight() const override;
+        
         void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
         
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const std::initializer_list<const RenderTexturePtr> &textures) override;
+        void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) override;
         
         void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) override;
         void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) override;
@@ -88,11 +91,14 @@ namespace foundation {
         void presentFrame() override;
         
     private:
-        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 1;
+        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 4;
         static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 2 * 1024;
         
         struct FrameConstants {
             float vewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view * proj matrix
+            float invVewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // inverted view * proj matrix
+            float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view matrix
+            float projMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // proj matrix
             float cameraPosition[4] = {0, 0, 0, 1};
             float cameraDirection[4] = {1, 0, 0, 1};
             float rtBounds[4] = {0, 0, 0, 0};
