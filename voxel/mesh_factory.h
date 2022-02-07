@@ -28,11 +28,11 @@ namespace voxel {
         std::unique_ptr<Frame[]> frames;
         std::uint16_t frameCount = 0;
     };
-
+    
     class MeshFactory {
     public:
         static std::shared_ptr<MeshFactory> instance(const foundation::PlatformInterfacePtr &platform);
-
+        
     public:
         // Load voxels from file and fill 'output' Mesh with loaded data
         // @voxPath - absolute path to '.vox' file
@@ -40,11 +40,11 @@ namespace voxel {
         // Notice: voxels on borders arent a part of the mesh. They are needed to correct lighting
         //
         virtual bool createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) = 0;
-
+        
     protected:
         virtual ~MeshFactory() = default;
     };
-
+    
     using MeshFactoryPtr = std::shared_ptr<MeshFactory>;
 }
 

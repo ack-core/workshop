@@ -67,7 +67,7 @@ namespace gears {
                     b = b + (v == 2.0 || v >= 4.0 ? 1.0 : 0.0);
                     a = a / 16.0 * 6.28318;
                     b = b / 16.0 * 6.28318;
-                    float3 position = float3(cos(a) * cos(b), sin(b), sin(a) * cos(b));
+                    float3 position = 1.0f * float3(cos(a) * cos(b), sin(b), sin(a) * cos(b));
                     output_color = float4(normalize(position), 1.0);
                     output_position = _transform(float4(position, 1.0), frame_viewProjMatrix);
                 }

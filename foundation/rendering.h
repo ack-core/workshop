@@ -20,12 +20,18 @@ namespace foundation {
         _count
     };
     
+    enum class ZType {
+        ENABLED,       // Z-test enabled, Z-write enabled, Z-buffer isn't cleared
+        ENABLED_CLEAR, // Z-test enabled, Z-write enabled, Z-buffer is cleared
+        DISABLED,      // Z-test disabled, Z-write disabled, Z-buffer isn't cleared
+    };
+    
     enum class BlendType {
-        DISABLED,
-        MIXING,
-        ADDITIVE,
-        MINVALUE,
-        MAXVALUE
+        DISABLED,      // Blending is disabled
+        MIXING,        // sourceRGB * sourceA + destRGB * (1 - sourceA)
+        ADDITIVE,      // sourceRGB * sourceA + destRGB
+        MINVALUE,      // min(sourceRGBA, destRGBA)
+        MAXVALUE       // max(sourceRGBA, destRGBA)
     };
     
     enum class RenderShaderInputFormat {
@@ -90,33 +96,36 @@ namespace foundation {
     //
     struct RenderPassConfig {
         RenderTexturePtr target = nullptr;
-        
         bool clearColor = false;
-        bool clearDepth = false;
         
-        float clear[4] = {0.0f};
-        float depth = 0.0f;
+        float initialColor[4] = {0.0f};
+        float initialDepth = 0.0f;
         
+        ZType zBehaviorType = ZType::ENABLED;
         BlendType blendType = BlendType::DISABLED;
         
         RenderPassConfig() {} // change nothing
-        RenderPassConfig(float r, float g, float b, float d = 0.0f) : clear{r, g, b, 1.0f} {
+        RenderPassConfig(float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
+            zBehaviorType = ZType::ENABLED_CLEAR;
             clearColor = true;
-            clearDepth = true;
-            depth = d;
+            initialDepth = d;
         }
-        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float d = 0.0f) : clear{r, g, b, 1.0f} {
+        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
+            target = rt;
+            zBehaviorType = ZType::ENABLED_CLEAR;
+            clearColor = true;
+            initialDepth = d;
+        }
+        RenderPassConfig(const RenderTexturePtr &rt, BlendType bType, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
             target = rt;
             clearColor = true;
-            clearDepth = true;
-            depth = d;
-        }
-        RenderPassConfig(const RenderTexturePtr &rt, BlendType bType, float r, float g, float b, float d = 0.0f) : clear{r, g, b, 1.0f} {
-            target = rt;
-            clearColor = true;
-            clearDepth = true;
             blendType = bType;
-            depth = d;
+            zBehaviorType = ZType::ENABLED_CLEAR;
+            initialDepth = d;
+        }
+        RenderPassConfig(BlendType bType, ZType zType) {
+            blendType = bType;
+            zBehaviorType = ZType::ENABLED_CLEAR;
         }
     };
 

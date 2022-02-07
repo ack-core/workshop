@@ -98,21 +98,21 @@
 //    }
 //)";
 
-static const char *g_billShaderSrc = R"(
-    inout {
-        texcoord : float2
-    }
-    vssrc {
-        float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-        float4 billPos = float4(vertexCoord.xy * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 0.0);
-        float4 viewPos = _transform(float4(20, 0, 0, 1), frame_viewMatrix) + billPos * 20.0;
-        output_position = _transform(viewPos, frame_projMatrix);
-        output_texcoord = vertexCoord;
-    }
-    fssrc {
-        output_color = float4(fragment_coord, 0, 1);
-    }
-)";
+//static const char *g_billShaderSrc = R"(
+//    inout {
+//        texcoord : float2
+//    }
+//    vssrc {
+//        float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
+//        float4 billPos = float4(vertexCoord.xy * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 0.0);
+//        float4 viewPos = _transform(float4(20, 0, 0, 1), frame_viewMatrix) + billPos * 20.0;
+//        output_position = _transform(viewPos, frame_projMatrix);
+//        output_texcoord = vertexCoord;
+//    }
+//    fssrc {
+//        output_color = float4(fragment_coord, 0, 1);
+//    }
+//)";
 
 
 
@@ -124,17 +124,17 @@ int main(int argc, const char * argv[]) {
     auto primitives = std::make_shared<gears::Primitives>(rendering);
     
     auto meshFactory = voxel::MeshFactory::instance(platform);
-    auto scene = voxel::Scene::instance(meshFactory, rendering, "");
+    auto scene = voxel::Scene::instance(meshFactory, platform, rendering, "palette.png");
 
-    scene->addStaticModel("walls.vox", {-30, -16, -30});
-    scene->addLightSource({0, 0, 0}, 50.0f, math::color(1.0, 1.0, 1.0, 1.0));
+    scene->addStaticModel("walls.vox", {-30, -16, -36});
+    scene->addLightSource({10.0, 0, -5}, 40.0f, math::color(1.0, 1.0, 1.0, 1.0));
     
     gears::OrbitCameraController cameraController (platform, camera);
     cameraController.setEnabled(true);
     
-    auto billShader = rendering->createShader("bill", g_billShaderSrc, {
-        {"ID", foundation::RenderShaderInputFormat::ID}
-    });
+//    auto billShader = rendering->createShader("bill", g_billShaderSrc, {
+//        {"ID", foundation::RenderShaderInputFormat::ID}
+//    });
     
 //    auto voxShader = rendering->createShader("vox", voxShaderSrc,
 //        { // vertex
@@ -170,11 +170,11 @@ int main(int argc, const char * argv[]) {
             camera->getPosition().flat3,
             camera->getForwardDirection().flat3
         );
-        primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
+        //primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
         
-        rendering->beginPass("bill", billShader);
-        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
-        rendering->endPass();
+//        rendering->beginPass("bill", billShader);
+//        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
+//        rendering->endPass();
         
         //rendering->beginPass("vox", voxShader); //
         //rendering->beginPass("vox", voxShader, foundation::RenderPassConfig(rt0, foundation::BlendType::MINVALUE, 1.0f, 1.0f, 1.0f)); //
@@ -182,10 +182,10 @@ int main(int argc, const char * argv[]) {
         //rendering->drawGeometry(nullptr, voxData, 24, 2, foundation::RenderTopology::TRIANGLESTRIP);
         //rendering->drawGeometry(nullptr, scene->getPositions(), 36, scene->getPositions()->getCount(), foundation::RenderTopology::TRIANGLES);
         //rendering->endPass();
-
         
         
-        //scene->updateAndDraw(dtSec);
+        
+        scene->updateAndDraw(dtSec);
         //primitives->drawSphere({}, 1.0f);
         //primitives->drawTexturedRectangle(16, 16, 128, 128, rt0);
         

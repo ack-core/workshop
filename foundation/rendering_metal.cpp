@@ -702,13 +702,18 @@ namespace foundation {
             double rtHeight = _view.currentDrawable.texture.height;
             const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
             const MetalTexture *platformRT = static_cast<const MetalTexture *>(cfg.target.get());
+
+            bool zClear = cfg.zBehaviorType == foundation::ZType::ENABLED_CLEAR && rtDepthFormat != MTLPixelFormatInvalid;
             
             _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionDontCare;
+            _currentPassDescriptor.colorAttachments[0].loadAction = cfg.clearColor ? MTLLoadActionClear : MTLLoadActionDontCare;
+            _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
+            _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
+            _currentPassDescriptor.depthAttachment.loadAction = zClear ? MTLLoadActionClear : MTLLoadActionDontCare;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
-            _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionDontCare;
-            
+
             if (cfg.target) {
                 rtColorFormat = nativeTextureFormat[int(platformRT->getFormat())];
                 rtDepthFormat = platformRT->getDepthFormat();
@@ -717,14 +722,6 @@ namespace foundation {
                 
                 _currentPassDescriptor.colorAttachments[0].texture = platformRT->getColor();
                 _currentPassDescriptor.depthAttachment.texture = platformRT->getDepth();
-            }
-            if (cfg.clearColor) {
-                _currentPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-                _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.clear[0], cfg.clear[1], cfg.clear[2], cfg.clear[3]);
-            }
-            if (cfg.clearDepth && rtDepthFormat != MTLPixelFormatInvalid) {
-                _currentPassDescriptor.depthAttachment.clearDepth = 0.0f;
-                _currentPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
             }
             
             _frameConstants.rtBounds[0] = rtWidth;
@@ -822,7 +819,7 @@ namespace foundation {
                 [_currentCommandEncoder setRenderPipelineState:state];
                 [_currentCommandEncoder setViewport:viewPort];
                 
-                if (rtDepthFormat != MTLPixelFormatInvalid) {
+                if (rtDepthFormat != MTLPixelFormatInvalid && cfg.zBehaviorType != foundation::ZType::DISABLED) {
                     [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
                 }
                 

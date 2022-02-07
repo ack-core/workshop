@@ -17,7 +17,7 @@ namespace voxel {
     
     class Scene {
     public:
-        static std::shared_ptr<Scene> instance(const voxel::MeshFactoryPtr &factory, const foundation::RenderingInterfacePtr &rendering, const char *palette);
+        static std::shared_ptr<Scene> instance(const voxel::MeshFactoryPtr &factory, const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const char *palette);
 
     public:
         virtual SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) = 0;
