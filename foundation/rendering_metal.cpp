@@ -216,7 +216,7 @@ namespace foundation {
             }
             typeSizeTable[] = {
                 {"float1",  "float",    "float",           4},
-                {"float2",  "float2",   "packed_float2",   8},
+                {"float2",  "float2",   "packed_float2",   8}, // TODO: decline in 'const' block
                 {"float3",  "float3",   "packed_float3",   12},
                 {"float4",  "float4",   "float4",          16},
                 {"int1",    "int",      "int",             4},
@@ -575,7 +575,7 @@ namespace foundation {
         }
         
         nativeShader = makeLines(nativeShader);
-        printf("----------\n%s\n------------\n", nativeShader.data());
+        //printf("----------\n%s\n------------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {

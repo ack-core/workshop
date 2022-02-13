@@ -114,9 +114,61 @@
 //    }
 //)";
 
+static const int VMAX = 5;
+static const float SPREAD0 = 0.012f;
+static const float SPREAD1 = 0.028f;
 
+math::vector3f vs[VMAX] = {
+    {0.0, 1.0, 0.0},
+
+    {+1.0000f * SPREAD0, 1.0, +0.0000f * SPREAD0},
+    {+0.0000f * SPREAD0, 1.0, +1.0000f * SPREAD0},
+    {-1.0000f * SPREAD0, 1.0, -0.0000f * SPREAD0},
+    {-0.0000f * SPREAD0, 1.0, -1.0000f * SPREAD0},
+
+//    {+0.7071f * SPREAD0, 1.0, +0.7071f * SPREAD0},
+//    {+0.7071f * SPREAD0, 1.0, -0.7071f * SPREAD0},
+//    {-0.7071f * SPREAD0, 1.0, +0.7071f * SPREAD0},
+//    {-0.7071f * SPREAD0, 1.0, -0.7071f * SPREAD0},
+//
+//    {+1.0000f * SPREAD1, 1.0, +0.0000f * SPREAD1},
+//    {+0.0000f * SPREAD1, 1.0, +1.0000f * SPREAD1},
+//    {-1.0000f * SPREAD1, 1.0, -0.0000f * SPREAD1},
+//    {-0.0000f * SPREAD1, 1.0, -1.0000f * SPREAD1},
+//
+//    {+0.7071f * SPREAD1, 1.0, +0.7071f * SPREAD1},
+//    {+0.7071f * SPREAD1, 1.0, -0.7071f * SPREAD1},
+//    {-0.7071f * SPREAD1, 1.0, +0.7071f * SPREAD1},
+//    {-0.7071f * SPREAD1, 1.0, -0.7071f * SPREAD1},
+
+};
 
 int main(int argc, const char * argv[]) {
+//    for (int i = 9; i < VMAX; i++) {
+//        vs[i] = vs[i].rotated({0, 1, 0}, M_PI / 8.0);
+//    }
+    srand(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+    float cosAngle = ::cos(M_PI / 32.0f);
+    printf("cos angle = %lf\n", cosAngle);
+    
+    for (int i = 0; i < VMAX; i++) {
+        float rnd0 = float(rand() % 1000) / 1000.0f;
+        float rnd1 = float(rand() % 1000) / 1000.0f;
+        float y = rnd0 * (1.0f - cosAngle) + cosAngle;
+        float phi = rnd1 * 2.0f * M_PI;
+
+        float x = sqrt(1.0f - y * y) * cos(phi);
+        float z = sqrt(1.0f - y * y) * sin(phi);
+    
+        vs[i] = math::vector3f(x, y, z);
+    
+        math::vector3f v = vs[i]; //.normalized();
+        printf("[%2.8f, %2.8f, %2.8f]\n", v.x, v.y, v.z);
+    }
+    
+    
+    math::vector2f a = math::vector2f{1.0, 1.0}.normalized();
+    
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
     
@@ -170,7 +222,7 @@ int main(int argc, const char * argv[]) {
             camera->getPosition().flat3,
             camera->getForwardDirection().flat3
         );
-        //primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
+        primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
         
 //        rendering->beginPass("bill", billShader);
 //        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
@@ -189,6 +241,19 @@ int main(int argc, const char * argv[]) {
         //primitives->drawSphere({}, 1.0f);
         //primitives->drawTexturedRectangle(16, 16, 128, 128, rt0);
         
+//        math::vector3f north = math::vector3f{0.0f, 1.0f, 0.0f}.normalized();
+//        math::vector3f direction = math::vector3f{1.0f, -1.0f, 1.0f}.normalized();
+//        math::vector3f axis = math::vector3f{0.0f, 1.0f, 0.0f}.cross(direction).normalized();
+//        float angle = ::acos(direction.dot({0.0f, 1.0f, 0.0f}));
+////        math::transform3f rotation = math::transform3f(axis, -angle);
+//
+//
+//        for (int i = 0; i < VMAX; i++) {
+//            math::vector3f v = vs[i];
+//            //math::vector3f v1 = v * ::cos(angle) + axis.cross(v) * ::sin(angle) + axis * axis.dot(v) * (1.0f - ::cos(angle));
+//
+//            primitives->drawLine({0, 0, 0}, v, {1.0, 0, 0, 1.0});
+//        }
         
 
         rendering->presentFrame();

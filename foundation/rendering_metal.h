@@ -92,7 +92,7 @@ namespace foundation {
         
     private:
         static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 4;
-        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 4 * 1024;
+        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 4 * 1024 * 128;
         
         struct FrameConstants {
             float vewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view * proj matrix

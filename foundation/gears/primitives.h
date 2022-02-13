@@ -48,6 +48,43 @@ namespace gears {
             _rendering->endPass();
         }
         
+        void drawLine(const math::vector3f &p1, const math::vector3f &p2, const math::color &rgba) {
+            static const char *lineShader = R"(
+                const {
+                    position[2] : float4
+                    color : float4
+                }
+                vssrc {
+                    output_position = _transform(const_position[vertex_ID], frame_viewProjMatrix);
+                }
+                fssrc {
+                    output_color = const_color;
+                }
+            )";
+
+            struct {
+                math::vector4f position1;
+                math::vector4f position2;
+                math::vector4f color;
+            }
+            lineData{
+                {p1, 1},
+                {p2, 1},
+                rgba
+            };
+
+            if (_lineShader == nullptr) {
+                _lineShader = _rendering->createShader("primitives_line", lineShader, {
+                    {"ID", foundation::RenderShaderInputFormat::ID}
+                });
+            }
+            
+            _rendering->beginPass("primitives_line", _lineShader);
+            _rendering->applyShaderConstants(&lineData);
+            _rendering->drawGeometry(nullptr, 2, foundation::RenderTopology::LINES);
+            _rendering->endPass();
+        }
+        
         void drawSphere(const math::vector3f &position, float radius) {
             static const char *sphereShaderSrc = R"(
                 const {
@@ -135,6 +172,7 @@ namespace gears {
     protected:
         std::shared_ptr<foundation::RenderingInterface> _rendering;
         std::shared_ptr<foundation::RenderShader> _axisShader;
+        std::shared_ptr<foundation::RenderShader> _lineShader;
         std::shared_ptr<foundation::RenderShader> _sphereShader;
         std::shared_ptr<foundation::RenderShader> _texturedRectangleShader;
     };

@@ -100,8 +100,6 @@ namespace {
             texcoord = texcoord + _step(0.5, _abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
             texcoord = texcoord + _step(0.5, _abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
 
-            //output_vpos = float4(absVertexPos.xyz, _step(cubeCenter.y, fixed_lightPosition.y));
-            
             uint3 inormal = uint3(128.0 * faceNormal + 127.0);
             float packedNormal = float(inormal.x << 16 | inormal.y << 8 | inormal.z) / 16777216.0;
             
@@ -111,20 +109,11 @@ namespace {
             output_koeff = koeff;
         }
         fssrc {
-            //float3 toLight = fixed_lightPosition - input_vpos.xyz;
-            //float3 toLightNrm = _norm(toLight);
-            //float3 octahedron = toLightNrm / _dot(toLightNrm, _sign(toLight));
-            //float  dist = (length(toLight) / 50.0f);
-            //float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
-            //float  shm = _tex2d(0, coord)[int(input_vpos.w)];
-
             float m0 = _lerp(input_koeff[0], input_koeff[1], input_texcoord.x);
             float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord.x);
-            float k = _pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5);// * step(0.96 * dist, shm);
+            float k = _pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5);
             
             output_color = float4(input_gparams.x, k, input_gparams.zw);
-
-            //output_color = float4(k, k, k, 1.0);
         }
     )";
 
@@ -203,9 +192,14 @@ namespace {
     )";
     
     static const char *g_lightBollboardShaderSrc = R"(
+        fixed {
+            north : float4 =
+                [0.0, 1.0, 0.0, 0.9999]
+        }
         const {
             positionRadius : float4
             color : float4
+            rotation : matrix4
         }
         inout {
             texcoord : float2
@@ -231,16 +225,37 @@ namespace {
             float3 toLight = const_positionRadius.xyz - worldPosition.xyz;
             float  toLightLength = length(toLight);
             float3 toLightNrm = toLight / toLightLength;
-            
-            float3 octahedron = toLightNrm / _dot(toLightNrm, _sign(toLight));
-            float  dist = (toLightLength / const_positionRadius.w);
+            float  dist = 0.96 * (toLightLength / const_positionRadius.w);
+
+            float3 axis = _norm(_cross(fixed_north.xyz, toLightNrm));
+            float  angle = acos(_dot(toLightNrm, fixed_north.xyz));
+            float3 cs = float3(_cos(angle), _sin(angle), 1.0 - _cos(angle));
+
+            float3 octahedron = toLightNrm / _dot(toLightNrm, _sign(toLightNrm));
             float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
             float  shm = _tex2d(2, coord)[int(_step(worldPosition.y, const_positionRadius.y))];
+            float  litSum = step(dist, shm);
+            
+            for (uint i = 1; i < 5; i++) {
+                float noise0 = (fract(_sin(_dot(fragment_coord * float(i), float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+                float noise1 = (fract(_cos(_dot(fragment_coord * float(i), float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+            
+                float y = noise0 * (1.0f - fixed_north.w) + fixed_north.w;
+                float phi = noise1 * 2.0f * 3.14159265359;
+                float3 spread = float3(sqrt(1.0 - y * y) * _cos(phi), y, sqrt(1.0 - y * y) * _sin(phi));
+                float3 toLightSpreadedNrm = spread * cs.x + _cross(axis, spread) * cs.y + axis * _dot(axis, spread) * cs.z;
+                
+                float3 octahedron = toLightSpreadedNrm / _dot(toLightSpreadedNrm, _sign(toLightSpreadedNrm));
+                float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
+                float  shm = _tex2d(2, coord)[int(_step(worldPosition.y, const_positionRadius.y))];
+                litSum = litSum + step(dist, shm);
+            }
             
             float  attenuation = pow(saturate(1.0 - toLightLength / const_positionRadius.w), 2.0);
             float  shading = 1.4 * (_dot(toLightNrm, normal) * 0.5 + 0.5) * gbuffer.y;
             
-            output_color = float4(surface.rgb, attenuation * shading) * step(0.97 * dist, shm);
+            //output_color = float4(surface.rgb, attenuation * shading) * step(dist, shm);
+            output_color = float4(surface.rgb, litSum / 5.0);
         }
     )";
     
