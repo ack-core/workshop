@@ -8,17 +8,23 @@
 
 #include "thirdparty/upng/upng.h"
 
+//[-0.6, 0.6, 0.6, -1][-0.6, -0.6, 0.6, -1][0.6, 0.6, 0.6, -1][-0.6, -0.6, 0.6, -1][0.6, 0.6, 0.6, -1][0.6, -0.6, 0.6, -1]
+//[0.6, -0.6, 0.6, -1][0.6, 0.6, 0.6, -1][0.6, -0.6, -0.6, -1][0.6, 0.6, 0.6, -1][0.6, -0.6, -0.6, -1][0.6, 0.6, -0.6, -1]
+//[0.6, 0.6, -0.6, -1][0.6, 0.6, 0.6, -1][-0.6, 0.6, -0.6, -1][0.6, 0.6, 0.6, -1][-0.6, 0.6, -0.6, -1][-0.6, 0.6, 0.6, -1]
+//[-0.6, 0.6, 0.6, +1][-0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][-0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, 0.6, +1]
+//[0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, -0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, -0.6, +1][0.6, 0.6, -0.6, +1]
+//[0.6, 0.6, -0.6, +1][0.6, 0.6, 0.6, +1][-0.6, 0.6, -0.6, +1][0.6, 0.6, 0.6, +1][-0.6, 0.6, -0.6, +1][-0.6, 0.6, 0.6, +1]
+
 namespace {
     const char *g_shadowShaderSrc = R"(
         fixed {
             cube[36] : float4 =
-                [-0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, 0.5, -1]
-                [0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, -0.5, -1]
-                [0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][-0.5, 0.5, 0.5, -1]
-                [-0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, 0.5, +1]
-                [0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, -0.5, +1]
-                [0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][-0.5, 0.5, 0.5, +1]
-        }
+[-0.6, 0.6, 0.6, -1][-0.6, -0.6, 0.6, -1][0.6, 0.6, 0.6, -1][-0.6, -0.6, 0.6, -1][0.6, 0.6, 0.6, -1][0.6, -0.6, 0.6, -1]
+[0.6, -0.6, 0.6, -1][0.6, 0.6, 0.6, -1][0.6, -0.6, -0.6, -1][0.6, 0.6, 0.6, -1][0.6, -0.6, -0.6, -1][0.6, 0.6, -0.6, -1]
+[0.6, 0.6, -0.6, -1][0.6, 0.6, 0.6, -1][-0.6, 0.6, -0.6, -1][0.6, 0.6, 0.6, -1][-0.6, 0.6, -0.6, -1][-0.6, 0.6, 0.6, -1]
+[-0.6, 0.6, 0.6, +1][-0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][-0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, 0.6, +1]
+[0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, -0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, -0.6, +1][0.6, 0.6, -0.6, +1]
+[0.6, 0.6, -0.6, +1][0.6, 0.6, 0.6, +1][-0.6, 0.6, -0.6, +1][0.6, 0.6, 0.6, +1][-0.6, 0.6, -0.6, +1][-0.6, 0.6, 0.6, +1]        }
         const {
             lightPosition : float3
             lightRadius : float1
@@ -59,23 +65,34 @@ namespace {
     // ZFace Indeces : [-y-x, -y+x, +y-x, +y+x]
     const char *g_staticMeshShaderSrc = R"(
         fixed {
-            axis[3] : float4 =
-                [0.0, 0.0, 1.0, 0.0]
-                [1.0, 0.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0, 0.0]
-                
+            axis[3] : float3 =
+                [0.0, 0.0, 1.0]
+                [1.0, 0.0, 0.0]
+                [0.0, 1.0, 0.0]
+
+            binormal[3] : float3 =
+                [1.0, 0.0, 0.0]
+                [0.0, 1.0, 0.0]
+                [0.0, 0.0, 1.0]
+
+            tangent[3] : float3 =
+                [0.0, 1.0, 0.0]
+                [0.0, 0.0, 1.0]
+                [1.0, 0.0, 0.0]
+
             cube[12] : float4 =
                 [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
                 [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
                 [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
 
             faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
-            lightPosition : float3 = [0, 0, 0]
         }
         inout {
-            texcoord : float2
             koeff : float4
-            gparams : float4
+            binormal_f0 : float4
+            tangent_f1 : float4
+            wpos_color_f2 : float3
+            texcoord : float2
         }
         vssrc {
             float3 cubeCenter = float3(instance_position_color.xyz);
@@ -83,8 +100,10 @@ namespace {
             float3 toCamSign = _sign(toCamera);
             float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
-            float3 faceNormal = toCamSign * fixed_axis[vertex_ID >> 2].xyz;
+            float3 faceNormal = toCamSign * fixed_axis[vertex_ID >> 2];
+            float3 offset = relVertexPos.xyz; // + float3(0.5, 0.5, 0.5);
 
+            // indexes of the current vertex in faceX, faceY and faceZ
             int3 faceIndeces = int3(float3(2.0, 2.0, 2.0) * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
             
             float4 koeff = float4(0.0, 0.0, 0.0, 0.0);
@@ -100,20 +119,28 @@ namespace {
             texcoord = texcoord + _step(0.5, _abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
             texcoord = texcoord + _step(0.5, _abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
 
-            uint3 inormal = uint3(128.0 * faceNormal + 127.0);
-            float packedNormal = float(inormal.x << 16 | inormal.y << 8 | inormal.z) / 16777216.0;
-            
             output_position = _transform(absVertexPos, frame_viewProjMatrix);
-            output_gparams = float4(instance_position_color.w, 0, packedNormal, output_position.z / output_position.w);
-            output_texcoord = texcoord;
             output_koeff = koeff;
+            output_binormal_f0 = float4(fixed_binormal[vertex_ID >> 2], offset.x); //toCamSign.zxy *
+            output_tangent_f1 = float4(fixed_tangent[vertex_ID >> 2], offset.y); //toCamSign.yzx *
+            output_wpos_color_f2 = float3(output_position.z / output_position.w, instance_position_color.w, offset.z);
+            output_texcoord = texcoord;
         }
         fssrc {
             float m0 = _lerp(input_koeff[0], input_koeff[1], input_texcoord.x);
             float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord.x);
-            float k = _pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5);
+            uint  k = uint(255.0 * saturate(_pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord.y)), 0.5)));
+
+            uint3 ioffset = uint3(127.0 * float3(input_binormal_f0.w, input_tangent_f1.w, input_wpos_color_f2.z) + 128);
+            float packedOffset = float(ioffset.x << 16 | ioffset.y << 8 | ioffset.z) / 16777216.0;
             
-            output_color = float4(input_gparams.x, k, input_gparams.zw);
+            uint3 ibinormal = uint3(127.0 * input_binormal_f0.xyz + 128.0);
+            uint  packedBinormalAndOcc = k << 24 | ibinormal.z << 16 | ibinormal.y << 8 | ibinormal.x;
+
+            uint3 itangent = uint3(127.0 * input_tangent_f1.xyz + 128.0);
+            uint  packedTangentAndColor = uint(input_wpos_color_f2.y - 1.0) << 24 | itangent.z << 16 | itangent.y << 8 | itangent.x;
+            
+            output_color = float4(input_wpos_color_f2.x, _asFloat(packedBinormalAndOcc), _asFloat(packedTangentAndColor), packedOffset);
         }
     )";
 
@@ -175,7 +202,31 @@ namespace {
 //            output_color = float4(k, k, k, 1.0);
 //        }
 //    )";
-    
+
+            //float4 clipSpaceWPos = float4(input_texcoord * float2(2.0, -2.0) + float2(-1.0, 1.0), gbuffer.r, 1.0);
+            //float4 invWPos = _transform(clipSpaceWPos, frame_invViewProjMatrix);
+            //float3 worldPosition = (invWPos / invWPos.w).xyz;
+            
+            //uint ibc = _asUint(gbuffer.g);
+            //float4 binormalAndOcc = float4(uint4(ibc, ibc, ibc, ibc) >> uint4(0, 8, 16, 24) & uint4(255, 255, 255, 255));
+            //binormalAndOcc = binormalAndOcc / float4(128.0, 128.0, 128.0, 255.0) - float4(1.0, 1.0, 1.0, 0.0);
+
+            //float4 tangentAndColor = float4(uint4(itc, itc, itc, itc) >> uint4(0, 8, 16, 24) & uint4(255, 255, 255, 255));
+            //tangentAndColor = tangentAndColor / float4(128.0, 128.0, 128.0, 255.0) - float4(1.0, 1.0, 1.0, 0.0);
+            
+            //float3 offset = 2.0 * _frac(float3(1.0, 256.0, 65536.0) * gbuffer.a) - 1.0;
+            
+            //float3 toCamera = frame_cameraPosition.xyz - worldPosition;
+            //float3 toCamSign = _sign(toCamera);
+            //float3 normal = toCamSign * _cross(binormalAndOcc.xyz, tangentAndColor.xyz);
+            
+            //float3 w0 = worldPosition - offset + 0.5 * normal - 0.5 * binormalAndOcc.xyz - 0.5 * tangentAndColor.xyz;
+            //float3 w1 = w0 + binormalAndOcc.xyz;
+            //float3 w2 = w0 + tangentAndColor.xyz;
+            //float3 w3 = w0 + binormalAndOcc.xyz + tangentAndColor.xyz;
+            //float4 d = float4(_len(worldPosition - w0), _len(worldPosition - w1), _len(worldPosition - w2), _len(worldPosition - w3));
+
+
     static const char *g_fullScreenQuadShaderSrc = R"(
         inout {
             texcoord : float2
@@ -186,8 +237,10 @@ namespace {
             output_texcoord = vertexCoord;
         }
         fssrc {
-            float4 gbuffer = _tex2d(1, input_texcoord);
-            output_color = 0.1 * _tex2d(0, float2(gbuffer.r / 256.0, 0));
+            float4 gbuffer = _tex2raw(1, input_texcoord);
+            uint itc = _asUint(gbuffer.b);
+            float4 surface = _tex2nearest(0, float2(float(itc >> 24) / 255.0, 0));
+            output_color = float4(surface.rgb, 1.0);
         }
     )";
     
@@ -212,8 +265,74 @@ namespace {
             output_texcoord = vertexCoord;
         }
         fssrc {
-            float4 gbuffer = _tex2d(1, fragment_coord);
-            float4 surface = _tex2d(0, float2(gbuffer.r / 256.0, 0));
+            float4 gbuffer = _tex2linear(1, fragment_coord);
+            gbuffer.yz = _tex2raw(1, fragment_coord).yz;
+            
+            float4 clipSpaceWPos = float4(fragment_coord * float2(2.0, -2.0) + float2(-1.0, 1.0), gbuffer.r, 1.0);
+            float4 invWPos = _transform(clipSpaceWPos, frame_invViewProjMatrix);
+            float3 worldPosition = (invWPos / invWPos.w).xyz;
+            
+            uint ibc = _asUint(gbuffer.g);
+            float4 binormalAndOcc = float4(uint4(ibc, ibc, ibc, ibc) >> uint4(0, 8, 16, 24) & uint4(255, 255, 255, 255));
+            binormalAndOcc = binormalAndOcc / float4(128.0, 128.0, 128.0, 255.0) - float4(1.0, 1.0, 1.0, 0.0);
+
+            uint itc = _asUint(gbuffer.b);
+            float4 tangentAndColor = float4(uint4(itc, itc, itc, itc) >> uint4(0, 8, 16, 24) & uint4(255, 255, 255, 255));
+            tangentAndColor = tangentAndColor / float4(128.0, 128.0, 128.0, 255.0) - float4(1.0, 1.0, 1.0, 0.0);
+            
+            float3 offset = 2.0 * _frac(float3(1.0, 256.0, 65536.0) * gbuffer.a) - 1.0;
+            float4 surface = _tex2nearest(0, float2(tangentAndColor.w, 0));
+            
+            float3 toCamera = frame_cameraPosition.xyz - worldPosition;
+            float3 toCamSign = _sign(toCamera);
+            float3 normal = toCamSign * _cross(binormalAndOcc.xyz, tangentAndColor.xyz);
+            
+            //float3 w0 = worldPosition - offset + 0.5 * normal - 0.5 * binormalAndOcc.xyz - 0.5 * tangentAndColor.xyz;
+            //float3 w1 = w0 + binormalAndOcc.xyz;
+            //float3 w2 = w0 + tangentAndColor.xyz;
+            //float3 w3 = w0 + binormalAndOcc.xyz + tangentAndColor.xyz;
+            
+            float4 lits = float4(0, 0, 0, 0);
+            float3 w0 = worldPosition - offset + 0.5 * normal - 0.5 * binormalAndOcc.xyz - 0.5 * tangentAndColor.xyz;
+            float3 w[4] = {
+                w0,
+                w0 + binormalAndOcc.xyz,
+                w0 + tangentAndColor.xyz,
+                w0 + binormalAndOcc.xyz + tangentAndColor.xyz,
+            };
+            
+            for (int i = 0; i < 4; i++) {
+                float3 toLight = const_positionRadius.xyz - w[i].xyz;
+                float  toLightLength = length(toLight);
+                float3 toLightNrm = toLight / toLightLength;
+                float  dist = 0.96 * toLightLength / const_positionRadius.w;
+                float3 octahedron = toLightNrm / _dot(toLightNrm, _sign(toLightNrm));
+                float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
+                float  shm = _tex2nearest(2, coord)[int(_step(w[i].y, const_positionRadius.y))];
+                lits[i] = step(dist, shm);
+            }
+              
+            float2 koeff = float2(_dot(worldPosition - w0, binormalAndOcc.xyz), _dot(worldPosition - w0, tangentAndColor.xyz));
+              
+            float m0 = _lerp(lits[0], lits[1], koeff.x);
+            float m1 = _lerp(lits[2], lits[3], koeff.x);
+            float k = _pow(_smooth(0, 1, _lerp(m0, m1, koeff.y)), 0.5); //_lerp(m0, m1, koeff.y);
+              
+            
+            //float  attenuation = pow(saturate(1.0 - toLightLength / const_positionRadius.w), 2.0);
+            //float  shading = 1.4 * (_dot(toLightNrm, normal) * 0.5 + 0.5) * gbuffer.y;
+            
+            //float2 f = float2(worldPosition.xz - w0.xz);
+            //float2 f = float2(_dot(worldPosition - w0, binormalAndOcc.xyz), _dot(worldPosition - w0, tangentAndColor.xyz));
+            //output_color = float4(surface.rgb, attenuation * shading) * step(dist, shm);
+            
+            output_color = float4(k, k, k, 0.5);
+        }
+    )";
+    
+    /*
+            float4 gbuffer = _tex2raw(1, fragment_coord);
+            float4 surface = _tex2nearest(0, float2(gbuffer.r / 256.0, 0));
             
             float4 clipSpacePos = float4(fragment_coord * float2(2.0, -2.0) + float2(-1.0, 1.0), gbuffer.w, 1.0);
             float4 worldPosition = _transform(clipSpacePos, frame_invViewProjMatrix);
@@ -233,7 +352,7 @@ namespace {
 
             float3 octahedron = toLightNrm / _dot(toLightNrm, _sign(toLightNrm));
             float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
-            float  shm = _tex2d(2, coord)[int(_step(worldPosition.y, const_positionRadius.y))];
+            float  shm = _tex2nearest(2, coord)[int(_step(worldPosition.y, const_positionRadius.y))];
             float  litSum = step(dist, shm);
             
             for (uint i = 1; i < 5; i++) {
@@ -247,7 +366,7 @@ namespace {
                 
                 float3 octahedron = toLightSpreadedNrm / _dot(toLightSpreadedNrm, _sign(toLightSpreadedNrm));
                 float2 coord = float2(0.5 + 0.5 * (octahedron.x + octahedron.z), 0.5 - 0.5 * (octahedron.z - octahedron.x));
-                float  shm = _tex2d(2, coord)[int(_step(worldPosition.y, const_positionRadius.y))];
+                float  shm = _tex2nearest(2, coord)[int(_step(worldPosition.y, const_positionRadius.y))];
                 litSum = litSum + step(dist, shm);
             }
             
@@ -256,8 +375,7 @@ namespace {
             
             //output_color = float4(surface.rgb, attenuation * shading) * step(dist, shm);
             output_color = float4(surface.rgb, litSum / 5.0);
-        }
-    )";
+    */
     
     voxel::SceneObjectToken g_lastToken = 0x100;
     
@@ -431,7 +549,7 @@ namespace voxel {
         std::unique_ptr<LightSource> lightSource = std::make_unique<LightSource>();
         SceneObjectToken token = g_lastToken++ & std::uint64_t(0x7FFFFFFF);
         
-        lightSource->distanceMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 512, 512, false);
+        lightSource->distanceMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA32F, 512, 512, false);
         lightSource->constants.positionRadius = math::vector4f(position, radius);
         lightSource->constants.rgba = rgba;
         

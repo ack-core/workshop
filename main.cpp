@@ -147,24 +147,24 @@ int main(int argc, const char * argv[]) {
 //    for (int i = 9; i < VMAX; i++) {
 //        vs[i] = vs[i].rotated({0, 1, 0}, M_PI / 8.0);
 //    }
-    srand(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
-    float cosAngle = ::cos(M_PI / 32.0f);
-    printf("cos angle = %lf\n", cosAngle);
-    
-    for (int i = 0; i < VMAX; i++) {
-        float rnd0 = float(rand() % 1000) / 1000.0f;
-        float rnd1 = float(rand() % 1000) / 1000.0f;
-        float y = rnd0 * (1.0f - cosAngle) + cosAngle;
-        float phi = rnd1 * 2.0f * M_PI;
-
-        float x = sqrt(1.0f - y * y) * cos(phi);
-        float z = sqrt(1.0f - y * y) * sin(phi);
-    
-        vs[i] = math::vector3f(x, y, z);
-    
-        math::vector3f v = vs[i]; //.normalized();
-        printf("[%2.8f, %2.8f, %2.8f]\n", v.x, v.y, v.z);
-    }
+//    srand(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+//    float cosAngle = ::cos(M_PI / 32.0f);
+//    printf("cos angle = %lf\n", cosAngle);
+//
+//    for (int i = 0; i < VMAX; i++) {
+//        float rnd0 = float(rand() % 1000) / 1000.0f;
+//        float rnd1 = float(rand() % 1000) / 1000.0f;
+//        float y = rnd0 * (1.0f - cosAngle) + cosAngle;
+//        float phi = rnd1 * 2.0f * M_PI;
+//
+//        float x = sqrt(1.0f - y * y) * cos(phi);
+//        float z = sqrt(1.0f - y * y) * sin(phi);
+//
+//        vs[i] = math::vector3f(x, y, z);
+//
+//        math::vector3f v = vs[i]; //.normalized();
+//        printf("[%2.8f, %2.8f, %2.8f]\n", v.x, v.y, v.z);
+//    }
     
     
     math::vector2f a = math::vector2f{1.0, 1.0}.normalized();
@@ -183,36 +183,7 @@ int main(int argc, const char * argv[]) {
     
     gears::OrbitCameraController cameraController (platform, camera);
     cameraController.setEnabled(true);
-    
-//    auto billShader = rendering->createShader("bill", g_billShaderSrc, {
-//        {"ID", foundation::RenderShaderInputFormat::ID}
-//    });
-    
-//    auto voxShader = rendering->createShader("vox", voxShaderSrc,
-//        { // vertex
-//            {"ID", foundation::RenderShaderInputFormat::ID}
-//        },
-//        { // instance
-//            {"position", foundation::RenderShaderInputFormat::SHORT4},
-//        }
-//    );
-//    voxel::VoxelPosition positions[] = {
-//        {1, -1, 1, 0},
-//        {1, 1, 1, 0}
-//    };
-    
-//    struct Light {
-//        math::vector3f position;
-//        float radius;
-//    }
-//    light {
-//        {0.0f, 0.0f, 0.0f}, 50.0f
-//    };
-    
-    //auto imageTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {&textureData});
-    //auto rt0 = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 512, 512, false);
-    //auto voxData = rendering->createData(&positions, 2, sizeof(voxel::VoxelPosition));
-    
+        
     platform->run([&](float dtSec) {
         rendering->updateFrameConstants(
             camera->getVPMatrix().flat16,
@@ -222,7 +193,7 @@ int main(int argc, const char * argv[]) {
             camera->getPosition().flat3,
             camera->getForwardDirection().flat3
         );
-        primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
+        //primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
         
 //        rendering->beginPass("bill", billShader);
 //        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);

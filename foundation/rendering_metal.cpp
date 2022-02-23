@@ -353,9 +353,14 @@ namespace foundation {
             "#define _sin(a) sin(a)\n"
             "#define _cos(a) cos(a)\n"
             "#define _abs(a) abs(a)\n"
+            "#define _sat(a) saturate(a)\n"
+            "#define _frac(a) fract(a)\n"
+            "#define _asFloat(a) as_type<float>(a)\n"
+            "#define _asUint(a) as_type<uint>(a)\n"
             "#define _transform(a, b) (b * a)\n"
             "#define _dot(a, b) dot(a, b)\n"
             "#define _cross(a, b) cross(a, b)\n"
+            "#define _len(a) length(a)\n"
             "#define _pow(a, b) pow(a, b)\n"
             "#define _norm(a) normalize(a)\n"
             "#define _lerp(a, b, k) mix(a, b, k)\n"
@@ -363,9 +368,12 @@ namespace foundation {
             "#define _smooth(a, b, k) smoothstep(a, b, k)\n"
             "#define _min(a, b) min(a, b)\n"
             "#define _max(a, b) max(a, b)\n"
-            "#define _tex2d(i, a) _texture##i.sample(_defaultSampler, a)\n"
+            "#define _tex2nearest(i, a) _texture##i.sample(_nearestSampler, a)\n"
+            "#define _tex2linear(i, a) _texture##i.sample(_linearSampler, a)\n"
+            "#define _tex2raw(i, a) _texture##i.read(ushort2(a.x * (_texture##i.get_width() - 1), a.y * (_texture##i.get_height() - 1)), 0)\n"
             "\n"
-            "const sampler _defaultSampler(mag_filter::linear, min_filter::linear);"
+            "const sampler _nearestSampler(mag_filter::nearest, min_filter::nearest);"
+            "const sampler _linearSampler(mag_filter::linear, min_filter::linear);"
             "\n"
             "struct _FrameData {\n"
             "    float4x4 viewProjMatrix;\n"
@@ -606,7 +614,7 @@ namespace foundation {
     }
     
     namespace {
-        static MTLPixelFormat nativeTextureFormat[] = { MTLPixelFormatR8Unorm, MTLPixelFormatR32Float, MTLPixelFormatRGBA8Unorm, MTLPixelFormatRGBA32Float };
+        static MTLPixelFormat nativeTextureFormat[] = { MTLPixelFormatR8Unorm, MTLPixelFormatR32Float, MTLPixelFormatRGBA8Unorm_sRGB, MTLPixelFormatRGBA32Float };
     }
         
     RenderTexturePtr MetalRendering::createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) {
