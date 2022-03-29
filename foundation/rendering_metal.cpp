@@ -34,7 +34,7 @@ namespace {
         explicit braced(std::string &out) : _out(out) {}
         
         inline friend std::istream &operator >>(std::istream &stream, const braced &target) {
-            char dbg = (stream >> std::ws).peek();
+            (stream >> std::ws).peek();
             (stream >> std::ws).peek() == '[' ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
             
             while (stream.fail() == false && stream.peek() != ']') {
@@ -882,7 +882,7 @@ namespace foundation {
     void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) {
         if (_currentCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
-            const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
+            //const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
             
             id<MTLBuffer> buffers[2] = {nativeVertexData, nullptr};
             NSUInteger offsets[2] = {0, 0};

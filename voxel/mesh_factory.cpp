@@ -155,7 +155,7 @@ namespace voxel {
                                 }
                             }
                             
-                            data += voxelCount * 4;
+                            //data += voxelCount * 4;
                             return true;
                         }
                         else {

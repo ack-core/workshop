@@ -20,7 +20,7 @@ namespace gears {
         explicit quoted(std::string &out) : _out(out) {}
 
         inline friend std::istream &operator >>(std::istream &stream, const quoted &target) {
-            char dbg = (stream >> std::ws).peek();
+            (stream >> std::ws).peek();
             (stream >> std::ws).peek() == '\"' ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
 
             while (stream.fail() == false && stream.peek() != '\"') {

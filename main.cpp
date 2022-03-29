@@ -167,7 +167,7 @@ int main(int argc, const char * argv[]) {
 //    }
     
     
-    math::vector2f a = math::vector2f{1.0, 1.0}.normalized();
+    //math::vector2f a = math::vector2f{1.0, 1.0}.normalized();
     
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);

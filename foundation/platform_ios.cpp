@@ -105,7 +105,7 @@ namespace {
 }
 - (void)loadView
 {
-    CGRect frame = UIScreen.mainScreen.bounds;
+    //CGRect frame = UIScreen.mainScreen.bounds;
     g_mtkView = [[MTKView alloc] init];
     self.view = g_mtkView;
 }
