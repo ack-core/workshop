@@ -178,7 +178,7 @@ int main(int argc, const char * argv[]) {
     auto meshFactory = voxel::MeshFactory::instance(platform);
     auto scene = voxel::Scene::instance(meshFactory, platform, rendering, "palette.png");
 
-    scene->addStaticModel("walls.vox", {-30, -16, -36});
+    scene->addStaticModel("walls.vox", {-31, -10, -30});
     scene->addLightSource({10.0, 0, -5}, 40.0f, math::color(1.0, 1.0, 1.0, 1.0));
     
     gears::OrbitCameraController cameraController (platform, camera);
@@ -193,7 +193,10 @@ int main(int argc, const char * argv[]) {
             camera->getPosition().flat3,
             camera->getForwardDirection().flat3
         );
-        //primitives->drawAxis(foundation::RenderPassConfig(0.8f, 0.775f, 0.75f));
+        
+        //rendering->beginPass("", )
+        
+        primitives->drawAxis(foundation::RenderPassCommonConfigs::CLEAR(0.8f, 0.775f, 0.75f));
         
 //        rendering->beginPass("bill", billShader);
 //        rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);

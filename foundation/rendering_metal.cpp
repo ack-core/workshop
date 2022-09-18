@@ -65,10 +65,90 @@ namespace {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
         return result;
     }
+    
+    std::string generatePipelineStateName(const foundation::MetalShader &shader, const foundation::RenderPassConfig &passConfig) {
+        std::string result = "r0_b0_" + shader.getName();
+        result[1] = passConfig.target ? '0' + int(passConfig.target->getFormat()) : 'X';
+        result[4] += int(passConfig.blendType);
+        return result;
+    }
+    
+    void initializeBlendOptions(MTLRenderPipelineColorAttachmentDescriptor *target, const foundation::RenderPassConfig &cfg) {
+        switch (cfg.blendType) {
+            case foundation::BlendType::DISABLED:
+            {
+                target.blendingEnabled = false;
+                break;
+            }
+            case foundation::BlendType::MIXING:
+            {
+                target.blendingEnabled = true;
+                target.alphaBlendOperation = MTLBlendOperationAdd;
+                target.rgbBlendOperation = MTLBlendOperationAdd;
+                target.sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+                target.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+                target.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                target.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                break;
+            }
+            case foundation::BlendType::ADDITIVE:
+            {
+                target.blendingEnabled = YES;
+                target.alphaBlendOperation = MTLBlendOperationAdd;
+                target.rgbBlendOperation = MTLBlendOperationAdd;
+                target.sourceAlphaBlendFactor = MTLBlendFactorOne;
+                target.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+                target.destinationAlphaBlendFactor = MTLBlendFactorOne;
+                target.destinationRGBBlendFactor = MTLBlendFactorOne;
+                break;
+            }
+            case foundation::BlendType::AGREGATION:
+            {
+                target.blendingEnabled = YES;
+                target.alphaBlendOperation = MTLBlendOperationAdd;
+                target.rgbBlendOperation = MTLBlendOperationAdd;
+                target.sourceAlphaBlendFactor = MTLBlendFactorOne;
+                target.sourceRGBBlendFactor = MTLBlendFactorOne;
+                target.destinationAlphaBlendFactor = MTLBlendFactorOne;
+                target.destinationRGBBlendFactor = MTLBlendFactorOne;
+                break;
+            }
+            case foundation::BlendType::MAXVALUE:
+            {
+                target.blendingEnabled = YES;
+                target.alphaBlendOperation = MTLBlendOperationMax;
+                target.rgbBlendOperation = MTLBlendOperationMax;
+                target.sourceAlphaBlendFactor = MTLBlendFactorOne;
+                target.sourceRGBBlendFactor = MTLBlendFactorOne;
+                target.destinationAlphaBlendFactor = MTLBlendFactorOne;
+                target.destinationRGBBlendFactor = MTLBlendFactorOne;
+                break;
+            }
+            case foundation::BlendType::MINVALUE:
+            {
+                target.blendingEnabled = YES;
+                target.alphaBlendOperation = MTLBlendOperationMin;
+                target.rgbBlendOperation = MTLBlendOperationMin;
+                target.sourceAlphaBlendFactor = MTLBlendFactorOne;
+                target.sourceRGBBlendFactor = MTLBlendFactorOne;
+                target.destinationAlphaBlendFactor = MTLBlendFactorOne;
+                target.destinationRGBBlendFactor = MTLBlendFactorOne;
+                break;
+            }
+            default:
+            break;
+        }
+    }
 }
 
 namespace foundation {
-    MetalShader::MetalShader(id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength) : _library(library), _vdesc(vdesc), _constBufferLength(constBufferLength) {}
+    MetalShader::MetalShader(const std::string &name, id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength)
+        : _name(name)
+        , _library(library)
+        , _vdesc(vdesc)
+        , _constBufferLength(constBufferLength)
+    {}
+    
     MetalShader::~MetalShader() {
         _library = nil;
         _vdesc = nil;
@@ -89,14 +169,16 @@ namespace foundation {
     MTLVertexDescriptor *MetalShader::getVertexDesc() const {
         return _vdesc;
     }
+    
+    const std::string &MetalShader::getName() const {
+        return _name;
+    }
 }
 
 namespace foundation {
-    MetalTexture::MetalTexture(id<MTLTexture> texture, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+    MetalTexture::MetalTexture(id<MTLTexture> texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
         : _texture(texture)
-        , _depth(depth)
         , _format(fmt)
-        , _depthFormat(depth ? depth.pixelFormat : MTLPixelFormatInvalid)
         , _width(w)
         , _height(h)
         , _mipCount(mipCount)
@@ -123,16 +205,59 @@ namespace foundation {
         return _format;
     }
 
-    MTLPixelFormat MetalTexture::getDepthFormat() const {
-        return _depthFormat;
-    }
-
-    id<MTLTexture> MetalTexture::getColor() const {
+    id<MTLTexture> MetalTexture::getNativeTexture() const {
         return _texture;
     }
+}
+
+namespace foundation {
+    MetalTarget::MetalTarget(__strong id<MTLTexture> *targets, unsigned count, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h)
+        : _depth(depth)
+        , _format(fmt)
+        , _depthFormat(depth ? depth.pixelFormat : MTLPixelFormatInvalid)
+        , _count(count)
+        , _width(w)
+        , _height(h)
+    {
+        for (unsigned i = 0; i < count; i++) {
+            _textures[i] = std::make_shared<RTTexture>(*this, targets[i]);
+        }
+    }
     
-    id<MTLTexture> MetalTexture::getDepth() const {
-        return _depth;
+    MetalTarget::~MetalTarget() {
+        for (unsigned i = 0; i < _count; i++) {
+            _textures[i] = nil;
+        }
+        
+        _depth = nil;
+    }
+    
+    std::uint32_t MetalTarget::getWidth() const {
+        return _width;
+    }
+    
+    std::uint32_t MetalTarget::getHeight() const {
+        return _height;
+    }
+    
+    RenderTextureFormat MetalTarget::getFormat() const {
+        return _format;
+    }
+    
+    bool MetalTarget::hasDepthBuffer() const {
+        return _depth != nil;
+    }
+
+    std::uint32_t MetalTarget::getTextureCount() const {
+        return _count;
+    }
+    
+    std::shared_ptr<RenderTexture> MetalTarget::getTexture(unsigned index) {
+        return _textures[index];
+    }
+
+    MTLPixelFormat MetalTarget::getDepthFormat() const {
+        return _depthFormat;
     }
 }
 
@@ -168,8 +293,12 @@ namespace foundation {
 
             MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
             depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
+            depthDesc.depthWriteEnabled = NO;
+            _zBehaviorStates[int(foundation::ZBehaviorType::TEST_ONLY)] = [_device newDepthStencilStateWithDescriptor:depthDesc];
+
+            depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
             depthDesc.depthWriteEnabled = YES;
-            _defaultDepthStencilState = [_device newDepthStencilStateWithDescriptor:depthDesc];
+            _zBehaviorStates[int(foundation::ZBehaviorType::TEST_AND_WRITE)] = [_device newDepthStencilStateWithDescriptor:depthDesc];
 
             for (std::uint32_t i = 0; i < CONSTANT_BUFFER_FRAMES_MAX; i++) {
                 _constantsBuffers[i] = [_device newBufferWithLength:CONSTANT_BUFFER_OFFSET_MAX options:MTLResourceStorageModeShared];
@@ -181,6 +310,7 @@ namespace foundation {
 
     MetalRendering::~MetalRendering() {}
 
+    // TODO: refine
     void MetalRendering::updateFrameConstants(const float(&VP)[16], const float(&invVP)[16], const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
         ::memcpy(_frameConstants.vewProjMatrix, VP, 16 * sizeof(float));
         ::memcpy(_frameConstants.invVewProjMatrix, invVP, 16 * sizeof(float));
@@ -194,6 +324,13 @@ namespace foundation {
         std::shared_ptr<RenderShader> result;
         std::istringstream input(shadersrc);
         const std::string indent = "    ";
+        
+        if (_shaderNames.find(name) == _shaderNames.end()) {
+            _shaderNames.emplace(name);
+        }
+        else {
+            _platform->logError("[MetalRendering::createShader] shader name '%s' already used\n", name);
+        }
         
         auto getArrayMultiply = [](const std::string &varname) {
             int  multiply = 1;
@@ -546,7 +683,13 @@ namespace foundation {
                     break;
                 }
                 nativeShader +=
-                    "fragment float4 main_fragment(\n    "
+                    "struct _Output {\n"
+                    "    float4 c0[[color(0)]];\n"
+                    "    float4 c1[[color(1)]];\n"
+                    "    float4 c2[[color(2)]];\n"
+                    "    float4 c3[[color(3)]];\n"
+                    "};\n"
+                    "fragment _Output main_fragment(\n    "
                     "_InOut input [[stage_in]],\n    "
                     "texture2d<float> _texture0 [[texture(0)]],\n    "
                     "texture2d<float> _texture1 [[texture(1)]],\n    "
@@ -559,8 +702,11 @@ namespace foundation {
                 }
                 
                 nativeShader += "    constant _FrameData &framedata [[buffer(1)]])\n{\n    ";
-                nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
-                nativeShader += "float4 output_color;\n";
+                //nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
+                nativeShader += "float4 output_color[4] = {};\n";
+                //nativeShader += "float4 output_color_1 = float4(0.0, 0.0, 0.0, 0.0);\n    ";
+                //nativeShader += "float4 output_color_2 = float4(0.0, 0.0, 0.0, 0.0);\n    ";
+                //nativeShader += "float4 output_color_3 = float4(0.0, 0.0, 0.0, 0.0);\n";
                 
                 std::string codeBlock;
 
@@ -574,7 +720,7 @@ namespace foundation {
                 replacePattern(codeBlock, "const_", "constants.", "._");
                 replacePattern(codeBlock, "input_", "input.", "._");
                 nativeShader += codeBlock;
-                nativeShader += "    return output_color;\n}\n";
+                nativeShader += "    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n}\n";
                 fssrcBlockDone = true;
                 continue;
             }
@@ -583,7 +729,7 @@ namespace foundation {
         }
         
         nativeShader = makeLines(nativeShader);
-        //printf("----------\n%s\n------------\n", nativeShader.data());
+        printf("----------\n%s\n------------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -595,7 +741,7 @@ namespace foundation {
                 id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
 
                 if (library) {
-                    result = std::make_shared<MetalShader>(library, vdesc, constBlockLength);
+                    result = std::make_shared<MetalShader>(name, library, vdesc, constBlockLength);
                 }
                 else {
                     const char *errorDesc = [[nsError localizedDescription] UTF8String];
@@ -614,7 +760,18 @@ namespace foundation {
     }
     
     namespace {
-        static MTLPixelFormat nativeTextureFormat[] = { MTLPixelFormatR8Unorm, MTLPixelFormatR32Float, MTLPixelFormatRGBA8Unorm_sRGB, MTLPixelFormatRGBA32Float };
+        static MTLPixelFormat nativeTextureFormat[] = {
+            MTLPixelFormatInvalid,
+            MTLPixelFormatR8Unorm,
+            MTLPixelFormatR16Float,
+            MTLPixelFormatR32Float,
+            MTLPixelFormatRG8Unorm,
+            MTLPixelFormatRG16Float,
+            MTLPixelFormatRG32Float,
+            MTLPixelFormatRGBA8Unorm,
+            MTLPixelFormatRGBA16Float,
+            MTLPixelFormatRGBA32Float
+        };
     }
         
     RenderTexturePtr MetalRendering::createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) {
@@ -622,10 +779,20 @@ namespace foundation {
             switch (fmt) {
             case RenderTextureFormat::R8UN:
                 return width;
+            case RenderTextureFormat::R16F:
+                return width * sizeof(std::uint16_t);
             case RenderTextureFormat::R32F:
                 return width * sizeof(float);
+            case RenderTextureFormat::RG8UN:
+                return width * 2;
+            case RenderTextureFormat::RG16F:
+                return width * 2 * sizeof(std::uint16_t);
+            case RenderTextureFormat::RG32F:
+                return width * 2 * sizeof(float);
             case RenderTextureFormat::RGBA8UN:
                 return width * 4;
+            case RenderTextureFormat::RGBA16F:
+                return width * 4 * sizeof(std::uint16_t);
             case RenderTextureFormat::RGBA32F:
                 return width * 4 * sizeof(float);
             default:
@@ -648,20 +815,25 @@ namespace foundation {
                 [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, w)];
             }
             
-            return std::make_shared<MetalTexture>(texture, nil, format, w, h, mipsData.size());
+            return std::make_shared<MetalTexture>(texture, format, w, h, mipsData.size());
         }
     }
     
-    RenderTexturePtr MetalRendering::createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
+    RenderTargetPtr MetalRendering::createRenderTarget(RenderTextureFormat format, unsigned count, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
         @autoreleasepool {
             MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
+            id<MTLTexture> targets[RenderTarget::MAXCOUNT] = {nullptr, nullptr, nullptr, nullptr};
             
             desc.pixelFormat = nativeTextureFormat[int(format)];
             desc.width = w;
             desc.height = h;
             desc.mipmapLevelCount = 1;
             desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
-            id<MTLTexture> texture = [_device newTextureWithDescriptor:desc];
+
+            for (unsigned i = 0; i < count; i++) {
+                targets[i] = [_device newTextureWithDescriptor:desc];
+            }
+
             id<MTLTexture> depth = nil;
             
             if (withZBuffer) {
@@ -671,7 +843,7 @@ namespace foundation {
                 depth = [_device newTextureWithDescriptor:desc];
             }
             
-            return std::make_shared<MetalTexture>(texture, depth, format, w, h, 1);
+            return std::make_shared<MetalTarget>(targets, count, depth, format, w, h);
         }
     }
     
@@ -690,11 +862,13 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
-    // TODO:
-    // autogenerate name + get shader name + error in rendering if shader is created with name that is already used
-    // const_ to shader unpacked only
-    // !!!
-    void MetalRendering::beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
+    void MetalRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
+        if (_currentCommandEncoder) {
+            [_currentCommandEncoder endEncoding];
+            _currentCommandEncoder = nil;
+            _currentShader = nullptr;
+        }
+        
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
         }
@@ -703,94 +877,63 @@ namespace foundation {
                 _currentCommandBuffer = [_commandQueue commandBuffer];
             }
 
-            MTLPixelFormat rtColorFormat = _view.colorPixelFormat;
-            MTLPixelFormat rtDepthFormat = _view.depthStencilPixelFormat;
-
-            double rtWidth = _view.currentDrawable.texture.width;
-            double rtHeight = _view.currentDrawable.texture.height;
-            const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
-            const MetalTexture *platformRT = static_cast<const MetalTexture *>(cfg.target.get());
-
-            bool zClear = cfg.zBehaviorType == foundation::ZType::ENABLED_CLEAR && rtDepthFormat != MTLPixelFormatInvalid;
+            MTLClearColor clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
+            MTLLoadAction loadAction = cfg.clearColorEnabled ? MTLLoadActionClear : MTLLoadActionDontCare;
             
             _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionDontCare;
-            _currentPassDescriptor.colorAttachments[0].loadAction = cfg.clearColor ? MTLLoadActionClear : MTLLoadActionDontCare;
-            _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
+            _currentPassDescriptor.colorAttachments[0].loadAction = loadAction;
+            _currentPassDescriptor.colorAttachments[0].clearColor = clearColor;
             _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
-            _currentPassDescriptor.depthAttachment.loadAction = zClear ? MTLLoadActionClear : MTLLoadActionDontCare;
+            _currentPassDescriptor.depthAttachment.loadAction = cfg.clearDepthEnabled ? MTLLoadActionClear : MTLLoadActionDontCare;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
-
+            
             if (cfg.target) {
-                rtColorFormat = nativeTextureFormat[int(platformRT->getFormat())];
-                rtDepthFormat = platformRT->getDepthFormat();
-                rtWidth = double(platformRT->getWidth());
-                rtHeight = double(platformRT->getHeight());
+                for (std::uint32_t i = 0; i < cfg.target->getTextureCount(); i++) {
+                    _currentPassDescriptor.colorAttachments[i].texture = static_cast<const MetalTexBase *>(cfg.target->getTexture(i).get())->getNativeTexture();
+                    _currentPassDescriptor.colorAttachments[i].storeAction = MTLStoreActionDontCare;
+                    _currentPassDescriptor.colorAttachments[i].loadAction = loadAction;
+                    _currentPassDescriptor.colorAttachments[i].clearColor = clearColor;
+                }
                 
-                _currentPassDescriptor.colorAttachments[0].texture = platformRT->getColor();
-                _currentPassDescriptor.depthAttachment.texture = platformRT->getDepth();
+                if (cfg.target->hasDepthBuffer() == false) {
+                    _currentPassDescriptor.depthAttachment.texture = nil;
+                }
             }
             
-            _frameConstants.rtBounds[0] = rtWidth;
-            _frameConstants.rtBounds[1] = rtHeight;
-            
+            const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
+            const MetalTarget *platformTarget = static_cast<const MetalTarget *>(cfg.target.get());
+
             id<MTLRenderPipelineState> state = nil;
             
             if (platformShader) {
-                auto index = _pipelineStates.find(name);
+                _currentShader = shader;
+                std::string stateName = generatePipelineStateName(*platformShader, cfg);
+                
+                auto index = _pipelineStates.find(stateName);
                 if (index == _pipelineStates.end()) {
-                    NSError *error;
                     MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
                     
                     desc.vertexFunction = platformShader->getVertexShader();
                     desc.vertexDescriptor = platformShader->getVertexDesc();
                     desc.fragmentFunction = platformShader->getFragmentShader();
-                    desc.colorAttachments[0].pixelFormat = rtColorFormat;
-                    desc.depthAttachmentPixelFormat = rtDepthFormat;
+                    desc.colorAttachments[0].pixelFormat = _view.colorPixelFormat;
+                    desc.depthAttachmentPixelFormat = _view.depthStencilPixelFormat;
+                    initializeBlendOptions(desc.colorAttachments[0], cfg);
                     
-                    if (cfg.blendType == BlendType::DISABLED) {
-                        desc.colorAttachments[0].blendingEnabled = false;
-                    }
-                    else if (cfg.blendType == BlendType::MIXING) {
-                        desc.colorAttachments[0].blendingEnabled = true;
-                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-                    }
-                    else if (cfg.blendType == BlendType::ADDITIVE) {
-                        desc.colorAttachments[0].blendingEnabled = YES;
-                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-                    }
-                    else if (cfg.blendType == BlendType::MAXVALUE) {
-                        desc.colorAttachments[0].blendingEnabled = YES;
-                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMax;
-                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMax;
-                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-                    }
-                    else if (cfg.blendType == BlendType::MINVALUE) {
-                        desc.colorAttachments[0].blendingEnabled = YES;
-                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMin;
-                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMin;
-                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+                    if (cfg.target) {
+                        desc.depthAttachmentPixelFormat = platformTarget->getDepthFormat();
+
+                        for (std::uint32_t i = 0; i < cfg.target->getTextureCount(); i++) {
+                            desc.colorAttachments[i].pixelFormat = nativeTextureFormat[int(platformTarget->getFormat())];
+                            initializeBlendOptions(desc.colorAttachments[i], cfg);
+                        }
                     }
                     
+                    NSError *error;
                     if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
-                        _pipelineStates.emplace(name, state);
+                        _pipelineStates.emplace(stateName, state);
                     }
                     else {
                         _platform->logError("[MetalRendering::beginPass] %s\n", [[error localizedDescription] UTF8String]);
@@ -800,65 +943,191 @@ namespace foundation {
                     state = index->second;
                 }
             }
-            
+
+            _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+
             if (state) {
-                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+                double rtWidth = _view.currentDrawable.texture.width;
+                double rtHeight = _view.currentDrawable.texture.height;
                 
-                // TODO: copypasta
-                if (_constantsBufferOffset + sizeof(FrameConstants) < CONSTANT_BUFFER_OFFSET_MAX) {
-                    std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
-                    std::memcpy(constantsMemory + _constantsBufferOffset, &_frameConstants, sizeof(FrameConstants));
-                    
-                    [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:3];
-                    [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:1];
-                    
-                    _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
-                }
-                else {
-                    _platform->logError("[MetalRendering::beginPass] Out of constants buffer length\n");
+                if (cfg.target) {
+                    rtWidth = double(cfg.target->getWidth());
+                    rtHeight = double(cfg.target->getHeight());
                 }
                 
-                MTLViewport viewPort {0.0f};
-                viewPort.znear = 0.0f;
-                viewPort.zfar = 1.0f;
-                viewPort.width = rtWidth;
-                viewPort.height = rtHeight;
-                
+                _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), 3, 1);
+
+                if (cfg.zBehaviorType != foundation::ZBehaviorType::DISABLED) {
+                    [_currentCommandEncoder setDepthStencilState:_zBehaviorStates[int(cfg.zBehaviorType)]];
+                }
+
+                MTLViewport viewPort {0.0f, 0.0f, rtWidth, rtHeight, 0.0f, 1.0f};
+
                 [_currentCommandEncoder setRenderPipelineState:state];
                 [_currentCommandEncoder setViewport:viewPort];
                 
-                if (rtDepthFormat != MTLPixelFormatInvalid && cfg.zBehaviorType != foundation::ZType::DISABLED) {
-                    [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
-                }
-                
-                _currentShader = shader;
-            }
-            else {
-                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+                _frameConstants.rtBounds[0] = rtWidth;
+                _frameConstants.rtBounds[1] = rtHeight;
             }
         }
     }
     
-    // TODO: copypasta
+    // TODO:
+    // autogenerate name + get shader name + error in rendering if shader is created with name that is already used
+    // const_ to shader unpacked only
+    // !!!
+//    void MetalRendering::beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
+//        if (_view == nil) {
+//            _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
+//        }
+//        if (_view) {
+//            if (_currentCommandBuffer == nil) {
+//                _currentCommandBuffer = [_commandQueue commandBuffer];
+//            }
+//
+//            MTLPixelFormat rtColorFormat = _view.colorPixelFormat;
+//            MTLPixelFormat rtDepthFormat = _view.depthStencilPixelFormat;
+//
+//            double rtWidth = _view.currentDrawable.texture.width;
+//            double rtHeight = _view.currentDrawable.texture.height;
+//            const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
+//            const MetalTexture *platformRT = static_cast<const MetalTexture *>(cfg.target.get());
+//
+//            bool zClear = cfg.zBehaviorType == foundation::ZType::ENABLED_CLEAR && rtDepthFormat != MTLPixelFormatInvalid;
+//
+//            _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+//            _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
+//            _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionDontCare;
+//            _currentPassDescriptor.colorAttachments[0].loadAction = cfg.clearColor ? MTLLoadActionClear : MTLLoadActionDontCare;
+//            _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
+//            _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
+//            _currentPassDescriptor.depthAttachment.loadAction = zClear ? MTLLoadActionClear : MTLLoadActionDontCare;
+//            _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
+//
+//            if (cfg.target) {
+//                rtColorFormat = nativeTextureFormat[int(platformRT->getFormat())];
+//                rtDepthFormat = platformRT->getDepthFormat();
+//                rtWidth = double(platformRT->getWidth());
+//                rtHeight = double(platformRT->getHeight());
+//
+//                _currentPassDescriptor.colorAttachments[0].texture = platformRT->getColor();
+//                _currentPassDescriptor.depthAttachment.texture = platformRT->getDepth();
+//            }
+//
+//            _frameConstants.rtBounds[0] = rtWidth;
+//            _frameConstants.rtBounds[1] = rtHeight;
+//
+//            id<MTLRenderPipelineState> state = nil;
+//
+//            if (platformShader) {
+//                auto index = _pipelineStates.find(name);
+//                if (index == _pipelineStates.end()) {
+//                    NSError *error;
+//                    MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
+//
+//                    desc.vertexFunction = platformShader->getVertexShader();
+//                    desc.vertexDescriptor = platformShader->getVertexDesc();
+//                    desc.fragmentFunction = platformShader->getFragmentShader();
+//                    desc.colorAttachments[0].pixelFormat = rtColorFormat;
+//                    desc.depthAttachmentPixelFormat = rtDepthFormat;
+//
+//                    if (cfg.blendType == BlendType::DISABLED) {
+//                        desc.colorAttachments[0].blendingEnabled = false;
+//                    }
+//                    else if (cfg.blendType == BlendType::MIXING) {
+//                        desc.colorAttachments[0].blendingEnabled = true;
+//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+//                    }
+//                    else if (cfg.blendType == BlendType::ADDITIVE) {
+//                        desc.colorAttachments[0].blendingEnabled = YES;
+//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+//                    }
+//                    else if (cfg.blendType == BlendType::MAXVALUE) {
+//                        desc.colorAttachments[0].blendingEnabled = YES;
+//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMax;
+//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMax;
+//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+//                    }
+//                    else if (cfg.blendType == BlendType::MINVALUE) {
+//                        desc.colorAttachments[0].blendingEnabled = YES;
+//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMin;
+//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMin;
+//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+//                    }
+//
+//                    if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
+//                        _pipelineStates.emplace(name, state);
+//                    }
+//                    else {
+//                        _platform->logError("[MetalRendering::beginPass] %s\n", [[error localizedDescription] UTF8String]);
+//                    }
+//                }
+//                else {
+//                    state = index->second;
+//                }
+//            }
+//
+//            if (state) {
+//                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+//
+//                // TODO: copypasta
+//                if (_constantsBufferOffset + sizeof(FrameConstants) < CONSTANT_BUFFER_OFFSET_MAX) {
+//                    std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
+//                    std::memcpy(constantsMemory + _constantsBufferOffset, &_frameConstants, sizeof(FrameConstants));
+//
+//                    [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:3];
+//                    [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:1];
+//
+//                    _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
+//                }
+//                else {
+//                    _platform->logError("[MetalRendering::beginPass] Out of constants buffer length\n");
+//                }
+//
+//                MTLViewport viewPort {0.0f};
+//                viewPort.znear = 0.0f;
+//                viewPort.zfar = 1.0f;
+//                viewPort.width = rtWidth;
+//                viewPort.height = rtHeight;
+//
+//                [_currentCommandEncoder setRenderPipelineState:state];
+//                [_currentCommandEncoder setViewport:viewPort];
+//
+//                if (rtDepthFormat != MTLPixelFormatInvalid && cfg.zBehaviorType != foundation::ZType::DISABLED) {
+//                    [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
+//                }
+//
+//                _currentShader = shader;
+//            }
+//            else {
+//                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+//            }
+//        }
+//    }
+    
     void MetalRendering::applyShaderConstants(const void *constants) {
         if (_currentCommandEncoder) {
             const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
 
             if (platformShader && platformShader->getConstBufferLength()) {
                 const std::uint32_t constBufferLength = platformShader->getConstBufferLength();
-                
-                if (_constantsBufferOffset + constBufferLength < CONSTANT_BUFFER_OFFSET_MAX) {
-                    std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
-                    std::memcpy(constantsMemory + _constantsBufferOffset, constants, constBufferLength);
-                    
-                    [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:2];
-                    [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:0];
-                    
-                    _constantsBufferOffset += roundTo256(platformShader->getConstBufferLength());
-                }
-                else {
-                    _platform->logError("[MetalRendering::applyShaderConstants] Out of constants buffer length\n");
-                }
+                _appendConstantBuffer(constants, constBufferLength, 2, 0);
             }
         }
     }
@@ -870,7 +1139,7 @@ namespace foundation {
                 id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
                 
                 for (std::uint32_t i = 0; i < count; i++) {
-                    texarray[i] = static_cast<const MetalTexture *>(textures[i].get())->getColor();
+                    texarray[i] = static_cast<const MetalTexBase *>(textures[i].get())->getNativeTexture();
                 }
                 
                 [_currentCommandEncoder setFragmentTextures:texarray withRange:range];
@@ -882,9 +1151,8 @@ namespace foundation {
     void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) {
         if (_currentCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
-            //const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
-            
             id<MTLBuffer> buffers[2] = {nativeVertexData, nullptr};
+
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
@@ -897,8 +1165,8 @@ namespace foundation {
         if (_currentCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
             id<MTLBuffer> nativeInstanceData = instanceData ? static_cast<const MetalData *>(instanceData.get())->get() : nullptr;
-            
             id<MTLBuffer> buffers[2] = {nativeVertexData, nativeInstanceData};
+            
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
@@ -906,34 +1174,54 @@ namespace foundation {
             [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
         }
     }
-
-    void MetalRendering::endPass() {
+    
+    void MetalRendering::presentFrame() {
         if (_currentCommandEncoder) {
             [_currentCommandEncoder endEncoding];
             _currentCommandEncoder = nil;
             _currentShader = nullptr;
         }
-    }
-    
-    void MetalRendering::presentFrame() {
         if (_view && _currentCommandBuffer) {
             const std::uint32_t bufferIndex = _constantsBuffersIndex;
+            MetalRendering *m = this;
             [_currentCommandBuffer presentDrawable:_view.currentDrawable];
             [_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
-                _constantsBuffersInUse[bufferIndex] = false;
+                m->_constantsBuffersInUse[bufferIndex] = false;
             }];
             [_currentCommandBuffer commit];
             _currentCommandBuffer = nil;
-            
-            if (++_constantsBuffersIndex >= CONSTANT_BUFFER_FRAMES_MAX) {
-                _constantsBuffersIndex = 0;
-            }
-            if (_constantsBuffersInUse[_constantsBuffersIndex]) {
-                _platform->logError("[MetalRendering::presentFrame] Global constant buffer in flight\n");
-            }
+
             _constantsBuffersInUse[_constantsBuffersIndex] = true;
             _constantsBufferOffset = 0;
+            
+            for (std::uint32_t i = 0; i < CONSTANT_BUFFER_FRAMES_MAX; i++) {
+                if (_constantsBuffersInUse[_constantsBuffersIndex] == false) {
+                    _constantsBuffersIndex = i;
+                    break;
+                }
+            }
+
+            if (_constantsBuffersIndex >= CONSTANT_BUFFER_FRAMES_MAX) {
+                _platform->logError("[MetalRendering::presentFrame] Global constant buffer in flight\n");
+            }
         }
+    }
+    
+    void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex) {
+        if (_constantsBufferOffset + size < CONSTANT_BUFFER_OFFSET_MAX) {
+            std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
+            std::memcpy(constantsMemory + _constantsBufferOffset, buffer, size);
+            
+            [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:vIndex];
+            [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:fIndex];
+            
+            _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
+            return true;
+        }
+        else {
+            _platform->logError("[MetalRendering::_appendConstantBuffer] Out of constants buffer length\n");
+        }
+        return false;
     }
 }
 

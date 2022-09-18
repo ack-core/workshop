@@ -20,18 +20,21 @@ namespace foundation {
         _count
     };
     
-    enum class ZType {
-        ENABLED,       // Z-test enabled, Z-write enabled, Z-buffer isn't cleared
-        ENABLED_CLEAR, // Z-test enabled, Z-write enabled, Z-buffer is cleared
-        DISABLED,      // Z-test disabled, Z-write disabled, Z-buffer isn't cleared
+    enum class ZBehaviorType {
+        DISABLED = 0,
+        TEST_ONLY,
+        TEST_AND_WRITE,
+        _count
     };
     
     enum class BlendType {
-        DISABLED,      // Blending is disabled
+        DISABLED = 0,  // Blending is disabled
         MIXING,        // sourceRGB * sourceA + destRGB * (1 - sourceA)
         ADDITIVE,      // sourceRGB * sourceA + destRGB
+        AGREGATION,     // sourceRGBA + destRGBA
         MINVALUE,      // min(sourceRGBA, destRGBA)
-        MAXVALUE       // max(sourceRGBA, destRGBA)
+        MAXVALUE,      // max(sourceRGBA, destRGBA)
+        _count
     };
     
     enum class RenderShaderInputFormat {
@@ -47,10 +50,16 @@ namespace foundation {
     };
     
     enum class RenderTextureFormat {
-        R8UN = 0, // 1 byte grayscale normalized to [0..1]. In shader .r component is used
-        R32F,     // float grayscale In shader .r component is used
-        RGBA8UN,  // rgba 1 byte per channel normalized to [0..1]
-        RGBA32F,  // 32-bit float per component
+        UNKNOWN = 0, // For error handling
+        R8UN,        // 1 byte grayscale normalized to [0..1]. In shader .r component is used
+        R16F,        // float16 grayscale In shader .r component is used
+        R32F,        // float grayscale In shader .r component is used
+        RG8UN,       // rg 1 byte per channel normalized to [0..1]
+        RG16F,       // 32-bit float per component
+        RG32F,       // 32-bit float per component
+        RGBA8UN,     // rgba 1 byte per channel normalized to [0..1]
+        RGBA16F,     // rgba 1 byte per channel normalized to [0..1]
+        RGBA32F,     // 32-bit float per component
         _count
     };
     
@@ -77,7 +86,24 @@ namespace foundation {
     protected:
         virtual ~RenderTexture() = default;
     };
-    
+
+    class RenderTarget {
+    public:
+        static const size_t MAXCOUNT = 4;
+        
+        virtual std::uint32_t getWidth() const = 0;
+        virtual std::uint32_t getHeight() const = 0;
+        
+        virtual RenderTextureFormat getFormat() const = 0;
+        virtual bool hasDepthBuffer() const = 0;
+        
+        virtual std::uint32_t getTextureCount() const = 0;
+        virtual std::shared_ptr<RenderTexture> getTexture(unsigned index) = 0;
+        
+    protected:
+        virtual ~RenderTarget() = default;
+    };
+
     class RenderData {
     public:
         virtual std::uint32_t getCount() const = 0;
@@ -90,42 +116,65 @@ namespace foundation {
     using RenderShaderInputDesc = std::initializer_list<RenderShader::Input>;
     using RenderShaderPtr = std::shared_ptr<RenderShader>;
     using RenderTexturePtr = std::shared_ptr<RenderTexture>;
+    using RenderTargetPtr = std::shared_ptr<RenderTarget>;
     using RenderDataPtr = std::shared_ptr<RenderData>;
     
-    // Render targets decription that is passed to 'beginPass'
+    // Render targets decription that is passed to 'applyState'
     //
     struct RenderPassConfig {
-        RenderTexturePtr target = nullptr;
-        bool clearColor = false;
+        RenderTargetPtr target = nullptr;
         
+        bool clearColorEnabled = false;
+        bool clearDepthEnabled = false;
+
         float initialColor[4] = {0.0f};
         float initialDepth = 0.0f;
         
-        ZType zBehaviorType = ZType::ENABLED;
+        ZBehaviorType zBehaviorType = ZBehaviorType::TEST_AND_WRITE;
         BlendType blendType = BlendType::DISABLED;
         
-        RenderPassConfig() {} // change nothing
-        RenderPassConfig(float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
-            zBehaviorType = ZType::ENABLED_CLEAR;
-            clearColor = true;
-            initialDepth = d;
+//        RenderPassConfig() {} // change nothing
+//        RenderPassConfig(float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
+//            zBehaviorType = ZType::ENABLED_CLEAR;
+//            clearColor = true;
+//            initialDepth = d;
+//        }
+//        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
+//            target = rt;
+//            zBehaviorType = ZType::ENABLED_CLEAR;
+//            clearColor = true;
+//            initialDepth = d;
+//        }
+//        RenderPassConfig(const RenderTexturePtr &rt, BlendType bType, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
+//            target = rt;
+//            clearColor = true;
+//            blendType = bType;
+//            zBehaviorType = ZType::ENABLED_CLEAR;
+//            initialDepth = d;
+//        }
+//        RenderPassConfig(BlendType bType, ZType zType) {
+//            blendType = bType;
+//            zBehaviorType = ZType::ENABLED_CLEAR;
+//        }
+    };
+    
+    struct RenderPassCommonConfigs {
+        static const RenderPassConfig DEFAULT() {
+            return {};
         }
-        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
-            target = rt;
-            zBehaviorType = ZType::ENABLED_CLEAR;
-            clearColor = true;
-            initialDepth = d;
+        static const RenderPassConfig CLEAR(float r, float g, float b, float a = 1.0f, float d = 0.0f) {
+            return RenderPassConfig {
+                nullptr, true, true,
+                {r, g, b, a}, d,
+                ZBehaviorType::TEST_AND_WRITE, BlendType::DISABLED,
+            };
         }
-        RenderPassConfig(const RenderTexturePtr &rt, BlendType bType, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
-            target = rt;
-            clearColor = true;
-            blendType = bType;
-            zBehaviorType = ZType::ENABLED_CLEAR;
-            initialDepth = d;
-        }
-        RenderPassConfig(BlendType bType, ZType zType) {
-            blendType = bType;
-            zBehaviorType = ZType::ENABLED_CLEAR;
+        static const RenderPassConfig CLEAR(const RenderTargetPtr &rt, BlendType blendType, float r, float g, float b, float a = 1.0f, float d = 0.0f) {
+            return RenderPassConfig {
+                rt, true, rt->hasDepthBuffer(),
+                {r, g, b, a}, d,
+                rt->hasDepthBuffer() ? ZBehaviorType::TEST_AND_WRITE : ZBehaviorType::DISABLED, blendType,
+            };
         }
     };
 
@@ -184,7 +233,7 @@ namespace foundation {
         // Textures. There 8 texture slots. Example of getting color from the last slot: float4 color = _tex2d(7, float2(0, 0));
         //
         // Global functions:
-        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(k, v, v), _tex2d(index, v)
+        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(k, v, v), _tex2nearest/_tex2linear/_tex2raw(index, v)
         //
         virtual RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc = {}) = 0;
 
@@ -195,9 +244,10 @@ namespace foundation {
         virtual RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
 
         // Create render target texture
+        // @count       - color targets count
         // @w and @h    - width and height
         //
-        virtual RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) = 0;
+        virtual RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) = 0;
 
         // Create geometry
         // @data        - pointer to data (array of structures)
@@ -210,12 +260,11 @@ namespace foundation {
         virtual float getBackBufferWidth() const = 0;
         virtual float getBackBufferHeight() const = 0;
 
-        // TODO: render states
-        // Pass is a rendering scope with shader, [TODO: blending+rasterizer states]
-        // @name        - unique constant name to associate parameters
+        // State is a rendering scope with shader
         // @shader      - shader object
+        // @cfg         - render pass configuration
         //
-        virtual void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg = {}) = 0;
+        virtual void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg = RenderPassCommonConfigs::DEFAULT()) = 0;
 
         // Apply textures
         // @textures    - textures[i] can be nullptr (texture at i-th position will not be set)
@@ -238,7 +287,6 @@ namespace foundation {
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) = 0;
 
-        virtual void endPass() = 0;
         virtual void presentFrame() = 0;
 
     protected:

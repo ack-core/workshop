@@ -15,49 +15,34 @@
 //[0.6, -0.6, 0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, -0.6, +1][0.6, 0.6, 0.6, +1][0.6, -0.6, -0.6, +1][0.6, 0.6, -0.6, +1]
 //[0.6, 0.6, -0.6, +1][0.6, 0.6, 0.6, +1][-0.6, 0.6, -0.6, +1][0.6, 0.6, 0.6, +1][-0.6, 0.6, -0.6, +1][-0.6, 0.6, 0.6, +1]
 
+
+        //const {
+        //    lightPosition : float3
+        //    lightRadius : float1
+        //}
+
+//                [-0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, 0.5, -1]
+//                [0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, -0.5, -1]
+//                [0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][-0.5, 0.5, 0.5, -1]
+//                [-0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, 0.5, +1]
+//                [0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, -0.5, +1]
+//                [0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][-0.5, 0.5, 0.5, +1]
+
+
 namespace {
     const char *g_shadowShaderSrc = R"(
-        fixed {
-            cube[36] : float4 =
-                [-0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][-0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, 0.5, -1]
-                [0.5, -0.5, 0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, 0.5, -1][0.5, -0.5, -0.5, -1][0.5, 0.5, -0.5, -1]
-                [0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][0.5, 0.5, 0.5, -1][-0.5, 0.5, -0.5, -1][-0.5, 0.5, 0.5, -1]
-                [-0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][-0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, 0.5, +1]
-                [0.5, -0.5, 0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, 0.5, +1][0.5, -0.5, -0.5, +1][0.5, 0.5, -0.5, +1]
-                [0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][0.5, 0.5, 0.5, +1][-0.5, 0.5, -0.5, +1][-0.5, 0.5, 0.5, +1]
-        }
         const {
-            lightPosition : float3
-            lightRadius : float1
-        }
-        inout {
-            dist : float4
+            positionRadius : float4
+            color : float4
         }
         vssrc {
-            float3 cubeCenter = float3(instance_position.xyz);
-            float3 toLight = const_lightPosition - cubeCenter;
-            float3 toLightSign = _sign(toLight);
-            
-            float4 cubeConst = fixed_cube[vertex_ID];
-            float3 relVertexPos = toLightSign * cubeConst.xyz;
-            float3 absVertexPos = cubeCenter + relVertexPos;
-            
-            float3 vToLight = const_lightPosition - absVertexPos;
-            float3 vToLightNrm = _norm(vToLight);
-            float3 vToLightSign = _sign(vToLight);
-            
-            float3 octahedron = vToLightNrm / _dot(vToLightNrm, vToLightSign);
-            float2 invOctahedron = vToLightSign.xz * (float2(1.0, 1.0) - _abs(octahedron.zx));
-            float  isCurrentHemisphere = _step(0, cubeConst.w * (toLight.y) + 1.0);
-            
-            octahedron.xz = cubeConst.w * octahedron.y <= 0.0 ? invOctahedron : octahedron.xz;
-            
-            output_dist = float4(1, 1, 1, 1);
-            output_dist[int(cubeConst.w * 0.5 + 0.5)] = _lerp(1.0, length(vToLight) / const_lightRadius, isCurrentHemisphere);
-            output_position = float4((octahedron.x + octahedron.z), (octahedron.z - octahedron.x), 0.5, 1);
+            int ypos = int(vertex_position.y + 31.0);
+            float2 fromLight = float2(vertex_position.xz);
+            float2 y = float2(float(ypos % 8) * (1.0 / 512.0), float(ypos / 8) * (1.0 / 512.0));
+            output_position = float4(float2(1.0, -1.0) * fromLight / 32.0 + y, 0.5, 1.0);
         }
         fssrc {
-            output_color = float4(input_dist.x, input_dist.y, 1, 1);
+            output_color[0] = float4(1, 1, 1, 1);
         }
     )";
 
@@ -117,13 +102,14 @@ namespace {
             float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord_wpos_color.x);
             float occ = saturate(_pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord_wpos_color.y)), 0.5));
 
-            uint3 inormal = uint3(127.0 * float3(input_normal.x, input_normal.y, input_normal.z) + 128);
-            float packedNormal = float(inormal.x << 16 | inormal.y << 8 | inormal.z) / 16777216.0;
+            //uint3 inormal = uint3(127.0 * float3(input_normal.x, input_normal.y, input_normal.z) + 128);
+            //float packedNormal = float(inormal.x << 16 | inormal.y << 8 | inormal.z) / 16777216.0;
             
-            uint2 icolor = uint2(255.0 * float2(occ, input_texcoord_wpos_color.w));
-            float packedColorOcc = float(icolor.x << 8 | icolor.y) / 16777216.0;
+            //uint2 icolor = uint2(255.0 * float2(occ, input_texcoord_wpos_color.w));
+            //float packedColorOcc = float(icolor.x << 8 | icolor.y) / 16777216.0;
 
-            output_color = float4(input_texcoord_wpos_color.z, packedNormal, packedColorOcc, 1.0);
+            //output_color_0 = float4(0.0, 1.0, 0.0, 1.0);
+            output_color[0] = float4(occ, occ, occ, 1.0); //float4(input_texcoord_wpos_color.z, packedNormal, packedColorOcc, 1.0);
         }
     )";
 
@@ -133,15 +119,18 @@ namespace {
         }
         vssrc {
             float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-            output_position = float4(vertexCoord.xy * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.5, 1);
+            output_position = float4(vertexCoord.xy * float2(0.76762, -(1.365)) + float2(-1.0, 1.0), 0.5, 1);
             output_texcoord = vertexCoord;
         }
         fssrc {
-            float4 gbuffer = _tex2nearest(1, input_texcoord);
-            float3 colorOcc = _frac(float3(1.0, 256.0, 65536.0) * gbuffer.b);
+            //float4 gbuffer = _tex2nearest(1, input_texcoord);
+            ///float3 colorOcc = _frac(float3(1.0, 256.0, 65536.0) * gbuffer.b);
             
-            float4 surface = _tex2nearest(0, float2(colorOcc.z, 0));
-            output_color = float4(surface.rgb, 1.0);
+            //float4 surface = _tex2nearest(0, float2(colorOcc.z, 0));
+            
+            float4 s0 = _tex2nearest(0, input_texcoord);
+            float4 s1 = _tex2nearest(1, input_texcoord);
+            output_color[0] = s0;//_lerp(s0, s1, _step(0.8, input_texcoord.y));
         }
     )";
 
@@ -226,7 +215,7 @@ namespace {
             
             float f = kk;
             
-            output_color = float4(f, f, f, 0.5);
+            output_color[0] = float4(1.0, 1.0, 0.0, 1.0);
         }
     )";
     
@@ -296,11 +285,12 @@ namespace voxel {
     
     struct LightSource {
         std::vector<const StaticVoxelModel *> receiverTmpBuffer;
-        foundation::RenderTexturePtr distanceMap;
+        foundation::RenderTargetPtr voxelMap;
 
         struct ShaderConst {
             math::vector4f positionRadius;
             math::color rgba;
+            //math::transform3f viewProjections[6];
         }
         constants;
     };
@@ -333,14 +323,20 @@ namespace voxel {
         std::unordered_map<SceneObjectToken, std::unique_ptr<LightSource>> _lightSources;
         
         foundation::RenderTexturePtr _palette;
-        foundation::RenderTexturePtr _gbuffer;
+        //foundation::RenderTargetPtr _gbuffer;
     };
     
     SceneImpl::SceneImpl(const voxel::MeshFactoryPtr &factory, const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const char *palette) {
         _factory = factory;
         _platform = platform;
         _rendering = rendering;
-        
+
+        _shadowShader = rendering->createShader("scene_shadow_voxels", g_shadowShaderSrc,
+            { // vertex
+                {"ID", foundation::RenderShaderInputFormat::ID},
+                {"position", foundation::RenderShaderInputFormat::SHORT4},
+            }
+        );
         _staticMeshShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID}
@@ -355,22 +351,14 @@ namespace voxel {
                 {"lightFacePZ", foundation::RenderShaderInputFormat::BYTE4_NRM},
             }
         );
-        _shadowShader = rendering->createShader("scene_shadow_distance", g_shadowShaderSrc,
-            { // vertex
-                {"ID", foundation::RenderShaderInputFormat::ID}
-            },
-            { // instance
-                {"position", foundation::RenderShaderInputFormat::SHORT4},
-            }
-        );
         _fullScreenQuadShader = _rendering->createShader("scene_screen_quad", g_fullScreenQuadShaderSrc, {
             {"ID", foundation::RenderShaderInputFormat::ID}
         });
-        _lightBillboardShader = _rendering->createShader("scene_light_billboard", g_lightBillboardShaderSrc, {
-            {"ID", foundation::RenderShaderInputFormat::ID}
-        });
+//        _lightBillboardShader = _rendering->createShader("scene_light_billboard", g_lightBillboardShaderSrc, {
+//            {"ID", foundation::RenderShaderInputFormat::ID}
+//        });
         
-        _gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA32F, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
+        //_gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA32F, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         
         std::unique_ptr<std::uint8_t[]> paletteData;
         std::size_t paletteSize;
@@ -449,11 +437,20 @@ namespace voxel {
         std::unique_ptr<LightSource> lightSource = std::make_unique<LightSource>();
         SceneObjectToken token = g_lastToken++ & std::uint64_t(0x7FFFFFFF);
         
-        lightSource->distanceMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA32F, 1024, 1024, false);
+        lightSource->voxelMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::R8UN, 1, 512, 512, false);
         lightSource->constants.positionRadius = math::vector4f(position, radius);
         lightSource->constants.rgba = rgba;
         
-        if (lightSource->distanceMap) {
+//        math::transform3f projMatrix = math::transform3f::perspectiveFovRH(90.0f / 180.0f * float(3.14159f), 1.0f, 0.001f, radius);
+//
+//        lightSource->constants.viewProjections[0] = math::transform3f::lookAtRH(position, position + math::vector3f(+1.0f, +0.0f, +0.0f), math::vector3f(0.0f, 1.0f, 0.0f)) * projMatrix;
+//        lightSource->constants.viewProjections[1] = math::transform3f::lookAtRH(position, position + math::vector3f(-1.0f, +0.0f, +0.0f), math::vector3f(0.0f, 1.0f, 0.0f)) * projMatrix;
+//        lightSource->constants.viewProjections[2] = math::transform3f::lookAtRH(position, position + math::vector3f(+0.0f, +1.0f, +0.0f), math::vector3f(-1.0f, 0.0f, 0.0f)) * projMatrix;
+//        lightSource->constants.viewProjections[3] = math::transform3f::lookAtRH(position, position + math::vector3f(+0.0f, -1.0f, +0.0f), math::vector3f(1.0f, 0.0f, 0.0f)) * projMatrix;
+//        lightSource->constants.viewProjections[4] = math::transform3f::lookAtRH(position, position + math::vector3f(+0.0f, +0.0f, +1.0f), math::vector3f(0.0f, 1.0f, 0.0f)) * projMatrix;
+//        lightSource->constants.viewProjections[5] = math::transform3f::lookAtRH(position, position + math::vector3f(+0.0f, +0.0f, -1.0f), math::vector3f(0.0f, 1.0f, 0.0f)) * projMatrix;
+
+        if (lightSource->voxelMap) {
             _lightSources.emplace(token, std::move(lightSource));
         }
         
@@ -471,28 +468,54 @@ namespace voxel {
     void SceneImpl::updateAndDraw(float dtSec) {
         for (const auto &modelIt : _staticModels) {
             const StaticVoxelModel *model = modelIt.second.get();
-            
+
             for (auto &lightIt : _lightSources) {
                 LightSource &light = *lightIt.second;
-                
+
                 if (isInLight(model->bbMin, model->bbMax, light.constants.positionRadius.xyz, light.constants.positionRadius.w)) {
                     light.receiverTmpBuffer.emplace_back(model);
                 }
             }
         }
         
-        for (auto &lightIt : _lightSources) {
-            LightSource &light = *lightIt.second;
-            _rendering->beginPass("scene_shadows", _shadowShader, foundation::RenderPassConfig(light.distanceMap, foundation::BlendType::MINVALUE, 1.0f, 1.0f, 1.0f));
-            _rendering->applyShaderConstants(&light.constants.positionRadius);
+        LightSource &light = *_lightSources.begin()->second;
+        
+        //for (auto &lightIt : _lightSources) {
+        //    LightSource &light = *lightIt.second;
+            //_rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyState(_shadowShader, foundation::RenderPassCommonConfigs::CLEAR(light.voxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
+        _rendering->applyShaderConstants(&light.constants);
 
-            for (const auto &item : light.receiverTmpBuffer) {
-                _rendering->drawGeometry(nullptr, item->positions, 36, item->positions->getCount(), foundation::RenderTopology::TRIANGLES);
-            }
+//        for (const auto &modelIt : _staticModels) {
+//            const StaticVoxelModel *model = modelIt.second.get();
+//            _rendering->drawGeometry(nullptr, model->voxels, 12, model->voxels->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
+//        }
 
-            _rendering->endPass();
-            light.receiverTmpBuffer.clear();
+            //_rendering->applyState(_shadowShader, foundation::RenderPassCommonConfigs::CLEAR(light.distanceMap, foundation::BlendType::DISABLED, 1.0f, 0.0f, 0.0f));
+//
+        for (const auto &item : light.receiverTmpBuffer) {
+            _rendering->drawGeometry(item->positions, nullptr, item->positions->getCount(), 1, foundation::RenderTopology::POINTS);
         }
+
+            //_rendering->endPass();
+        light.receiverTmpBuffer.clear();
+        //}
+
+        foundation::RenderTexturePtr textures[1] = {light.voxelMap->getTexture(0)};
+        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+
+        for (const auto &modelIt : _staticModels) {
+            const StaticVoxelModel *model = modelIt.second.get();
+            _rendering->drawGeometry(nullptr, model->voxels, 12, model->voxels->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
+        }
+
+
+        _rendering->applyState(_fullScreenQuadShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyTextures(textures, 1);
+        _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
+        //_rendering->endPass();
+
+        /*
         
         // TODO:
         // 1. lights -> vector
@@ -520,6 +543,7 @@ namespace voxel {
             _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
         }
         _rendering->endPass();
+        */
     }
 }
 

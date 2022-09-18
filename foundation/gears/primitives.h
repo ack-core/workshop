@@ -4,6 +4,7 @@
 #include "math.h"
 #include "foundation/rendering.h"
 
+
 namespace gears {
     class Primitives {
     public:
@@ -33,7 +34,7 @@ namespace gears {
                     output_color = fixed_colors[vertex_ID >> 1];
                 }
                 fssrc {
-                    output_color = input_color;
+                    output_color[0] = input_color;
                 }
             )";
 
@@ -43,11 +44,11 @@ namespace gears {
                 });
             }
             
-            _rendering->beginPass("primitives_axis", _axisShader, cfg);
+            _rendering->applyState(_axisShader, cfg);
             _rendering->drawGeometry(nullptr, 10, foundation::RenderTopology::LINES);
-            _rendering->endPass();
         }
         
+        /*
         void drawLine(const math::vector3f &p1, const math::vector3f &p2, const math::color &rgba) {
             static const char *lineShader = R"(
                 const {
@@ -168,6 +169,7 @@ namespace gears {
             _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
             _rendering->endPass();
         }
+        */
         
     protected:
         std::shared_ptr<foundation::RenderingInterface> _rendering;

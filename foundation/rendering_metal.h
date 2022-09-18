@@ -2,51 +2,99 @@
 #include "rendering.h"
 #include <MetalKit/MetalKit.h>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace foundation {
     class MetalShader : public RenderShader {
     public:
-        MetalShader(id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength);
+        MetalShader(const std::string &name, id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength);
         ~MetalShader() override;
         
         id<MTLFunction> getVertexShader() const;
         id<MTLFunction> getFragmentShader() const;
+        
         MTLVertexDescriptor *getVertexDesc() const;
         std::uint32_t getConstBufferLength() const;
+        const std::string &getName() const;
         
     private:
+        std::string _name;
         id<MTLLibrary> _library;
         MTLVertexDescriptor *_vdesc;
         std::uint32_t _constBufferLength;
     };
-    
-    class MetalTexture : public RenderTexture {
+
+    class MetalTexBase : public RenderTexture {
     public:
-        MetalTexture(id<MTLTexture> texture, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
-        ~MetalTexture() override;
+        ~MetalTexBase() override {}
         
-        void replace(id<MTLTexture> texture);
+        virtual id<MTLTexture> getNativeTexture() const = 0;
+    };
+
+    class MetalTexture : public MetalTexBase {
+    public:
+        MetalTexture(id<MTLTexture> texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        ~MetalTexture() override;
         
         std::uint32_t getWidth() const override;
         std::uint32_t getHeight() const override;
         std::uint32_t getMipCount() const override;
         
         RenderTextureFormat getFormat() const override;
-        MTLPixelFormat getDepthFormat() const;
-        
-        id<MTLTexture> getColor() const;
-        id<MTLTexture> getDepth() const;
+        id<MTLTexture> getNativeTexture() const override;
         
     private:
         RenderTextureFormat _format;
-        MTLPixelFormat _depthFormat;
-
         id<MTLTexture> _texture;
-        id<MTLTexture> _depth;
 
         std::uint32_t _width;
         std::uint32_t _height;
         std::uint32_t _mipCount;
+    };
+    
+    class MetalTarget : public RenderTarget {
+    public:
+        class RTTexture : public MetalTexBase {
+        public:
+            RTTexture(MetalTarget &target, id<MTLTexture> texture) : _target(target), _texture(texture) {}
+            ~RTTexture() override {}
+            
+            std::uint32_t getWidth() const override { return _target._width; }
+            std::uint32_t getHeight() const override { return _target._height; }
+            std::uint32_t getMipCount() const override { return 1; }
+            RenderTextureFormat getFormat() const override { return _target._format; }
+            id<MTLTexture> getNativeTexture() const override { return _texture; }
+
+        private:
+            MetalTarget &_target;
+            id<MTLTexture> _texture;
+        };
+
+        MetalTarget(__strong id<MTLTexture> * targets, unsigned count, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h);
+        ~MetalTarget() override;
+        
+        std::uint32_t getWidth() const override;
+        std::uint32_t getHeight() const override;
+        
+        RenderTextureFormat getFormat() const override;
+        bool hasDepthBuffer() const override;
+        
+        std::uint32_t getTextureCount() const override;
+        std::shared_ptr<RenderTexture> getTexture(unsigned index) override;
+        
+        MTLPixelFormat getDepthFormat() const;
+        
+    private:
+        RenderTextureFormat _format;
+        MTLPixelFormat _depthFormat;
+        
+        std::shared_ptr<RTTexture> _textures[RenderTarget::MAXCOUNT] = {nil, nil, nil, nil};
+        unsigned _count;
+        
+        id<MTLTexture> _depth;
+    
+        std::uint32_t _width;
+        std::uint32_t _height;
     };
 
     class MetalData : public RenderData {
@@ -73,32 +121,32 @@ namespace foundation {
         
         RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
-        RenderTexturePtr createRenderTarget(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
+        RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
         
         float getBackBufferWidth() const override;
         float getBackBufferHeight() const override;
         
-        void beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
-        
+        void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) override;
         
         void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) override;
         void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) override;
         
-        void endPass() override;
         void presentFrame() override;
         
     private:
-        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 4;
-        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 4 * 1024 * 128;
+        void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex);
+        
+        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
+        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 64;
         
         struct FrameConstants {
             float vewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view * proj matrix
-            float invVewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // inverted view * proj matrix
-            float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view matrix
-            float projMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // proj matrix
+            float invVewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};  // inverted view * proj matrix
+            float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // view matrix
+            float projMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // proj matrix
             float cameraPosition[4] = {0, 0, 0, 1};
             float cameraDirection[4] = {1, 0, 0, 1};
             float rtBounds[4] = {0, 0, 0, 0};
@@ -111,14 +159,16 @@ namespace foundation {
         id<MTLDevice> _device = nil;
         id<MTLCommandQueue> _commandQueue = nil;
         
+        std::unordered_set<std::string> _shaderNames;
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _pipelineStates;
+        id<MTLDepthStencilState> _zBehaviorStates[int(foundation::ZBehaviorType::_count)];
         std::shared_ptr<RenderShader> _currentShader;
         
         id<MTLCommandBuffer> _currentCommandBuffer = nil;
         id<MTLRenderCommandEncoder> _currentCommandEncoder = nil;
         MTLRenderPassDescriptor *_currentPassDescriptor = nil;
         
-        id<MTLDepthStencilState> _defaultDepthStencilState = nil;
+        //id<MTLDepthStencilState> _defaultDepthStencilState = nil;
         
         bool _constantsBuffersInUse[CONSTANT_BUFFER_FRAMES_MAX] = {false};
         id<MTLBuffer> _constantsBuffers[CONSTANT_BUFFER_FRAMES_MAX];
