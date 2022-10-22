@@ -31,23 +31,25 @@ namespace {
     }
     
     struct braced {
-        explicit braced(std::string &out) : _out(out) {}
+        explicit braced(std::string &out, char opening, char closing) : _opening(opening), _closing(closing), _out(out) {}
         
         inline friend std::istream &operator >>(std::istream &stream, const braced &target) {
             (stream >> std::ws).peek();
-            (stream >> std::ws).peek() == '[' ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
+            (stream >> std::ws).peek() == target._opening ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
             
-            while (stream.fail() == false && stream.peek() != ']') {
+            while (stream.fail() == false && stream.peek() != target._closing) {
                 target._out.push_back(stream.get());
             }
             if (stream.fail() == false) {
-                (stream >> std::ws).peek() == ']' ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
+                (stream >> std::ws).peek() == target._closing ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
             }
             
             return stream;
         }
         
     private:
+        char _opening;
+        char _closing;
         std::string &_out;
     };
     
@@ -394,7 +396,7 @@ namespace foundation {
                         for (std::size_t i = 0; i < elementCount; i++) {
                             output += indent + nativeTypeName + "(";
 
-                            if (stream >> braced(output)) {
+                            if (stream >> braced(output, '[', ']')) {
                                 output += "),\n";
                             }
                             else return false;
@@ -509,8 +511,8 @@ namespace foundation {
             "#define _tex2linear(i, a) _texture##i.sample(_linearSampler, a)\n"
             "#define _tex2raw(i, a) _texture##i.read(ushort2(a.x * (_texture##i.get_width() - 1), a.y * (_texture##i.get_height() - 1)), 0)\n"
             "\n"
-            "const sampler _nearestSampler(mag_filter::nearest, min_filter::nearest);"
-            "const sampler _linearSampler(mag_filter::linear, min_filter::linear);"
+            "const sampler _nearestSampler(mag_filter::nearest, min_filter::nearest);\n"
+            "const sampler _linearSampler(mag_filter::linear, min_filter::linear);\n"
             "\n"
             "struct _FrameData {\n"
             "    float4x4 viewProjMatrix;\n"
@@ -532,8 +534,8 @@ namespace foundation {
         bool vssrcBlockDone = false;
         bool fssrcBlockDone = false;
         
-        while (input >> blockName >> expect<'{'>) {
-            if (fixedBlockDone == false && blockName == "fixed") {
+        while (input >> blockName) {
+            if (fixedBlockDone == false && blockName == "fixed" && (input >> expect<'{'>)) {
                 if (formFixedBlock(input, nativeShader) == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'fixed' block\n", name);
                     completed = false;
@@ -543,7 +545,7 @@ namespace foundation {
                 fixedBlockDone = true;
                 continue;
             }
-            if (constBlockDone == false && blockName == "const") {
+            if (constBlockDone == false && blockName == "const" && (input >> expect<'{'>)) {
                 nativeShader += "struct _Constants {\n";
                 
                 if ((constBlockLength = formVarsBlock(input, nativeShader, true)) == 0) {
@@ -555,7 +557,7 @@ namespace foundation {
                 constBlockDone = true;
                 continue;
             }
-            if (inoutBlockDone == false && blockName == "inout") {
+            if (inoutBlockDone == false && blockName == "inout" && (input >> expect<'{'>)) {
                 nativeShader += "struct _InOut {\n    float4 position [[position]];\n";
                 
                 if (formVarsBlock(input, nativeShader, false) == 0) {
@@ -567,7 +569,33 @@ namespace foundation {
                 inoutBlockDone = true;
                 continue;
             }
-            if (vssrcBlockDone == false && blockName == "vssrc") {
+            if (blockName == "fndef") {
+                std::string funcName;
+                std::string funcSignature;
+                std::string funcReturnType;
+
+                if (input >> funcName >> braced(funcSignature, '(', ')') >> expect<'-', '>'> >> funcReturnType >> expect<'{'>) {
+                    std::string codeBlock;
+                    
+                    if (formCodeBlock(input, codeBlock)) {
+                        nativeShader += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
+                        nativeShader += codeBlock;
+                        nativeShader += "}\n";
+                    }
+                    else {
+                        _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
+                        completed = false;
+                        break;
+                    }
+                }
+                else {
+                    _platform->logError("[MetalRendering::createShader] shader '%s' has invalid 'fndef' block\n", name);
+                    completed = false;
+                    break;
+                }
+                continue;
+            }
+            if (vssrcBlockDone == false && blockName == "vssrc" && (input >> expect<'{'>)) {
                 if (inoutBlockDone == false) {
                     inoutBlockDone = true;
                     nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n";
@@ -676,7 +704,7 @@ namespace foundation {
                 vssrcBlockDone = true;
                 continue;
             }
-            if (fssrcBlockDone == false && blockName == "fssrc") {
+            if (fssrcBlockDone == false && blockName == "fssrc" && (input >> expect<'{'>)) {
                 if (vssrcBlockDone == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' : 'vssrc' block must be defined before 'fssrc'\n", name);
                     completed = false;
@@ -892,7 +920,7 @@ namespace foundation {
             if (cfg.target) {
                 for (std::uint32_t i = 0; i < cfg.target->getTextureCount(); i++) {
                     _currentPassDescriptor.colorAttachments[i].texture = static_cast<const MetalTexBase *>(cfg.target->getTexture(i).get())->getNativeTexture();
-                    _currentPassDescriptor.colorAttachments[i].storeAction = MTLStoreActionDontCare;
+                    _currentPassDescriptor.colorAttachments[i].storeAction = MTLStoreActionStore;
                     _currentPassDescriptor.colorAttachments[i].loadAction = loadAction;
                     _currentPassDescriptor.colorAttachments[i].clearColor = clearColor;
                 }
@@ -1139,7 +1167,7 @@ namespace foundation {
                 id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
                 
                 for (std::uint32_t i = 0; i < count; i++) {
-                    texarray[i] = static_cast<const MetalTexBase *>(textures[i].get())->getNativeTexture();
+                    texarray[i] = textures[i] ? static_cast<const MetalTexBase *>(textures[i].get())->getNativeTexture() : nil;
                 }
                 
                 [_currentCommandEncoder setFragmentTextures:texarray withRange:range];

@@ -178,7 +178,7 @@ int main(int argc, const char * argv[]) {
     auto meshFactory = voxel::MeshFactory::instance(platform);
     auto scene = voxel::Scene::instance(meshFactory, platform, rendering, "palette.png");
 
-    scene->addStaticModel("walls.vox", {-31, -10, -30});
+    scene->addStaticModel("walls.vox", {-31, -10, -31});
     scene->addLightSource({10.0, 0, -5}, 40.0f, math::color(1.0, 1.0, 1.0, 1.0));
     
     gears::OrbitCameraController cameraController (platform, camera);
