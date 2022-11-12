@@ -30,21 +30,35 @@
 
 
 namespace {
-    const char *g_shadowShaderSrc = R"(
+    const char *g_voxelMapShaderSrc = R"(
+        fixed {
+            cube[8] : float4 =
+                [-0.5, -0.5, -0.5, 1.0][0.5, -0.5, -0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
+                [-0.5, 0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+        }
         const {
             positionRadius : float4
             color : float4
         }
         vssrc {
-            int ypos = int(vertex_position.y + 31.0);
-            float2 fromLight = float2(vertex_position.xz);
-            float2 vcoord = float2(float(ypos % 8) * (2.0 / 1024.0), -float(ypos / 8) * (2.0 / 1024.0));
-            output_position = float4(fromLight / float2(32.0, -32.0) - float2(0.0, 2.0 / 1024.0) + vcoord, 0.5, 1.0);
+            float3 cubeCenter = float3(instance_position.xyz);// - positionRadius.xyz;
+            
+            //float  discard = _step(positionRadius.w * positionRadius.w, _dot(cubeCenter, cubeCenter));
+            float4 absVertexPos = float4(cubeCenter, 0.0) + fixed_cube[vertex_ID];// * discard;
+            
+            int ypos = int(absVertexPos.y + 32.0);
+            float2 fromLight = absVertexPos.xz + float2(32.0, 32.0) + float2(ypos % 8, ypos / 8) * float2(64, 64);
+            output_position = float4((fromLight - float2(256.0, 256.0)) / float2(256.0, -256.0), 0.5, 1.0);
         }
         fssrc {
-            output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+            output_color[0] = float4(0.33, 0.0, 0.0, 1.0);
         }
     )";
+
+//                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+//                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+//                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+
 
     // XFace Indeces : [-y-z, -y+z, +y-z, +y+z]
     // YFace Indeces : [-z-x, -z+x, +z-x, +z+x]
@@ -56,61 +70,71 @@ namespace {
                 [1.0, 0.0, 0.0]
                 [0.0, 1.0, 0.0]
 
-            cube[12] : float4 =
-                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+            bnm[3] : float3 =
+                [1.0, 0.0, 0.0]
+                [0.0, 0.0, 1.0]
+                [1.0, 0.0, 0.0]
 
-            faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+            tgt[3] : float3 =
+                [0.0, 1.0, 0.0]
+                [0.0, 1.0, 0.0]
+                [0.0, 0.0, 1.0]
+
+            cube[18] : float4 =
+                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0]
+                [0.5, -0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0]
+
+            faceUV[4] : float2 =
+                [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+
         }
         inout {
             koeff : float4
             normal : float3
-            cubepos : int3
+            texcoord : float2
+            tmp : float1
         }
-        fndef myfunc (int3 cubepos) -> float2 {
-            int ypos = cubepos.y + 31;
-            return float2(cubepos.xz) / 64.0 + float2(0.5, 0.5) + float2(ypos % 8, ypos / 8) * float2(1.0 / 1024.0, 1.0 / 1024.0);
+        fndef voxTexCoord (float3 cubepos) -> float2 {
+            int ypos = int(cubepos.y + 32.0);
+            float2 yoffset = float2(ypos % 8, ypos / 8) * float2(64, 64);
+            return (cubepos.xz + float2(32.0, 32.0) + yoffset) / float2(512.0, 512.0);
         }
         vssrc {
             float3 cubeCenter = float3(instance_position_color.xyz);
-            float3 toCamera = frame_cameraPosition.xyz - cubeCenter;
-            float3 toCamSign = _sign(toCamera);
+            float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
             float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
-            float3 faceNormal = toCamSign * fixed_axis[vertex_ID >> 2];
+            float3 faceNormal = toCamSign * fixed_axis[vertex_ID / 6];
 
-            // indexes of the current vertex in faceX, faceY and faceZ
-            //int3 faceIndeces = int3(float3(2.0, 2.0, 2.0) * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
-            //float4 koeff = float4(0.0, 0.0, 0.0, 0.0);
-            //koeff = koeff + _step(0.5, -faceNormal.x) * instance_lightFaceNX;
-            //koeff = koeff + _step(0.5,  faceNormal.x) * instance_lightFacePX;
-            //koeff = koeff + _step(0.5, -faceNormal.y) * instance_lightFaceNY;
-            //koeff = koeff + _step(0.5,  faceNormal.y) * instance_lightFacePY;
-            //koeff = koeff + _step(0.5, -faceNormal.z) * instance_lightFaceNZ;
-            //koeff = koeff + _step(0.5,  faceNormal.z) * instance_lightFacePZ;
-            //float2 texcoord = float2(0.0, 0.0);
-            //texcoord = texcoord + _step(0.5, _abs(faceNormal.x)) * fixed_faceUV[faceIndeces.x];
-            //texcoord = texcoord + _step(0.5, _abs(faceNormal.y)) * fixed_faceUV[faceIndeces.y];
-            //texcoord = texcoord + _step(0.5, _abs(faceNormal.z)) * fixed_faceUV[faceIndeces.z];
+            int3 faceIndices = int3(2.0 * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
             
-            output_cubepos = instance_position_color.xyz;
+            float2 texcoord = float2(0.0, 0.0);
+            texcoord = texcoord + _abs(faceNormal.x) * fixed_faceUV[faceIndices.x];
+            texcoord = texcoord + _abs(faceNormal.y) * fixed_faceUV[faceIndices.y];
+            texcoord = texcoord + _abs(faceNormal.z) * fixed_faceUV[faceIndices.z];
+            output_texcoord = texcoord;
+            
+            float3 dirB = fixed_bnm[vertex_ID / 6];
+            float3 dirT = fixed_tgt[vertex_ID / 6];
+            float3 cornerPos = cubeCenter - 0.5 * (dirB + dirT - faceNormal);
+            
+            output_koeff.x = _tex2nearest(0, voxTexCoord(cornerPos.xyz + faceNormal)).x;
+            output_koeff.y = _tex2nearest(0, voxTexCoord(cornerPos.xyz + dirB + faceNormal)).x;
+            output_koeff.z = _tex2nearest(0, voxTexCoord(cornerPos.xyz + dirT + faceNormal)).x;
+            output_koeff.w = _tex2nearest(0, voxTexCoord(cornerPos.xyz + dirT + dirB + faceNormal)).x;
+            
             output_position = _transform(absVertexPos, frame_viewProjMatrix);
-            output_normal = faceNormal;
+            output_normal = float3(faceNormal);
         }
         fssrc {
-            //float m0 = _lerp(input_koeff[0], input_koeff[1], input_texcoord_wpos_color.x);
-            //float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord_wpos_color.x);
-            //float occ = saturate(_pow(_smooth(0, 1, _lerp(m0, m1, input_texcoord_wpos_color.y)), 0.5));
-
-            //float3 cubeCenter = float3(input_cubepos);
-            //int ypos = input_cubepos.y + 31;
-            //float2 yp = float2(float(ypos % 8) * (1.0 / 1024.0), float(ypos / 8) * (1.0 / 1024.0));
-            //float2 voxS = cubeCenter.xz / 64.0 + 0.5 + yp;
-            //float2 voxS = float2(cubeCenter.x / 64.0 + 0.5 + float(ypos % 8) * (1.0 / 1024.0), cubeCenter.z / 64.0 + 0.5 + float(ypos / 8) * (1.0 / 1024.0));
-            float4 voxValue = _tex2nearest(0, myfunc(input_cubepos));
-
-            output_color[0] = float4(voxValue.rgb, 1.0);
+            float m0 = _lerp(input_koeff[0], input_koeff[1], input_texcoord.x);
+            float m1 = _lerp(input_koeff[2], input_koeff[3], input_texcoord.x);
+            float k = _lerp(m0, m1, input_texcoord.y);
+            output_color[0] = float4(k, 0, 0, 1);
         }
     )";
 
@@ -314,7 +338,7 @@ namespace voxel {
         foundation::PlatformInterfacePtr _platform;
         foundation::RenderingInterfacePtr _rendering;
 
-        foundation::RenderShaderPtr _shadowShader;
+        foundation::RenderShaderPtr _voxelMapShader;
         foundation::RenderShaderPtr _staticMeshShader;
         foundation::RenderShaderPtr _dynamicMeshShader;
         foundation::RenderShaderPtr _fullScreenQuadShader;
@@ -332,9 +356,11 @@ namespace voxel {
         _platform = platform;
         _rendering = rendering;
 
-        _shadowShader = rendering->createShader("scene_shadow_voxels", g_shadowShaderSrc,
+        _voxelMapShader = rendering->createShader("scene_shadow_voxel_map", g_voxelMapShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID},
+            },
+            { // instance
                 {"position", foundation::RenderShaderInputFormat::SHORT4},
             }
         );
@@ -469,10 +495,10 @@ namespace voxel {
     void SceneImpl::updateAndDraw(float dtSec) {
         for (const auto &modelIt : _staticModels) {
             const StaticVoxelModel *model = modelIt.second.get();
-
+            
             for (auto &lightIt : _lightSources) {
                 LightSource &light = *lightIt.second;
-
+                
                 if (isInLight(model->bbMin, model->bbMax, light.constants.positionRadius.xyz, light.constants.positionRadius.w)) {
                     light.receiverTmpBuffer.emplace_back(model);
                 }
@@ -484,7 +510,7 @@ namespace voxel {
         //for (auto &lightIt : _lightSources) {
         //    LightSource &light = *lightIt.second;
             //_rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
-        _rendering->applyState(_shadowShader, foundation::RenderPassCommonConfigs::CLEAR(light.voxelMap, foundation::BlendType::DISABLED, 0.0f, 0.0f, 0.0f, 0.0f));
+        _rendering->applyState(_voxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(light.voxelMap, foundation::BlendType::ADDITIVE, 0.0f, 0.0f, 0.0f, 0.0f));
         _rendering->applyShaderConstants(&light.constants);
 
 //        for (const auto &modelIt : _staticModels) {
@@ -495,7 +521,7 @@ namespace voxel {
             //_rendering->applyState(_shadowShader, foundation::RenderPassCommonConfigs::CLEAR(light.distanceMap, foundation::BlendType::DISABLED, 1.0f, 0.0f, 0.0f));
 //
         for (const auto &item : light.receiverTmpBuffer) {
-            _rendering->drawGeometry(item->positions, nullptr, item->positions->getCount(), 1, foundation::RenderTopology::POINTS);
+            _rendering->drawGeometry(nullptr, item->positions, 8, item->positions->getCount(), foundation::RenderTopology::POINTS);
         }
 
             //_rendering->endPass();
@@ -509,7 +535,7 @@ namespace voxel {
 
         for (const auto &modelIt : _staticModels) {
             const StaticVoxelModel *model = modelIt.second.get();
-            _rendering->drawGeometry(nullptr, model->voxels, 12, model->voxels->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
+            _rendering->drawGeometry(nullptr, model->voxels, 18, model->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
         }
 
 

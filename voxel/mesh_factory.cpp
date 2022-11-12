@@ -80,10 +80,10 @@ namespace voxel {
                                 
                                 // TODO: remove invisible voxels
                                 
-                                if (x > 0 && x < sizeX - 1 && y > 0 && y < sizeY - 1 && z > 0 && z < sizeZ - 1) {
+                                //if (x > 0 && x < sizeX - 1 && y > 0 && y < sizeY - 1 && z > 0 && z < sizeZ - 1) {
                                     voxelArray[arrayIndex(x, y, z)].isMesh = 1;
                                     meshVoxelCount++;
-                                }
+                                //}
                             }
                             
                             output.frames[i].positions = std::make_unique<VoxelPosition[]>(meshVoxelCount);
@@ -99,9 +99,9 @@ namespace voxel {
                                     VoxelPosition &targetPosition = output.frames[i].positions[k];
                                     VoxelInfo &targetVoxel = output.frames[i].voxels[k++];
                                     
-                                    targetVoxel.positionZ = std::int16_t(z) + offset[2] - 1;
-                                    targetVoxel.positionX = std::int16_t(x) + offset[0] - 1;
-                                    targetVoxel.positionY = std::int16_t(y) + offset[1] - 1;
+                                    targetVoxel.positionZ = std::int16_t(z) + offset[2];
+                                    targetVoxel.positionX = std::int16_t(x) + offset[0];
+                                    targetVoxel.positionY = std::int16_t(y) + offset[1];
                                     targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3);
                                     std::fill_n(targetVoxel.lightFaceNX, 24, 0xFF);
                                     
