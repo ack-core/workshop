@@ -53,8 +53,7 @@ namespace voxel {
                         std::uint8_t sizeY = *(std::uint8_t *)(data + 20);
                         
                         struct InterVoxel {
-                            std::uint8_t isExist : 1;
-                            std::uint8_t isMesh : 1;
+                            std::uint8_t isExist;
                         };
                         
                         std::unique_ptr<InterVoxel[]> voxelArray = std::make_unique<InterVoxel[]>(sizeX * sizeY * sizeZ);
@@ -69,90 +68,21 @@ namespace voxel {
                             std::size_t voxelCount = *(std::uint32_t *)(data + 12);
                             
                             data += 16;
-                            std::uint16_t meshVoxelCount = 0;
                             
-                            for (std::size_t c = 0; c < voxelCount; c++) {
-                                std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
-                                std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
-                                std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
-                                
-                                voxelArray[arrayIndex(x, y, z)].isExist = 1;
-                                
-                                // TODO: remove invisible voxels
-                                
-                                //if (x > 0 && x < sizeX - 1 && y > 0 && y < sizeY - 1 && z > 0 && z < sizeZ - 1) {
-                                    voxelArray[arrayIndex(x, y, z)].isMesh = 1;
-                                    meshVoxelCount++;
-                                //}
-                            }
-                            
-                            output.frames[i].positions = std::make_unique<VoxelPosition[]>(meshVoxelCount);
-                            output.frames[i].voxels = std::make_unique<VoxelInfo[]>(meshVoxelCount);
-                            output.frames[i].voxelCount = meshVoxelCount;
+                            output.frames[i].voxels = std::make_unique<VoxelInfo[]>(voxelCount);
+                            output.frames[i].voxelCount = voxelCount;
                             
                             for (std::size_t c = 0, k = 0; c < voxelCount; c++) {
                                 std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
                                 std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
                                 std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
                                 
-                                if (voxelArray[arrayIndex(x, y, z)].isMesh) {
-                                    VoxelPosition &targetPosition = output.frames[i].positions[k];
-                                    VoxelInfo &targetVoxel = output.frames[i].voxels[k++];
-                                    
-                                    targetVoxel.positionZ = std::int16_t(z) + offset[2];
-                                    targetVoxel.positionX = std::int16_t(x) + offset[0];
-                                    targetVoxel.positionY = std::int16_t(y) + offset[1];
-                                    targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3);
-                                    std::fill_n(targetVoxel.lightFaceNX, 24, 0xFF);
-                                    
-                                    targetPosition.positionX = targetVoxel.positionX;
-                                    targetPosition.positionY = targetVoxel.positionY;
-                                    targetPosition.positionZ = targetVoxel.positionZ;
-                                    
-                                    struct MultiplySign {
-                                        std::int8_t a, b;
-                                    };
-                                    
-                                    MultiplySign offsets[] = {{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}};
-                                    std::int8_t faceSign[] = {-1, 1};
-                                    
-                                    const std::uint8_t CORNER_EXIST = 0x80;
-                                    
-                                    for (std::size_t s = 0; s < 2; s++) {
-                                        std::uint8_t *lightFaceX = targetVoxel.lightFaceNX + s * 4;
-                                        std::uint8_t *lightFaceY = targetVoxel.lightFaceNY + s * 4;
-                                        std::uint8_t *lightFaceZ = targetVoxel.lightFaceNZ + s * 4;
-                                        
-                                        for (std::size_t f = 0; f < 4; f++) {
-                                            std::uint8_t config = 0;
-                                            
-                                            auto evalReducedLight = [](std::uint8_t config) {
-                                                std::uint8_t reducedLight = 0;
-                                                if ((config & 0xf) > 1) reducedLight = 200;
-                                                else if ((config & 0xf) && (config & CORNER_EXIST)) reducedLight = 160;
-                                                else if (config == 1 || config == CORNER_EXIST) reducedLight = 130;
-                                                return reducedLight;
-                                            };
-                                            
-                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) config++;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 0 * offsets[f].b)].isExist) config++;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + faceSign[s], z + 1 * offsets[f].b)].isExist) config |= CORNER_EXIST;
-                                            lightFaceY[f] -= evalReducedLight(config);
-                                            
-                                            config = 0;
-                                            if (voxelArray[arrayIndex(x + 0 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) config++;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 0 * offsets[f].b, z + faceSign[s])].isExist) config++;
-                                            if (voxelArray[arrayIndex(x + 1 * offsets[f].a, y + 1 * offsets[f].b, z + faceSign[s])].isExist) config |= CORNER_EXIST;
-                                            lightFaceZ[f] -= evalReducedLight(config);
-                                            
-                                            config = 0;
-                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 0 * offsets[f].b, z + 1 * offsets[f].a)].isExist) config++;
-                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 0 * offsets[f].a)].isExist) config++;
-                                            if (voxelArray[arrayIndex(x + faceSign[s], y + 1 * offsets[f].b, z + 1 * offsets[f].a)].isExist) config |= CORNER_EXIST;
-                                            lightFaceX[f] -= evalReducedLight(config);
-                                        }
-                                    }
-                                }
+                                VoxelInfo &targetVoxel = output.frames[i].voxels[k++];
+                                
+                                targetVoxel.positionZ = std::int16_t(z) + offset[2];
+                                targetVoxel.positionX = std::int16_t(x) + offset[0];
+                                targetVoxel.positionY = std::int16_t(y) + offset[1];
+                                targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3);
                             }
                             
                             //data += voxelCount * 4;

@@ -132,30 +132,6 @@ namespace foundation {
         
         ZBehaviorType zBehaviorType = ZBehaviorType::TEST_AND_WRITE;
         BlendType blendType = BlendType::DISABLED;
-        
-//        RenderPassConfig() {} // change nothing
-//        RenderPassConfig(float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
-//            zBehaviorType = ZType::ENABLED_CLEAR;
-//            clearColor = true;
-//            initialDepth = d;
-//        }
-//        RenderPassConfig(const RenderTexturePtr &rt, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
-//            target = rt;
-//            zBehaviorType = ZType::ENABLED_CLEAR;
-//            clearColor = true;
-//            initialDepth = d;
-//        }
-//        RenderPassConfig(const RenderTexturePtr &rt, BlendType bType, float r, float g, float b, float d = 0.0f) : initialColor{r, g, b, 1.0f} {
-//            target = rt;
-//            clearColor = true;
-//            blendType = bType;
-//            zBehaviorType = ZType::ENABLED_CLEAR;
-//            initialDepth = d;
-//        }
-//        RenderPassConfig(BlendType bType, ZType zType) {
-//            blendType = bType;
-//            zBehaviorType = ZType::ENABLED_CLEAR;
-//        }
     };
     
     struct RenderPassCommonConfigs {
@@ -174,6 +150,13 @@ namespace foundation {
                 rt, true, rt->hasDepthBuffer(),
                 {r, g, b, a}, d,
                 rt->hasDepthBuffer() ? ZBehaviorType::TEST_AND_WRITE : ZBehaviorType::DISABLED, blendType,
+            };
+        }
+        static const RenderPassConfig OVERLAY(BlendType blendType) {
+            return RenderPassConfig {
+                nullptr, false, false,
+                {0, 0, 0, 0}, 0.0f,
+                ZBehaviorType::DISABLED, blendType,
             };
         }
     };

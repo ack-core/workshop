@@ -179,7 +179,7 @@ int main(int argc, const char * argv[]) {
     auto scene = voxel::Scene::instance(meshFactory, platform, rendering, "palette.png");
 
     scene->addStaticModel("1.vox", {0, 0, 0});
-    scene->addLightSource({10.0, 0, -5}, 40.0f, math::color(1.0, 1.0, 1.0, 1.0));
+    scene->addLightSource({3.0, 4.0, 3.0}, 10.0f, math::color(1.0, 1.0, 1.0, 1.0));
     
     gears::OrbitCameraController cameraController (platform, camera);
     cameraController.setEnabled(true);

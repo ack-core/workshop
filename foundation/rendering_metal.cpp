@@ -501,6 +501,7 @@ namespace foundation {
             "#define _cross(a, b) cross(a, b)\n"
             "#define _len(a) length(a)\n"
             "#define _pow(a, b) pow(a, b)\n"
+            "#define _fract(a) fract(a)\n"
             "#define _norm(a) normalize(a)\n"
             "#define _lerp(a, b, k) mix(a, b, k)\n"
             "#define _step(k, a) step(k, a)\n"
@@ -730,11 +731,8 @@ namespace foundation {
                 }
                 
                 nativeShader += "    constant _FrameData &framedata [[buffer(1)]])\n{\n    ";
-                //nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
+                nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
                 nativeShader += "float4 output_color[4] = {};\n";
-                //nativeShader += "float4 output_color_1 = float4(0.0, 0.0, 0.0, 0.0);\n    ";
-                //nativeShader += "float4 output_color_2 = float4(0.0, 0.0, 0.0, 0.0);\n    ";
-                //nativeShader += "float4 output_color_3 = float4(0.0, 0.0, 0.0, 0.0);\n";
                 
                 std::string codeBlock;
 
