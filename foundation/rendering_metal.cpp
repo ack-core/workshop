@@ -502,6 +502,7 @@ namespace foundation {
             "#define _len(a) length(a)\n"
             "#define _pow(a, b) pow(a, b)\n"
             "#define _fract(a) fract(a)\n"
+            "#define _floor(a) floor(a)\n"
             "#define _norm(a) normalize(a)\n"
             "#define _lerp(a, b, k) mix(a, b, k)\n"
             "#define _step(k, a) step(k, a)\n"
@@ -1160,7 +1161,7 @@ namespace foundation {
     
     void MetalRendering::applyTextures(const RenderTexturePtr *textures, std::uint32_t count) {
         if (_currentCommandEncoder && _currentShader) {
-            if (count < MAX_TEXTURES) {
+            if (count <= MAX_TEXTURES) {
                 NSRange range {0, count};
                 id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
                 
