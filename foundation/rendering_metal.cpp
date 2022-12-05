@@ -503,6 +503,7 @@ namespace foundation {
             "#define _pow(a, b) pow(a, b)\n"
             "#define _fract(a) fract(a)\n"
             "#define _floor(a) floor(a)\n"
+            "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
             "#define _norm(a) normalize(a)\n"
             "#define _lerp(a, b, k) mix(a, b, k)\n"
             "#define _step(k, a) step(k, a)\n"

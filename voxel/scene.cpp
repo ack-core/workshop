@@ -36,7 +36,7 @@ namespace {
             output_discard = _step(_dot(cubeCenter, cubeCenter), const_positionRadius.w * const_positionRadius.w);
         }
         fssrc {
-            output_color[0] = float4(0.75, 0.0, 0.0, input_discard);
+            output_color[0] = float4(0.125, 0.0, 0.0, input_discard);
         }
     )";
     
@@ -176,6 +176,8 @@ namespace {
                 [0.0, 1.0, 0.0]
                 [0.0, 1.0, 0.0]
                 [0.0, 0.0, 1.0]
+                
+            koeffs[4] : float1 = [0.00][0.80][0.90][0.96]
         }
         const {
             positionRadius : float4
@@ -211,20 +213,28 @@ namespace {
             float3 dirB = fixed_bnm[faceIndex];
             float3 dirT = fixed_tgt[faceIndex];
             float3 faceNormal = fixed_axis[faceIndex];
+            float4 vox;
             
-            float koeff_0 = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal)).x;
-            float koeff_1 = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirB)).x;
-            float koeff_2 = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirT)).x;
-            float koeff_3 = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirB + dirT)).x;
+            vox.x = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal)).x;
+            vox.y = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirB)).x;
+            vox.z = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirT)).x;
+            vox.w = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirB + dirT)).x;
 
-            float2 f = gbuffer1.zw; //_smooth(0.0, 1.0, gbuffer1.zw);
-            float2 smoothCoord = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+            int4 vi = int4(3.0 * _clamp(2.667 * vox));
             
-            float m0 = _lerp(koeff_0, koeff_1, smoothCoord.x);
-            float m1 = _lerp(koeff_2, koeff_3, smoothCoord.x);
+            vox.x = fixed_koeffs[vi.x];
+            vox.y = fixed_koeffs[vi.y];
+            vox.z = fixed_koeffs[vi.z];
+            vox.w = fixed_koeffs[vi.w];
+            
+            float2 smoothCoord = gbuffer1.zw;
+            
+            float m0 = _lerp(vox.x, vox.y, smoothCoord.x);
+            float m1 = _lerp(vox.z, vox.w, smoothCoord.x);
             float k = _lerp(m0, m1, smoothCoord.y);
 
-            //output_color[0] = float4(fixed_axis[faceIndex] * 0.5 + 0.5, 1.0);
+            k = 0.1 * (1.0 - _pow(1.0 - _pow(k, 2.6), 2.0));
+
             output_color[0] = float4(k, k, k, 1.0);
         }
     )";
@@ -343,7 +353,6 @@ namespace voxel {
         });
         
         _gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 4, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
-        //_gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA32F, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         
         std::unique_ptr<std::uint8_t[]> paletteData;
         std::size_t paletteSize;
@@ -461,7 +470,7 @@ namespace voxel {
         
         // per-light voxel cube
         for (auto &lightIt : _lightSources) {
-            _rendering->applyState(_voxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(lightIt.second->voxelMap, foundation::BlendType::MAXVALUE, 0.0f, 0.0f, 0.0f, 0.0f));
+            _rendering->applyState(_voxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(lightIt.second->voxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
             _rendering->applyShaderConstants(&lightIt.second->constants);
             
             for (const auto &item : lightIt.second->receiverTmpBuffer) {
