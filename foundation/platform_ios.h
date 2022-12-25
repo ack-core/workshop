@@ -7,7 +7,7 @@ namespace foundation {
         IOSPlatform();
         ~IOSPlatform() override;
 
-        std::vector<FileEntry> formFileList(const char *dirPath) override;
+        std::vector<PlatformFileEntry> formFileList(const char *dirPath) override;
         bool loadFile(const char *filePath, std::unique_ptr<unsigned char[]> &data, std::size_t &size) override;
 
         float getScreenWidth() const override;

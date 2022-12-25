@@ -208,12 +208,12 @@ namespace foundation {
     
     }
 
-    std::vector<FileEntry> IOSPlatform::formFileList(const char *dirPath) {
+    std::vector<PlatformFileEntry> IOSPlatform::formFileList(const char *dirPath) {
         std::string fullPath = _executableDirectoryPath + "/" + dirPath;
-        std::vector<FileEntry> result;
+        std::vector<PlatformFileEntry> result;
 
         for (auto &entry : std::filesystem::directory_iterator(fullPath)) {
-            result.emplace_back(FileEntry{ entry.path().generic_u8string(), entry.is_directory()});
+            result.emplace_back(PlatformFileEntry{ entry.path().generic_u8string(), entry.is_directory()});
         }
 
         return result;
@@ -296,7 +296,7 @@ namespace foundation {
 
         va_list args;
         va_start(args, fmt);
-        vsprintf(g_buffer, fmt, args);
+        vsnprintf(g_buffer, BUFFER_SIZE, fmt, args);
         va_end(args);
 
         printf("%s\n", g_buffer);
@@ -307,7 +307,7 @@ namespace foundation {
 
         va_list args;
         va_start(args, fmt);
-        vsprintf(g_buffer, fmt, args);
+        vsnprintf(g_buffer, BUFFER_SIZE, fmt, args);
         va_end(args);
 
         printf("%s\n", g_buffer);

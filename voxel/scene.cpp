@@ -36,7 +36,7 @@ namespace {
             output_discard = _step(_dot(cubeCenter, cubeCenter), const_positionRadius.w * const_positionRadius.w);
         }
         fssrc {
-            output_color[0] = float4(0.125, 0.0, 0.0, input_discard);
+            output_color[0] = float4(0.125 * input_discard, 0.0, 0.0, 0.0);
         }
     )";
     
@@ -93,7 +93,7 @@ namespace {
             
             output_corner = cubeCenter - 0.5 * (dirB + dirT - faceNormal);
             output_uvf.z = 0.16667 * (float(faceID) + (toCamSign.zxy[faceID] * 1.5 + 1.5) + 1.0);
-            output_position = _transform(absVertexPos, frame_viewProjMatrix);
+            output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
             float3 scaledCorner = (input_corner.xyz + 1024.0) / 2048.0f;
@@ -148,6 +148,7 @@ namespace {
         }
     )";
     
+    /*
     static const char *g_lightBillboardShaderSrc = R"(
         fixed {
             axis[7] : float3 =
@@ -177,7 +178,7 @@ namespace {
                 [0.0, 1.0, 0.0]
                 [0.0, 0.0, 1.0]
                 
-            koeffs[4] : float1 = [0.00][0.80][0.90][0.96]
+            koeffs[4] : float1 = [0.00][0.70][0.85][0.96]
         }
         const {
             positionRadius : float4
@@ -245,7 +246,7 @@ namespace {
         }
         vssrc {
             float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-            output_position = float4(vertexCoord.xy * float2(0.76762, -(1.365)) + float2(-0.96, 0.96), 0.5, 1);
+            output_position = float4(vertexCoord.xy * float2(0.76762, -(1.365)) + float2(-0.96, 0.96), 0.7, 1);
             output_texcoord = vertexCoord;
         }
         fssrc {
@@ -255,10 +256,10 @@ namespace {
             //float4 surface = _tex2nearest(0, float2(colorOcc.z, 0));
             
             float4 s0 = _tex2nearest(0, input_texcoord);
-            float4 s1 = _tex2nearest(1, input_texcoord);
             output_color[0] = s0;//_lerp(s0, s1, _step(0.8, input_texcoord.y));
         }
     )";
+    */
 
     voxel::SceneObjectToken g_lastToken = 0x100;
     
@@ -275,29 +276,42 @@ namespace voxel {
         voxel::Mesh source;
         foundation::RenderDataPtr voxels;
     };
-    
-    struct LightSource {
-        std::vector<const StaticVoxelModel *> receiverTmpBuffer;
-        foundation::RenderTargetPtr voxelMap;
-
-        struct ShaderConst {
-            math::vector4f positionRadius;
-            math::vector4f bounds;
-            math::color rgba;
-        }
-        constants;
+    struct DynamicVoxelModel {
+        math::vector3f position;
+        float rotation;
+        voxel::Mesh source;
+        foundation::RenderDataPtr voxels;
     };
+
+//    struct LightSource {
+//        std::vector<const StaticVoxelModel *> receiverTmpBuffer;
+//        foundation::RenderTargetPtr voxelMap;
+//        foundation::RenderTexturePtr tempMap;
+//
+//        struct ShaderConst {
+//            math::vector4f positionRadius;
+//            math::vector4f bounds;
+//            math::color rgba;
+//        }
+//        constants;
+//    };
     
     class SceneImpl : public Scene {
     public:
         SceneImpl(const voxel::MeshFactoryPtr &factory, const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const char *palette);
         ~SceneImpl() override;
         
+        const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const override;
+        const std::shared_ptr<foundation::RenderingInterface> &getRenderingInterface() const override;
+
+        void setObservingPoint(const math::vector3f &position) override;
+        void setSun(const math::vector3f &direction, const math::color &rgba) override;
+
         SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) override;
-        SceneObjectToken addLightSource(const math::vector3f &position, float radius, const math::color &rgba) override;
+        SceneObjectToken addDynamicModel(const char *voxPath, const math::vector3f &position, float rotation) override;
         
         void removeStaticModel(SceneObjectToken token) override;
-        void removeLightSource(SceneObjectToken token) override;
+        void removeDynamicModel(SceneObjectToken token) override;
         
         void updateAndDraw(float dtSec) override;
         
@@ -307,14 +321,17 @@ namespace voxel {
         foundation::RenderingInterfacePtr _rendering;
 
         foundation::RenderShaderPtr _voxelMapShader;
+        //foundation::ComputeShaderPtr _voxelMapShadow;
         foundation::RenderShaderPtr _staticMeshGBuferShader;
         foundation::RenderShaderPtr _fullScreenBaseShader;
-        foundation::RenderShaderPtr _lightBillboardShader;
+        //foundation::RenderShaderPtr _lightBillboardShader;
 
-        foundation::RenderShaderPtr _tmpScreenQuadShader;
+        //foundation::RenderShaderPtr _tmpScreenQuadShader;
         
         std::unordered_map<SceneObjectToken, std::unique_ptr<StaticVoxelModel>> _staticModels;
-        std::unordered_map<SceneObjectToken, std::unique_ptr<LightSource>> _lightSources;
+        std::unordered_map<SceneObjectToken, std::unique_ptr<DynamicVoxelModel>> _dynamicModels;
+
+        //std::unordered_map<SceneObjectToken, std::unique_ptr<LightSource>> _lightSources;
         
         foundation::RenderTexturePtr _palette;
         foundation::RenderTargetPtr _gbuffer;
@@ -325,7 +342,7 @@ namespace voxel {
         _platform = platform;
         _rendering = rendering;
 
-        _voxelMapShader = rendering->createShader("scene_shadow_voxel_map", g_voxelMapShaderSrc,
+        _voxelMapShader = rendering->createShader("scene_voxel_map", g_voxelMapShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID},
             },
@@ -333,6 +350,7 @@ namespace voxel {
                 {"position", foundation::RenderShaderInputFormat::SHORT4},
             }
         );
+        //_voxelMapShadow = rendering->createComputeShader("scene_voxel_shadow", g_voxelMapShadowSrc);
         _staticMeshGBuferShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshGBufferShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID}
@@ -344,13 +362,14 @@ namespace voxel {
         _fullScreenBaseShader = _rendering->createShader("scene_full_screen_base", g_fullScreenBaseShaderSrc, {
             {"ID", foundation::RenderShaderInputFormat::ID}
         });
-        _lightBillboardShader = _rendering->createShader("scene_light_billboard", g_lightBillboardShaderSrc, {
-            {"ID", foundation::RenderShaderInputFormat::ID}
-        });
-        
-        _tmpScreenQuadShader = _rendering->createShader("scene_screen_quad", g_tmpScreenQuadShaderSrc, {
-            {"ID", foundation::RenderShaderInputFormat::ID}
-        });
+//        _lightBillboardShader = _rendering->createShader("scene_light_billboard", g_lightBillboardShaderSrc, {
+//            {"ID", foundation::RenderShaderInputFormat::ID}
+//        });
+//
+//
+//        _tmpScreenQuadShader = _rendering->createShader("scene_screen_quad", g_tmpScreenQuadShaderSrc, {
+//            {"ID", foundation::RenderShaderInputFormat::ID}
+//        });
         
         _gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 4, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         
@@ -383,6 +402,22 @@ namespace voxel {
     
     std::shared_ptr<Scene> Scene::instance(const voxel::MeshFactoryPtr &factory, const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const char *palette) {
         return std::make_shared<SceneImpl>(factory, platform, rendering, palette);
+    }
+    
+    const std::shared_ptr<foundation::PlatformInterface> &SceneImpl::getPlatformInterface() const {
+    
+    }
+    
+    const std::shared_ptr<foundation::RenderingInterface> &SceneImpl::getRenderingInterface() const {
+    
+    }
+    
+    void SceneImpl::setObservingPoint(const math::vector3f &position) {
+    
+    }
+    
+    void SceneImpl::setSun(const math::vector3f &direction, const math::color &rgba) {
+    
     }
     
     SceneObjectToken SceneImpl::addStaticModel(const char *voxPath, const int16_t(&offset)[3]) {
@@ -426,60 +461,70 @@ namespace voxel {
         return INVALID_TOKEN;
     }
     
-    SceneObjectToken SceneImpl::addLightSource(const math::vector3f &position, float radius, const math::color &rgba) {
-        std::unique_ptr<LightSource> lightSource = std::make_unique<LightSource>();
-        SceneObjectToken token = g_lastToken++ & std::uint64_t(0x7FFFFFFF);
-        
-        // Possible sets:
-        // 64x64x64 cube is 512x512 texture for the light of max radius = 31
-        // 256x256x256 cube is 4096x4096 texture for the light of max radius = 127
-        
-        lightSource->voxelMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::R8UN, 1, 512, 512, false);
-        lightSource->constants.positionRadius = math::vector4f(position, radius);
-        lightSource->constants.bounds = math::vector4f(256.0f, 32.0f, 8.0f, 0.0f);
-        lightSource->constants.rgba = rgba;
-        
-        if (lightSource->voxelMap) {
-            _lightSources.emplace(token, std::move(lightSource));
-        }
-        
+    SceneObjectToken SceneImpl::addDynamicModel(const char *voxPath, const math::vector3f &position, float rotation) {
         return INVALID_TOKEN;
     }
+    
+//    SceneObjectToken SceneImpl::addLightSource(const math::vector3f &position, float radius, const math::color &rgba) {
+//        std::unique_ptr<LightSource> lightSource = std::make_unique<LightSource>();
+//        SceneObjectToken token = g_lastToken++ & std::uint64_t(0x7FFFFFFF);
+//
+//        // Possible sets:
+//        // 64x64x64 cube is 512x512 texture for the light of max radius = 31
+//        // 256x256x256 cube is 4096x4096 texture for the light of max radius = 127
+//
+//        lightSource->voxelMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::R32F, 1, 512, 512, false);
+//        lightSource->tempMap = _rendering->createTexture(foundation::RenderTextureFormat::R32F, 512, 512, {});
+//        lightSource->constants.positionRadius = math::vector4f(position, radius);
+//        lightSource->constants.bounds = math::vector4f(256.0f, 32.0f, 8.0f, 0.0f);
+//        lightSource->constants.rgba = rgba;
+//
+//        if (lightSource->voxelMap) {
+//            _lightSources.emplace(token, std::move(lightSource));
+//        }
+//
+//        return INVALID_TOKEN;
+//    }
     
     void SceneImpl::removeStaticModel(SceneObjectToken token) {
         _staticModels.erase(token);
     }
     
-    void SceneImpl::removeLightSource(SceneObjectToken token) {
-        _lightSources.erase(token);
+    void SceneImpl::removeDynamicModel(SceneObjectToken token) {
+
     }
     
     void SceneImpl::updateAndDraw(float dtSec) {
         foundation::RenderTexturePtr textures[4] = {nullptr};
 
         // models among the lights
-        for (const auto &modelIt : _staticModels) {
-            const StaticVoxelModel *model = modelIt.second.get();
-            
-            for (auto &lightIt : _lightSources) {
-                if (isInLight(model->bbMin, model->bbMax, lightIt.second->constants.positionRadius.xyz, lightIt.second->constants.positionRadius.w)) {
-                    lightIt.second->receiverTmpBuffer.emplace_back(model);
-                }
-            }
-        }
+//        for (const auto &modelIt : _staticModels) {
+//            const StaticVoxelModel *model = modelIt.second.get();
+//
+//            for (auto &lightIt : _lightSources) {
+//                if (isInLight(model->bbMin, model->bbMax, lightIt.second->constants.positionRadius.xyz, lightIt.second->constants.positionRadius.w)) {
+//                    lightIt.second->receiverTmpBuffer.emplace_back(model);
+//                }
+//            }
+//        }
         
         // per-light voxel cube
-        for (auto &lightIt : _lightSources) {
-            _rendering->applyState(_voxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(lightIt.second->voxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
-            _rendering->applyShaderConstants(&lightIt.second->constants);
-            
-            for (const auto &item : lightIt.second->receiverTmpBuffer) {
-                _rendering->drawGeometry(nullptr, item->voxels, 8, item->voxels->getCount(), foundation::RenderTopology::POINTS);
-            }
+//        for (auto &lightIt : _lightSources) {
+//            _rendering->applyState(_voxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(lightIt.second->voxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
+//            _rendering->applyShaderConstants(&lightIt.second->constants);
+//
+//            for (const auto &item : lightIt.second->receiverTmpBuffer) {
+//                _rendering->drawGeometry(nullptr, item->voxels, 8, item->voxels->getCount(), foundation::RenderTopology::POINTS);
+//            }
+//
+//            lightIt.second->receiverTmpBuffer.clear();
+//        }
 
-            lightIt.second->receiverTmpBuffer.clear();
-        }
-        
+        // per-light voxel shadow
+//        for (auto &lightIt : _lightSources) {
+//            _rendering->compute(_voxelMapShadow, lightIt.second->voxelMap->getTexture(0), lightIt.second->tempMap, foundation::Size{512, 512});
+//        }
+
         // gbuffer
         _rendering->applyState(_staticMeshGBuferShader, foundation::RenderPassCommonConfigs::CLEAR(_gbuffer, foundation::BlendType::DISABLED, 0.0f, 0.0f, 0.0f));
         for (const auto &modelIt : _staticModels) {
@@ -498,14 +543,18 @@ namespace voxel {
         _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
 
         // per-light billboard
-        _rendering->applyState(_lightBillboardShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::ADDITIVE));
-        for (auto &lightIt : _lightSources) {
-            textures[3] = lightIt.second->voxelMap->getTexture(0);
-            _rendering->applyTextures(textures, 4);
-            _rendering->applyShaderConstants(&lightIt.second->constants);
-            _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
-        }
-        
+//        _rendering->applyState(_lightBillboardShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::ADDITIVE));
+//        for (auto &lightIt : _lightSources) {
+//            textures[3] = lightIt.second->voxelMap->getTexture(0);
+//            _rendering->applyTextures(textures, 4);
+//            _rendering->applyShaderConstants(&lightIt.second->constants);
+//            _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
+//        }
+//
+//        textures[0] = _lightSources.begin()->second->tempMap;
+//        _rendering->applyState(_tmpScreenQuadShader, foundation::RenderPassCommonConfigs::DEFAULT());
+//        _rendering->applyTextures(textures, 1);
+//        _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
     }
 }
 

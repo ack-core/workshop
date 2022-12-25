@@ -30,7 +30,6 @@ namespace voxel {
         // Load voxels from file and fill 'output' Mesh with loaded data
         // @voxPath - absolute path to '.vox' file
         // @offset  - values to be added to voxel position
-        // Notice: voxels on borders arent a part of the mesh. They are needed to correct lighting
         //
         virtual bool createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) = 0;
         

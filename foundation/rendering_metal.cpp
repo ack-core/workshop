@@ -68,7 +68,7 @@ namespace {
         return result;
     }
     
-    std::string generatePipelineStateName(const foundation::MetalShader &shader, const foundation::RenderPassConfig &passConfig) {
+    std::string generateRenderPipelineStateName(const foundation::MetalShader &shader, const foundation::RenderPassConfig &passConfig) {
         std::string result = "r0_b0_" + shader.getName();
         result[1] = passConfig.target ? '0' + int(passConfig.target->getFormat()) : 'X';
         result[4] += int(passConfig.blendType);
@@ -173,6 +173,24 @@ namespace foundation {
     }
     
     const std::string &MetalShader::getName() const {
+        return _name;
+    }
+}
+
+namespace foundation {
+    MetalComputeShader::MetalComputeShader(const std::string &name, id<MTLLibrary> library)
+        : _name(name)
+        , _library(library)
+    {}
+    MetalComputeShader::~MetalComputeShader() {
+        _library = nil;
+    }
+    
+    id<MTLFunction> MetalComputeShader::getShader() const {
+        return [_library newFunctionWithName:@"main_compute"];
+    }
+    
+    const std::string &MetalComputeShader::getName() const {
         return _name;
     }
 }
@@ -312,14 +330,51 @@ namespace foundation {
 
     MetalRendering::~MetalRendering() {}
 
-    // TODO: refine
-    void MetalRendering::updateFrameConstants(const float(&VP)[16], const float(&invVP)[16], const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
-        ::memcpy(_frameConstants.vewProjMatrix, VP, 16 * sizeof(float));
-        ::memcpy(_frameConstants.invVewProjMatrix, invVP, 16 * sizeof(float));
+    const std::shared_ptr<PlatformInterface> &MetalRendering::getPlatformInterface() const {
+        return _platform;
+    }
+    
+    void MetalRendering::updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
+        //::memcpy(_frameConstants.vewProjMatrix, VP, 16 * sizeof(float));
         ::memcpy(_frameConstants.viewMatrix, view, 16 * sizeof(float));
         ::memcpy(_frameConstants.projMatrix, proj, 16 * sizeof(float));
         ::memcpy(_frameConstants.cameraPosition, camPos, 3 * sizeof(float));
         ::memcpy(_frameConstants.cameraDirection, camDir, 3 * sizeof(float));
+    }
+    
+    namespace shaderUtils {
+        bool formCodeBlock(const std::string &indent, std::istringstream &stream, std::string &output) {
+            stream >> std::ws;
+            int  braceCounter = 1;
+            char prev = '\n', next;
+
+            while (stream && ((next = stream.get()) != '}' || --braceCounter > 0)) {
+                if (prev == '\n') output += indent;
+                if (next == '{') braceCounter++;
+                output += next;
+                if (next == '\n')  stream >> std::ws;
+                prev = next;
+            }
+            
+            return braceCounter == 0;
+        };
+        
+        std::string makeLines(const std::string &src) {
+            std::string result;
+            std::string::const_iterator left = std::begin(src);
+            std::string::const_iterator right;
+            int counter = 0;
+
+            while ((right = std::find(left, std::end(src), '\n')) != std::end(src)) {
+                right++;
+                char line[64];
+                std::snprintf(line, 64, "/* %3d */  ", ++counter);
+                result += std::string(line) + std::string(left, right);
+                left = right;
+            }
+
+            return result;
+        };
     }
 
     RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const RenderShaderInputDesc &vertex, const RenderShaderInputDesc &instance) {
@@ -435,22 +490,6 @@ namespace foundation {
             return totalLength;
         };
         
-        auto formCodeBlock = [&shaderGetTypeSize, &indent](std::istringstream &stream, std::string &output) {
-            stream >> std::ws;
-            int  braceCounter = 1;
-            char prev = '\n', next;
-
-            while (stream && ((next = stream.get()) != '}' || --braceCounter > 0)) {
-                if (prev == '\n') output += indent;
-                if (next == '{') braceCounter++;
-                output += next;
-                if (next == '\n')  stream >> std::ws;
-                prev = next;
-            }
-            
-            return braceCounter == 0;
-        };
-        
         auto replacePattern = [](std::string &target, const std::string &pattern, const std::string &replacement, const std::string &prevChExc, const std::string &exception = {}) {
             std::size_t start_pos = 0;
             while((start_pos = target.find(pattern, start_pos)) != std::string::npos) {
@@ -464,23 +503,6 @@ namespace foundation {
                 
                 start_pos++;
             }
-        };
-
-        auto makeLines = [](const std::string &src) {
-            std::string result;
-            std::string::const_iterator left = std::begin(src);
-            std::string::const_iterator right;
-            int counter = 0;
-
-            while ((right = std::find(left, std::end(src), '\n')) != std::end(src)) {
-                right++;
-                char line[64];
-                std::sprintf(line, "/* %3d */  ", ++counter);
-                result += std::string(line) + std::string(left, right);
-                left = right;
-            }
-
-            return result;
         };
 
         MTLVertexDescriptor *vdesc = [MTLVertexDescriptor vertexDescriptor];
@@ -512,14 +534,13 @@ namespace foundation {
             "#define _max(a, b) max(a, b)\n"
             "#define _tex2nearest(i, a) _texture##i.sample(_nearestSampler, a)\n"
             "#define _tex2linear(i, a) _texture##i.sample(_linearSampler, a)\n"
-            "#define _tex2raw(i, a) _texture##i.read(ushort2(a.x * (_texture##i.get_width() - 1), a.y * (_texture##i.get_height() - 1)), 0)\n"
             "\n"
             "const sampler _nearestSampler(mag_filter::nearest, min_filter::nearest);\n"
             "const sampler _linearSampler(mag_filter::linear, min_filter::linear);\n"
             "\n"
             "struct _FrameData {\n"
-            "    float4x4 viewProjMatrix;\n"
-            "    float4x4 invViewProjMatrix;\n"
+            //"    float4x4 viewProjMatrix;\n"
+            //"    float4x4 invViewProjMatrix;\n"
             "    float4x4 viewMatrix;\n"
             "    float4x4 projMatrix;\n"
             "    float4 cameraPosition;\n"
@@ -580,7 +601,7 @@ namespace foundation {
                 if (input >> funcName >> braced(funcSignature, '(', ')') >> expect<'-', '>'> >> funcReturnType >> expect<'{'>) {
                     std::string codeBlock;
                     
-                    if (formCodeBlock(input, codeBlock)) {
+                    if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
                         nativeShader += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
                         nativeShader += codeBlock;
                         nativeShader += "}\n";
@@ -610,7 +631,7 @@ namespace foundation {
                     std::uint32_t size;
                     MTLVertexFormat nativeFormat;
                 }
-                formatTable[] = { // index is RenderingShaderInputFormat value
+                formatTable[] = { // index is RenderShaderInputFormat value
                     {"uint",   0,  MTLVertexFormatInvalid},
                     {"float2", 4,  MTLVertexFormatHalf2},
                     {"float4", 8,  MTLVertexFormatHalf4},
@@ -628,10 +649,10 @@ namespace foundation {
                     {"int2",   8,  MTLVertexFormatInt2},
                     {"int3",   12, MTLVertexFormatInt3},
                     {"int4",   16, MTLVertexFormatInt4},
-                    {"uint1",   4,  MTLVertexFormatUInt},
-                    {"uint2",   8,  MTLVertexFormatUInt2},
-                    {"uint3",   12, MTLVertexFormatUInt3},
-                    {"uint4",   16, MTLVertexFormatUInt4}
+                    {"uint1",  4,  MTLVertexFormatUInt},
+                    {"uint2",  8,  MTLVertexFormatUInt2},
+                    {"uint3",  12, MTLVertexFormatUInt3},
+                    {"uint4",  16, MTLVertexFormatUInt4}
                 };
 
                 std::string vertexIDName;
@@ -691,7 +712,7 @@ namespace foundation {
 
                 std::string codeBlock;
                 
-                if (formCodeBlock(input, codeBlock) == false) {
+                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'vssrc' block\n", name);
                     completed = false;
                     break;
@@ -738,7 +759,7 @@ namespace foundation {
                 
                 std::string codeBlock;
 
-                if (formCodeBlock(input, codeBlock) == false) {
+                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fssrc' block\n", name);
                     completed = false;
                     break;
@@ -756,8 +777,8 @@ namespace foundation {
             _platform->logError("[MetalRendering::createShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
         }
         
-        nativeShader = makeLines(nativeShader);
-        printf("----------\n%s\n------------\n", nativeShader.data());
+        nativeShader = shaderUtils::makeLines(nativeShader);
+        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -784,6 +805,104 @@ namespace foundation {
             _platform->logError("[MetalRendering::createShader] shader '%s' missing 'fssrc' block\n", name);
         }
 
+        return result;
+    }
+    
+    ComputeShaderPtr MetalRendering::createComputeShader(const char *name, const char *shadersrc) {
+        std::shared_ptr<ComputeShader> result;
+        std::istringstream input(shadersrc);
+        const std::string indent = "    ";
+        
+        if (_shaderNames.find(name) == _shaderNames.end()) {
+            _shaderNames.emplace(name);
+        }
+        else {
+            _platform->logError("[MetalRendering::createComputeShader] shader name '%s' already used\n", name);
+        }
+        
+        std::string nativeShader =
+            "#include <metal_stdlib>\n"
+            "using namespace metal;\n"
+            "\n"
+            "#define _sign(a) (2.0 * step(0.0, a) - 1.0)\n"
+            "#define _sin(a) sin(a)\n"
+            "#define _cos(a) cos(a)\n"
+            "#define _abs(a) abs(a)\n"
+            "#define _sat(a) saturate(a)\n"
+            "#define _frac(a) fract(a)\n"
+            "#define _asFloat(a) as_type<float>(a)\n"
+            "#define _asUint(a) as_type<uint>(a)\n"
+            "#define _transform(a, b) (b * a)\n"
+            "#define _dot(a, b) dot(a, b)\n"
+            "#define _cross(a, b) cross(a, b)\n"
+            "#define _len(a) length(a)\n"
+            "#define _pow(a, b) pow(a, b)\n"
+            "#define _fract(a) fract(a)\n"
+            "#define _floor(a) floor(a)\n"
+            "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
+            "#define _norm(a) normalize(a)\n"
+            "#define _lerp(a, b, k) mix(a, b, k)\n"
+            "#define _step(k, a) step(k, a)\n"
+            "#define _smooth(a, b, k) smoothstep(a, b, k)\n"
+            "#define _min(a, b) min(a, b)\n"
+            "#define _max(a, b) max(a, b)\n"
+            "#define _read(i, c) _texture0.read(c)\n"
+            "#define _write(i, c, a) _texture##i.write(a, c)\n"
+            "\n";
+
+        std::string blockName;
+        bool entryBlockDone = false;
+        
+        while (input >> blockName) {
+            if (entryBlockDone == false && blockName == "entry" && (input >> expect<'{'>)) {
+                nativeShader +=
+                    "kernel void main_compute(\n    "
+                    "texture2d<float, access::read_write> _texture0 [[texture(0)]],\n    "
+                    "texture2d<float, access::read_write> _texture1 [[texture(1)]],\n    "
+                    "uint3 thread_index [[thread_position_in_grid]])\n{\n"
+                    "";
+                
+                std::string codeBlock;
+
+                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
+                    _platform->logError("[MetalRendering::createComputeShader] shader '%s' has uncompleted 'entry' block\n", name);
+                    break;
+                }
+                
+                nativeShader += codeBlock;
+                nativeShader += "}\n";
+                entryBlockDone = true;
+                continue;
+            }
+            
+            _platform->logError("[MetalRendering::createComputeShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
+        }
+        
+        nativeShader = shaderUtils::makeLines(nativeShader);
+        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
+        
+        if (entryBlockDone) {
+            @autoreleasepool {
+                NSError *nsError = nil;
+                MTLCompileOptions* compileOptions = [MTLCompileOptions new];
+                compileOptions.languageVersion = MTLLanguageVersion2_0;
+                compileOptions.fastMathEnabled = true;
+                
+                id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
+                
+                if (library) {
+                    result = std::make_shared<MetalComputeShader>(name, library);
+                }
+                else {
+                    const char *errorDesc = [[nsError localizedDescription] UTF8String];
+                    _platform->logError("[MetalRendering::createComputeShader] '%s' generated code:\n--------------------\n%s\n--------------------\n%s\n", name, nativeShader.data(), errorDesc);
+                }
+            }
+        }
+        else {
+            _platform->logError("[MetalRendering::createComputeShader] shader '%s' missing 'entry' block\n", name);
+        }
+        
         return result;
     }
     
@@ -829,12 +948,14 @@ namespace foundation {
         };
         
         @autoreleasepool {
+            size_t mipmapLevelCount = std::max(size_t(1), mipsData.size());
+            
             MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
             desc.pixelFormat = nativeTextureFormat[int(format)];
             desc.width = w;
             desc.height = h;
-            desc.mipmapLevelCount = mipsData.size();
-            desc.usage = MTLTextureUsageShaderRead;
+            desc.mipmapLevelCount = mipmapLevelCount;
+            desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
             id<MTLTexture> texture = [_device newTextureWithDescriptor:desc];
             
             unsigned counter = 0;
@@ -843,7 +964,7 @@ namespace foundation {
                 [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, w)];
             }
             
-            return std::make_shared<MetalTexture>(texture, format, w, h, mipsData.size());
+            return std::make_shared<MetalTexture>(texture, format, w, h, mipmapLevelCount);
         }
     }
     
@@ -856,7 +977,7 @@ namespace foundation {
             desc.width = w;
             desc.height = h;
             desc.mipmapLevelCount = 1;
-            desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+            desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget;
 
             for (unsigned i = 0; i < count; i++) {
                 targets[i] = [_device newTextureWithDescriptor:desc];
@@ -891,9 +1012,9 @@ namespace foundation {
     }
     
     void MetalRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
-        if (_currentCommandEncoder) {
-            [_currentCommandEncoder endEncoding];
-            _currentCommandEncoder = nil;
+        if (_currentRenderCommandEncoder) {
+            [_currentRenderCommandEncoder endEncoding];
+            _currentRenderCommandEncoder = nil;
             _currentShader = nullptr;
         }
         
@@ -937,10 +1058,10 @@ namespace foundation {
             
             if (platformShader) {
                 _currentShader = shader;
-                std::string stateName = generatePipelineStateName(*platformShader, cfg);
+                std::string stateName = generateRenderPipelineStateName(*platformShader, cfg);
                 
-                auto index = _pipelineStates.find(stateName);
-                if (index == _pipelineStates.end()) {
+                auto index = _renderPipelineStates.find(stateName);
+                if (index == _renderPipelineStates.end()) {
                     MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
                     
                     desc.vertexFunction = platformShader->getVertexShader();
@@ -961,10 +1082,10 @@ namespace foundation {
                     
                     NSError *error;
                     if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
-                        _pipelineStates.emplace(stateName, state);
+                        _renderPipelineStates.emplace(stateName, state);
                     }
                     else {
-                        _platform->logError("[MetalRendering::beginPass] %s\n", [[error localizedDescription] UTF8String]);
+                        _platform->logError("[MetalRendering::applyState] %s\n", [[error localizedDescription] UTF8String]);
                     }
                 }
                 else {
@@ -972,7 +1093,7 @@ namespace foundation {
                 }
             }
 
-            _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
+            _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
 
             if (state) {
                 double rtWidth = _view.currentDrawable.texture.width;
@@ -986,171 +1107,22 @@ namespace foundation {
                 _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), 3, 1);
 
                 if (cfg.zBehaviorType != foundation::ZBehaviorType::DISABLED) {
-                    [_currentCommandEncoder setDepthStencilState:_zBehaviorStates[int(cfg.zBehaviorType)]];
+                    [_currentRenderCommandEncoder setDepthStencilState:_zBehaviorStates[int(cfg.zBehaviorType)]];
                 }
 
                 MTLViewport viewPort {0.0f, 0.0f, rtWidth, rtHeight, 0.0f, 1.0f};
 
-                [_currentCommandEncoder setRenderPipelineState:state];
-                [_currentCommandEncoder setViewport:viewPort];
+                [_currentRenderCommandEncoder setRenderPipelineState:state];
+                [_currentRenderCommandEncoder setViewport:viewPort];
                 
                 _frameConstants.rtBounds[0] = rtWidth;
                 _frameConstants.rtBounds[1] = rtHeight;
             }
         }
     }
-    
-    // TODO:
-    // autogenerate name + get shader name + error in rendering if shader is created with name that is already used
-    // const_ to shader unpacked only
-    // !!!
-//    void MetalRendering::beginPass(const char *name, const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
-//        if (_view == nil) {
-//            _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
-//        }
-//        if (_view) {
-//            if (_currentCommandBuffer == nil) {
-//                _currentCommandBuffer = [_commandQueue commandBuffer];
-//            }
-//
-//            MTLPixelFormat rtColorFormat = _view.colorPixelFormat;
-//            MTLPixelFormat rtDepthFormat = _view.depthStencilPixelFormat;
-//
-//            double rtWidth = _view.currentDrawable.texture.width;
-//            double rtHeight = _view.currentDrawable.texture.height;
-//            const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
-//            const MetalTexture *platformRT = static_cast<const MetalTexture *>(cfg.target.get());
-//
-//            bool zClear = cfg.zBehaviorType == foundation::ZType::ENABLED_CLEAR && rtDepthFormat != MTLPixelFormatInvalid;
-//
-//            _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-//            _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
-//            _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionDontCare;
-//            _currentPassDescriptor.colorAttachments[0].loadAction = cfg.clearColor ? MTLLoadActionClear : MTLLoadActionDontCare;
-//            _currentPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
-//            _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
-//            _currentPassDescriptor.depthAttachment.loadAction = zClear ? MTLLoadActionClear : MTLLoadActionDontCare;
-//            _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
-//
-//            if (cfg.target) {
-//                rtColorFormat = nativeTextureFormat[int(platformRT->getFormat())];
-//                rtDepthFormat = platformRT->getDepthFormat();
-//                rtWidth = double(platformRT->getWidth());
-//                rtHeight = double(platformRT->getHeight());
-//
-//                _currentPassDescriptor.colorAttachments[0].texture = platformRT->getColor();
-//                _currentPassDescriptor.depthAttachment.texture = platformRT->getDepth();
-//            }
-//
-//            _frameConstants.rtBounds[0] = rtWidth;
-//            _frameConstants.rtBounds[1] = rtHeight;
-//
-//            id<MTLRenderPipelineState> state = nil;
-//
-//            if (platformShader) {
-//                auto index = _pipelineStates.find(name);
-//                if (index == _pipelineStates.end()) {
-//                    NSError *error;
-//                    MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
-//
-//                    desc.vertexFunction = platformShader->getVertexShader();
-//                    desc.vertexDescriptor = platformShader->getVertexDesc();
-//                    desc.fragmentFunction = platformShader->getFragmentShader();
-//                    desc.colorAttachments[0].pixelFormat = rtColorFormat;
-//                    desc.depthAttachmentPixelFormat = rtDepthFormat;
-//
-//                    if (cfg.blendType == BlendType::DISABLED) {
-//                        desc.colorAttachments[0].blendingEnabled = false;
-//                    }
-//                    else if (cfg.blendType == BlendType::MIXING) {
-//                        desc.colorAttachments[0].blendingEnabled = true;
-//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-//                    }
-//                    else if (cfg.blendType == BlendType::ADDITIVE) {
-//                        desc.colorAttachments[0].blendingEnabled = YES;
-//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-//                    }
-//                    else if (cfg.blendType == BlendType::MAXVALUE) {
-//                        desc.colorAttachments[0].blendingEnabled = YES;
-//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMax;
-//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMax;
-//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-//                    }
-//                    else if (cfg.blendType == BlendType::MINVALUE) {
-//                        desc.colorAttachments[0].blendingEnabled = YES;
-//                        desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationMin;
-//                        desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationMin;
-//                        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-//                        desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-//                    }
-//
-//                    if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
-//                        _pipelineStates.emplace(name, state);
-//                    }
-//                    else {
-//                        _platform->logError("[MetalRendering::beginPass] %s\n", [[error localizedDescription] UTF8String]);
-//                    }
-//                }
-//                else {
-//                    state = index->second;
-//                }
-//            }
-//
-//            if (state) {
-//                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
-//
-//                // TODO: copypasta
-//                if (_constantsBufferOffset + sizeof(FrameConstants) < CONSTANT_BUFFER_OFFSET_MAX) {
-//                    std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
-//                    std::memcpy(constantsMemory + _constantsBufferOffset, &_frameConstants, sizeof(FrameConstants));
-//
-//                    [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:3];
-//                    [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:1];
-//
-//                    _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
-//                }
-//                else {
-//                    _platform->logError("[MetalRendering::beginPass] Out of constants buffer length\n");
-//                }
-//
-//                MTLViewport viewPort {0.0f};
-//                viewPort.znear = 0.0f;
-//                viewPort.zfar = 1.0f;
-//                viewPort.width = rtWidth;
-//                viewPort.height = rtHeight;
-//
-//                [_currentCommandEncoder setRenderPipelineState:state];
-//                [_currentCommandEncoder setViewport:viewPort];
-//
-//                if (rtDepthFormat != MTLPixelFormatInvalid && cfg.zBehaviorType != foundation::ZType::DISABLED) {
-//                    [_currentCommandEncoder setDepthStencilState:_defaultDepthStencilState];
-//                }
-//
-//                _currentShader = shader;
-//            }
-//            else {
-//                _currentCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
-//            }
-//        }
-//    }
-    
+        
     void MetalRendering::applyShaderConstants(const void *constants) {
-        if (_currentCommandEncoder) {
+        if (_currentRenderCommandEncoder) {
             const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
 
             if (platformShader && platformShader->getConstBufferLength()) {
@@ -1161,7 +1133,7 @@ namespace foundation {
     }
     
     void MetalRendering::applyTextures(const RenderTexturePtr *textures, std::uint32_t count) {
-        if (_currentCommandEncoder && _currentShader) {
+        if (_currentRenderCommandEncoder && _currentShader) {
             if (count <= MAX_TEXTURES) {
                 NSRange range {0, count};
                 id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
@@ -1170,27 +1142,27 @@ namespace foundation {
                     texarray[i] = textures[i] ? static_cast<const MetalTexBase *>(textures[i].get())->getNativeTexture() : nil;
                 }
                 
-                [_currentCommandEncoder setFragmentTextures:texarray withRange:range];
-                [_currentCommandEncoder setVertexTextures:texarray withRange:range];
+                [_currentRenderCommandEncoder setFragmentTextures:texarray withRange:range];
+                [_currentRenderCommandEncoder setVertexTextures:texarray withRange:range];
             }
         }
     }
     
     void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) {
-        if (_currentCommandEncoder && _currentShader) {
+        if (_currentRenderCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
             id<MTLBuffer> buffers[2] = {nativeVertexData, nullptr};
 
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
-            [_currentCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-            [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount];
+            [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount];
         }
     }
 
     void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) {
-        if (_currentCommandEncoder && _currentShader) {
+        if (_currentRenderCommandEncoder && _currentShader) {
             id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
             id<MTLBuffer> nativeInstanceData = instanceData ? static_cast<const MetalData *>(instanceData.get())->get() : nullptr;
             id<MTLBuffer> buffers[2] = {nativeVertexData, nativeInstanceData};
@@ -1198,15 +1170,60 @@ namespace foundation {
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
-            [_currentCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-            [_currentCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
+            [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
         }
     }
     
+    void MetalRendering::compute(const ComputeShaderPtr &shader, const RenderTexturePtr *textures, std::uint32_t count, ComputeGridSize grid) {
+        if (_currentRenderCommandEncoder) {
+            [_currentRenderCommandEncoder endEncoding];
+            _currentRenderCommandEncoder = nil;
+            _currentShader = nullptr;
+        }
+        
+        if (_currentCommandBuffer == nil) {
+            _currentCommandBuffer = [_commandQueue commandBuffer];
+        }
+        
+//        const MetalComputeShader *platformShader = static_cast<const MetalComputeShader *>(shader.get());
+//        const MetalTexture *platformWorkingTexture = static_cast<const MetalTexture *>(working.get());
+//        const MetalTexture *platformTempTexture = static_cast<const MetalTexture *>(tmp.get());
+//
+//        id<MTLComputePipelineState> state = nil;
+//
+//        if (platformShader) {
+//            auto index = _computePipelineStates.find(platformShader->getName());
+//            if (index == _computePipelineStates.end()) {
+//                NSError *error;
+//                if ((state = [_device newComputePipelineStateWithFunction:platformShader->getShader() error:&error]) != nil) {
+//                    _computePipelineStates.emplace(platformShader->getName(), state);
+//                }
+//                else {
+//                    _platform->logError("[MetalRendering::compute] %s\n", [[error localizedDescription] UTF8String]);
+//                }
+//            }
+//            else {
+//                state = index->second;
+//            }
+//
+//            id<MTLComputeCommandEncoder> computeEncoder = [_currentCommandBuffer computeCommandEncoder];
+//            [computeEncoder setComputePipelineState:state];
+//            [computeEncoder setTexture:platformWorkingTexture->getNativeTexture() atIndex:0];
+//            [computeEncoder setTexture:platformTempTexture->getNativeTexture() atIndex:1];
+//
+//            MTLSize groupSize = MTLSizeMake(8, 8, 1);
+//            MTLSize groupsPerGridSize = MTLSizeMake(grid.x / groupSize.width, grid.y / groupSize.height, 1);
+//
+//            [computeEncoder dispatchThreadgroups:groupsPerGridSize threadsPerThreadgroup:groupSize];
+//            [computeEncoder endEncoding];
+//        }
+    }
+    
     void MetalRendering::presentFrame() {
-        if (_currentCommandEncoder) {
-            [_currentCommandEncoder endEncoding];
-            _currentCommandEncoder = nil;
+        if (_currentRenderCommandEncoder) {
+            [_currentRenderCommandEncoder endEncoding];
+            _currentRenderCommandEncoder = nil;
             _currentShader = nullptr;
         }
         if (_view && _currentCommandBuffer) {
@@ -1240,8 +1257,8 @@ namespace foundation {
             std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
             std::memcpy(constantsMemory + _constantsBufferOffset, buffer, size);
             
-            [_currentCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:vIndex];
-            [_currentCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:fIndex];
+            [_currentRenderCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:vIndex];
+            [_currentRenderCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:fIndex];
             
             _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
             return true;

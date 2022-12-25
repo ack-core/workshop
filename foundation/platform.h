@@ -10,7 +10,7 @@
 namespace foundation {
     using EventHandlerToken = unsigned char *;
 
-    struct FileEntry {
+    struct PlatformFileEntry {
         std::string name;
         bool isDirectory = false;
     };
@@ -85,7 +85,7 @@ namespace foundation {
         // @dirPath  - target directory. Example: "data/map1"
         // @return   - vector of entries
         //
-        virtual std::vector<FileEntry> formFileList(const char *dirPath) = 0;
+        virtual std::vector<PlatformFileEntry> formFileList(const char *dirPath) = 0;
 
         // Loads file to memory
         // @filePath - file path. Example: "data/map1/test.png"

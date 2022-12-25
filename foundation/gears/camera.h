@@ -66,16 +66,20 @@ namespace gears {
             }
             return _viewMatrix * _projMatrix;
         }
-
-        math::transform3f getInvViewProjMatrix() {
-            return (_viewMatrix * _projMatrix).inverted();
-        }
         
         math::transform3f getViewMatrix() {
+            if (_outdated) {
+                _outdated = false;
+                _updateMatrices();
+            }
             return _viewMatrix;
         }
 
         math::transform3f getProjMatrix() {
+            if (_outdated) {
+                _outdated = false;
+                _updateMatrices();
+            }
             return _projMatrix;
         }
 

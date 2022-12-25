@@ -63,6 +63,11 @@ namespace foundation {
         _count
     };
     
+    struct ComputeGridSize {
+        std::uint32_t x;
+        std::uint32_t y;
+    };
+    
     class RenderShader {
     public:
         // Field description for Vertex Shader input struct
@@ -74,6 +79,11 @@ namespace foundation {
         
     protected:
         virtual ~RenderShader() = default;
+    };
+    
+    class ComputeShader {
+    protected:
+        virtual ~ComputeShader() = default;
     };
     
     class RenderTexture {
@@ -115,6 +125,7 @@ namespace foundation {
     
     using RenderShaderInputDesc = std::initializer_list<RenderShader::Input>;
     using RenderShaderPtr = std::shared_ptr<RenderShader>;
+    using ComputeShaderPtr = std::shared_ptr<ComputeShader>;
     using RenderTexturePtr = std::shared_ptr<RenderTexture>;
     using RenderTargetPtr = std::shared_ptr<RenderTarget>;
     using RenderDataPtr = std::shared_ptr<RenderData>;
@@ -160,20 +171,22 @@ namespace foundation {
             };
         }
     };
-
+    
     // Interface provides 3D-visualization methods
     //
     class RenderingInterface {
     public:
         static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
-    
+        
     public:
+        virtual const std::shared_ptr<PlatformInterface> &getPlatformInterface() const = 0;
+        
         // Set global per-frame constants, available from shaders
-        // @viewProj - view * proj matrix
-        // @invProj  - inverted proj matrix
-        // @invView  - inverted view matrix
+        // @proj  - proj matrix
+        // @view  - view matrix
+        // Matrices are row-major
         //
-        virtual void updateFrameConstants(const float(&VP)[16], const float(&invVP)[16], const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) = 0;
+        virtual void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) = 0;
         
         // Create shader from source text
         // @name      - name that is used in error messages
@@ -186,22 +199,22 @@ namespace foundation {
         // s--------------------------------------
         //     fixed {                                           - block of permanent constants. Can be omitted if unused.
         //         constName0 : float4 = [1.0, -3.0, 0.0, 1.0]   - in the code these constants have 'fixed_' prefix
-        //         constNames0[2] : float4 = [1.0, 0.3, 0.6, 0.9][0.0, 0.1, 0.2, 0.3] 
-        //         constNameI : int2 = [1, -2] 
+        //         constName1 : int2 = [1, -2]
+        //         constNameArray0[2] : float4 = [1.0, 0.3, 0.6, 0.9][0.0, 0.1, 0.2, 0.3]
         //     }
         //     const {                                           - block of per-pass constants. Can be omitted if unused.
         //         constName1 : float4                           - these constants have 'const_' prefix in code
-        //         constNames1[16] : float4                      - spaces in/before array braces are not permitted
+        //         constNamesArray1[16] : float4                 - spaces in/before array braces are not permitted
         //     }
         //     inout {                                           - vertex output and fragment input. Can be omitted if unused.
         //         varName4 : float4                             - these variables have 'input_' prefix in vssrc and 'output_' in fssrc
         //     }                                                 - vertex shader also has float4 'output_position' variable
         //     vssrc {
-        //         output_varName4 = _lerp(vertex_color, const_constName0, const_constName1);
+        //         output_varName4 = _lerp(vertex_color, const_constName1, fixed_constName1);
         //         output_position = _transform(float4(vertex_position, 1.0), frame_viewProjMatrix);
         //     }
-        //     fssrc {                                           - fragment shader has float4 'output_color' variable
-        //         output_color = input_varName4;                - fragment shader has float2 'fragment_coord' variable with range 0.0 <= x, y <= 1.0
+        //     fssrc {                                           - fragment shader has float4 'output_color[4]' variable. Max four render targets
+        //         output_color[0] = input_varName4;             - fragment shader has float2 'fragment_coord' variable with range 0.0 <= x, y <= 1.0
         //     }
         // s--------------------------------------
         // Types:
@@ -213,16 +226,30 @@ namespace foundation {
         //     frame_cameraDirection    : float4  - normalized camera direction (w = 0)
         //     frame_rtBounds           : float4  - render target size in pixels (.rg)
         //
-        // Textures. There 8 texture slots. Example of getting color from the last slot: float4 color = _tex2d(7, float2(0, 0));
+        // Textures. There 4 texture slots. Example of getting color from the last slot: float4 color = _tex2linear(3, float2(0, 0));
         //
         // Global functions:
         //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(k, v, v), _tex2nearest/_tex2linear/_tex2raw(index, v)
         //
         virtual RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc = {}) = 0;
 
-        // Create texture from binary data
+        // Create compute shader from source text
+        // @name      - name that is used in error messages
+        // @src       - generic shader source text. Example:
+        //
+        // s--------------------------------------
+        //     entry {                                           - every compute shader has one RW texture
+        //         ...
+        //     }
+        // s--------------------------------------
+        // Types are the same as for render shader.
+        // Global functions are the same as for render shader (excluding _tex2nearest/_tex2linear/_tex2raw)
+        //
+        virtual ComputeShaderPtr createComputeShader(const char *name, const char *src) = 0;
+
+        // Create texture from binary data or empty
         // @w and @h    - width and height of the 0th mip layer
-        // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr
+        // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr. Array can be empty if there is only one mip-level
         //
         virtual RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
 
@@ -269,7 +296,16 @@ namespace foundation {
         // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) = 0;
-
+        
+        // Dispatch compute work
+        // @shader      - shader object
+        // @textures    - working textures
+        // @count       - number of textures
+        //
+        virtual void compute(const ComputeShaderPtr &shader, const RenderTexturePtr *textures, std::uint32_t count, ComputeGridSize grid) = 0;
+        
+        // Frame finalization
+        //
         virtual void presentFrame() = 0;
 
     protected:

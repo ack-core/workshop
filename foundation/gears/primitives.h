@@ -30,7 +30,7 @@ namespace gears {
                     color : float4
                 }
                 vssrc {
-                    output_position = _transform(fixed_coords[vertex_ID], frame_viewProjMatrix);
+                    output_position = _transform(fixed_coords[vertex_ID], _transform(frame_viewMatrix, frame_projMatrix));
                     output_color = fixed_colors[vertex_ID >> 1];
                 }
                 fssrc {
