@@ -48,19 +48,19 @@ namespace voxel {
                 
                 for (std::int32_t i = 0; i < frameCount; i++) {
                     if (memcmp(data, "SIZE", 4) == 0) {
-                        std::uint8_t sizeZ = *(std::uint8_t *)(data + 12);
-                        std::uint8_t sizeX = *(std::uint8_t *)(data + 16);
-                        std::uint8_t sizeY = *(std::uint8_t *)(data + 20);
+//                        std::uint16_t sizeZ = *(std::uint16_t *)(data + 12);
+//                        std::uint16_t sizeX = *(std::uint16_t *)(data + 16);
+//                        std::uint16_t sizeY = *(std::uint16_t *)(data + 20);
                         
-                        struct InterVoxel {
-                            std::uint8_t isExist;
-                        };
-                        
-                        std::unique_ptr<InterVoxel[]> voxelArray = std::make_unique<InterVoxel[]>(sizeX * sizeY * sizeZ);
-                        std::fill_n(voxelArray.get(), sizeX * sizeY * sizeZ, InterVoxel{0});
-                        auto arrayIndex = [&](std::uint8_t x, std::uint8_t y, std::uint8_t z) {
-                            return x + y * sizeX + z * sizeY * sizeX;
-                        };
+//                        struct InterVoxel {
+//                            std::uint8_t isExist;
+//                        };
+//
+//                        std::unique_ptr<InterVoxel[]> voxelArray = std::make_unique<InterVoxel[]>(sizeX * sizeY * sizeZ);
+//                        std::fill_n(voxelArray.get(), sizeX * sizeY * sizeZ, InterVoxel{0});
+//                        auto arrayIndex = [&](std::uint8_t x, std::uint8_t y, std::uint8_t z) {
+//                            return x + y * sizeX + z * sizeY * sizeX;
+//                        };
                         
                         data += 24;
                         

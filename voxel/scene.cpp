@@ -8,32 +8,34 @@
 
 #include "thirdparty/upng/upng.h"
 
+// TODO: voxel map constants
+
 namespace {
-    const char *g_voxelMapShaderSrc = R"(
+    const char *g_sunVoxelMapShaderSrc = R"(
         fixed {
             cube[8] : float4 =
                 [-0.5, -0.5, -0.5, 1.0][0.5, -0.5, -0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
                 [-0.5, 0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
         }
         const {
-            positionRadius : float4
+            sunDirection : float4
+            sunColor_sunPower : float4
+            observingPoint_radius : float4
             bounds : float4
-            color : float4
         }
         inout {
             discard : float1
         }
         vssrc {
-            float3 cubeCenter = float3(instance_position.xyz) - const_positionRadius.xyz;
-            float3 relVertexPos = fixed_cube[vertex_ID].xyz;
-            float4 absVertexPos = float4(cubeCenter + relVertexPos, 0.0);
+            float3 cubeCenterOffset = float3(instance_position.xyz) - const_observingPoint_radius.xyz;
+            float3 vertexPosInMap = cubeCenterOffset + fixed_cube[vertex_ID].xyz + float3(32.0, 32.0, 32.0);
             
-            int ypos = int(absVertexPos.y + const_bounds.y);
-            int ybase = int(const_bounds.z);
-            float2 fromLight = absVertexPos.xz + const_bounds.yy + float2(ypos % ybase, ypos / ybase) * 2.0f * const_bounds.yy;
-            
-            output_position = float4((fromLight - const_bounds.xx) / float2(const_bounds.x, -const_bounds.x), 0.5, 1.0);
-            output_discard = _step(_dot(cubeCenter, cubeCenter), const_positionRadius.w * const_positionRadius.w);
+            int ypos = int(vertexPosInMap.y);
+            float2 vertexPosInTexture = vertexPosInMap.xz + float2(ypos % 8, ypos / 8) * float2(64.0, 64.0);
+            float2 screenCoord = vertexPosInTexture / frame_rtBounds.xy * float2(2.0, -2.0) - float2(1.0, -1.0);
+
+            output_position = float4(screenCoord, 0.5, 1.0);
+            output_discard = _step(_dot(cubeCenterOffset, cubeCenterOffset), const_observingPoint_radius.w * const_observingPoint_radius.w);
         }
         fssrc {
             output_color[0] = float4(0.125 * input_discard, 0.0, 0.0, 0.0);
@@ -42,20 +44,9 @@ namespace {
     
     const char *g_staticMeshGBufferShaderSrc = R"(
         fixed {
-            axis[3] : float3 =
-                [0.0, 0.0, 1.0]
-                [1.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0]
-                
-            bnm[3] : float3 =
-                [1.0, 0.0, 0.0]
-                [0.0, 0.0, 1.0]
-                [1.0, 0.0, 0.0]
-            
-            tgt[3] : float3 =
-                [0.0, 1.0, 0.0]
-                [0.0, 1.0, 0.0]
-                [0.0, 0.0, 1.0]
+            axis[3] : float3 = [0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
+            bnm[3] : float3 = [1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
+            tgt[3] : float3 = [0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
             
             cube[18] : float4 =
                 [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
@@ -65,8 +56,7 @@ namespace {
                 [0.5, 0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
                 [0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0]
             
-            faceUV[4] : float2 =
-                [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+            faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
         }
         inout {
             corner : float3
@@ -100,7 +90,6 @@ namespace {
 
             output_color[0].xy = _frac(float2(1.0, 255.0) * scaledCorner.xx);
             output_color[0].x -= output_color[0].y * (1.0 / 255.0);
-
             output_color[0].zw = _frac(float2(1.0, 255.0) * scaledCorner.yy);
             output_color[0].z -= output_color[0].w * (1.0 / 255.0);
 
@@ -112,19 +101,29 @@ namespace {
         }
     )";
     
-    static const char *g_fullScreenBaseShaderSrc = R"(
+    static const char *g_staticMeshScreenShaderSrc = R"(
         fixed {
-            ambient[7] : float3 =
-                [0.00, 0.00, 0.00]
-                [0.24, 0.24, 0.23]
-                [0.25, 0.25, 0.24]
-                [0.23, 0.23, 0.22]
-                [0.26, 0.26, 0.25]
-                [0.28, 0.28, 0.27]
-                [0.30, 0.30, 0.30]
+            ambient[7] : float3 = [0.00, 0.00, 0.00][0.24, 0.24, 0.23][0.25, 0.25, 0.24][0.23, 0.23, 0.22][0.26, 0.26, 0.25][0.28, 0.28, 0.27][0.30, 0.30, 0.30]
+            axis[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
+            bnm[7] : float3 = [0.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
+            tgt[7] : float3 = [0.0, 0.0, 0.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
+            koeffs[4] : float1 = [0.00][0.70][0.85][0.96]
+        }
+        const {
+            sunDirection : float4
+            sunColor_sunPower : float4
+            observingPoint_radius : float4
+            bounds : float4
         }
         inout {
             texcoord : float2
+        }
+        fndef voxTexCoord (float3 offsetFromObservingPoint, float maxRadius) -> float2 {
+            float3 positionInMap = offsetFromObservingPoint + float3(32.0, 32.0, 32.0);
+            int ypos = int(positionInMap.y);
+            
+            float2 yoffset = float2(ypos % 8, ypos / 8) * float2(64, 64);
+            return (positionInMap.xz + yoffset) / float2(512.0, 512.0) * _step(_dot(offsetFromObservingPoint, offsetFromObservingPoint), maxRadius * maxRadius);
         }
         vssrc {
             float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
@@ -135,7 +134,6 @@ namespace {
             float4 gbuffer0 = _tex2nearest(0, input_texcoord);
             float4 gbuffer1 = _tex2nearest(1, input_texcoord);
             float4 gbuffer2 = _tex2nearest(2, input_texcoord);
-            int faceIndex = int(6.1 * gbuffer2.x);
             
             float3 cornerPosition;
             cornerPosition.x = _dot(gbuffer0.xy, float2(1.0, 1.0 / 255.0));
@@ -143,83 +141,19 @@ namespace {
             cornerPosition.z = _dot(gbuffer1.xy, float2(1.0, 1.0 / 255.0));
             cornerPosition = cornerPosition * 2048.0 - 1024.0;
 
-            //output_color[0] = float4(gbuffer2.x, 0, 0, 1.0);
-            output_color[0] = float4(fixed_ambient[faceIndex], 1.0);
-        }
-    )";
-    
-    /*
-    static const char *g_lightBillboardShaderSrc = R"(
-        fixed {
-            axis[7] : float3 =
-                [0.0, 0.0, 0.0]
-                [0.0, 0.0, -1.0]
-                [-1.0, 0.0, 0.0]
-                [0.0, -1.0, 0.0]
-                [0.0, 0.0, 1.0]
-                [1.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0]
-            
-            bnm[7] : float3 =
-                [0.0, 0.0, 0.0]
-                [1.0, 0.0, 0.0]
-                [0.0, 0.0, 1.0]
-                [1.0, 0.0, 0.0]
-                [1.0, 0.0, 0.0]
-                [0.0, 0.0, 1.0]
-                [1.0, 0.0, 0.0]
-            
-            tgt[7] : float3 =
-                [0.0, 0.0, 0.0]
-                [0.0, 1.0, 0.0]
-                [0.0, 1.0, 0.0]
-                [0.0, 0.0, 1.0]
-                [0.0, 1.0, 0.0]
-                [0.0, 1.0, 0.0]
-                [0.0, 0.0, 1.0]
-                
-            koeffs[4] : float1 = [0.00][0.70][0.85][0.96]
-        }
-        const {
-            positionRadius : float4
-            bounds : float4
-            color : float4
-        }
-        fndef voxTexCoord (float3 cubepos) -> float2 {
-            int ypos = int(cubepos.y + 32.0);
-            float2 yoffset = float2(ypos % 8, ypos / 8) * float2(64, 64);
-            return (cubepos.xz + float2(32.0, 32.0) + yoffset) / float2(512.0, 512.0);
-        }
-        vssrc {
-            float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-            float4 billPos = float4(vertexCoord.xy * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 0.0);
-            float4 viewPos = _transform(float4(const_positionRadius.xyz, 1), frame_viewMatrix) + billPos * const_positionRadius.w * 1.2;
-            output_position = _transform(viewPos, frame_projMatrix);
-        }
-        fssrc {
-            float4 gbuffer0 = _tex2nearest(0, fragment_coord);
-            float4 gbuffer1 = _tex2nearest(1, fragment_coord);
-            float4 gbuffer2 = _tex2nearest(2, fragment_coord);
+            float exist = 6.1 * gbuffer2.x;
+            int faceIndex = int(exist);
+            exist = _clamp(exist);
 
-            int faceIndex = int(6.1 * gbuffer2.x);
-            
-            float3 cornerPosition;
-            cornerPosition.x = _dot(gbuffer0.xy, float2(1.0, 1.0 / 255.0));
-            cornerPosition.y = _dot(gbuffer0.zw, float2(1.0, 1.0 / 255.0));
-            cornerPosition.z = _dot(gbuffer1.xy, float2(1.0, 1.0 / 255.0));
-            cornerPosition = cornerPosition * 2048.0 - 1024.0;
-            
-            float3 relCornerPos = cornerPosition - const_positionRadius.xyz;
-            
             float3 dirB = fixed_bnm[faceIndex];
             float3 dirT = fixed_tgt[faceIndex];
             float3 faceNormal = fixed_axis[faceIndex];
             float4 vox;
             
-            vox.x = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal)).x;
-            vox.y = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirB)).x;
-            vox.z = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirT)).x;
-            vox.w = _tex2nearest(3, voxTexCoord(relCornerPos.xyz + faceNormal + dirB + dirT)).x;
+            vox.x = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
+            vox.y = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal + dirB - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
+            vox.z = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal + dirT - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
+            vox.w = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal + dirB + dirT - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
 
             int4 vi = int4(3.0 * _clamp(2.667 * vox));
             
@@ -232,14 +166,13 @@ namespace {
             
             float m0 = _lerp(vox.x, vox.y, smoothCoord.x);
             float m1 = _lerp(vox.z, vox.w, smoothCoord.x);
-            float k = _lerp(m0, m1, smoothCoord.y);
+            float oc = _lerp(m0, m1, smoothCoord.y);
 
-            k = 0.1 * (1.0 - _pow(1.0 - _pow(k, 2.6), 2.0));
-
-            output_color[0] = float4(k, k, k, 1.0);
+            oc = exist * _pow(1.0 - _pow(oc, 2.6), 2.0);
+            output_color[0] = float4(oc, oc, oc, 1.0);
         }
     )";
-
+    
     static const char *g_tmpScreenQuadShaderSrc = R"(
         inout {
             texcoord : float2
@@ -250,23 +183,12 @@ namespace {
             output_texcoord = vertexCoord;
         }
         fssrc {
-            //float4 gbuffer = _tex2nearest(1, input_texcoord);
-            ///float3 colorOcc = _frac(float3(1.0, 256.0, 65536.0) * gbuffer.b);
-            
-            //float4 surface = _tex2nearest(0, float2(colorOcc.z, 0));
-            
             float4 s0 = _tex2nearest(0, input_texcoord);
-            output_color[0] = s0;//_lerp(s0, s1, _step(0.8, input_texcoord.y));
+            output_color[0] = s0 * 0.5;//_lerp(s0, s1, _step(0.8, input_texcoord.y));
         }
     )";
-    */
 
     voxel::SceneObjectToken g_lastToken = 0x100;
-    
-    bool isInLight(const math::vector3f &bbMin, const math::vector3f &bbMax, const math::vector3f &lightPosition, float lightRadius) {
-        math::vector3f center = bbMin + 0.5f * (bbMax - bbMin);
-        return center.distanceTo(lightPosition) < lightRadius + center.distanceTo(bbMax);
-    }
 }
 
 namespace voxel {
@@ -282,19 +204,6 @@ namespace voxel {
         voxel::Mesh source;
         foundation::RenderDataPtr voxels;
     };
-
-//    struct LightSource {
-//        std::vector<const StaticVoxelModel *> receiverTmpBuffer;
-//        foundation::RenderTargetPtr voxelMap;
-//        foundation::RenderTexturePtr tempMap;
-//
-//        struct ShaderConst {
-//            math::vector4f positionRadius;
-//            math::vector4f bounds;
-//            math::color rgba;
-//        }
-//        constants;
-//    };
     
     class SceneImpl : public Scene {
     public:
@@ -316,23 +225,29 @@ namespace voxel {
         void updateAndDraw(float dtSec) override;
         
     private:
+        struct ShaderConst {
+            math::vector4f sunDirection;
+            math::vector4f sunColor_sunPower;
+            math::vector4f observingPoint_radius;
+            math::vector4f bounds;
+        }
+        _sunShaderConstants;
+        
         voxel::MeshFactoryPtr _factory;
         foundation::PlatformInterfacePtr _platform;
         foundation::RenderingInterfacePtr _rendering;
 
-        foundation::RenderShaderPtr _voxelMapShader;
-        //foundation::ComputeShaderPtr _voxelMapShadow;
+        foundation::RenderShaderPtr _sunVoxelMapShader;
+        foundation::RenderTargetPtr _sunVoxelMap;
+        
         foundation::RenderShaderPtr _staticMeshGBuferShader;
-        foundation::RenderShaderPtr _fullScreenBaseShader;
-        //foundation::RenderShaderPtr _lightBillboardShader;
+        foundation::RenderShaderPtr _staticMeshScreenShader;
 
-        //foundation::RenderShaderPtr _tmpScreenQuadShader;
+        foundation::RenderShaderPtr _tmpScreenQuadShader;
         
         std::unordered_map<SceneObjectToken, std::unique_ptr<StaticVoxelModel>> _staticModels;
         std::unordered_map<SceneObjectToken, std::unique_ptr<DynamicVoxelModel>> _dynamicModels;
 
-        //std::unordered_map<SceneObjectToken, std::unique_ptr<LightSource>> _lightSources;
-        
         foundation::RenderTexturePtr _palette;
         foundation::RenderTargetPtr _gbuffer;
     };
@@ -342,7 +257,7 @@ namespace voxel {
         _platform = platform;
         _rendering = rendering;
 
-        _voxelMapShader = rendering->createShader("scene_voxel_map", g_voxelMapShaderSrc,
+        _sunVoxelMapShader = rendering->createShader("scene_voxel_map", g_sunVoxelMapShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID},
             },
@@ -350,7 +265,6 @@ namespace voxel {
                 {"position", foundation::RenderShaderInputFormat::SHORT4},
             }
         );
-        //_voxelMapShadow = rendering->createComputeShader("scene_voxel_shadow", g_voxelMapShadowSrc);
         _staticMeshGBuferShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshGBufferShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID}
@@ -359,18 +273,17 @@ namespace voxel {
                 {"position_color", foundation::RenderShaderInputFormat::SHORT4},
             }
         );
-        _fullScreenBaseShader = _rendering->createShader("scene_full_screen_base", g_fullScreenBaseShaderSrc, {
+        _staticMeshScreenShader = _rendering->createShader("scene_full_screen_base", g_staticMeshScreenShaderSrc, {
             {"ID", foundation::RenderShaderInputFormat::ID}
         });
-//        _lightBillboardShader = _rendering->createShader("scene_light_billboard", g_lightBillboardShaderSrc, {
-//            {"ID", foundation::RenderShaderInputFormat::ID}
-//        });
-//
-//
-//        _tmpScreenQuadShader = _rendering->createShader("scene_screen_quad", g_tmpScreenQuadShaderSrc, {
-//            {"ID", foundation::RenderShaderInputFormat::ID}
-//        });
+        _tmpScreenQuadShader = _rendering->createShader("scene_screen_quad", g_tmpScreenQuadShaderSrc, {
+            {"ID", foundation::RenderShaderInputFormat::ID}
+        });
         
+        _sunShaderConstants.observingPoint_radius = math::vector4f(0.0, 0.0, 0.0, 32.0);
+        _sunShaderConstants.bounds = math::vector4f(256.0f, 32.0f, 8.0f, 0.0f);
+        _sunShaderConstants.sunColor_sunPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
+        _sunVoxelMap = rendering->createRenderTarget(foundation::RenderTextureFormat::R32F, 1, 512, 512, false);
         _gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 4, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         
         std::unique_ptr<std::uint8_t[]> paletteData;
@@ -465,27 +378,6 @@ namespace voxel {
         return INVALID_TOKEN;
     }
     
-//    SceneObjectToken SceneImpl::addLightSource(const math::vector3f &position, float radius, const math::color &rgba) {
-//        std::unique_ptr<LightSource> lightSource = std::make_unique<LightSource>();
-//        SceneObjectToken token = g_lastToken++ & std::uint64_t(0x7FFFFFFF);
-//
-//        // Possible sets:
-//        // 64x64x64 cube is 512x512 texture for the light of max radius = 31
-//        // 256x256x256 cube is 4096x4096 texture for the light of max radius = 127
-//
-//        lightSource->voxelMap = _rendering->createRenderTarget(foundation::RenderTextureFormat::R32F, 1, 512, 512, false);
-//        lightSource->tempMap = _rendering->createTexture(foundation::RenderTextureFormat::R32F, 512, 512, {});
-//        lightSource->constants.positionRadius = math::vector4f(position, radius);
-//        lightSource->constants.bounds = math::vector4f(256.0f, 32.0f, 8.0f, 0.0f);
-//        lightSource->constants.rgba = rgba;
-//
-//        if (lightSource->voxelMap) {
-//            _lightSources.emplace(token, std::move(lightSource));
-//        }
-//
-//        return INVALID_TOKEN;
-//    }
-    
     void SceneImpl::removeStaticModel(SceneObjectToken token) {
         _staticModels.erase(token);
     }
@@ -497,33 +389,14 @@ namespace voxel {
     void SceneImpl::updateAndDraw(float dtSec) {
         foundation::RenderTexturePtr textures[4] = {nullptr};
 
-        // models among the lights
-//        for (const auto &modelIt : _staticModels) {
-//            const StaticVoxelModel *model = modelIt.second.get();
-//
-//            for (auto &lightIt : _lightSources) {
-//                if (isInLight(model->bbMin, model->bbMax, lightIt.second->constants.positionRadius.xyz, lightIt.second->constants.positionRadius.w)) {
-//                    lightIt.second->receiverTmpBuffer.emplace_back(model);
-//                }
-//            }
-//        }
-        
-        // per-light voxel cube
-//        for (auto &lightIt : _lightSources) {
-//            _rendering->applyState(_voxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(lightIt.second->voxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
-//            _rendering->applyShaderConstants(&lightIt.second->constants);
-//
-//            for (const auto &item : lightIt.second->receiverTmpBuffer) {
-//                _rendering->drawGeometry(nullptr, item->voxels, 8, item->voxels->getCount(), foundation::RenderTopology::POINTS);
-//            }
-//
-//            lightIt.second->receiverTmpBuffer.clear();
-//        }
+        // sun voxel map
+        _rendering->applyState(_sunVoxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(_sunVoxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
+        _rendering->applyShaderConstants(&_sunShaderConstants);
 
-        // per-light voxel shadow
-//        for (auto &lightIt : _lightSources) {
-//            _rendering->compute(_voxelMapShadow, lightIt.second->voxelMap->getTexture(0), lightIt.second->tempMap, foundation::Size{512, 512});
-//        }
+        for (const auto &modelIt : _staticModels) {
+            const StaticVoxelModel *model = modelIt.second.get();
+            _rendering->drawGeometry(nullptr, model->voxels, 8, model->voxels->getCount(), foundation::RenderTopology::POINTS);
+        }
 
         // gbuffer
         _rendering->applyState(_staticMeshGBuferShader, foundation::RenderPassCommonConfigs::CLEAR(_gbuffer, foundation::BlendType::DISABLED, 0.0f, 0.0f, 0.0f));
@@ -536,23 +409,15 @@ namespace voxel {
         textures[0] = _gbuffer->getTexture(0);
         textures[1] = _gbuffer->getTexture(1);
         textures[2] = _gbuffer->getTexture(2);
-        textures[3] = _gbuffer->getTexture(3);
+        textures[3] = _sunVoxelMap->getTexture(0);
 
-        _rendering->applyState(_fullScreenBaseShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyState(_staticMeshScreenShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyShaderConstants(&_sunShaderConstants);
         _rendering->applyTextures(textures, 4);
         _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
 
-        // per-light billboard
-//        _rendering->applyState(_lightBillboardShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::ADDITIVE));
-//        for (auto &lightIt : _lightSources) {
-//            textures[3] = lightIt.second->voxelMap->getTexture(0);
-//            _rendering->applyTextures(textures, 4);
-//            _rendering->applyShaderConstants(&lightIt.second->constants);
-//            _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
-//        }
-//
-//        textures[0] = _lightSources.begin()->second->tempMap;
-//        _rendering->applyState(_tmpScreenQuadShader, foundation::RenderPassCommonConfigs::DEFAULT());
+//        textures[0] = _sunVoxelMap->getTexture(0);
+//        _rendering->applyState(_tmpScreenQuadShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
 //        _rendering->applyTextures(textures, 1);
 //        _rendering->drawGeometry(nullptr, 4, foundation::RenderTopology::TRIANGLESTRIP);
     }

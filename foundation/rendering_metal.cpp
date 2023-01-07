@@ -1104,6 +1104,9 @@ namespace foundation {
                     rtHeight = double(cfg.target->getHeight());
                 }
                 
+                _frameConstants.rtBounds[0] = rtWidth;
+                _frameConstants.rtBounds[1] = rtHeight;                
+                
                 _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), 3, 1);
 
                 if (cfg.zBehaviorType != foundation::ZBehaviorType::DISABLED) {
@@ -1114,9 +1117,6 @@ namespace foundation {
 
                 [_currentRenderCommandEncoder setRenderPipelineState:state];
                 [_currentRenderCommandEncoder setViewport:viewPort];
-                
-                _frameConstants.rtBounds[0] = rtWidth;
-                _frameConstants.rtBounds[1] = rtHeight;
             }
         }
     }
