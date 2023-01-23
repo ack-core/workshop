@@ -63,11 +63,6 @@ namespace foundation {
         _count
     };
     
-    struct ComputeGridSize {
-        std::uint32_t x;
-        std::uint32_t y;
-    };
-    
     class RenderShader {
     public:
         // Field description for Vertex Shader input struct
@@ -77,13 +72,8 @@ namespace foundation {
             RenderShaderInputFormat format;
         };
         
-    protected:
+    public:
         virtual ~RenderShader() = default;
-    };
-    
-    class ComputeShader {
-    protected:
-        virtual ~ComputeShader() = default;
     };
     
     class RenderTexture {
@@ -93,7 +83,7 @@ namespace foundation {
         virtual std::uint32_t getMipCount() const = 0;
         virtual RenderTextureFormat getFormat() const = 0;
         
-    protected:
+    public:
         virtual ~RenderTexture() = default;
     };
 
@@ -108,9 +98,9 @@ namespace foundation {
         virtual bool hasDepthBuffer() const = 0;
         
         virtual std::uint32_t getTextureCount() const = 0;
-        virtual std::shared_ptr<RenderTexture> getTexture(unsigned index) = 0;
+        virtual const std::shared_ptr<RenderTexture> &getTexture(unsigned index) const = 0;
         
-    protected:
+    public:
         virtual ~RenderTarget() = default;
     };
 
@@ -119,13 +109,12 @@ namespace foundation {
         virtual std::uint32_t getCount() const = 0;
         virtual std::uint32_t getStride() const = 0;
         
-    protected:
+    public:
         virtual ~RenderData() = default;
     };
     
     using RenderShaderInputDesc = std::initializer_list<RenderShader::Input>;
     using RenderShaderPtr = std::shared_ptr<RenderShader>;
-    using ComputeShaderPtr = std::shared_ptr<ComputeShader>;
     using RenderTexturePtr = std::shared_ptr<RenderTexture>;
     using RenderTargetPtr = std::shared_ptr<RenderTarget>;
     using RenderDataPtr = std::shared_ptr<RenderData>;
@@ -233,20 +222,6 @@ namespace foundation {
         //
         virtual RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc = {}) = 0;
 
-        // Create compute shader from source text
-        // @name      - name that is used in error messages
-        // @src       - generic shader source text. Example:
-        //
-        // s--------------------------------------
-        //     entry {                                           - every compute shader has one RW texture
-        //         ...
-        //     }
-        // s--------------------------------------
-        // Types are the same as for render shader.
-        // Global functions are the same as for render shader (excluding _tex2nearest/_tex2linear/_tex2raw)
-        //
-        virtual ComputeShaderPtr createComputeShader(const char *name, const char *src) = 0;
-
         // Create texture from binary data or empty
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr. Array can be empty if there is only one mip-level
@@ -296,19 +271,12 @@ namespace foundation {
         // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) = 0;
-        
-        // Dispatch compute work
-        // @shader      - shader object
-        // @textures    - working textures
-        // @count       - number of textures
-        //
-        virtual void compute(const ComputeShaderPtr &shader, const RenderTexturePtr *textures, std::uint32_t count, ComputeGridSize grid) = 0;
-        
+                
         // Frame finalization
         //
         virtual void presentFrame() = 0;
 
-    protected:
+    public:
         virtual ~RenderingInterface() = default;
     };
     

@@ -24,19 +24,6 @@ namespace foundation {
         std::uint32_t _constBufferLength;
     };
 
-    class MetalComputeShader : public ComputeShader {
-    public:
-        MetalComputeShader(const std::string &name, id<MTLLibrary> library);
-        ~MetalComputeShader() override;
-
-        id<MTLFunction> getShader() const;
-        const std::string &getName() const;
-
-    private:
-        std::string _name;
-        id<MTLLibrary> _library;
-    };
-
     class MetalTexBase : public RenderTexture {
     public:
         ~MetalTexBase() override {}
@@ -83,7 +70,7 @@ namespace foundation {
             id<MTLTexture> _texture;
         };
 
-        MetalTarget(__strong id<MTLTexture> * targets, unsigned count, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h);
+        MetalTarget(__strong id<MTLTexture> *targets, unsigned count, id<MTLTexture> depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h);
         ~MetalTarget() override;
         
         std::uint32_t getWidth() const override;
@@ -93,7 +80,7 @@ namespace foundation {
         bool hasDepthBuffer() const override;
         
         std::uint32_t getTextureCount() const override;
-        std::shared_ptr<RenderTexture> getTexture(unsigned index) override;
+        const std::shared_ptr<RenderTexture> &getTexture(unsigned index) const override;
         
         MTLPixelFormat getDepthFormat() const;
         
@@ -101,7 +88,7 @@ namespace foundation {
         RenderTextureFormat _format;
         MTLPixelFormat _depthFormat;
         
-        std::shared_ptr<RTTexture> _textures[RenderTarget::MAXCOUNT] = {nil, nil, nil, nil};
+        std::shared_ptr<RenderTexture> _textures[RenderTarget::MAXCOUNT] = {nil, nil, nil, nil};
         unsigned _count;
         
         id<MTLTexture> _depth;
@@ -135,7 +122,6 @@ namespace foundation {
         void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) override;
         
         RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
-        ComputeShaderPtr createComputeShader(const char *name, const char *src) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
@@ -150,7 +136,6 @@ namespace foundation {
         void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) override;
         void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) override;
 
-        void compute(const ComputeShaderPtr &shader, const RenderTexturePtr *textures, std::uint32_t count, ComputeGridSize grid) override;
         void presentFrame() override;
         
     private:
@@ -160,8 +145,6 @@ namespace foundation {
         static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 64;
         
         struct FrameConstants {
-            //float vewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};     // view * proj matrix
-            //float invVewProjMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};  // inverted view * proj matrix
             float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // view matrix
             float projMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // proj matrix
             float cameraPosition[4] = {0, 0, 0, 1};
@@ -170,7 +153,7 @@ namespace foundation {
         }
         _frameConstants;
         
-        std::shared_ptr<PlatformInterface> _platform;
+        const std::shared_ptr<PlatformInterface> _platform;
         MTKView *_view = nil;
         
         id<MTLDevice> _device = nil;

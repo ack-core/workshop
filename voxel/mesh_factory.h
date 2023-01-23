@@ -9,7 +9,8 @@
 
 namespace voxel {
     struct VoxelInfo {
-        std::int16_t positionX, positionY, positionZ, colorIndex;
+        std::int16_t positionX, positionY, positionZ;
+        std::uint8_t colorIndex;
     };
     
     struct Mesh {
@@ -27,13 +28,15 @@ namespace voxel {
         static std::shared_ptr<MeshFactory> instance(const foundation::PlatformInterfacePtr &platform);
         
     public:
+        virtual const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const = 0;
+        
         // Load voxels from file and fill 'output' Mesh with loaded data
         // @voxPath - absolute path to '.vox' file
         // @offset  - values to be added to voxel position
         //
         virtual bool createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) = 0;
         
-    protected:
+    public:
         virtual ~MeshFactory() = default;
     };
     

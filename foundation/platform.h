@@ -152,7 +152,7 @@ namespace foundation {
         //
         virtual void exit() = 0;
 
-    protected:
+    public:
         virtual ~PlatformInterface() = default;
     };
     

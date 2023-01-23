@@ -7,7 +7,7 @@
 
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
-#include "foundation/gears/math.h"
+#include "foundation/math.h"
 
 #include "mesh_factory.h"
 
@@ -19,15 +19,17 @@ namespace voxel {
     // + Static and dynamic models rendering
     // + Sun and shadows from it
     // + Local light source
+    // + Camera management
     //
-    class Scene {
+    class SceneInterface {
     public:
-        static std::shared_ptr<Scene> instance(const voxel::MeshFactoryPtr &factory, const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const char *palette);
-
+        static std::shared_ptr<SceneInterface> instance(const foundation::RenderingInterfacePtr &rendering, const voxel::MeshFactoryPtr &factory, const char *palette);
+        
     public:
         virtual const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const = 0;
         virtual const std::shared_ptr<foundation::RenderingInterface> &getRenderingInterface() const = 0;
         
+        virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) = 0;
         virtual void setObservingPoint(const math::vector3f &position) = 0;
         virtual void setSun(const math::vector3f &direction, const math::color &rgba) = 0;
         
@@ -39,10 +41,10 @@ namespace voxel {
         
         virtual void updateAndDraw(float dtSec) = 0;
         
-    protected:
-        virtual ~Scene() = default;
+    public:
+        virtual ~SceneInterface() = default;
     };
-
-    using ScenePtr = std::shared_ptr<Scene>;
+    
+    using SceneInterfacePtr = std::shared_ptr<SceneInterface>;
 }
 

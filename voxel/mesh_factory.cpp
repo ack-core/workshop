@@ -2,7 +2,6 @@
 #include "mesh_factory.h"
 
 #include "thirdparty/upng/upng.h"
-#include "foundation/gears/parsing.h"
 
 namespace voxel {
     class MeshFactoryImpl : public std::enable_shared_from_this<MeshFactoryImpl>, public MeshFactory {
@@ -10,10 +9,11 @@ namespace voxel {
         MeshFactoryImpl(const foundation::PlatformInterfacePtr &platform);
         ~MeshFactoryImpl() override;
         
+        const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const override;
         bool createMesh(const char *resourcePath, const int16_t(&offset)[3], Mesh &output) override;
         
     private:
-        std::shared_ptr<foundation::PlatformInterface> _platform;
+        const std::shared_ptr<foundation::PlatformInterface> _platform;
     };
     
     MeshFactoryImpl::MeshFactoryImpl(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform) {
@@ -23,7 +23,11 @@ namespace voxel {
     MeshFactoryImpl::~MeshFactoryImpl() {
 
     }
-    
+
+    const std::shared_ptr<foundation::PlatformInterface> &MeshFactoryImpl::getPlatformInterface() const {
+        return _platform;
+    }
+
     bool MeshFactoryImpl::createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) {
         const std::int32_t version = 150;
         

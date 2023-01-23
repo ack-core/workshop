@@ -5,7 +5,6 @@ cmake_policy(SET CMP0091 NEW)
 # platform-specific settings
 
 set(PLATFORM_POSTFIX "unknown")
-
 if(${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
 	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 	set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /EHsc /std:c++17")
@@ -41,6 +40,8 @@ include_directories("${m_source_root}")
 add_subdirectory("${m_source_root}/thirdparty/upng")
 add_subdirectory("${m_source_root}/foundation")
 add_subdirectory("${m_source_root}/voxel")
+add_subdirectory("${m_source_root}/ui")
+add_subdirectory("${m_source_root}/game")
 
 set(
 	m_sources_list
@@ -49,10 +50,11 @@ set(
 source_group("" FILES ${m_sources_list})
 add_executable(workshop ${m_sources_list})
 
-
 target_link_libraries(workshop PUBLIC upng)
 target_link_libraries(workshop PUBLIC foundation)
 target_link_libraries(workshop PUBLIC voxel)
+target_link_libraries(workshop PUBLIC ui)
+target_link_libraries(workshop PUBLIC game)
 
 set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY_DEBUG "${m_source_root}/binary")
 set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY_RELEASE "${m_source_root}/binary")

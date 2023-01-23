@@ -178,24 +178,6 @@ namespace foundation {
 }
 
 namespace foundation {
-    MetalComputeShader::MetalComputeShader(const std::string &name, id<MTLLibrary> library)
-        : _name(name)
-        , _library(library)
-    {}
-    MetalComputeShader::~MetalComputeShader() {
-        _library = nil;
-    }
-    
-    id<MTLFunction> MetalComputeShader::getShader() const {
-        return [_library newFunctionWithName:@"main_compute"];
-    }
-    
-    const std::string &MetalComputeShader::getName() const {
-        return _name;
-    }
-}
-
-namespace foundation {
     MetalTexture::MetalTexture(id<MTLTexture> texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
         : _texture(texture)
         , _format(fmt)
@@ -272,7 +254,7 @@ namespace foundation {
         return _count;
     }
     
-    std::shared_ptr<RenderTexture> MetalTarget::getTexture(unsigned index) {
+    const std::shared_ptr<RenderTexture> &MetalTarget::getTexture(unsigned index) const {
         return _textures[index];
     }
 
@@ -807,105 +789,7 @@ namespace foundation {
 
         return result;
     }
-    
-    ComputeShaderPtr MetalRendering::createComputeShader(const char *name, const char *shadersrc) {
-        std::shared_ptr<ComputeShader> result;
-        std::istringstream input(shadersrc);
-        const std::string indent = "    ";
         
-        if (_shaderNames.find(name) == _shaderNames.end()) {
-            _shaderNames.emplace(name);
-        }
-        else {
-            _platform->logError("[MetalRendering::createComputeShader] shader name '%s' already used\n", name);
-        }
-        
-        std::string nativeShader =
-            "#include <metal_stdlib>\n"
-            "using namespace metal;\n"
-            "\n"
-            "#define _sign(a) (2.0 * step(0.0, a) - 1.0)\n"
-            "#define _sin(a) sin(a)\n"
-            "#define _cos(a) cos(a)\n"
-            "#define _abs(a) abs(a)\n"
-            "#define _sat(a) saturate(a)\n"
-            "#define _frac(a) fract(a)\n"
-            "#define _asFloat(a) as_type<float>(a)\n"
-            "#define _asUint(a) as_type<uint>(a)\n"
-            "#define _transform(a, b) (b * a)\n"
-            "#define _dot(a, b) dot(a, b)\n"
-            "#define _cross(a, b) cross(a, b)\n"
-            "#define _len(a) length(a)\n"
-            "#define _pow(a, b) pow(a, b)\n"
-            "#define _fract(a) fract(a)\n"
-            "#define _floor(a) floor(a)\n"
-            "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
-            "#define _norm(a) normalize(a)\n"
-            "#define _lerp(a, b, k) mix(a, b, k)\n"
-            "#define _step(k, a) step(k, a)\n"
-            "#define _smooth(a, b, k) smoothstep(a, b, k)\n"
-            "#define _min(a, b) min(a, b)\n"
-            "#define _max(a, b) max(a, b)\n"
-            "#define _read(i, c) _texture0.read(c)\n"
-            "#define _write(i, c, a) _texture##i.write(a, c)\n"
-            "\n";
-
-        std::string blockName;
-        bool entryBlockDone = false;
-        
-        while (input >> blockName) {
-            if (entryBlockDone == false && blockName == "entry" && (input >> expect<'{'>)) {
-                nativeShader +=
-                    "kernel void main_compute(\n    "
-                    "texture2d<float, access::read_write> _texture0 [[texture(0)]],\n    "
-                    "texture2d<float, access::read_write> _texture1 [[texture(1)]],\n    "
-                    "uint3 thread_index [[thread_position_in_grid]])\n{\n"
-                    "";
-                
-                std::string codeBlock;
-
-                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
-                    _platform->logError("[MetalRendering::createComputeShader] shader '%s' has uncompleted 'entry' block\n", name);
-                    break;
-                }
-                
-                nativeShader += codeBlock;
-                nativeShader += "}\n";
-                entryBlockDone = true;
-                continue;
-            }
-            
-            _platform->logError("[MetalRendering::createComputeShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
-        }
-        
-        nativeShader = shaderUtils::makeLines(nativeShader);
-        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
-        
-        if (entryBlockDone) {
-            @autoreleasepool {
-                NSError *nsError = nil;
-                MTLCompileOptions* compileOptions = [MTLCompileOptions new];
-                compileOptions.languageVersion = MTLLanguageVersion2_0;
-                compileOptions.fastMathEnabled = true;
-                
-                id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
-                
-                if (library) {
-                    result = std::make_shared<MetalComputeShader>(name, library);
-                }
-                else {
-                    const char *errorDesc = [[nsError localizedDescription] UTF8String];
-                    _platform->logError("[MetalRendering::createComputeShader] '%s' generated code:\n--------------------\n%s\n--------------------\n%s\n", name, nativeShader.data(), errorDesc);
-                }
-            }
-        }
-        else {
-            _platform->logError("[MetalRendering::createComputeShader] shader '%s' missing 'entry' block\n", name);
-        }
-        
-        return result;
-    }
-    
     namespace {
         static MTLPixelFormat nativeTextureFormat[] = {
             MTLPixelFormatInvalid,
@@ -1173,51 +1057,6 @@ namespace foundation {
             [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
             [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
         }
-    }
-    
-    void MetalRendering::compute(const ComputeShaderPtr &shader, const RenderTexturePtr *textures, std::uint32_t count, ComputeGridSize grid) {
-        if (_currentRenderCommandEncoder) {
-            [_currentRenderCommandEncoder endEncoding];
-            _currentRenderCommandEncoder = nil;
-            _currentShader = nullptr;
-        }
-        
-        if (_currentCommandBuffer == nil) {
-            _currentCommandBuffer = [_commandQueue commandBuffer];
-        }
-        
-//        const MetalComputeShader *platformShader = static_cast<const MetalComputeShader *>(shader.get());
-//        const MetalTexture *platformWorkingTexture = static_cast<const MetalTexture *>(working.get());
-//        const MetalTexture *platformTempTexture = static_cast<const MetalTexture *>(tmp.get());
-//
-//        id<MTLComputePipelineState> state = nil;
-//
-//        if (platformShader) {
-//            auto index = _computePipelineStates.find(platformShader->getName());
-//            if (index == _computePipelineStates.end()) {
-//                NSError *error;
-//                if ((state = [_device newComputePipelineStateWithFunction:platformShader->getShader() error:&error]) != nil) {
-//                    _computePipelineStates.emplace(platformShader->getName(), state);
-//                }
-//                else {
-//                    _platform->logError("[MetalRendering::compute] %s\n", [[error localizedDescription] UTF8String]);
-//                }
-//            }
-//            else {
-//                state = index->second;
-//            }
-//
-//            id<MTLComputeCommandEncoder> computeEncoder = [_currentCommandBuffer computeCommandEncoder];
-//            [computeEncoder setComputePipelineState:state];
-//            [computeEncoder setTexture:platformWorkingTexture->getNativeTexture() atIndex:0];
-//            [computeEncoder setTexture:platformTempTexture->getNativeTexture() atIndex:1];
-//
-//            MTLSize groupSize = MTLSizeMake(8, 8, 1);
-//            MTLSize groupsPerGridSize = MTLSizeMake(grid.x / groupSize.width, grid.y / groupSize.height, 1);
-//
-//            [computeEncoder dispatchThreadgroups:groupsPerGridSize threadsPerThreadgroup:groupSize];
-//            [computeEncoder endEncoding];
-//        }
     }
     
     void MetalRendering::presentFrame() {

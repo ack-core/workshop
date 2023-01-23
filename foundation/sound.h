@@ -13,7 +13,7 @@ namespace foundation {
 
     public:
 
-    protected:
+    public:
         virtual ~SoundInterface() = default;
     };
 }
