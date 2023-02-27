@@ -41,6 +41,7 @@ add_subdirectory("${m_source_root}/thirdparty/upng")
 add_subdirectory("${m_source_root}/foundation")
 add_subdirectory("${m_source_root}/voxel")
 add_subdirectory("${m_source_root}/ui")
+add_subdirectory("${m_source_root}/datahub")
 add_subdirectory("${m_source_root}/game")
 
 set(
@@ -54,6 +55,7 @@ target_link_libraries(workshop PUBLIC upng)
 target_link_libraries(workshop PUBLIC foundation)
 target_link_libraries(workshop PUBLIC voxel)
 target_link_libraries(workshop PUBLIC ui)
+target_link_libraries(workshop PUBLIC datahub)
 target_link_libraries(workshop PUBLIC game)
 
 set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY_DEBUG "${m_source_root}/binary")

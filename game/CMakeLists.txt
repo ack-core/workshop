@@ -3,6 +3,7 @@ get_filename_component(m_source_root "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 set(
 	m_sources_list
+	"${m_source_root}/game.h"
 	"${m_source_root}/state_manager.h"
 	"${m_source_root}/state_manager.cpp"
 )

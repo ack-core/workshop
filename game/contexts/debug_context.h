@@ -5,15 +5,13 @@
 namespace game {
     class DebugContext : public Context {
     public:
-        DebugContext(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui);
+        DebugContext(API &&api);
         ~DebugContext() override;
         
         void update(float dtSec) override;
         
     private:
-        const foundation::PlatformInterfacePtr _platform;
-        const voxel::SceneInterfacePtr _scene;
-        const ui::StageInterfacePtr _ui;
+        const API _api;
     
         bool _mouseLocked = false;
         math::vector2f _lockedMouseCoordinates;

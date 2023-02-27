@@ -6,12 +6,20 @@
 #include <memory>
 
 #include "voxel/scene.h"
+#include "voxel/yard.h"
 #include "ui/stage.h"
+#include "datahub/datahub.h"
 
 namespace game {
     class StateManager {
     public:
-        static std::shared_ptr<StateManager> instance(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui);
+        static std::shared_ptr<StateManager> instance(
+            const foundation::PlatformInterfacePtr &platform,
+            const voxel::SceneInterfacePtr &scene,
+            const voxel::YardInterfacePtr &yard,
+            const ui::StageInterfacePtr &ui,
+            const dh::DataHubPtr &dh
+        );
         
     public:
         virtual void switchToState(const char *name) = 0;

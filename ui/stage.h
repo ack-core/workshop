@@ -24,12 +24,9 @@ namespace ui {
     
     class StageInterface {
     public:
-        static std::shared_ptr<StageInterface> instance(const foundation::RenderingInterfacePtr &rendering);
+        static std::shared_ptr<StageInterface> instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
         
     public:
-        virtual const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const = 0;
-        virtual const std::shared_ptr<foundation::RenderingInterface> &getRenderingInterface() const = 0;
-        
         virtual ElementToken addRect(ElementToken parent, const math::vector2f &lt, const math::vector2f &size) = 0;
         virtual void setActionHandler(ElementToken element, std::function<void(ActionType type)> &handler) = 0;
         virtual void removeElement(ElementToken token) = 0;

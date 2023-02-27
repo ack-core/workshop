@@ -1,30 +1,21 @@
 
 #include "state_manager.h"
 
-#include "contexts/context.h"
-#include "contexts/debug_context.h"
+#include "game.h"
 
 #include <unordered_map>
 #include <vector>
 
 namespace game {
-    using MakeContextFunc = std::unique_ptr<Context>(*)(const voxel::SceneInterfacePtr &, const ui::StageInterfacePtr &);
-    // Rule of states:
-    // Context is created if the next state contains it and previous state does not
-    // Context is deleted if the next state does not contain it
-    const std::unordered_map<const char *, std::vector<MakeContextFunc>> states = {
-        {"default",
-            {
-                &makeContext<DebugContext>
-            }
-        },
-    };
-}
-
-namespace game {
     class StateManagerImpl : public StateManager {
     public:
-        StateManagerImpl(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui);
+        StateManagerImpl(
+            const foundation::PlatformInterfacePtr &platform,
+            const voxel::SceneInterfacePtr &scene,
+            const voxel::YardInterfacePtr &yard,
+            const ui::StageInterfacePtr &ui,
+            const dh::DataHubPtr &dh
+        );
         ~StateManagerImpl() override;
         
         void switchToState(const char *name) override;
@@ -33,20 +24,36 @@ namespace game {
     private:
         const foundation::PlatformInterfacePtr _platform;
         const voxel::SceneInterfacePtr _scene;
+        const voxel::YardInterfacePtr _yard;
         const ui::StageInterfacePtr _ui;
+        const dh::DataHubPtr _dh;
         
         std::string _currentStateName = "default";
         std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> _currentContextList;
     };
     
-    std::shared_ptr<StateManager> StateManager::instance(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui) {
-        return std::make_shared<StateManagerImpl>(scene, ui);
+    std::shared_ptr<StateManager> StateManager::instance(
+        const foundation::PlatformInterfacePtr &platform,
+        const voxel::SceneInterfacePtr &scene,
+        const voxel::YardInterfacePtr &yard,
+        const ui::StageInterfacePtr &ui,
+        const dh::DataHubPtr &dh
+    ) {
+        return std::make_shared<StateManagerImpl>(platform, scene, yard, ui, dh);
     }
     
-    StateManagerImpl::StateManagerImpl(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui)
-    : _platform(scene->getPlatformInterface())
+    StateManagerImpl::StateManagerImpl(
+        const foundation::PlatformInterfacePtr &platform,
+        const voxel::SceneInterfacePtr &scene,
+        const voxel::YardInterfacePtr &yard,
+        const ui::StageInterfacePtr &ui,
+        const dh::DataHubPtr &dh
+    )
+    : _platform(platform)
     , _scene(scene)
+    , _yard(yard)
     , _ui(ui)
+    , _dh(dh)
     {
         switchToState("default");
     }
@@ -63,7 +70,7 @@ namespace game {
             for (auto& makeContextFunction : index->second) {
                 auto index = _currentContextList.find(makeContextFunction);
                 if (index == _currentContextList.end()) {
-                    _newContextList.emplace(makeContextFunction, makeContextFunction(_scene, _ui));
+                    _newContextList.emplace(makeContextFunction, makeContextFunction(API{_platform, _scene, _yard, _ui, _dh}));
                 }
                 else {
                     _newContextList.emplace(index->first, std::move(index->second));

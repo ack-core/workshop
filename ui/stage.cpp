@@ -11,13 +11,10 @@
 namespace ui {
     class StageInterfaceImpl : public StageInterface {
     public:
-        StageInterfaceImpl(const foundation::RenderingInterfacePtr &rendering);
+        StageInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
         ~StageInterfaceImpl() override;
         
     public:
-        const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const override { return _platform; }
-        const std::shared_ptr<foundation::RenderingInterface> &getRenderingInterface() const override { return _rendering; }
-        
         ElementToken addRect(ElementToken parent, const math::vector2f &lt, const math::vector2f &size) override;
         void setActionHandler(ElementToken element, std::function<void(ActionType type)> &handler) override;
         void removeElement(ElementToken token) override;
@@ -29,13 +26,16 @@ namespace ui {
         const foundation::RenderingInterfacePtr _rendering;
     };
 
-    std::shared_ptr<StageInterface> StageInterface::instance(const foundation::RenderingInterfacePtr &rendering) {
-        return std::make_shared<StageInterfaceImpl>(rendering);
+    std::shared_ptr<StageInterface> StageInterface::instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering) {
+        return std::make_shared<StageInterfaceImpl>(platform, rendering);
     }
 }
 
 namespace ui {
-    StageInterfaceImpl::StageInterfaceImpl(const foundation::RenderingInterfacePtr &rendering) : _platform(rendering->getPlatformInterface()), _rendering(rendering) {
+    StageInterfaceImpl::StageInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering)
+    : _platform(platform)
+    , _rendering(rendering)
+    {
     
     }
     

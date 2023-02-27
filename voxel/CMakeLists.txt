@@ -7,6 +7,8 @@ set(
 	"${m_source_root}/mesh_factory.cpp"
 	"${m_source_root}/scene.h"
 	"${m_source_root}/scene.cpp"
+	"${m_source_root}/yard.h"
+	"${m_source_root}/yard.cpp"
 )
 source_group("" FILES ${m_sources_list})
 add_library(voxel ${m_sources_list})

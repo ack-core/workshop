@@ -9,7 +9,6 @@ namespace voxel {
         MeshFactoryImpl(const foundation::PlatformInterfacePtr &platform);
         ~MeshFactoryImpl() override;
         
-        const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const override;
         bool createMesh(const char *resourcePath, const int16_t(&offset)[3], Mesh &output) override;
         
     private:
@@ -22,10 +21,6 @@ namespace voxel {
     
     MeshFactoryImpl::~MeshFactoryImpl() {
 
-    }
-
-    const std::shared_ptr<foundation::PlatformInterface> &MeshFactoryImpl::getPlatformInterface() const {
-        return _platform;
     }
 
     bool MeshFactoryImpl::createMesh(const char *voxPath, const int16_t(&offset)[3], Mesh &output) {

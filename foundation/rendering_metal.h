@@ -117,8 +117,6 @@ namespace foundation {
         MetalRendering(const std::shared_ptr<PlatformInterface> &platform);
         ~MetalRendering() override;
         
-        const std::shared_ptr<PlatformInterface> &getPlatformInterface() const override;
-        
         void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) override;
         
         RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;

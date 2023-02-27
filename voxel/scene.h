@@ -23,14 +23,16 @@ namespace voxel {
     //
     class SceneInterface {
     public:
-        static std::shared_ptr<SceneInterface> instance(const foundation::RenderingInterfacePtr &rendering, const voxel::MeshFactoryPtr &factory, const char *palette);
+        static std::shared_ptr<SceneInterface> instance(
+            const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
+            const voxel::MeshFactoryPtr &factory,
+            const char *palette
+        );
         
     public:
-        virtual const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const = 0;
-        virtual const std::shared_ptr<foundation::RenderingInterface> &getRenderingInterface() const = 0;
-        
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) = 0;
-        virtual void setObservingPoint(const math::vector3f &position) = 0;
+        virtual void setSceneCenter(const math::vector3f &position) = 0;
         virtual void setSun(const math::vector3f &direction, const math::color &rgba) = 0;
         
         virtual SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) = 0;

@@ -2,13 +2,13 @@
 #include "debug_context.h"
 
 namespace game {
-    template <> std::unique_ptr<Context> makeContext<DebugContext>(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui) {
-        return std::make_unique<DebugContext>(scene, ui);
+    template <> std::unique_ptr<Context> makeContext<DebugContext>(API &&api) {
+        return std::make_unique<DebugContext>(std::move(api));
     }
     
-    DebugContext::DebugContext(const voxel::SceneInterfacePtr &scene, const ui::StageInterfacePtr &ui) : _platform(scene->getPlatformInterface()), _scene(scene), _ui(ui) {
-        _scene->setCameraLookAt(_center + _orbit, _center);
-        _touchEventHandlerToken = _platform->addTouchEventHandler(
+    DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
+        _api.scene->setCameraLookAt(_center + _orbit, _center);
+        _touchEventHandlerToken = _api.platform->addTouchEventHandler(
             [this](const foundation::PlatformTouchEventArgs &args) {
                 if (args.type == foundation::PlatformTouchEventArgs::EventType::START) {
                     _mouseLocked = true;
@@ -28,7 +28,7 @@ namespace game {
                             _orbit = rotatedOrbit;
                         }
 
-                        _scene->setCameraLookAt(_center + _orbit, _center);
+                        _api.scene->setCameraLookAt(_center + _orbit, _center);
                         _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
                     }
                 }
@@ -38,15 +38,14 @@ namespace game {
             }
         );
         
-        _scene->addStaticModel("1.vox", {-16, 0, -16});
-        _scene->addStaticModel("1.vox", {23, 0, -16});
-        _scene->addStaticModel("knight.vox", {-12, 1, 6});
-        _scene->setCameraLookAt(math::vector3f(45.0f, 45.0f, 45.0f), math::vector3f(0, 0, 0));
+        _api.scene->addStaticModel("1.vox", {-16, 0, -16});
+        _api.scene->addStaticModel("1.vox", {23, 0, -16});
+        _api.scene->addStaticModel("knight.vox", {-12, 1, 6});
+        _api.scene->setCameraLookAt(math::vector3f(45.0f, 45.0f, 45.0f), math::vector3f(0, 0, 0));
     }
     
     DebugContext::~DebugContext() {
-        _platform->removeEventHandler(_touchEventHandlerToken);
-        _touchEventHandlerToken = {};
+        _api.platform->removeEventHandler(_touchEventHandlerToken);
     }
     
     void DebugContext::update(float dtSec) {

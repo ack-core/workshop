@@ -69,18 +69,26 @@ namespace foundation {
 
     // TODO:
     struct PlatformGamepadEventArgs {};
+    
+    
+    class LoggerInterface {
+    public:
+        virtual void logMsg(const char *fmt, ...) = 0;
+        virtual void logError(const char *fmt, ...) = 0;
 
+    public:
+        virtual ~LoggerInterface() = default;
+    };
+    
+    using LoggerInterfacePtr = std::shared_ptr<LoggerInterface>;
+    
     // Interface provides low-level core methods
     //
-    class PlatformInterface {
+    class PlatformInterface : public LoggerInterface {
     public:
         static std::shared_ptr<PlatformInterface> instance();
 
     public:
-        // Logging
-        virtual void logMsg(const char *fmt, ...) = 0;
-        virtual void logError(const char *fmt, ...) = 0;
-
         // Forms std::vector of file paths in @dirPath
         // @dirPath  - target directory. Example: "data/map1"
         // @return   - vector of entries
@@ -156,5 +164,5 @@ namespace foundation {
         virtual ~PlatformInterface() = default;
     };
     
-    using PlatformInterfacePtr = std::shared_ptr<PlatformInterface>;    
+    using PlatformInterfacePtr = std::shared_ptr<PlatformInterface>;
 }

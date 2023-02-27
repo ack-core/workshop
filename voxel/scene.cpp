@@ -32,14 +32,16 @@ namespace voxel {
     
     class SceneInterfaceImpl : public SceneInterface {
     public:
-        SceneInterfaceImpl(const foundation::RenderingInterfacePtr &rendering, const voxel::MeshFactoryPtr &factory, const char *palette);
+        SceneInterfaceImpl(
+            const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
+            const voxel::MeshFactoryPtr &factory,
+            const char *palette
+        );
         ~SceneInterfaceImpl() override;
         
-        const std::shared_ptr<foundation::PlatformInterface> &getPlatformInterface() const override { return _platform; }
-        const std::shared_ptr<foundation::RenderingInterface> &getRenderingInterface() const override { return _rendering; }
-
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) override;
-        void setObservingPoint(const math::vector3f &position) override;
+        void setSceneCenter(const math::vector3f &position) override;
         void setSun(const math::vector3f &direction, const math::color &rgba) override;
 
         SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) override;
@@ -93,8 +95,13 @@ namespace voxel {
         foundation::RenderTargetPtr _gbuffer;
     };
     
-    std::shared_ptr<SceneInterface> SceneInterface::instance(const foundation::RenderingInterfacePtr &rendering, const voxel::MeshFactoryPtr &factory, const char *palette) {
-        return std::make_shared<SceneInterfaceImpl>(rendering, factory, palette);
+    std::shared_ptr<SceneInterface> SceneInterface::instance(
+        const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const voxel::MeshFactoryPtr &factory,
+        const char *palette
+    ) {
+        return std::make_shared<SceneInterfaceImpl>(platform, rendering, factory, palette);
     }
 }
 
@@ -298,8 +305,13 @@ namespace {
 }
 
 namespace voxel {
-    SceneInterfaceImpl::SceneInterfaceImpl(const foundation::RenderingInterfacePtr &rendering, const voxel::MeshFactoryPtr &factory, const char *palette)
-    : _platform(rendering->getPlatformInterface())
+    SceneInterfaceImpl::SceneInterfaceImpl(
+        const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const voxel::MeshFactoryPtr &factory,
+        const char *palette
+    )
+    : _platform(platform)
     , _rendering(rendering)
     , _factory(factory)
     {
@@ -372,7 +384,7 @@ namespace voxel {
         _updateMatrices();
     }
     
-    void SceneInterfaceImpl::setObservingPoint(const math::vector3f &position) {
+    void SceneInterfaceImpl::setSceneCenter(const math::vector3f &position) {
         
     }
     

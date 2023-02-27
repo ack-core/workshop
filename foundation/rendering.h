@@ -168,8 +168,6 @@ namespace foundation {
         static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
         
     public:
-        virtual const std::shared_ptr<PlatformInterface> &getPlatformInterface() const = 0;
-        
         // Set global per-frame constants, available from shaders
         // @proj  - proj matrix
         // @view  - view matrix

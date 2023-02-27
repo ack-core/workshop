@@ -312,10 +312,6 @@ namespace foundation {
 
     MetalRendering::~MetalRendering() {}
 
-    const std::shared_ptr<PlatformInterface> &MetalRendering::getPlatformInterface() const {
-        return _platform;
-    }
-    
     void MetalRendering::updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
         //::memcpy(_frameConstants.vewProjMatrix, VP, 16 * sizeof(float));
         ::memcpy(_frameConstants.viewMatrix, view, 16 * sizeof(float));
