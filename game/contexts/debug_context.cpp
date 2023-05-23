@@ -1,6 +1,8 @@
 
 #include "debug_context.h"
 
+extern int dbg_counter;
+
 namespace game {
     template <> std::unique_ptr<Context> makeContext<DebugContext>(API &&api) {
         return std::make_unique<DebugContext>(std::move(api));
@@ -34,14 +36,39 @@ namespace game {
                 }
                 if (args.type == foundation::PlatformTouchEventArgs::EventType::FINISH) {
                     _mouseLocked = false;
+                    if (args.coordinateX < 50 && args.coordinateY < 50) {
+                        if (dbg_counter > 0) dbg_counter--;
+                    }
+                    if (args.coordinateX > _api.platform->getScreenWidth() - 50 && args.coordinateY < 50) {
+                        if (dbg_counter < 1000) dbg_counter++;
+                    }
                 }
             }
         );
         
-        _api.scene->addStaticModel("1.vox", {-16, 0, -16});
-        _api.scene->addStaticModel("1.vox", {23, 0, -16});
-        _api.scene->addStaticModel("knight.vox", {-12, 1, 6});
-        _api.scene->setCameraLookAt(math::vector3f(45.0f, 45.0f, 45.0f), math::vector3f(0, 0, 0));
+        if (_api.yard->loadYard("default.yard")) {
+            _api.yard->addObject("player");
+        }
+        
+//        {
+//            voxel::Mesh mesh;
+//            int16_t offset[3] = {-22, -1, -8};
+//
+//            if (_api.factory->createMesh("1.vox", offset, mesh)) {
+//                _api.scene->addStaticModel(mesh, {});
+//            }
+//        }
+//
+//        {
+//            voxel::Mesh mesh;
+//            int16_t offset[3] = {-2, 0, -2};
+//
+//            if (_api.factory->createMesh("knight.vox", offset, mesh)) {
+//                _api.scene->addDynamicModel(mesh, {3, 0, 0}, M_PI / 4.0);
+//            }
+//        }
+
+        _api.scene->setCameraLookAt(_center + _orbit, _center);
     }
     
     DebugContext::~DebugContext() {

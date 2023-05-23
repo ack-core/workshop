@@ -9,10 +9,7 @@
 #include <unordered_map>
 #include <sstream>
 
-// TODO: v remove _indexByName
-//       v scope name in parsing errors
-//       - errors printing
-//       - try to remove ScopeToken (use ptr)
+// TODO: tests
 
 namespace {
     template <typename = void> std::istream &expect(std::istream &stream) {
@@ -65,9 +62,9 @@ namespace {
         return g_nextEventToken++;
     }
 
-    dh::ScopeToken getNextScopeToken() {
-        static dh::ScopeToken g_nextScopeToken = 0x800000;
-        return g_nextScopeToken = (g_nextScopeToken + 1) & 0xffffff;
+    dh::ScopeId getNextScopeId() {
+        static dh::ScopeId g_nextScopeId = 0x800000;
+        return g_nextScopeId = (g_nextScopeId + 1) & 0xffffff;
     }
 
     std::uint64_t getCurrentTimeStamp() {
@@ -86,21 +83,36 @@ namespace {
     };
     
     class MemoryQueue {
+        struct Msg {
+            MsgHeader header;
+            std::unique_ptr<std::uint8_t[]> data;
+            std::size_t length;
+        };
+    
     public:
-        MemoryQueue() {
-        
-        }
-
         void enqueue( const MsgHeader &header, const void *data, std::size_t length ) {
-        
+            std::lock_guard<std::mutex> guard(_mutex);
+            std::unique_ptr<std::uint8_t[]> m = std::make_unique<std::uint8_t[]>(length);
+            memcpy(m.get(), data, length);
+            _queue.emplace(Msg{header, std::move(m), length});
         }
         
-        bool dequeue( MsgHeader &header, std::unique_ptr<std::uint8_t> &data, std::size_t &length ) {
-        
+        bool dequeue( MsgHeader &header, std::unique_ptr<std::uint8_t[]> &data, std::size_t &length ) {
+            std::lock_guard<std::mutex> guard(_mutex);
+            
+            if (_queue.empty() == false) {
+                header = _queue.front().header;
+                data = std::move(_queue.front().data);
+                length = _queue.front().length;
+                _queue.pop();
+            }
+            
+            return false;
         }
         
     private:
-        
+        std::mutex _mutex;
+        std::queue<Msg> _queue;
     };
 }
 
@@ -121,9 +133,9 @@ namespace dh {
         Array(TemplateIndex templateIndex) : scopeTemplateIndex(templateIndex) {}
         
         const TemplateIndex scopeTemplateIndex;
-        std::unordered_map<ScopeToken, std::shared_ptr<ScopeImpl>> items;
-        std::vector<std::pair<EventToken, std::function<void(ScopeToken, ReadAccessor&)>>> onAddedHandlers;
-        std::vector<std::pair<EventToken, std::function<void(ScopeToken)>>> onRemoveHandlers;
+        std::unordered_map<ScopeId, std::shared_ptr<ScopeImpl>> items;
+        std::vector<std::pair<EventToken, std::function<void(const ScopePtr &)>>> onAddedHandlers;
+        std::vector<std::pair<EventToken, std::function<void(ScopeId)>>> onRemoveHandlers;
     };
     
     struct Element {
@@ -162,84 +174,12 @@ namespace dh {
 }
 
 namespace dh {
-    class ScopeSerializer : public WriteAccessor {
-    public:
-        ScopeSerializer(ScopeToken scopeId, TemplateIndex templateIndex, const ScopeTemplate &scopeTemplate);
-        ~ScopeSerializer() = default;
-        
-        void setBool(const char *name, bool value) override { _setValue(name, value); }
-        void setNumber(const char *name, double value) override { _setValue(name, value); }
-        void setInteger(const char *name, int value) override { _setValue(name, value); }
-        void setString(const char *name, const std::string &value) override;
-        void setVector2f(const char *name, const math::vector2f &value) override { _setValue(name, value); }
-        void setVector3f(const char *name, const math::vector3f &value) override { _setValue(name, value); }
-        
-        const void *getData() const;
-        std::size_t getLength() const;
-        
-    private:
-        std::uint8_t *_getStorage(std::size_t length);
-        template<typename T> void _setValue(const char *name, const T &value);
-
-        const ScopeTemplate &_template;
-        std::vector<std::uint8_t> _buffer;
-    };
-}
-
-namespace dh {
-    ScopeSerializer::ScopeSerializer(ScopeToken scopeId, TemplateIndex templateIndex, const ScopeTemplate &scopeTemplate) : _template(scopeTemplate) {
-        std::uint8_t *ptr = _getStorage(sizeof(ScopeToken) + sizeof(TemplateIndex));
-        *(ScopeToken *)ptr = scopeId;
-        *(TemplateIndex *)(ptr + sizeof(ScopeToken)) = templateIndex;
-    }
-    
-    const void *ScopeSerializer::getData() const {
-        return _buffer.data();
-    }
-    
-    std::size_t ScopeSerializer::getLength() const {
-        return _buffer.size();
-    }
-    
-    std::uint8_t *ScopeSerializer::_getStorage(std::size_t length) {
-        std::size_t offset = _buffer.size();
-        _buffer.resize(_buffer.size() + length);
-        return _buffer.data() + offset;
-    }
-    
-    void ScopeSerializer::setString(const char *name, const std::string &value) {
-        for (ElementIndex elementIndex = 0; elementIndex < _template.size(); elementIndex++) {
-            if (_template[elementIndex].first == name) {
-                std::uint8_t *ptr = _getStorage(sizeof(ElementIndex) + sizeof(std::uint16_t) + value.length());
-                *(ElementIndex *)ptr = elementIndex;
-                *(std::uint16_t *)(ptr + sizeof(ElementIndex)) = value.length();
-                memcpy(ptr + sizeof(ElementIndex) + sizeof(std::uint16_t), value.data(), value.length());
-                return;
-            }
-        }
-
-        // error
-    }
-    
-    template<typename T> void ScopeSerializer::_setValue(const char *name, const T &value) {
-        for (ElementIndex elementIndex = 0; elementIndex < _template.size(); elementIndex++) {
-            if (_template[elementIndex].first == name) {
-                std::uint8_t *ptr = _getStorage(sizeof(ElementIndex) + sizeof(T));
-                *(ElementIndex *)ptr = elementIndex;
-                *(T *)(ptr + sizeof(ElementIndex)) = value;
-                return;
-            }
-        }
-        
-        // error
-    }
-}
-
-namespace dh {
     class ScopeImpl : public Scope {
     public:
-        ScopeImpl(foundation::LoggerInterface &logger, ScopeToken scopeId, TemplateIndex templateIndex, const TemplateArray &scopeTemplates, MemoryQueue &queue);
+        ScopeImpl(foundation::LoggerInterface &logger, ScopeId scopeId, TemplateIndex templateIndex, const TemplateArray &scopeTemplates, MemoryQueue &queue);
         ~ScopeImpl() = default;
+        
+        auto getId() const -> ScopeId override { return _id; }
         
         void setBool(const char *name, bool value) override { _setValue(name, value); }
         void setNumber(const char *name, double value) override { _setValue(name, value); }
@@ -262,15 +202,15 @@ namespace dh {
         void onVector2fChanged(EventToken &h, const char *name, std::function<void(const math::vector2f &)> &&f) override { _setOnChangedHandler(h, name, std::move(f)); }
         void onVector3fChanged(EventToken &h, const char *name, std::function<void(const math::vector3f &)> &&f) override { _setOnChangedHandler(h, name, std::move(f)); }
         
-        void onItemAdded(EventToken &handler, const char *arrayName, std::function<void(ScopeToken,  ReadAccessor&)> &&f) override;
-        void onItemRemoved(EventToken &handler, const char *arrayName, std::function<void(ScopeToken)> &&f) override;
-
+        void onItemAdded(EventToken &handler, const char *arrayName, std::function<void(const ScopePtr &)> &&f) override;
+        void onItemRemoved(EventToken &handler, const char *arrayName, std::function<void(ScopeId)> &&f) override;
+        
         void removeOnChangedHandler(const char *name, EventToken handler);
         void removeOnItemAddedHandler(const char *arrayName, EventToken handler);
         void removeOnItemRemovedHandler(const char *arrayName, EventToken handler);
-
-        void addItem(ScopeToken &token, const char *arrayName, std::function<void(WriteAccessor&)> &&initializer) override;
-        void removeItem(const char *arrayName, ScopeToken token) override;
+        
+        auto addItem(const char *arrayName, std::function<void(WriteAccessor&)> &&initializer) -> ScopePtr override;
+        void removeItem(const char *arrayName, const ScopePtr &scope) override;
         
         TemplateIndex getTemplateIndex() const { return _scopeTemplateIndex; }
         Element *getElementAt(ElementIndex index) { return index < _elements.size() ? &_elements[index].second : nullptr; }
@@ -281,8 +221,8 @@ namespace dh {
         template<typename T> void _setValue(const char *name, const T &value);
         template<typename T> const T &_getValue(const char *name) const;
         void _setValue(const char *name, const std::string &value);
-
-        const ScopeToken _id;
+        
+        const ScopeId _id;
         const TemplateIndex _scopeTemplateIndex;
         const TemplateArray &_scopeTemplates;
         
@@ -293,7 +233,7 @@ namespace dh {
 }
 
 namespace dh {
-    ScopeImpl::ScopeImpl(foundation::LoggerInterface &logger, ScopeToken scopeId, TemplateIndex templateIndex, const TemplateArray &scopeTemplates, MemoryQueue &queue)
+    ScopeImpl::ScopeImpl(foundation::LoggerInterface &logger, ScopeId scopeId, TemplateIndex templateIndex, const TemplateArray &scopeTemplates, MemoryQueue &queue)
     : _logger(logger)
     , _id(scopeId)
     , _scopeTemplateIndex(templateIndex)
@@ -302,69 +242,78 @@ namespace dh {
     , _elements(scopeTemplates[templateIndex].second)
     {}
     
-    void ScopeImpl::onItemAdded(EventToken &handler, const char *arrayName, std::function<void(ScopeToken,  ReadAccessor&)> &&f) {
+    void ScopeImpl::onItemAdded(EventToken &handler, const char *arrayName, std::function<void(const ScopePtr &)> &&f) {
         for (auto &element : _elements) {
             if (element.first == arrayName) {
                 if (Array *array = std::get_if<Array>(&element.second.data)) {
                     handler = getNextEventToken();
                     array->onAddedHandlers.emplace_back(std::make_pair(handler, std::move(f)));
-                    return;
                 }
                 else {
                     _logger.logError("[ScopeImpl::onItemAdded] '%s' is not an array\n", arrayName);
                 }
+                
+                return;
             }
         }
         
         _logger.logError("[ScopeImpl::onItemAdded] Array '%s' not found\n", arrayName);
     }
     
-    void ScopeImpl::onItemRemoved(EventToken &handler, const char *arrayName, std::function<void(ScopeToken)> &&f) {
+    void ScopeImpl::onItemRemoved(EventToken &handler, const char *arrayName, std::function<void(ScopeId)> &&f) {
         for (auto &element : _elements) {
             if (element.first == arrayName) {
                 if (Array *array = std::get_if<Array>(&element.second.data)) {
                     handler = getNextEventToken();
                     array->onRemoveHandlers.emplace_back(std::make_pair(handler, std::move(f)));
-                    return;
                 }
                 else {
                     _logger.logError("[ScopeImpl::onItemRemoved] '%s' is not an array\n", arrayName);
                 }
+                
+                return;
             }
         }
-
+        
         _logger.logError("[ScopeImpl::onItemRemoved] Array '%s' not found\n", arrayName);
     }
     
-    void ScopeImpl::addItem(ScopeToken &token, const char *arrayName, std::function<void(WriteAccessor&)> &&initializer) {
+    ScopePtr ScopeImpl::addItem(const char *arrayName, std::function<void(WriteAccessor&)> &&initializer) {
         for (ElementIndex i = 0; i <_elements.size(); i++) {
             if (_elements[i].first == arrayName) {
-                if (const Array *array = std::get_if<Array>(&_elements[i].second.data)) {
-                    token = getNextScopeToken();
-                    ScopeSerializer serializer = ScopeSerializer(token, _scopeTemplateIndex, _scopeTemplates[_scopeTemplateIndex].second);
-                    initializer(serializer);
-                    _queue.enqueue(MsgHeader{MSG_TYPE_ITEM_ADDED, getCurrentTimeStamp(), Location{i, _id}}, serializer.getData(), serializer.getLength());
-                    return;
+                std::shared_ptr<ScopeImpl> result = nullptr;
+                
+                if (Array *array = std::get_if<Array>(&_elements[i].second.data)) {
+                    ScopeId newId = getNextScopeId();
+                    result = std::make_shared<ScopeImpl>(_logger, newId, _scopeTemplateIndex, _scopeTemplates, _queue);
+                    initializer(*result);
+                    array->items.emplace(newId, result);
+                    _queue.enqueue(MsgHeader{MSG_TYPE_ITEM_ADDED, getCurrentTimeStamp(), Location{i, _id}}, &newId, sizeof(newId));
                 }
                 else {
                     _logger.logError("[ScopeImpl::addItem] '%s' is not an array\n", arrayName);
                 }
+                
+                return result;
             }
         }
         
         _logger.logError("[ScopeImpl::addItem] Array '%s' not found\n", arrayName);
+        return nullptr;
     }
-
-    void ScopeImpl::removeItem(const char *arrayName, ScopeToken token) {
+    
+    void ScopeImpl::removeItem(const char *arrayName, const ScopePtr &scope) {
         for (ElementIndex i = 0; i <_elements.size(); i++) {
             if (_elements[i].first == arrayName) {
                 if (const Array *array = std::get_if<Array>(&_elements[i].second.data)) {
-                    _queue.enqueue(MsgHeader{MSG_TYPE_ITEM_REMOVED, getCurrentTimeStamp(), Location{i, _id}}, &token, sizeof(token));
-                    return;
+                    ScopeId id = scope->getId();
+                    _queue.enqueue(MsgHeader{MSG_TYPE_ITEM_REMOVED, getCurrentTimeStamp(), Location{i, _id}}, &id, sizeof(id));
                 }
                 else {
                     _logger.logError("[ScopeImpl::removeItem] '%s' is not an array\n", arrayName);
                 }
+                
+                return;
             }
         }
         
@@ -390,27 +339,29 @@ namespace dh {
                     v.value = std::string(str, length);
                     offset += length + sizeof(std::uint16_t);
                 },
-                [this](Array &) {
+                [this, &offset, &length](Array &) {
                     _logger.logError("[ScopeImpl::applyChanges] Array cannot be deserialized\n");
+                    offset = length;
                 }
             );
         }
     }
-
+    
     template<typename T> void ScopeImpl::_setOnChangedHandler(EventToken &handler, const char *name, std::function<void(const T &)> &&f) {
         for (auto &element : _elements) {
             if (element.first == name) {
                 if (Value<T> *ptr = std::get_if<Value<T>>(&element.second.data)) {
                     handler = getNextEventToken();
                     ptr->onChangedHandlers.emplace_back(std::make_pair(handler, std::move(f)));
-                    return;
                 }
                 else {
                     _logger.logError("[ScopeImpl::setOnChangedHandler] '%s' is not a value\n", name);
                 }
+                
+                return;
             }
         }
-
+        
         _logger.logError("[ScopeImpl::setOnChangedHandler] Value '%s' not found\n", name);
     }
     
@@ -419,11 +370,12 @@ namespace dh {
             if (_elements[i].first == name) {
                 if (std::holds_alternative<Value<T>>(_elements[i].second.data)) {
                     _queue.enqueue(MsgHeader{MSG_TYPE_VALUE_CHANGED, getCurrentTimeStamp(), Location{i, _id}}, &value, sizeof(T));
-                    return;
                 }
                 else {
                     _logger.logError("[ScopeImpl::setValue] '%s' is not a value\n", name);
                 }
+                
+                return;
             }
         }
 
@@ -441,12 +393,14 @@ namespace dh {
                         _queue.enqueue(MsgHeader{MSG_TYPE_VALUE_CHANGED, getCurrentTimeStamp(), Location{i, _id}}, buffer, sizeof(std::uint16_t) + value.length());
                     }
                     else {
-                        _logger.logError("[ScopeImpl::setValue] String is too large to assign to '%s'\n", name);
+                        _logger.logError("[ScopeImpl::setValue] String is too large to asign to '%s'\n", name);
                     }
                 }
                 else {
                     _logger.logError("[ScopeImpl::setValue] '%s' is not a value\n", name);
                 }
+                
+                return;
             }
         }
         
@@ -461,6 +415,7 @@ namespace dh {
                 }
                 else {
                     _logger.logError("[ScopeImpl::getValue] '%s' is not a value\n", name);
+                    return;
                 }
             }
         }
@@ -480,13 +435,13 @@ namespace dh {
         void initialize(const char *src);
         void update(float dtSec) override;
         
-        std::shared_ptr<Scope> getScope(ScopeToken token) override;
+        std::shared_ptr<Scope> getScope(ScopeId id) override;
         std::shared_ptr<Scope> getRootScope(const char *rootScopeName) override;
         
     private:
         const foundation::LoggerInterfacePtr _logger;
         std::vector<std::pair<std::string, ScopeTemplate>> _scopeTemplates;
-        std::unordered_map<ScopeToken, std::shared_ptr<ScopeImpl>> _scopes;
+        std::unordered_map<ScopeId, std::shared_ptr<ScopeImpl>> _scopes;
         std::unordered_map<std::string, std::shared_ptr<ScopeImpl>> _roots;
         
         MemoryQueue _queue;
@@ -655,8 +610,8 @@ namespace dh {
         
         for (TemplateIndex i = 0; i < _scopeTemplates.size(); i++) {
             if (_scopeTemplates[i].first.find('.') == std::string::npos) {
-                ScopeToken token = getNextScopeToken();
-                std::shared_ptr<ScopeImpl> scope = std::make_shared<ScopeImpl>(token, i, _scopeTemplates, _queue);
+                ScopeId id = getNextScopeId();
+                std::shared_ptr<ScopeImpl> scope = std::make_shared<ScopeImpl>(*_logger, id, i, _scopeTemplates, _queue);
                 _roots.emplace(_scopeTemplates[i].first, std::move(scope));
             }
         }
@@ -668,7 +623,7 @@ namespace dh {
     
     void DataHubImpl::update(float dtSec) {
         MsgHeader header {0};
-        std::unique_ptr<std::uint8_t> data = nullptr;
+        std::unique_ptr<std::uint8_t[]> data = nullptr;
         std::size_t length = 0;
         
         if (_queue.dequeue(header, data, length)) {
@@ -698,13 +653,17 @@ namespace dh {
                     }
                     else if (header.cmd == MSG_TYPE_ITEM_ADDED) {
                         if (Array *array = std::get_if<Array>(&element->data)) {
-                            const ScopeToken itemToken = *reinterpret_cast<ScopeToken *>(data.get());
-                            const TemplateIndex templateIndex = *(data.get() + sizeof(ScopeToken));
-                            const std::size_t dataOffset = sizeof(ScopeToken) + sizeof(TemplateIndex);
+                            const ScopeId itemId = *reinterpret_cast<ScopeId *>(data.get());
+                            const auto &index = _scopes.find(itemId);
                             
-                            std::shared_ptr<ScopeImpl> scope = std::make_shared<ScopeImpl>(itemToken, templateIndex, _scopeTemplates, _queue);
-                            scope->applyChanges(data.get() + dataOffset, length - dataOffset);
-                            _scopes.emplace(itemToken, scope);
+                            if (index != _scopes.end()) {
+                                for (auto &handler : array->onAddedHandlers) {
+                                    handler.second(index->second);
+                                }
+                            }
+                            else {
+                                _logger->logError("[DataHubImpl::update] Received MSG_TYPE_ITEM_ADDED for unknown item with id = %d\n", int(itemId));
+                            }
                         }
                         else {
                             _logger->logError("[DataHubImpl::update] Received MSG_TYPE_ITEM_ADDED for value\n");
@@ -712,11 +671,14 @@ namespace dh {
                     }
                     else if (header.cmd == MSG_TYPE_ITEM_REMOVED) {
                         if (Array *array = std::get_if<Array>(&element->data)) {
-                            ScopeToken itemToken = *reinterpret_cast<ScopeToken *>(data.get());
-                            array->items.erase(itemToken);
-                            
-                            for (auto &handler : array->onRemoveHandlers) {
-                                handler.second(itemToken);
+                            ScopeId itemId = *reinterpret_cast<ScopeId *>(data.get());
+                            if (array->items.erase(itemId) == 1) {
+                                for (auto &handler : array->onRemoveHandlers) {
+                                    handler.second(itemId);
+                                }
+                            }
+                            else {
+                                _logger->logError("[DataHubImpl::update] Received MSG_TYPE_ITEM_REMOVED for unknown item with id = %d\n", int(itemId));
                             }
                         }
                         else {
@@ -737,12 +699,25 @@ namespace dh {
         }
     }
 
-    std::shared_ptr<Scope> DataHubImpl::getScope(ScopeToken token) {
-        return  nullptr;
+    std::shared_ptr<Scope> DataHubImpl::getScope(ScopeId token) {
+        auto index = _scopes.find(token);
+        if (index != _scopes.end()) {
+            return index->second;
+        }
+        
+        return nullptr;
     }
     
     std::shared_ptr<Scope> DataHubImpl::getRootScope(const char *rootScopeName) {
-        return  nullptr;
+        auto index = _roots.find(rootScopeName);
+        if (index != _roots.end()) {
+            return index->second;
+        }
+        
+        return nullptr;
     }
 
+    void testDataHub() {
+        
+    }
 }

@@ -16,8 +16,8 @@ namespace game {
         bool _mouseLocked = false;
         math::vector2f _lockedMouseCoordinates;
 
-        math::vector3f _center = { 0, 0, 0 };
-        math::vector3f _orbit = { 45, 45, 45 };
+        math::vector3f _center = { 36, 0, 36 };
+        math::vector3f _orbit = { 0, 40, 15 };
 
         foundation::EventHandlerToken _touchEventHandlerToken;
     };
