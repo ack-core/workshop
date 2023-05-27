@@ -5,29 +5,83 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+
+#include <list>
 
 #include "thirdparty/upng/upng.h"
 
 namespace voxel {
-    struct StaticVoxelModel {
+    class StaticModelImpl : public SceneInterface::StaticModel {
+    public:
         struct Voxel {
             std::int16_t positionX, positionY, positionZ, colorIndex;
         };
         
-        math::vector3f bbMin = {FLT_MAX, FLT_MAX, FLT_MAX};
-        math::vector3f bbMax = {FLT_MIN, FLT_MIN, FLT_MIN};
         foundation::RenderDataPtr voxels;
+        
+    public:
+        StaticModelImpl(foundation::RenderDataPtr &&v) : voxels(std::move(v)) {}
+        ~StaticModelImpl() override {}
     };
-    struct DynamicVoxelModel {
+    
+    class TexturedModelImpl : public SceneInterface::TexturedModel {
+    public:
+        foundation::RenderDataPtr vertices;
+        foundation::RenderDataPtr indices;
+        foundation::RenderTexturePtr texture;
+    
+    public:
+        TexturedModelImpl(foundation::RenderDataPtr &&v, foundation::RenderDataPtr &&i, const foundation::RenderTexturePtr &t) {
+            vertices = std::move(v);
+            indices = std::move(i);
+            texture = t;
+        }
+        ~TexturedModelImpl() override {}
+    };
+    
+    class DynamicModelImpl : public SceneInterface::DynamicModel {
+    public:
         struct Voxel {
             std::int16_t positionX, positionY, positionZ, colorIndex;
-            std::int32_t litPX, litNX, litPY, litNY, litPZ, litNZ;
         };
-
-        math::vector3f position;
-        float rotation;
-        voxel::Mesh source;
+        
         foundation::RenderDataPtr voxels;
+        math::transform3f transform;
+        
+    public:
+        DynamicModelImpl(foundation::RenderDataPtr &&v, const math::transform3f &trfm) : voxels(std::move(v)), transform(trfm) {}
+        ~DynamicModelImpl() override {}
+        
+        void setFrame(std::uint16_t index) override {
+        
+        }
+        void setPosition(const math::vector3f &pos) override {
+            transform._41 = pos.x;
+            transform._42 = pos.y;
+            transform._43 = pos.z;
+        }
+        void setRotation(float r) override {
+            math::vector3f position = transform.translation();
+            transform = math::transform3f({0.0f, 1.0f, 0.0f}, r).translated(position);
+        }
+    };
+    
+    class LightSourceImpl : public SceneInterface::LightSource {
+    public:
+        struct ShaderConst {
+            math::vector4f positionAndRadius;
+            math::vector4f color;
+        }
+        shaderConstants;
+        
+    public:
+        LightSourceImpl() {}
+        ~LightSourceImpl() override {}
+        
+        void setPosition(const math::vector3f &position) override {
+            shaderConstants.positionAndRadius.xyz = position;
+        }
     };
     
     class SceneInterfaceImpl : public SceneInterface {
@@ -35,39 +89,39 @@ namespace voxel {
         SceneInterfaceImpl(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const voxel::MeshFactoryPtr &factory,
+            const voxel::TextureProviderPtr &textureProvider,
             const char *palette
         );
         ~SceneInterfaceImpl() override;
         
-        void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) override;
-        void setSceneCenter(const math::vector3f &position) override;
-        void setSun(const math::vector3f &direction, const math::color &rgba) override;
-
-        SceneObjectToken addStaticModel(const char *voxPath, const int16_t(&offset)[3]) override;
-        SceneObjectToken addDynamicModel(const char *voxPath, const math::vector3f &position, float rotation) override;
+        void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
+        void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
-        void removeStaticModel(SceneObjectToken token) override;
-        void removeDynamicModel(SceneObjectToken token) override;
+        StaticModelPtr addStaticModel(const voxel::Mesh &mesh, const int16_t(&offset)[3]) override;
+        TexturedModelPtr addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) override;
+        DynamicModelPtr addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &position, float rotation) override;
+        LightSourcePtr addLightSource(const math::vector3f &position, float r, float g, float b, float radius) override;
         
         void updateAndDraw(float dtSec) override;
         
     private:
         void _updateMatrices();
+        void _drawPoint(const math::vector3f &p, const math::color &rgba);
+        void _drawLine(const math::vector3f &a, const math::vector3f &b, const math::color &rgba);
+        void _drawTriangle(const math::vector3f &a, const math::vector3f &b, const math::vector3f &c, const math::color &rgba);
         void _drawAxis();
         
         struct ShaderConst {
+            math::transform3f modelTransform;
             math::vector4f sunDirection;
-            math::vector4f sunColor_sunPower;
-            math::vector4f observingPoint_radius;
-            math::vector4f bounds;
+            math::vector4f sunColorAndPower;
+            math::vector4f observingPointAndRadius;
         }
-        _sunShaderConstants;
+        _shaderConstants;
         
         struct Camera {
             math::transform3f viewMatrix;
             math::transform3f projMatrix;
-
             math::vector3f position;
             math::vector3f target;
             math::vector3f forward;
@@ -77,76 +131,40 @@ namespace voxel {
         
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
-        const voxel::MeshFactoryPtr _factory;
+        const voxel::TextureProviderPtr _textureProvider;
+        const voxel::MeshProviderPtr _factory;
 
-        foundation::RenderShaderPtr _sunVoxelMapShader;
-        foundation::RenderTargetPtr _sunVoxelMap;
-        
-        foundation::RenderShaderPtr _staticMeshGBuferShader;
-        foundation::RenderShaderPtr _staticMeshScreenShader;
-
-        foundation::RenderShaderPtr _tmpScreenQuadShader;
+        foundation::RenderShaderPtr _staticMeshShader;
+        foundation::RenderShaderPtr _texturedMeshShader;
+        foundation::RenderShaderPtr _dynamicMeshShader;
+        foundation::RenderShaderPtr _pointShader;
+        foundation::RenderShaderPtr _lineShader;
+        foundation::RenderShaderPtr _triangleShader;
         foundation::RenderShaderPtr _axisShader;
         
-        std::unordered_map<SceneObjectToken, std::unique_ptr<StaticVoxelModel>> _staticModels;
-        std::unordered_map<SceneObjectToken, std::unique_ptr<DynamicVoxelModel>> _dynamicModels;
+        std::vector<std::shared_ptr<StaticModelImpl>> _staticModels;
+        std::vector<std::shared_ptr<TexturedModelImpl>> _texturedModels;
+        std::vector<std::shared_ptr<DynamicModelImpl>> _dynamicModels;
 
         foundation::RenderTexturePtr _palette;
-        foundation::RenderTargetPtr _gbuffer;
     };
     
     std::shared_ptr<SceneInterface> SceneInterface::instance(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const voxel::MeshFactoryPtr &factory,
+        const voxel::TextureProviderPtr &textureProvider,
         const char *palette
     ) {
-        return std::make_shared<SceneInterfaceImpl>(platform, rendering, factory, palette);
+        return std::make_shared<SceneInterfaceImpl>(platform, rendering, textureProvider, palette);
     }
 }
 
 // TODO: voxel map constants
 
 namespace {
-    const char *g_sunVoxelMapShaderSrc = R"(
+    const char *g_staticMeshShaderSrc = R"(
         fixed {
-            cube[8] : float4 =
-                [-0.5, -0.5, -0.5, 1.0][0.5, -0.5, -0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
-                [-0.5, 0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
-        }
-        const {
-            sunDirection : float4
-            sunColor_sunPower : float4
-            observingPoint_radius : float4
-            bounds : float4
-        }
-        inout {
-            discard : float1
-        }
-        vssrc {
-            float3 cubeCenterOffset = float3(instance_position.xyz) - const_observingPoint_radius.xyz;
-            float3 vertexPosInMap = cubeCenterOffset + fixed_cube[vertex_ID].xyz + float3(32.0, 32.0, 32.0);
-            
-            int ypos = int(vertexPosInMap.y);
-            float2 vertexPosInTexture = vertexPosInMap.xz + float2(ypos % 8, ypos / 8) * float2(64.0, 64.0);
-            float2 screenCoord = vertexPosInTexture / frame_rtBounds.xy * float2(2.0, -2.0) - float2(1.0, -1.0);
-
-            output_position = float4(screenCoord, 0.5, 1.0);
-            output_discard = _step(_dot(cubeCenterOffset, cubeCenterOffset), const_observingPoint_radius.w * const_observingPoint_radius.w);
-        }
-        fssrc {
-            output_color[0] = float4(1.0 * input_discard, 0.0, 0.0, 0.0);
-        }
-    )";
-
-//            axis[3] : float3 = [0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
-//            bnm[3] : float3 = [1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
-//            tgt[3] : float3 = [0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
-
-
-    const char *g_staticMeshGBufferShaderSrc = R"(
-        fixed {
-            axis[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
+            axs[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
             bnm[7] : float3 = [0.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
             tgt[7] : float3 = [0.0, 0.0, 0.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
 
@@ -161,21 +179,13 @@ namespace {
             faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
         }
         const {
+            modelTransform : matrix4
             sunDirection : float4
-            sunColor_sunPower : float4
-            observingPoint_radius : float4
-            bounds : float4
+            sunColorAndPower : float4
+            observingPointAndRadius : float4
         }
         inout {
-            uvf : float4
-            koeffs : float4
-        }
-        fndef voxTexCoord (float3 offsetFromObservingPoint, float maxRadius) -> float2 {
-            float3 positionInMap = offsetFromObservingPoint + float3(32.0, 32.0, 32.0);
-            int ypos = int(positionInMap.y);
-            
-            float2 yoffset = float2(ypos % 8, ypos / 8) * float2(64, 64);
-            return (positionInMap.xz + yoffset) / float2(512.0, 512.0) * _step(_dot(offsetFromObservingPoint, offsetFromObservingPoint), maxRadius * maxRadius);
+            tmp : float4
         }
         vssrc {
             float3 cubeCenter = float3(instance_position_color.xyz);
@@ -186,144 +196,92 @@ namespace {
             int3 faceIndices = int3(2.0 * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
             int  faceIndex = vertex_ID / 6 + int((toCamSign.zxy[vertex_ID / 6] * 1.5 + 1.5) + 1.0);
 
-            float3 faceNormal = fixed_axis[faceIndex];
+            float3 faceNormal = fixed_axs[faceIndex];
             float3 dirB = fixed_bnm[faceIndex];
             float3 dirT = fixed_tgt[faceIndex];
 
-            output_uvf = float4(0, 0, 0, 0);
-            output_uvf.xy = output_uvf.xy + _abs(faceNormal.x) * fixed_faceUV[faceIndices.x];
-            output_uvf.xy = output_uvf.xy + _abs(faceNormal.y) * fixed_faceUV[faceIndices.y];
-            output_uvf.xy = output_uvf.xy + _abs(faceNormal.z) * fixed_faceUV[faceIndices.z];
-
-            float3 faceStart = cubeCenter - 0.5 * (dirB + dirT - faceNormal) + faceNormal - const_observingPoint_radius.xyz;
-            output_koeffs.x = _tex2nearest(0, voxTexCoord(faceStart, const_observingPoint_radius.w)).x;
-            output_koeffs.y = _tex2nearest(0, voxTexCoord(faceStart + dirB, const_observingPoint_radius.w)).x;
-            output_koeffs.z = _tex2nearest(0, voxTexCoord(faceStart + dirT, const_observingPoint_radius.w)).x;
-            output_koeffs.w = _tex2nearest(0, voxTexCoord(faceStart + dirB + dirT, const_observingPoint_radius.w)).x;
-            
+            output_tmp = float4(faceNormal, 1.0);
             output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
-            float2 t = (input_uvf.xy);
-            float m0 = _lerp(input_koeffs.x, input_koeffs.y, t.x);
-            float m1 = _lerp(input_koeffs.z, input_koeffs.w, t.x);
-            float oc = _lerp(m0, m1, t.y);
+            output_color[0] = input_tmp;
+        }
+    )";
 
-            oc = 0.5 + 0.5 * _pow(1.0 - _pow(oc, 4.6), 2.0);
-            output_color[0] = float4(oc, oc, oc, 1);
+    const char *g_texturedMeshShaderSrc = R"(
+        inout {
+            uv : float2
+            nrm : float3
+        }
+        vssrc {
+            output_position = _transform(float4(vertex_position_u.xyz, 1.0), _transform(frame_viewMatrix, frame_projMatrix));
+            output_uv = float2(vertex_position_u.w, vertex_normal_v.w);
+            output_nrm = vertex_normal_v.xyz;
+        }
+        fssrc {
+            output_color[0] = _tex2linear(0, input_uv);
         }
     )";
     
-    static const char *g_staticMeshScreenShaderSrc = R"(
+    const char *g_dynamicMeshShaderSrc = R"(
         fixed {
-            ambient[7] : float3 = [0.00, 0.00, 0.00][0.24, 0.24, 0.23][0.25, 0.25, 0.24][0.23, 0.23, 0.22][0.26, 0.26, 0.25][0.28, 0.28, 0.27][0.30, 0.30, 0.30]
-            axis[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
+            axs[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
             bnm[7] : float3 = [0.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
             tgt[7] : float3 = [0.0, 0.0, 0.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
-            koeffs[4] : float1 = [0.00][0.70][0.85][0.96]
+            
+            cube[18] : float4 =
+                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0]
+                [0.5, -0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0]
+            
+            faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
         }
         const {
+            modelTransform : matrix4
             sunDirection : float4
-            sunColor_sunPower : float4
-            observingPoint_radius : float4
-            bounds : float4
+            sunColorAndPower : float4
+            observingPointAndRadius : float4
         }
         inout {
-            texcoord : float2
-        }
-        fndef voxTexCoord (float3 offsetFromObservingPoint, float maxRadius) -> float2 {
-            float3 positionInMap = offsetFromObservingPoint + float3(32.0, 32.0, 32.0);
-            int ypos = int(positionInMap.y);
-            
-            float2 yoffset = float2(ypos % 8, ypos / 8) * float2(64, 64);
-            return (positionInMap.xz + yoffset) / float2(512.0, 512.0) * _step(_dot(offsetFromObservingPoint, offsetFromObservingPoint), maxRadius * maxRadius);
+            tmp : float4
         }
         vssrc {
-            float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-            output_position = float4(vertexCoord.xy * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.5, 1);
-            output_texcoord = vertexCoord;
-        }
-        fssrc {
-            float4 gbuffer0 = _tex2nearest(0, input_texcoord);
-            float4 gbuffer1 = _tex2nearest(1, input_texcoord);
-            float4 gbuffer2 = _tex2nearest(2, input_texcoord);
+            float3 cubeCenter = float3(instance_position_color.xyz);
+            float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - cubeCenter, 0.0)).xyz);
+            float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
+            float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
-            float3 cornerPosition;
-            cornerPosition.x = _dot(gbuffer0.xy, float2(1.0, 1.0 / 255.0));
-            cornerPosition.y = _dot(gbuffer0.zw, float2(1.0, 1.0 / 255.0));
-            cornerPosition.z = _dot(gbuffer1.xy, float2(1.0, 1.0 / 255.0));
-            cornerPosition = cornerPosition * 2048.0 - 1024.0;
-
-            float exist = 6.1 * gbuffer2.x;
-            int faceIndex = int(exist);
-            exist = _clamp(exist);
-
+            int3 faceIndices = int3(2.0 * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
+            int  faceIndex = vertex_ID / 6 + int((toCamSign.zxy[vertex_ID / 6] * 1.5 + 1.5) + 1.0);
+            
+            float3 faceNormal = fixed_axs[faceIndex];
             float3 dirB = fixed_bnm[faceIndex];
             float3 dirT = fixed_tgt[faceIndex];
-            float3 faceNormal = fixed_axis[faceIndex];
-            float4 vox;
             
-            vox.x = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
-            vox.y = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal + dirB - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
-            vox.z = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal + dirT - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
-            vox.w = _tex2nearest(3, voxTexCoord(cornerPosition.xyz + faceNormal + dirB + dirT - const_observingPoint_radius.xyz, const_observingPoint_radius.w)).x;
-
-            int4 vi = int4(3.0 * _clamp(2.667 * vox));
-            
-            vox.x = fixed_koeffs[vi.x];
-            vox.y = fixed_koeffs[vi.y];
-            vox.z = fixed_koeffs[vi.z];
-            vox.w = fixed_koeffs[vi.w];
-            
-            float2 smoothCoord = gbuffer1.zw;
-            
-            float m0 = _lerp(vox.x, vox.y, smoothCoord.x);
-            float m1 = _lerp(vox.z, vox.w, smoothCoord.x);
-            float oc = _lerp(m0, m1, smoothCoord.y);
-
-            oc = exist * _pow(1.0 - _pow(oc, 2.6), 2.0);
-            output_color[0] = float4(oc, oc, oc, 1.0);
-        }
-    )";
-    
-    static const char *g_tmpScreenQuadShaderSrc = R"(
-        inout {
-            texcoord : float2
-        }
-        vssrc {
-            float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
-            output_position = float4(vertexCoord.xy * float2(0.76762, -(1.365)) + float2(-0.96, 0.96), 0.7, 1);
-            output_texcoord = vertexCoord;
+            output_tmp = float4(faceNormal, 1.0);
+            output_position = _transform(absVertexPos, _transform(const_modelTransform, _transform(frame_viewMatrix, frame_projMatrix)));
         }
         fssrc {
-            float4 s0 = _tex2nearest(0, input_texcoord);
-            output_color[0] = s0 * 0.5;//_lerp(s0, s1, _step(0.8, input_texcoord.y));
+            output_color[0] = input_tmp;
         }
     )";
-
-    voxel::SceneObjectToken g_lastToken = 0x100;
 }
 
 namespace voxel {
     SceneInterfaceImpl::SceneInterfaceImpl(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const voxel::MeshFactoryPtr &factory,
+        const voxel::TextureProviderPtr &textureProvider,
         const char *palette
     )
     : _platform(platform)
     , _rendering(rendering)
-    , _factory(factory)
+    , _textureProvider(textureProvider)
     {
-        _sunVoxelMapShader = rendering->createShader("scene_voxel_map", g_sunVoxelMapShaderSrc,
-            { // vertex
-                {"ID", foundation::RenderShaderInputFormat::ID},
-            },
-            { // instance
-                {"position", foundation::RenderShaderInputFormat::SHORT4},
-            }
-        );
-        _staticMeshGBuferShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshGBufferShaderSrc,
+        _staticMeshShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshShaderSrc,
             { // vertex
                 {"ID", foundation::RenderShaderInputFormat::ID}
             },
@@ -331,150 +289,510 @@ namespace voxel {
                 {"position_color", foundation::RenderShaderInputFormat::SHORT4},
             }
         );
-        _staticMeshScreenShader = _rendering->createShader("scene_full_screen_base", g_staticMeshScreenShaderSrc, {
-            {"ID", foundation::RenderShaderInputFormat::ID}
-        });
-        _tmpScreenQuadShader = _rendering->createShader("scene_screen_quad", g_tmpScreenQuadShaderSrc, {
-            {"ID", foundation::RenderShaderInputFormat::ID}
-        });
-        
-        _sunShaderConstants.observingPoint_radius = math::vector4f(0.0, 0.0, 0.0, 32.0);
-        _sunShaderConstants.bounds = math::vector4f(256.0f, 32.0f, 8.0f, 0.0f);
-        _sunShaderConstants.sunColor_sunPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
-        _sunVoxelMap = rendering->createRenderTarget(foundation::RenderTextureFormat::R8UN, 1, 512, 512, false);
-        _gbuffer = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 4, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
-        
-        std::unique_ptr<std::uint8_t[]> paletteData;
-        std::size_t paletteSize;
 
-        if (_platform->loadFile(palette, paletteData, paletteSize)) {
-            upng_t *upng = upng_new_from_bytes(paletteData.get(), (unsigned long)(paletteSize));
-
-            if (upng != nullptr) {
-                if (*reinterpret_cast<const unsigned *>(paletteData.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-                    if (upng_get_format(upng) == UPNG_RGBA8 && upng_get_width(upng) == 256 && upng_get_height(upng) == 1) {
-                        _palette = _rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, { upng_get_buffer(upng) });
-                    }
-                }
-
-                upng_free(upng);
+        _texturedMeshShader = rendering->createShader("scene_static_textured_mesh", g_texturedMeshShaderSrc,
+            { // vertex
+                {"position_u", foundation::RenderShaderInputFormat::FLOAT4},
+                {"normal_v", foundation::RenderShaderInputFormat::FLOAT4},
+            },
+            { // instance
             }
-        }
+        );
+
+        _dynamicMeshShader = rendering->createShader("scene_dynamic_voxel_mesh", g_dynamicMeshShaderSrc,
+            { // vertex
+                {"ID", foundation::RenderShaderInputFormat::ID}
+            },
+            { // instance
+                {"position_color", foundation::RenderShaderInputFormat::SHORT4},
+            }
+        );
         
-        if (_palette == nullptr) {
-            _platform->logError("[Scene] '%s' not found", palette);
-        }
-        
+        _shaderConstants.observingPointAndRadius = math::vector4f(0.0, 0.0, 0.0, 32.0);
+        _shaderConstants.sunColorAndPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
+        _shaderConstants.sunDirection = math::vector4f(math::vector3f(0.2, 1.0, 0.3).normalized(), 1.0f);
+        _palette = _textureProvider->getOrLoad2DTexture(palette);
     }
     
     SceneInterfaceImpl::~SceneInterfaceImpl() {
         
     }
     
-    void SceneInterfaceImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &target) {
+    void SceneInterfaceImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) {
         _camera.position = position;
-        _camera.target = target;
-
-        math::vector3f right = math::vector3f(0, 1, 0).cross(position - target);
-        math::vector3f nrmlook = (target - position).normalized();
+        _camera.target = sceneCenter;
+        
+        math::vector3f right = math::vector3f(0, 1, 0).cross(position - sceneCenter);
+        math::vector3f nrmlook = (sceneCenter - position).normalized();
         math::vector3f nrmright = right.normalized();
-
+        
         _camera.forward = nrmlook;
         _camera.up = nrmright.cross(nrmlook);
         _updateMatrices();
     }
     
-    void SceneInterfaceImpl::setSceneCenter(const math::vector3f &position) {
+    void SceneInterfaceImpl::setSun(const math::vector3f &directionToSun, const math::color &rgba) {
+    
+    }
+    
+    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const voxel::Mesh &mesh, const int16_t(&offset)[3]) {
+        std::shared_ptr<StaticModelImpl> model = nullptr;
+        std::uint32_t voxelCount = mesh.frames[0].voxelCount;
+        std::unique_ptr<StaticModelImpl::Voxel[]> positions = std::make_unique<StaticModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
         
-    }
-    
-    void SceneInterfaceImpl::setSun(const math::vector3f &direction, const math::color &rgba) {
-    
-    }
-    
-    SceneObjectToken SceneInterfaceImpl::addStaticModel(const char *voxPath, const int16_t(&offset)[3]) {
-        std::unique_ptr<StaticVoxelModel> model = std::make_unique<StaticVoxelModel>();
-        SceneObjectToken token = g_lastToken++;
-        voxel::Mesh source;
-
-        if (_factory->createMesh(voxPath, offset, source)) {
-            std::uint32_t voxelCount = source.frames[0].voxelCount;
-            std::unique_ptr<StaticVoxelModel::Voxel[]> positions = std::make_unique<StaticVoxelModel::Voxel[]>(source.frames[0].voxelCount);
-            
-            for (std::uint32_t i = 0; i < voxelCount; i++) {
-                positions[i].positionX = source.frames[0].voxels[i].positionX;
-                positions[i].positionY = source.frames[0].voxels[i].positionY;
-                positions[i].positionZ = source.frames[0].voxels[i].positionZ;
-                positions[i].colorIndex = source.frames[0].voxels[i].colorIndex;
-                
-                if (model->bbMin.x > float(positions[i].positionX)) {
-                    model->bbMin.x = float(positions[i].positionX);
-                }
-                if (model->bbMin.y > float(positions[i].positionY)) {
-                    model->bbMin.y = float(positions[i].positionY);
-                }
-                if (model->bbMin.z > float(positions[i].positionZ)) {
-                    model->bbMin.z = float(positions[i].positionZ);
-                }
-                if (model->bbMax.x < float(positions[i].positionX)) {
-                    model->bbMax.x = float(positions[i].positionX);
-                }
-                if (model->bbMax.y < float(positions[i].positionY)) {
-                    model->bbMax.y = float(positions[i].positionY);
-                }
-                if (model->bbMax.z < float(positions[i].positionZ)) {
-                    model->bbMax.z = float(positions[i].positionZ);
-                }
-            }
-            
-            model->voxels = _rendering->createData(positions.get(), voxelCount, sizeof(StaticVoxelModel::Voxel));
-            
-            if (model->voxels) {
-                _staticModels.emplace(token, std::move(model));
-                return token;
-            }
+        for (std::uint32_t i = 0; i < voxelCount; i++) {
+            positions[i].positionX = mesh.frames[0].voxels[i].positionX;
+            positions[i].positionY = mesh.frames[0].voxels[i].positionY;
+            positions[i].positionZ = mesh.frames[0].voxels[i].positionZ;
+            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
         }
         
-        _platform->logError("[Scene] model '%s' not loaded", voxPath);
-        return INVALID_TOKEN;
+        foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(StaticModelImpl::Voxel));
+        
+        if (voxels) {
+            model = std::make_shared<StaticModelImpl>(std::move(voxels));
+            _staticModels.emplace_back(model);
+        }
+        
+        return model;
     }
     
-    SceneObjectToken SceneInterfaceImpl::addDynamicModel(const char *voxPath, const math::vector3f &position, float rotation) {
-        return INVALID_TOKEN;
+    SceneInterface::TexturedModelPtr
+    SceneInterfaceImpl::addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) {
+        std::shared_ptr<TexturedModelImpl> model = nullptr;
+        foundation::RenderDataPtr vertexData = _rendering->createData(vtx.data(), std::uint32_t(vtx.size()), sizeof(VTXNRMUV));
+        foundation::RenderDataPtr indexData = _rendering->createData(idx.data(), std::uint32_t(idx.size()), sizeof(std::uint32_t));
+        
+        if (vertexData && indexData && tx) {
+            model = std::make_shared<TexturedModelImpl>(std::move(vertexData), std::move(indexData), tx);
+            _texturedModels.emplace_back(model);
+        }
+        
+        return model;
     }
     
-    void SceneInterfaceImpl::removeStaticModel(SceneObjectToken token) {
-        _staticModels.erase(token);
+    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &position, float rotation) {
+        std::uint32_t voxelCount = mesh.frames[0].voxelCount;
+        std::unique_ptr<DynamicModelImpl::Voxel[]> positions = std::make_unique<DynamicModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
+        std::shared_ptr<DynamicModelImpl> model = nullptr;
+        
+        for (std::uint32_t i = 0; i < voxelCount; i++) {
+            positions[i].positionX = mesh.frames[0].voxels[i].positionX;
+            positions[i].positionY = mesh.frames[0].voxels[i].positionY;
+            positions[i].positionZ = mesh.frames[0].voxels[i].positionZ;
+            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
+        }
+        
+        foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(DynamicModelImpl::Voxel));
+        
+        if (voxels) {
+            model = std::make_shared<DynamicModelImpl>(std::move(voxels), math::transform3f({0.0f, 1.0f, 0.0f}, rotation).translated(position));
+            _dynamicModels.emplace_back(model);
+        }
+        
+        return model;
     }
     
-    void SceneInterfaceImpl::removeDynamicModel(SceneObjectToken token) {
+    SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(const math::vector3f &position, float r, float g, float b, float radius) {
+        return nullptr;
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    }
+    
+    int dbg_counter = 0; //330;
+    
+    namespace voxel {
+    
+    
+namespace {
+    struct Edge {
+        std::uint32_t a;
+        std::uint32_t b;
+        
+        Edge(std::uint32_t first, std::uint32_t second) : a(first), b(second) {}
+        
+        bool operator==(const Edge &other) const {
+            return (a == other.a && b == other.b) || (a == other.b && b == other.a);
+        }
+    };
+    
+//    struct EdgeHash
+//    {
+//        std::size_t operator()(const Edge& e) const noexcept
+//        {
+//            return e.a * e.b;
+//        }
+//    };
+    
+    bool isEdgeIntersect(const voxel::SceneInterface::VTXNRMUV &a1, const voxel::SceneInterface::VTXNRMUV &a2, const voxel::SceneInterface::VTXNRMUV &b1, const voxel::SceneInterface::VTXNRMUV &b2) {
+            float d = (a2.x - a1.x) * (b2.z - b1.z) - (a2.z - a1.z) * (b2.x - b1.x);
 
+            if (std::fabs(d) < std::numeric_limits<float>::epsilon()) {
+                return false;
+            }
+
+            float u = ((b1.x - a1.x) * (b2.z - b1.z) - (b1.z - a1.z) * (b2.x - b1.x)) / d;
+            float v = ((b1.x - a1.x) * (a2.z - a1.z) - (b1.z - a1.z) * (a2.x - a1.x)) / d;
+
+            if (u <= 0.0f || u >= 1.0f || v <= 0.0f || v >= 1.0f)
+            {
+                return false;
+            }
+
+            return true;
     }
+
+    void makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<Edge> &completeEdges, std::list<Edge> &computingEdges, std::vector<std::uint32_t> &indices) {
+        computingEdges.clear();
+        completeEdges.clear();
+        computingEdges.emplace_back(Edge(0, 1));
+        
+        auto tryAddCompleteEdge = [&points, &computingEdges, &completeEdges](const Edge &newEdge) {
+            for (auto index = completeEdges.rbegin(); index != completeEdges.rend(); ++index) {
+                if (*index == newEdge || isEdgeIntersect(points[newEdge.a], points[newEdge.b], points[index->a], points[index->b])) {
+                    return false;
+                }
+            }
+            for (auto index = computingEdges.begin(); index != computingEdges.end(); ++index) {
+                if (isEdgeIntersect(points[newEdge.a], points[newEdge.b], points[index->a], points[index->b])) {
+                    return false;
+                }
+            }
+            
+            completeEdges.emplace_back(newEdge);
+            return true;
+        };
+
+        auto tryAddComputingEdge = [&points, &computingEdges, &completeEdges](const Edge &newEdge) { //, &completeEdges
+            bool doNotAdd = false;
+            
+            for (auto index = completeEdges.rbegin(); index != completeEdges.rend(); ++index) {
+                if (*index == newEdge) {
+                    doNotAdd = true;
+                    break;
+                }
+                if (isEdgeIntersect(points[newEdge.a], points[newEdge.b], points[index->a], points[index->b])) {
+                    return false;
+                }
+            }
+            
+            for (auto index = computingEdges.begin(); index != computingEdges.end(); ) {
+                if (*index == newEdge) {
+                    completeEdges.emplace_back(newEdge);
+//                    points[newEdge.a].ny += 1.0f; points[newEdge.b].ny += 1.0f;
+//                    points[newEdge.a].nx -= 1.0f; points[newEdge.b].nx -= 1.0f;
+                    
+                    index = computingEdges.erase(index);
+                    doNotAdd = true;
+                    break;
+                }
+                else {
+                    if (isEdgeIntersect(points[newEdge.a], points[newEdge.b], points[index->a], points[index->b])) {
+                        return false;
+                    }
+                    
+                    ++index;
+                }
+            }
+            
+            if (doNotAdd == false) {
+                computingEdges.emplace_back(newEdge);
+                //points[newEdge.a].nx += 1.0f; points[newEdge.b].nx += 1.0f;
+            }
+            
+            return true;
+        };
+        
+        
+        for (int cc = 0; cc < dbg_counter; cc++) {
+        //while (computingEdges.empty() == false) {
+//            if (cc == dbg_counter - 1) {
+//                printf("");
+//            }
+            
+            const Edge edge = computingEdges.front();
+            const voxel::SceneInterface::VTXNRMUV &ea = points[edge.a];
+            const voxel::SceneInterface::VTXNRMUV &eb = points[edge.b];
+            const math::vector2f ab {eb.x - ea.x, eb.z - ea.z};
+            const math::vector2f edgen = ab.normalized();
+            
+            computingEdges.pop_front();
+            completeEdges.emplace_back(edge);
+            points[edge.a].nx -= 1.0f; points[edge.b].nx -= 1.0f;
+            points[edge.a].ny += 1.0f; points[edge.b].ny += 1.0f;
+
+            float minDot = 1.0f;
+            
+            struct {
+                std::uint32_t index;
+                float cosa;
+            }
+            minIndeces[16];
+            int minIndexCount = 0;
+            
+            for (std::uint32_t i = 0; i < points.size(); i++) {
+                const voxel::SceneInterface::VTXNRMUV &pp = points[i];
+                const math::vector2f ap {pp.x - ea.x, pp.z - ea.z};
+                
+                if (ab.cross(ap) < 0.0f) { //isPointAtLeft(points[i], edge)
+                    const math::vector2f dirA = ap.normalized(); //math::vector2f(pp.x - ea.x, pp.z - ea.z)
+                    const math::vector2f dirB = math::vector2f(pp.x - eb.x, pp.z - eb.z).normalized();
+                    const float currentDot = dirA.dot(dirB);
+
+                    if (currentDot < minDot - std::numeric_limits<float>::epsilon()) {
+                        minDot = currentDot;
+                        minIndexCount = 0;
+                        minIndeces[minIndexCount].index = i;
+                        minIndeces[minIndexCount].cosa = dirA.dot(edgen);
+                        minIndexCount++;
+                    }
+                    else if (std::fabs(currentDot - minDot) < std::numeric_limits<float>::epsilon() && minIndexCount < 16) {
+                        float cosa = dirA.dot(edgen);
+                        
+                        if (cosa >= 0.0f) {
+                            minIndeces[minIndexCount].index = i;
+                            minIndeces[minIndexCount].cosa = cosa; //dirA.dot(edgen);
+                            minIndexCount++;
+                        }
+                    }
+                }
+            }
+            
+            for (int i = 0; i < minIndexCount - 1; ) {
+                if (minIndeces[i].cosa > minIndeces[i + 1].cosa) {
+                    std::swap(minIndeces[i], minIndeces[i + 1]);
+                    i = 0;
+                }
+                else i++;
+            }
+            
+            minIndeces[minIndexCount].index = edge.b;
+            minIndeces[minIndexCount].cosa = 1.0f;
+            
+            for (int i = 1; i < minIndexCount + 1; i++) {
+                const std::uint32_t pre = minIndeces[i - 1].index;
+                const std::uint32_t cur = minIndeces[i].index;
+
+                if (cur != edge.b) {
+                    if (tryAddCompleteEdge(Edge(edge.a, cur))) {
+                        indices.emplace_back(pre);
+                        indices.emplace_back(cur);
+                        indices.emplace_back(edge.a);
+                    }
+                    //completeEdges.emplace_back();
+                }
+                
+                //const std::size_t pointsMax = points.size() - 2;
+                
+//                if (pre < pointsMax && cur < pointsMax && edge.a < pointsMax) {
+//                }
+                
+                const Edge newEdge = Edge(pre, cur);
+                tryAddComputingEdge(newEdge);
+            }
+            
+            if (minIndexCount) {
+                const Edge newEdge = Edge(edge.a, minIndeces[0].index);
+
+                if (tryAddComputingEdge(newEdge)) {
+                    indices.emplace_back(edge.a);
+                    indices.emplace_back(edge.b);
+                    indices.emplace_back(minIndeces[minIndexCount - 1].index);
+                }
+            }
+            
+        }
+    }
+    
+    std::vector<voxel::SceneInterface::VTXNRMUV> points;
+    std::vector<std::uint32_t> indices;
+    
+    std::vector<Edge> completeEdges;
+    std::list<Edge> computingEdges;
+}
+    
+    
     
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _rendering->updateFrameConstants(_camera.viewMatrix.flat16, _camera.projMatrix.flat16, _camera.position.flat3, _camera.forward.flat3);
+        _drawAxis();
+        
+        /*
+        points.clear();
+        indices.clear();
+        
+        srand(100);
+        
+//        for (int c = 2; c < 34; c++) {
+//            points.emplace_back(SceneInterface::VTXNRMUV{float(2), 0.0f, float(c), 0.0f, 0,0,0, 0.0f});
+//            points.emplace_back(SceneInterface::VTXNRMUV{float(33), 0.0f, float(c), 0.0f, 0,0,0, 0.0f});
+//        }
+//        for (int i = 2; i < 34; i++) {
+//            points.emplace_back(SceneInterface::VTXNRMUV{float(i), 0.0f, float(2), 0.0f, 0,0,0, 0.0f});
+//            points.emplace_back(SceneInterface::VTXNRMUV{float(i), 0.0f, float(33), 0.0f, 0,0,0, 0.0f});
+//        }
+
+
+        for (int i = 2; i < 34; i++) {
+            for (int c = 2; c < 34; c++) {
+                if (i == 2 || c == 2 || i == 33 || c == 33) {
+                //if ((rand() % 100) > 20) {
+                    points.emplace_back(SceneInterface::VTXNRMUV{float(i), 0.0f, float(c), 0.0f, 0,0,0, 0.0f});
+                }
+            }
+        }
+        
+        makeIndices(points, completeEdges, computingEdges, indices);
+        
+        for (int i = 0; i < points.size(); i++) {
+            _drawPoint(math::vector3f(points[i].x, points[i].y, points[i].z), math::color(1.0, 0.0, 0.0, 1.0));
+        }
+
+
+        for (auto index = computingEdges.begin(); index != computingEdges.end(); ++index) {
+            VTXNRMUV &p0 = points[index->a];
+            VTXNRMUV &p1 = points[index->b];
+            
+            if (index == computingEdges.begin()) {
+                _drawLine(math::vector3f(p0.x, p0.y, p0.z), math::vector3f(p1.x, p1.y, p1.z), math::color(0.0f, 1.0f, 0.0f, 1.0f));
+            }
+            else {
+                _drawLine(math::vector3f(p0.x, p0.y, p0.z), math::vector3f(p1.x, p1.y, p1.z), math::color(0.5f, 0.5f, 0.5f, 1.0f));
+            }
+        }
+        */
+        
+//        for (auto index = completeEdges.begin(); index != completeEdges.end(); ++index) {
+//            VTXNRMUV &p0 = points[index->a];
+//            VTXNRMUV &p1 = points[index->b];
+//
+//            _drawLine(math::vector3f(p0.x, p0.y, p0.z), math::vector3f(p1.x, p1.y, p1.z), math::color(0.5f, 0.25f, 0.0f, 1.0f));
+//        }
+        
+
+//        _drawLine(math::vector3f(3.1, 0, 3.0), math::vector3f(3.1, 0, 7.0), math::color(1.0f, 1.0f, 0.0f, 1.0f));
+//        _drawLine(math::vector3f(3.0, 0, 1.0), math::vector3f(3.0, 0, 7.0), math::color(1.0f, 1.0f, 0.0f, 1.0f));
+//
+//        printf("%d\n", isLinesIntersect({3.0, 3.0}, {3.1, 7.0}, {3.0, 1.0}, {3.0, 7.0}));
+
+        for (int i = 0; i < indices.size() / 3; i++) {
+            VTXNRMUV &p0 = points[indices[i * 3 + 0]];
+            VTXNRMUV &p1 = points[indices[i * 3 + 1]];
+            VTXNRMUV &p2 = points[indices[i * 3 + 2]];
+            
+            _drawTriangle(math::vector3f(p0.x, p0.y - 0.1f, p0.z), math::vector3f(p1.x, p1.y - 0.1f, p1.z), math::vector3f(p2.x, p2.y - 0.1f, p2.z), math::color(1.0f, 1.0f, 1.0f, 1.0f));
+            //_drawLine(math::vector3f(p0.x, p0.y, p0.z), math::vector3f(p1.x, p1.y, p1.z), math::color(1.0f, 1.0f, 1.0f, 1.0f));
+            //_drawLine(math::vector3f(p1.x, p1.y, p1.z), math::vector3f(p2.x, p2.y, p2.z), math::color(1.0f, 1.0f, 1.0f, 1.0f));
+            //_drawLine(math::vector3f(p2.x, p2.y, p2.z), math::vector3f(p0.x, p0.y, p0.z), math::color(1.0f, 1.0f, 1.0f, 1.0f));
+        }
+        
+        _rendering->applyState(_texturedMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        for (const auto &texturedModel : _texturedModels) {
+            _rendering->applyTextures(&texturedModel->texture, 1);
+            _rendering->drawGeometry(texturedModel->vertices, texturedModel->indices, texturedModel->indices->getCount(), foundation::RenderTopology::TRIANGLES);
+        }
+        
+//        if (prepared == false) {
+//            prepared = true;
+//
+//            std::vector<math::vector2f> points;
+//            std::vector<bool> flags;
+//            std::vector<std::uint32_t> indices;
+//
+//            for (int i = 0; i < 9; i++) {
+//                for (int c = 0; c < 9; c++) {
+//                    //if ((rand() % 100) > 30) {
+//                        flags.emplace_back(i != 3 || c >= 5);
+//                        points.emplace_back(math::vector2f(c + 6, i + 6));
+//                    //}
+//                }
+//            }
+//
+//            makeIndices(points, triangles, indices);
+//        }
+//
+//        _drawLine({5, 0, 5}, {5, 0, 15}, {0.2, 0.2, 0.2, 0.5});
+//        _drawLine({5, 0, 5}, {15, 0, 5}, {0.2, 0.2, 0.2, 0.5});
+//        _drawLine({5, 0, 15}, {15, 0, 15}, {0.2, 0.2, 0.2, 0.5});
+//        _drawLine({15, 0, 5}, {15, 0, 15}, {0.2, 0.2, 0.2, 0.5});
+
+//        for (std::size_t i = 0; i < points.size(); i++) {
+//            if (i == minimalIndex) {
+//                _drawPoint(points[i].position, {1.0, 0.0, 0.0, 1.0});
+//            }
+//            else if (i == secondIndex) {
+//                _drawPoint(points[i].position, {0.0, 0.0, 1.0, 1.0});
+//            }
+//            else {
+//                _drawPoint(points[i].position, {0.0, 1.0, 0.0, 1.0});
+//            }
+//        }
+        
+//        for (auto &item : computingEdges) {
+//            _drawLine(points[item.a].position, points[item.b].position, {0.5, 0.5, 0.5, 1.0});
+//        }
+
+        //_drawTriangle({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
+
+//        srand(0);
+//        for (auto &item : triangles) {
+//            _drawTriangle(item.a, item.b, item.c, {float(rand() % 10) / 10.0f, float(rand() % 10) / 10.0f, float(rand() % 10) / 10.0f, 1.0});
+//        }
+
+  
+//        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+//        _rendering->applyShaderConstants(&_shaderConstants);
+//        for (const auto &staticModel : _staticModels) {
+//            _rendering->drawGeometry(nullptr, staticModel->voxels, 18, staticModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
+//        }
+//
+//        _rendering->applyState(_dynamicMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+//        for (const auto &dynamicModel : _dynamicModels) {
+//            _shaderConstants.modelTransform = dynamicModel->transform;
+//            _rendering->applyShaderConstants(&_shaderConstants);
+//            _rendering->drawGeometry(nullptr, dynamicModel->voxels, 18, dynamicModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
+//        }
+
+
 
         // sun voxel map
-        _rendering->applyState(_sunVoxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(_sunVoxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
-        _rendering->applyShaderConstants(&_sunShaderConstants);
-
-        for (const auto &modelIt : _staticModels) {
-            const StaticVoxelModel *model = modelIt.second.get();
-            _rendering->drawGeometry(nullptr, model->voxels, 8, model->voxels->getCount(), foundation::RenderTopology::POINTS);
-        }
-
-        foundation::RenderTexturePtr textures[4] = {nullptr};
-
+//        _rendering->applyState(_sunVoxelMapShader, foundation::RenderPassCommonConfigs::CLEAR(_sunVoxelMap, foundation::BlendType::AGREGATION, 0.0f, 0.0f, 0.0f, 0.0f));
+//        _rendering->applyShaderConstants(&_sunShaderConstants);
+//
+//        for (const auto &model : _staticModels) {
+//            _rendering->drawGeometry(nullptr, model->voxels, 8, model->voxels->getCount(), foundation::RenderTopology::POINTS);
+//        }
+//
+//        foundation::RenderTexturePtr textures[4] = {nullptr};
+        
         // gbuffer
         //_rendering->applyState(_staticMeshGBuferShader, foundation::RenderPassCommonConfigs::CLEAR(_gbuffer, foundation::BlendType::DISABLED, 0.0f, 0.0f, 0.0f));
-        _rendering->applyState(_staticMeshGBuferShader, foundation::RenderPassCommonConfigs::CLEAR(0.0, 0.0, 0.0));
-        _rendering->applyShaderConstants(&_sunShaderConstants);
-        _rendering->applyTextures(&_sunVoxelMap->getTexture(0), 1);
-
-        for (const auto &modelIt : _staticModels) {
-            const StaticVoxelModel *model = modelIt.second.get();
-            _rendering->drawGeometry(nullptr, model->voxels, 18, model->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
-        }
+//        _rendering->applyState(_staticMeshGBuferShader, foundation::RenderPassCommonConfigs::CLEAR(0.0, 0.0, 0.0));
+//        _rendering->applyShaderConstants(&_sunShaderConstants);
+//        _rendering->applyTextures(&_sunVoxelMap->getTexture(0), 1);
+//
+//        for (const auto &model : _staticModels) {
+//            _rendering->drawGeometry(nullptr, model->voxels, 18, model->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
+//        }
         
         // base image
 //        textures[0] = _gbuffer->getTexture(0);
@@ -498,7 +816,115 @@ namespace voxel {
         _camera.viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
         _camera.projMatrix = math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
     }
+    
+    void SceneInterfaceImpl::_drawPoint(const math::vector3f &p, const math::color &rgba) {
+        static const char *pointShaderSrc = R"(
+            const {
+                coord : float4
+                color : float4
+            }
+            inout {
+                color : float4
+            }
+            vssrc {
+                output_position = _transform(const_coord, _transform(frame_viewMatrix, frame_projMatrix));
+                output_color = const_color;
+            }
+            fssrc {
+                output_color[0] = input_color;
+            }
+        )";
         
+        if (_pointShader == nullptr) {
+            _pointShader = _rendering->createShader("scene_primitives_point", pointShaderSrc, {
+                {"ID", foundation::RenderShaderInputFormat::ID}
+            });
+        }
+        
+        struct {
+            math::vector4f coord;
+            math::vector4f color;
+        }
+        constants {math::vector4f(p, 1.0), rgba};
+        
+        _rendering->applyState(_pointShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyShaderConstants(&constants);
+        _rendering->drawGeometry(nullptr, 1, foundation::RenderTopology::POINTS);
+    }
+    
+    void SceneInterfaceImpl::_drawLine(const math::vector3f &a, const math::vector3f &b, const math::color &rgba) {
+        static const char *lineShaderSrc = R"(
+            const {
+                coords[2] : float4
+                color : float4
+            }
+            inout {
+                color : float4
+            }
+            vssrc {
+                output_position = _transform(const_coords[vertex_ID], _transform(frame_viewMatrix, frame_projMatrix));
+                output_color = const_color * vertex_ID;
+            }
+            fssrc {
+                output_color[0] = input_color;
+            }
+        )";
+        
+        if (_lineShader == nullptr) {
+            _lineShader = _rendering->createShader("scene_primitives_line", lineShaderSrc, {
+                {"ID", foundation::RenderShaderInputFormat::ID}
+            });
+        }
+        
+        struct {
+            math::vector4f coordA;
+            math::vector4f coordB;
+            math::vector4f color;
+        }
+        constants {math::vector4f(a, 1.0), math::vector4f(b, 1.0), rgba};
+        
+        _rendering->applyState(_lineShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyShaderConstants(&constants);
+        _rendering->drawGeometry(nullptr, 2, foundation::RenderTopology::LINES);
+    }
+    
+    void SceneInterfaceImpl::_drawTriangle(const math::vector3f &a, const math::vector3f &b, const math::vector3f &c, const math::color &rgba) {
+        static const char *triangleShaderSrc = R"(
+            const {
+                coords[3] : float4
+                color : float4
+            }
+            inout {
+                color : float4
+            }
+            vssrc {
+                output_position = _transform(const_coords[vertex_ID], _transform(frame_viewMatrix, frame_projMatrix));
+                output_color = const_color;
+            }
+            fssrc {
+                output_color[0] = input_color;
+            }
+        )";
+        
+        if (_triangleShader == nullptr) {
+            _triangleShader = _rendering->createShader("scene_primitives_triangle", triangleShaderSrc, {
+                {"ID", foundation::RenderShaderInputFormat::ID}
+            });
+        }
+        
+        struct {
+            math::vector4f coordA;
+            math::vector4f coordB;
+            math::vector4f coordC;
+            math::vector4f color;
+        }
+        constants {math::vector4f(a, 1.0), math::vector4f(b, 1.0), math::vector4f(c, 1.0), rgba};
+        
+        _rendering->applyState(_triangleShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyShaderConstants(&constants);
+        _rendering->drawGeometry(nullptr, 3, foundation::RenderTopology::TRIANGLES);
+    }
+    
     void SceneInterfaceImpl::_drawAxis() {
         static const char *axisShaderSrc = R"(
             fixed {
@@ -526,9 +952,9 @@ namespace voxel {
                 output_color[0] = input_color;
             }
         )";
-
+        
         if (_axisShader == nullptr) {
-            _axisShader = _rendering->createShader("primitives_axis", axisShaderSrc, {
+            _axisShader = _rendering->createShader("scene_primitives_axis", axisShaderSrc, {
                 {"ID", foundation::RenderShaderInputFormat::ID}
             });
         }

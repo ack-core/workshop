@@ -1,0 +1,11 @@
+square 10000 {
+    heightmap hm00.png
+    texture tx00.png
+    position 0 0 0
+}
+
+object player {
+    model knight.vox
+    animation idle 0 0
+    helpers 1
+}
