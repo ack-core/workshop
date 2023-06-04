@@ -8,10 +8,10 @@
 #include "foundation/math.h"
 
 namespace voxel {
-    class ObjectImpl : public YardInterface::Object {
+    class YardObjectImpl : public YardInterface::Object {
     public:
-        ObjectImpl();
-        ~ObjectImpl();
+        YardObjectImpl();
+        ~YardObjectImpl();
 
     public:
         bool instantMove(const math::vector3f &position) = 0;

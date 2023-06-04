@@ -265,6 +265,12 @@ namespace foundation {
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) = 0;
 
+        // Draw vertexes from RenderData with indices
+        // @vertexData  - vertex data that has layout set by current shader
+        // @indexData   - indeces (uint32)
+        //
+        virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) = 0;
+
         // Draw instanced vertexes from RenderData
         // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //

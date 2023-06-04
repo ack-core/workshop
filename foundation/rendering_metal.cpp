@@ -517,8 +517,6 @@ namespace foundation {
             "const sampler _linearSampler(mag_filter::linear, min_filter::linear);\n"
             "\n"
             "struct _FrameData {\n"
-            //"    float4x4 viewProjMatrix;\n"
-            //"    float4x4 invViewProjMatrix;\n"
             "    float4x4 viewMatrix;\n"
             "    float4x4 projMatrix;\n"
             "    float4 cameraPosition;\n"
@@ -1036,8 +1034,27 @@ namespace foundation {
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
+            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
             [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
             [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount];
+        }
+    }
+    
+    void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) {
+        if (_currentRenderCommandEncoder && _currentShader) {
+            if (vertexData && indexData) {
+                id<MTLBuffer> idata = static_cast<const MetalData *>(indexData.get())->get();
+                id<MTLBuffer> nativeVertexData = static_cast<const MetalData *>(vertexData.get())->get();
+                id<MTLBuffer> buffers[2] = {nativeVertexData, nullptr};
+
+                NSUInteger offsets[2] = {0, 0};
+                NSRange vrange {0, 2};
+                MTLPrimitiveType t = g_topologies[int(topology)];
+                
+                //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
+                [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+                [_currentRenderCommandEncoder drawIndexedPrimitives:t indexCount:indexCount indexType:MTLIndexTypeUInt32 indexBuffer:idata indexBufferOffset:0];
+            }
         }
     }
 

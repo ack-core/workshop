@@ -43,16 +43,17 @@ namespace voxel {
         //     skybox "name"
         // }
         // ...
-        // static <id> {
-        //     model "name"
-        //     visual 0
-        //     collision 1
-        //     link <N> <id_1> .. <id_N>
-        // }
-        // ...
         // square <id> {
         //     heightmap "name"
         //     texture "name"
+        //     link <N> <id_1> .. <id_N>
+        // }
+        // ...
+        // thing <id> {
+        //     model "name"
+        //     visual 0
+        //     collision 1
+        //     direction -1.0 1.0 1.0
         //     link <N> <id_1> .. <id_N>
         // }
         // ...
@@ -62,8 +63,9 @@ namespace voxel {
         // ...
         // s--------------------------------------
         //
-        virtual bool loadYard(const char *src) = 0;
+        virtual bool loadYard(const char *sourcepath) = 0;
         virtual auto addObject(const char *type) -> std::shared_ptr<Object> = 0;
+        virtual void update(float dtSec) = 0;
         
     public:
         virtual ~YardInterface() = default;

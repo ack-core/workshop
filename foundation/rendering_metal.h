@@ -132,6 +132,7 @@ namespace foundation {
         void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) override;
         
         void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) override;
+        void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) override;
         void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) override;
 
         void presentFrame() override;
@@ -140,7 +141,7 @@ namespace foundation {
         void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex);
         
         static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
-        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 64;
+        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024 * 16;
         
         struct FrameConstants {
             float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // view matrix

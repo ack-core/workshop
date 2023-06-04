@@ -29,6 +29,9 @@ namespace voxel {
         };
         
     public:
+        struct BoundingBox {
+            virtual ~BoundingBox() = default;
+        };
         struct StaticModel {
             virtual ~StaticModel() = default;
         };
@@ -46,6 +49,7 @@ namespace voxel {
             virtual ~LightSource() = default;
         };
         
+        using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using StaticModelPtr = std::shared_ptr<StaticModel>;
         using TexturedModelPtr = std::shared_ptr<TexturedModel>;
         using DynamicModelPtr = std::shared_ptr<DynamicModel>;
@@ -55,6 +59,7 @@ namespace voxel {
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
+        virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
         virtual auto addStaticModel(const voxel::Mesh &mesh, const int16_t(&offset)[3]) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
         virtual auto addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &position, float rotation) -> DynamicModelPtr = 0;

@@ -3,23 +3,23 @@
 #include "yard_object.h"
 
 namespace voxel {
-    ObjectImpl::ObjectImpl() {
+    YardObjectImpl::YardObjectImpl() {
     
     }
     
-    ObjectImpl::~ObjectImpl() {
+    YardObjectImpl::~YardObjectImpl() {
     
     }
 
-    bool ObjectImpl::instantMove(const math::vector3f &position) {
+    bool YardObjectImpl::instantMove(const math::vector3f &position) {
     
     }
     
-    void ObjectImpl::continuousMove(const math::vector3f &increment) {
+    void YardObjectImpl::continuousMove(const math::vector3f &increment) {
     
     }
     
-    void ObjectImpl::rotate(const math::vector3f &targetDirection) {
+    void YardObjectImpl::rotate(const math::vector3f &targetDirection) {
     
     }
 }

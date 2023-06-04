@@ -1,10 +1,15 @@
 
+#include "yard_base.h"
 #include "yard_square.h"
 
 #include <list>
 #include <unordered_set>
 
-#include <chrono>
+namespace {
+    static const float HM_EDGE_EPS = 0.001f;
+    static const float HM_INTERNAL_EPS = 0.7f;
+    static const float HM_DIV = 4.0f;
+}
 
 namespace voxel {
     struct Edge {
@@ -34,7 +39,7 @@ namespace voxel {
             return true;
     }
 
-    void makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices) {
+    void YardSquare::_makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices) {
         std::vector<Edge> completeEdges;
         std::list<Edge> computingEdges;
     
@@ -178,66 +183,127 @@ namespace voxel {
             
         }
     }
-}
-
-namespace {
-    static const float HM_EDGE_EPS = 0.001f;
-    static const float HM_INTERNAL_EPS = 1.0f;
-    static const float HM_DIV = 16.0f;
-}
-
-namespace voxel {
-    YardSquare::YardSquare(const SceneInterfacePtr &scene, int x, int z, int w, int h, std::unique_ptr<std::uint8_t[]> &&hm, const foundation::RenderTexturePtr &tx)
-    : _texture(tx)
-    , _heightmap(std::move(hm))
-    , _width(w)
-    , _height(h)
-    {
-        std::vector<SceneInterface::VTXNRMUV> vertices;
-        std::vector<std::uint32_t> indices;
+    
+    void YardSquare::_makeGeometry(const std::unique_ptr<std::uint8_t[]> &hm, const math::bound3f &bbox, std::vector<SceneInterface::VTXNRMUV> &ov, std::vector<std::uint32_t> &oi) {
+        int w = int(bbox.xmax - bbox.xmin) + 1;
+        int h = int(bbox.zmax - bbox.zmin) + 1;
         
         for (int c = 0; c < h; c++) {
             for (int i = 0; i < w; i++) {
-                float height = float(_heightmap[c * w + i]) / HM_DIV;
+                float yoffset = bbox.ymin + 1.0f;
+                float height = float(hm[c * w + i]) / HM_DIV;
                 float u = float(i) / float(w - 1), v = float(c) / float(h - 1);
-                float fx = float(i) - 0.5f + float(x);
-                float fz = float(c) - 0.5f + float(z);
+                float fx = float(i) + bbox.xmin;
+                float fz = float(c) + bbox.zmin;
                 
                 if (i == 0 || i == w - 1) {
                     if (c == 0 || c == h - 1) {
-                        vertices.emplace_back(SceneInterface::VTXNRMUV{fx, height, fz, u, 0,0,0, v});
+                        ov.emplace_back(SceneInterface::VTXNRMUV{fx, height + yoffset, fz, u, 0,0,0, v});
                     }
-                    else if (fabs(float(_heightmap[(c - 1) * w + i]) / HM_DIV - height) + fabs(float(_heightmap[(c + 1) * w + i]) / HM_DIV - height) > HM_EDGE_EPS) {
-                        vertices.emplace_back(SceneInterface::VTXNRMUV{fx, height, fz, u, 0,0,0, v});
+                    else if (fabs(float(hm[(c - 1) * w + i]) / HM_DIV - height) + fabs(float(hm[(c + 1) * w + i]) / HM_DIV - height) > HM_EDGE_EPS) {
+                        ov.emplace_back(SceneInterface::VTXNRMUV{fx, height + yoffset, fz, u, 0,0,0, v});
                     }
                 }
                 else if (c == 0 || c == h - 1) {
                     if (i == 0 || i == w - 1) {
-                        vertices.emplace_back(SceneInterface::VTXNRMUV{fx, height, fz, u, 0,0,0, v});
+                        ov.emplace_back(SceneInterface::VTXNRMUV{fx, height + yoffset, fz, u, 0,0,0, v});
                     }
-                    else if (fabs(float(_heightmap[c * w + i - 1]) / HM_DIV - height) + fabs(float(_heightmap[c * w + i + 1]) / HM_DIV - height) > HM_EDGE_EPS) {
-                        vertices.emplace_back(SceneInterface::VTXNRMUV{fx, height, fz, u, 0,0,0, v});
+                    else if (fabs(float(hm[c * w + i - 1]) / HM_DIV - height) + fabs(float(hm[c * w + i + 1]) / HM_DIV - height) > HM_EDGE_EPS) {
+                        ov.emplace_back(SceneInterface::VTXNRMUV{fx, height + yoffset, fz, u, 0,0,0, v});
                     }
                 }
                 else {
-                    float d1 = (float(_heightmap[(c - 1) * w + i]) / HM_DIV - height) - (height - float(_heightmap[(c + 1) * w + i]) / HM_DIV);
-                    float d2 = (float(_heightmap[c * w + i - 1]) / HM_DIV - height) - (height - float(_heightmap[c * w + i + 1]) / HM_DIV);
+                    float d1 = (float(hm[(c - 1) * w + i]) / HM_DIV - height) - (height - float(hm[(c + 1) * w + i]) / HM_DIV);
+                    float d2 = (float(hm[c * w + i - 1]) / HM_DIV - height) - (height - float(hm[c * w + i + 1]) / HM_DIV);
+
                     if (fabs(d1) + fabs(d2) > HM_INTERNAL_EPS) {
-                        vertices.emplace_back(SceneInterface::VTXNRMUV{fx, height, fz, u, 0,0,0, v});
+                        ov.emplace_back(SceneInterface::VTXNRMUV{fx, height + yoffset, fz, u, 0,0,0, v});
                     }
                 }
             }
         }
         
-        auto start = std::chrono::steady_clock::now();
-        makeIndices(vertices, indices);
-        auto end = std::chrono::steady_clock::now();
-        printf("------>>> %lf\n", double(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0);
-        
-        _model = scene->addTexturedModel(vertices, indices, tx);
+        _makeIndices(ov, oi);
     }
+}
+
+namespace voxel {
+    YardSquare::YardSquare(const YardInterfaceProvider &interfaces, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
+    : _interfaces(interfaces)
+    , _texturePath(std::move(texture))
+    , _heightmapPath(std::move(heightmap))
+    , _bbox(bbox)
+    {}
     
     YardSquare::~YardSquare() {
-    
+        _model = nullptr;
     }
+    
+    void YardSquare::setState(YardStatic::State newState) {
+        if (_currentState != newState) {
+            if (newState == YardStatic::State::NONE) { // unload
+                _heightmap = nullptr;
+                _texture = nullptr;
+                _model = nullptr;
+                _bboxmdl = nullptr;
+            }
+            else {
+                if (_currentState == YardStatic::State::NONE) { // load resources
+                    if (const foundation::RenderTexturePtr &tx = _interfaces.getTextureProvider()->getOrLoad2DTexture(_texturePath.data())) {
+                        std::uint32_t bbx = std::uint32_t(_bbox.xmax - _bbox.xmin);
+                        std::uint32_t bbz = std::uint32_t(_bbox.zmax - _bbox.zmin);
+                        
+                        if (tx->getWidth() == bbx && tx->getHeight() == bbz) {
+                            if (_heightmapPath[0]) {
+                                std::uint32_t hmwidth, hmheight;
+                                
+                                if (_interfaces.getTextureProvider()->getOrLoadTextureData(_heightmapPath.data(), _heightmap, hmwidth, hmheight) == false) {
+                                    _interfaces.getLogger()->logError("[YardSquare::setState] unable to load heightmap '%s'\n", _heightmapPath.data());
+                                }
+                                else if (hmwidth != bbx + 1 || hmheight != bbz + 1) {
+                                    _interfaces.getLogger()->logError("[YardSquare::setState] heightmap '%s' doesnt fit square bbox\n", _heightmapPath.data());
+                                    _heightmap = nullptr;
+                                }
+                            }
+                            
+                            if (_heightmap == nullptr) {
+                                _heightmap = std::make_unique<std::uint8_t[]>((bbx + 1) * (bbz + 1));
+                            }
+                            
+                            _texture = tx;
+                        
+                        }
+                        else {
+                            _interfaces.getLogger()->logError("[YardSquare::setState] texture '%s' doesnt fit square bbox\n", _texturePath.data());
+                        }
+                    }
+                    else {
+                        _interfaces.getLogger()->logError("[YardSquare::setState] unable to load texture '%s'\n", _texturePath.data());
+                    }
+                }
+                if (newState == YardStatic::State::RENDERED) { // add to scene
+                    std::vector<SceneInterface::VTXNRMUV> vertices;
+                    std::vector<std::uint32_t> indices;
+                    
+                    _makeGeometry(_heightmap, _bbox, vertices, indices);
+                    _model = _interfaces.getScene()->addTexturedModel(vertices, indices, _texture);
+                    _bboxmdl = _interfaces.getScene()->addBoundingBox(_bbox);
+                }
+                if (newState == YardStatic::State::NEARBY) { // remove from scene
+                    _model = nullptr;
+                }
+            }
+        }
+        
+        _currentState = newState;
+    }
+    
+    YardStatic::State YardSquare::getState() const {
+        return _currentState;
+    }
+    
+    math::bound3f YardSquare::getBBox() const {
+        return _bbox;
+    }
+    
 }
