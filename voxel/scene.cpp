@@ -9,8 +9,6 @@
 
 #include <list>
 
-//#include "thirdparty/upng/upng.h"
-
 namespace voxel {
     class BoundingBoxImpl : public SceneInterface::BoundingBox {
     public:
@@ -117,7 +115,6 @@ namespace voxel {
         void updateAndDraw(float dtSec) override;
         
     private:
-        void _updateMatrices();
         void _drawAxis();
         
         struct ShaderConst {
@@ -351,7 +348,10 @@ namespace voxel {
         
         _camera.forward = nrmlook;
         _camera.up = nrmright.cross(nrmlook);
-        _updateMatrices();
+        
+        float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
+        _camera.viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
+        _camera.projMatrix = math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
     }
     
     void SceneInterfaceImpl::setSun(const math::vector3f &directionToSun, const math::color &rgba) {
@@ -447,27 +447,40 @@ namespace voxel {
     SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(const math::vector3f &position, float r, float g, float b, float radius) {
         return nullptr;
     }
-        
+    
+    namespace {
+        template<typename T> void cleanupUnused(std::vector<T> &v) {
+            for (auto index = v.begin(); index != v.end(); ) {
+                if (index->use_count() <= 1) {
+                    *index = v.back();
+                    v.pop_back();
+                }
+                else {
+                    ++index;
+                }
+            }
+        }
+    }
+    
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
+        cleanupUnused(_boundingBoxes);
+        cleanupUnused(_staticModels);
+        cleanupUnused(_texturedModels);
+        cleanupUnused(_dynamicModels);
+        
         _rendering->updateFrameConstants(_camera.viewMatrix.flat16, _camera.projMatrix.flat16, _camera.position.flat3, _camera.forward.flat3);
         _drawAxis();
-
+        
         _rendering->applyState(_boundingBoxShader, foundation::RenderPassCommonConfigs::DEFAULT());
         for (const auto &boundingBox : _boundingBoxes) {
             _rendering->drawGeometry(boundingBox->lines, 24, foundation::RenderTopology::LINES);
         }
-
+        
         _rendering->applyState(_texturedMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
         for (const auto &texturedModel : _texturedModels) {
             _rendering->applyTextures(&texturedModel->texture, 1);
             _rendering->drawGeometry(texturedModel->vertices, texturedModel->indices, texturedModel->indices->getCount(), foundation::RenderTopology::TRIANGLES);
         }
-    }
-    
-    void SceneInterfaceImpl::_updateMatrices() {
-        float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
-        _camera.viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
-        _camera.projMatrix = math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
     }
     
 //    void SceneInterfaceImpl::_drawPoint(const math::vector3f &p, const math::color &rgba) {

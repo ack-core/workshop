@@ -229,10 +229,9 @@ namespace voxel {
 
 namespace voxel {
     YardSquare::YardSquare(const YardInterfaceProvider &interfaces, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
-    : _interfaces(interfaces)
+    : YardStatic(interfaces, bbox)
     , _texturePath(std::move(texture))
     , _heightmapPath(std::move(heightmap))
-    , _bbox(bbox)
     {}
     
     YardSquare::~YardSquare() {
@@ -271,7 +270,7 @@ namespace voxel {
                             }
                             
                             _texture = tx;
-                        
+                            _bboxmdl = _interfaces.getScene()->addBoundingBox(_bbox);
                         }
                         else {
                             _interfaces.getLogger()->logError("[YardSquare::setState] texture '%s' doesnt fit square bbox\n", _texturePath.data());
@@ -287,7 +286,6 @@ namespace voxel {
                     
                     _makeGeometry(_heightmap, _bbox, vertices, indices);
                     _model = _interfaces.getScene()->addTexturedModel(vertices, indices, _texture);
-                    _bboxmdl = _interfaces.getScene()->addBoundingBox(_bbox);
                 }
                 if (newState == YardStatic::State::NEARBY) { // remove from scene
                     _model = nullptr;
@@ -296,14 +294,6 @@ namespace voxel {
         }
         
         _currentState = newState;
-    }
-    
-    YardStatic::State YardSquare::getState() const {
-        return _currentState;
-    }
-    
-    math::bound3f YardSquare::getBBox() const {
-        return _bbox;
     }
     
 }

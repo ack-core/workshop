@@ -12,6 +12,7 @@ set(
 	"${m_source_root}/yard.h"
 	"${m_source_root}/yard.cpp"
 	"${m_source_root}/yard_base.h"
+	"${m_source_root}/yard_base.cpp"
 	"${m_source_root}/yard_object.h"
 	"${m_source_root}/yard_object.cpp"
 	"${m_source_root}/yard_square.h"

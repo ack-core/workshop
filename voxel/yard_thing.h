@@ -10,7 +10,7 @@
 namespace voxel {
     class YardThing : public YardStatic {
     public:
-        YardThing();
+        YardThing(const YardInterfaceProvider &interfaces, const math::bound3f &bbox);
         ~YardThing() override;
 
     };

@@ -1,8 +1,6 @@
 
 #include "debug_context.h"
 
-extern int dbg_counter;
-
 namespace game {
     template <> std::unique_ptr<Context> makeContext<DebugContext>(API &&api) {
         return std::make_unique<DebugContext>(std::move(api));
@@ -34,20 +32,20 @@ namespace game {
                         _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
                     }
                 }
-                if (args.type == foundation::PlatformTouchEventArgs::EventType::FINISH) {
-                    _mouseLocked = false;
-                    if (args.coordinateX < 50 && args.coordinateY < 50) {
-                        if (dbg_counter > 0) dbg_counter--;
-                    }
-                    if (args.coordinateX > _api.platform->getScreenWidth() - 50 && args.coordinateY < 50) {
-                        if (dbg_counter < 1000) dbg_counter++;
-                    }
-                }
+//                if (args.type == foundation::PlatformTouchEventArgs::EventType::FINISH) {
+//                    _mouseLocked = false;
+//                    if (args.coordinateX < 50 && args.coordinateY < 50) {
+//                        if (dbg_counter > 0) dbg_counter--;
+//                    }
+//                    if (args.coordinateX > _api.platform->getScreenWidth() - 50 && args.coordinateY < 50) {
+//                        if (dbg_counter < 1000) dbg_counter++;
+//                    }
+//                }
             }
         );
         
-        if (_api.yard->loadYard("default.yard")) {
-            _api.yard->addObject("player");
+        if (_api.yard->loadYard("debug")) {
+            //_api.yard->addObject("player");
         }
         
 //        {

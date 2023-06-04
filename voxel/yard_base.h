@@ -33,12 +33,23 @@ namespace voxel {
         };
         
     public:
-        virtual void setState(State state) = 0;
-        virtual auto getState() const -> State = 0;
-        virtual auto getBBox() const -> math::bound3f = 0;
-
-    public:
+        YardStatic(const YardInterfaceProvider &interfaces, const math::bound3f &bbox);
         virtual ~YardStatic() = default;
+    
+    public:
+        virtual void setState(State state) = 0;
+        
+        auto getState() const -> State;
+        auto getBBox() const -> math::bound3f;
+        auto getLinks() const -> const std::vector<YardStatic *> &;
+        void linkTo(YardStatic *object);
+
+    protected:
+        const YardInterfaceProvider &_interfaces;
+        const math::bound3f _bbox;
+
+        std::vector<YardStatic *> _links;
+        State _currentState;
     };
 }
 
