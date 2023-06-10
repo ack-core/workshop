@@ -13,7 +13,12 @@
 #include "voxel/scene.h"
 
 namespace voxel {
-    class YardInterfaceProvider {
+    struct YardObjectType {
+        std::string model;
+        math::vector3f center;
+    };
+    
+    class YardFacility {
     public:
         virtual const foundation::LoggerInterfacePtr &getLogger() const = 0;
         virtual const MeshProviderPtr &getMeshProvider() const = 0;
@@ -21,7 +26,15 @@ namespace voxel {
         virtual const SceneInterfacePtr &getScene() const = 0;
         
     public:
-        virtual ~YardInterfaceProvider() = default;
+        virtual ~YardFacility() = default;
+    };
+
+    class YardCollision {
+    public:
+        virtual void correctMovement(const math::vector3f &position, math::vector3f &movement) const = 0;
+        
+    public:
+        virtual ~YardCollision() = default;
     };
     
     class YardStatic {
@@ -33,7 +46,7 @@ namespace voxel {
         };
         
     public:
-        YardStatic(const YardInterfaceProvider &interfaces, const math::bound3f &bbox);
+        YardStatic(const YardFacility &facility, const math::bound3f &bbox);
         virtual ~YardStatic() = default;
     
     public:
@@ -45,7 +58,7 @@ namespace voxel {
         void linkTo(YardStatic *object);
 
     protected:
-        const YardInterfaceProvider &_interfaces;
+        const YardFacility &_facility;
         const math::bound3f _bbox;
 
         std::vector<YardStatic *> _links;

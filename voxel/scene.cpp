@@ -51,7 +51,8 @@ namespace voxel {
     class DynamicModelImpl : public SceneInterface::DynamicModel {
     public:
         struct Voxel {
-            std::int16_t positionX, positionY, positionZ, colorIndex;
+            float positionX, positionY, positionZ;
+            std::uint32_t colorIndex;
         };
         
     public:
@@ -65,14 +66,8 @@ namespace voxel {
         void setFrame(std::uint16_t index) override {
         
         }
-        void setPosition(const math::vector3f &pos) override {
-            transform._41 = pos.x;
-            transform._42 = pos.y;
-            transform._43 = pos.z;
-        }
-        void setRotation(float r) override {
-            math::vector3f position = transform.translation();
-            transform = math::transform3f({0.0f, 1.0f, 0.0f}, r).translated(position);
+        void setTransform(const math::transform3f &trfm) override {
+            transform = trfm;
         }
     };
     
@@ -107,9 +102,9 @@ namespace voxel {
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
         BoundingBoxPtr addBoundingBox(const math::bound3f &bbox) override;
-        StaticModelPtr addStaticModel(const voxel::Mesh &mesh, const int16_t(&offset)[3]) override;
+        StaticModelPtr addStaticModel(const voxel::Mesh &mesh) override;
         TexturedModelPtr addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) override;
-        DynamicModelPtr addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &position, float rotation) override;
+        DynamicModelPtr addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &center, const math::transform3f &transform) override;
         LightSourcePtr addLightSource(const math::vector3f &position, float r, float g, float b, float radius) override;
         
         void updateAndDraw(float dtSec) override;
@@ -261,7 +256,7 @@ namespace {
             tmp : float4
         }
         vssrc {
-            float3 cubeCenter = float3(instance_position_color.xyz);
+            float3 cubeCenter = float3(instance_position.xyz);
             float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - cubeCenter, 0.0)).xyz);
             float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
@@ -324,7 +319,8 @@ namespace voxel {
                 {"ID", foundation::RenderShaderInputFormat::ID}
             },
             { // instance
-                {"position_color", foundation::RenderShaderInputFormat::SHORT4},
+                {"position", foundation::RenderShaderInputFormat::FLOAT3},
+                {"color", foundation::RenderShaderInputFormat::BYTE4},
             }
         );
         
@@ -387,7 +383,7 @@ namespace voxel {
         return model;
     }
     
-    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const voxel::Mesh &mesh, const int16_t(&offset)[3]) {
+    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const voxel::Mesh &mesh) {
         std::shared_ptr<StaticModelImpl> model = nullptr;
         std::uint32_t voxelCount = mesh.frames[0].voxelCount;
         std::unique_ptr<StaticModelImpl::Voxel[]> positions = std::make_unique<StaticModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
@@ -422,22 +418,22 @@ namespace voxel {
         return model;
     }
     
-    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &position, float rotation) {
+    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &center, const math::transform3f &transform) {
         std::uint32_t voxelCount = mesh.frames[0].voxelCount;
         std::unique_ptr<DynamicModelImpl::Voxel[]> positions = std::make_unique<DynamicModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
         std::shared_ptr<DynamicModelImpl> model = nullptr;
         
         for (std::uint32_t i = 0; i < voxelCount; i++) {
-            positions[i].positionX = mesh.frames[0].voxels[i].positionX;
-            positions[i].positionY = mesh.frames[0].voxels[i].positionY;
-            positions[i].positionZ = mesh.frames[0].voxels[i].positionZ;
+            positions[i].positionX = float(mesh.frames[0].voxels[i].positionX) - center.x;
+            positions[i].positionY = float(mesh.frames[0].voxels[i].positionY) - center.y;
+            positions[i].positionZ = float(mesh.frames[0].voxels[i].positionZ) - center.z;
             positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
         }
         
         foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(DynamicModelImpl::Voxel));
         
         if (voxels) {
-            model = std::make_shared<DynamicModelImpl>(std::move(voxels), math::transform3f({0.0f, 1.0f, 0.0f}, rotation).translated(position));
+            model = std::make_shared<DynamicModelImpl>(std::move(voxels), transform);
             _dynamicModels.emplace_back(model);
         }
         
@@ -480,6 +476,13 @@ namespace voxel {
         for (const auto &texturedModel : _texturedModels) {
             _rendering->applyTextures(&texturedModel->texture, 1);
             _rendering->drawGeometry(texturedModel->vertices, texturedModel->indices, texturedModel->indices->getCount(), foundation::RenderTopology::TRIANGLES);
+        }
+
+        _rendering->applyState(_dynamicMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        for (const auto &dynamicModel : _dynamicModels) {
+            _shaderConstants.modelTransform = dynamicModel->transform;
+            _rendering->applyShaderConstants(&_shaderConstants);
+            _rendering->drawGeometry(nullptr, dynamicModel->voxels, 18, dynamicModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
         }
     }
     

@@ -28,12 +28,14 @@ namespace voxel {
         static std::shared_ptr<MeshProvider> instance(const foundation::PlatformInterfacePtr &platform);
         
     public:
+        virtual const std::unique_ptr<Mesh> &getOrLoadVoxelMesh(const char *voxPath) = 0;
+    
         // Load voxels from file if they aren't loaded yet
         // @name    - path to file without '.vox' extension
         // @offset  - value to be added to voxel positions
         // @return  - pointer to Mesh or nullptr
         //
-        virtual auto getOrLoadVoxelMesh(const char *name, const int16_t(&offset)[3]) -> const std::unique_ptr<Mesh> & = 0;
+        virtual auto getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3]) -> const std::unique_ptr<Mesh> & = 0;
         
     public:
         virtual ~MeshProvider() = default;

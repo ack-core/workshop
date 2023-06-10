@@ -3,7 +3,7 @@
 #include "yard_thing.h"
 
 namespace voxel {
-    YardThing::YardThing(const YardInterfaceProvider &interfaces, const math::bound3f &bbox) : YardStatic(interfaces, bbox) {
+    YardThing::YardThing(const YardFacility &facility, const math::bound3f &bbox) : YardStatic(facility, bbox) {
     
     }
     
@@ -11,4 +11,7 @@ namespace voxel {
     
     }
 
+    void YardThing::setState(State newState) {
+    
+    }
 }

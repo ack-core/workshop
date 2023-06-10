@@ -29,7 +29,7 @@ int main(int argc, const char * argv[]) {
     auto ui = ui::StageInterface::instance(platform, rendering);
     auto datahub = dh::DataHub::instance(platform, game::datahub);
     auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);
-
+    
     platform->run([&](float dtSec) {
         states->update(dtSec);
         datahub->update(dtSec);

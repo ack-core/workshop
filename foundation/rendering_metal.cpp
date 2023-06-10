@@ -1002,9 +1002,9 @@ namespace foundation {
     void MetalRendering::applyShaderConstants(const void *constants) {
         if (_currentRenderCommandEncoder) {
             const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
-
-            if (platformShader && platformShader->getConstBufferLength()) {
-                const std::uint32_t constBufferLength = platformShader->getConstBufferLength();
+            const std::uint32_t constBufferLength = platformShader->getConstBufferLength();
+            
+            if (platformShader && constBufferLength) {
                 _appendConstantBuffer(constants, constBufferLength, 2, 0);
             }
         }

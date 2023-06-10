@@ -1,8 +1,8 @@
 
+#include "yard.h"
 #include "yard_base.h"
 #include "yard_square.h"
 #include "yard_thing.h"
-#include "yard.h"
 #include "yard_object.h"
 
 #include "thirdparty/expect/expect.h"
@@ -18,7 +18,7 @@ namespace {
 }
 
 namespace voxel {
-    class YardImpl : public YardInterface, public YardInterfaceProvider {
+    class YardImpl : public YardInterface, public YardFacility, public YardCollision {
     public:
         YardImpl(const foundation::PlatformInterfacePtr &platform, const MeshProviderPtr &meshProvider, const TextureProviderPtr &textureProvider, const SceneInterfacePtr &scene);
         ~YardImpl() override;
@@ -28,10 +28,13 @@ namespace voxel {
         const MeshProviderPtr &getMeshProvider() const override { return _meshProvider; }
         const TextureProviderPtr &getTextureProvider() const override { return _textureProvider; }
         const SceneInterfacePtr &getScene() const override { return _scene; }
-
+    
+    public:
+        void correctMovement(const math::vector3f &position, math::vector3f &movement) const override;
+        
     public:
         bool loadYard(const char *src) override;
-        auto addObject(const char *type) -> std::shared_ptr<Object> override;
+        auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> override;
         void update(float dtSec) override;
         
     public:
@@ -48,14 +51,11 @@ namespace voxel {
         struct Node {
             std::vector<YardStatic *> items;
         };
-        struct ObjectType {
-            std::string model;
-        };
         
         bool _partial;
         std::unordered_map<std::uint64_t, Node> _nodes;
         std::unordered_map<std::uint64_t, std::unique_ptr<YardStatic>> _statics;
-        std::unordered_map<std::string, ObjectType> _objectTypes;
+        std::unordered_map<std::string, YardObjectType> _objectTypes;
         std::vector<std::shared_ptr<YardObjectImpl>> _objects;
     };
 }
@@ -90,7 +90,11 @@ namespace voxel {
     YardImpl::~YardImpl() {
     
     }
-
+    
+    void YardImpl::correctMovement(const math::vector3f &position, math::vector3f &movement) const {
+        // collide
+    }
+    
     bool YardImpl::loadYard(const char *sourcepath) {
         std::string yardpath = std::string(sourcepath) + ".yard";
         std::unique_ptr<std::uint8_t[]> binary;
@@ -152,16 +156,20 @@ namespace voxel {
                 if (type == "object" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
                     std::istringstream input = std::istringstream(block);
                     std::string model;
+                    math::vector3f center;
                     
                     while (input.eof() == false && input >> parameter) {
                         if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
                             _platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'model' syntax\n", name.data());
                         }
+                        if (parameter == "center" && bool(input >> center.x >> center.y >> center.z) == false) {
+                            _platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'center' syntax\n", name.data());
+                        }
                         input >> std::ws;
                     }
                     
                     if (input.fail() == false) {
-                        _objectTypes.emplace(name, ObjectType{std::move(model)});
+                        _objectTypes.emplace(name, YardObjectType{std::move(model), center});
                     }
                     else {
                         _platform->logError("[YardImpl::loadYard] unable to load object type '%s'\n", name.data());
@@ -186,7 +194,16 @@ namespace voxel {
         return false;
     }
     
-    std::shared_ptr<YardImpl::Object> YardImpl::addObject(const char *type) {
+    std::shared_ptr<YardImpl::Object> YardImpl::addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) {
+        auto index = _objectTypes.find(type);
+        if (index != _objectTypes.end()) {
+            std::shared_ptr<YardObjectImpl> object = std::make_shared<YardObjectImpl>(*this, *this, index->second, position, direction);
+            _objects.emplace_back(object);
+        }
+        else {
+            _platform->logError("[YardImpl::addObject] unknown object type '%s'\n", type);
+        }
+        
         return nullptr;
     }
     

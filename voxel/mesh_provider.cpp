@@ -9,7 +9,8 @@ namespace voxel {
         MeshProviderImpl(const foundation::PlatformInterfacePtr &platform);
         ~MeshProviderImpl() override;
         
-        const std::unique_ptr<Mesh> &getOrLoadVoxelMesh(const char *voxPath, const int16_t(&offset)[3]) override;
+        const std::unique_ptr<Mesh> &getOrLoadVoxelMesh(const char *voxPath) override;
+        const std::unique_ptr<Mesh> &getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3]) override;
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
@@ -24,8 +25,13 @@ namespace voxel {
     MeshProviderImpl::~MeshProviderImpl() {
     
     }
-    
-    const std::unique_ptr<Mesh> &MeshProviderImpl::getOrLoadVoxelMesh(const char *name, const int16_t(&offset)[3]) {
+
+    const std::unique_ptr<Mesh> &MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath) {
+        std::int16_t zero[3] = {0, 0, 0};
+        return getOrLoadVoxelMesh(voxPath, zero);
+    }
+
+    const std::unique_ptr<Mesh> &MeshProviderImpl::getOrLoadVoxelMesh(const char *name, const std::int16_t(&offset)[3]) {
         auto index = _meshes.find(name);
         if (index != _meshes.end()) {
             return index->second;

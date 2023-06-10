@@ -8,7 +8,7 @@
 namespace voxel {
     class YardSquare : public YardStatic {
     public:
-        YardSquare(const YardInterfaceProvider &interfaces, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
+        YardSquare(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
         ~YardSquare() override;
         
     public:

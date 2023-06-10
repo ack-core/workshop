@@ -40,8 +40,7 @@ namespace voxel {
         };
         struct DynamicModel {
             virtual void setFrame(std::uint16_t index) = 0;
-            virtual void setPosition(const math::vector3f &position) = 0;
-            virtual void setRotation(float rotation) = 0;
+            virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual ~DynamicModel() = default;
         };
         struct LightSource {
@@ -60,9 +59,9 @@ namespace voxel {
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addStaticModel(const voxel::Mesh &mesh, const int16_t(&offset)[3]) -> StaticModelPtr = 0;
+        virtual auto addStaticModel(const voxel::Mesh &mesh) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
-        virtual auto addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &position, float rotation) -> DynamicModelPtr = 0;
+        virtual auto addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &center, const math::transform3f &transform) -> DynamicModelPtr = 0;
         virtual auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual void updateAndDraw(float dtSec) = 0;

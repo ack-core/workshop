@@ -228,8 +228,8 @@ namespace voxel {
 }
 
 namespace voxel {
-    YardSquare::YardSquare(const YardInterfaceProvider &interfaces, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
-    : YardStatic(interfaces, bbox)
+    YardSquare::YardSquare(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
+    : YardStatic(facility, bbox)
     , _texturePath(std::move(texture))
     , _heightmapPath(std::move(heightmap))
     {}
@@ -248,7 +248,7 @@ namespace voxel {
             }
             else {
                 if (_currentState == YardStatic::State::NONE) { // load resources
-                    if (const foundation::RenderTexturePtr &tx = _interfaces.getTextureProvider()->getOrLoad2DTexture(_texturePath.data())) {
+                    if (const foundation::RenderTexturePtr &tx = _facility.getTextureProvider()->getOrLoad2DTexture(_texturePath.data())) {
                         std::uint32_t bbx = std::uint32_t(_bbox.xmax - _bbox.xmin);
                         std::uint32_t bbz = std::uint32_t(_bbox.zmax - _bbox.zmin);
                         
@@ -256,11 +256,11 @@ namespace voxel {
                             if (_heightmapPath[0]) {
                                 std::uint32_t hmwidth, hmheight;
                                 
-                                if (_interfaces.getTextureProvider()->getOrLoadTextureData(_heightmapPath.data(), _heightmap, hmwidth, hmheight) == false) {
-                                    _interfaces.getLogger()->logError("[YardSquare::setState] unable to load heightmap '%s'\n", _heightmapPath.data());
+                                if (_facility.getTextureProvider()->getOrLoadTextureData(_heightmapPath.data(), _heightmap, hmwidth, hmheight) == false) {
+                                    _facility.getLogger()->logError("[YardSquare::setState] unable to load heightmap '%s'\n", _heightmapPath.data());
                                 }
                                 else if (hmwidth != bbx + 1 || hmheight != bbz + 1) {
-                                    _interfaces.getLogger()->logError("[YardSquare::setState] heightmap '%s' doesnt fit square bbox\n", _heightmapPath.data());
+                                    _facility.getLogger()->logError("[YardSquare::setState] heightmap '%s' doesnt fit square bbox\n", _heightmapPath.data());
                                     _heightmap = nullptr;
                                 }
                             }
@@ -270,14 +270,14 @@ namespace voxel {
                             }
                             
                             _texture = tx;
-                            _bboxmdl = _interfaces.getScene()->addBoundingBox(_bbox);
+                            _bboxmdl = _facility.getScene()->addBoundingBox(_bbox);
                         }
                         else {
-                            _interfaces.getLogger()->logError("[YardSquare::setState] texture '%s' doesnt fit square bbox\n", _texturePath.data());
+                            _facility.getLogger()->logError("[YardSquare::setState] texture '%s' doesnt fit square bbox\n", _texturePath.data());
                         }
                     }
                     else {
-                        _interfaces.getLogger()->logError("[YardSquare::setState] unable to load texture '%s'\n", _texturePath.data());
+                        _facility.getLogger()->logError("[YardSquare::setState] unable to load texture '%s'\n", _texturePath.data());
                     }
                 }
                 if (newState == YardStatic::State::RENDERED) { // add to scene
@@ -285,7 +285,7 @@ namespace voxel {
                     std::vector<std::uint32_t> indices;
                     
                     _makeGeometry(_heightmap, _bbox, vertices, indices);
-                    _model = _interfaces.getScene()->addTexturedModel(vertices, indices, _texture);
+                    _model = _facility.getScene()->addTexturedModel(vertices, indices, _texture);
                 }
                 if (newState == YardStatic::State::NEARBY) { // remove from scene
                     _model = nullptr;

@@ -2,7 +2,7 @@
 #include "yard_base.h"
 
 namespace voxel {
-    YardStatic::YardStatic(const YardInterfaceProvider &interfaces, const math::bound3f &bbox) : _interfaces(interfaces), _currentState(YardStatic::State::NONE), _bbox(bbox) {}
+    YardStatic::YardStatic(const YardFacility &facility, const math::bound3f &bbox) : _facility(facility), _currentState(YardStatic::State::NONE), _bbox(bbox) {}
     
     YardStatic::State YardStatic::getState() const {
         return _currentState;

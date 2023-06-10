@@ -45,7 +45,7 @@ namespace game {
         );
         
         if (_api.yard->loadYard("debug")) {
-            //_api.yard->addObject("player");
+            _api.yard->addObject("player", math::vector3f(16, 0, 16), math::vector3f(1.0, 0.0, 0.0));
         }
         
 //        {

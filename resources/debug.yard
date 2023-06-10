@@ -1,11 +1,32 @@
-square 10000 {
-    heightmap hm00.png
-    texture tx00.png
-    position 0 0 0
+options {
+    partial false
 }
 
-object player {
-    model knight.vox
-    animation idle 0 0
-    helpers 1
+square 1000 {
+    texture "textures/yards/dungeon_room00"
+    position 0 -1 0 71 -1 41
+    link 1 1001
+}
+
+square 1001 {
+    texture "textures/yards/dungeon_pass01"
+    position 20 -1 42 51 -1 61
+    link 2 1000 1002
+}
+
+square 1002 {
+    texture "textures/yards/dungeon_crn00"
+    position 20 -1 62 51 -1 93
+    link 2 1001 1003
+}
+
+square 1003 {
+    texture "textures/yards/dungeon_pass00"
+    position -60 -1 62 19 -1 93
+    link 1 1002
+}
+
+object "player" {
+    model "models/characters/knight"
+    center 2.0 0.0 2.0
 }

@@ -14,6 +14,7 @@
 
 namespace voxel {
     // + collision
+    // + object list must be separated from statics
     // + 
     class YardInterface {
     public:
@@ -26,12 +27,14 @@ namespace voxel {
         
     public:
         struct Object {
-            virtual void setPrimary() = 0;
-            virtual bool instantMove(const math::vector3f &position) = 0;
+            virtual void attach(const char *helper, const char *type, const math::transform3f &trfm) = 0;
+            virtual void detach(const char *helper) = 0;
+            virtual void instantMove(const math::vector3f &position) = 0;
             virtual void continuousMove(const math::vector3f &increment) = 0;
             virtual void rotate(const math::vector3f &targetDirection) = 0;
-            virtual auto getPosition() const -> math::vector3f & = 0;
-            virtual auto getRotation() const -> float = 0;
+            virtual auto getPosition() const -> const math::vector3f & = 0;
+            virtual auto getDirection() const -> const math::vector3f & = 0;
+            virtual void update(float dtSec) = 0;
             virtual ~Object() = default;
         };
         
@@ -59,12 +62,13 @@ namespace voxel {
         // ...
         // object "type" {
         //     model "name"
+        //     center 3 0 3
         // }
         // ...
         // s--------------------------------------
         //
         virtual bool loadYard(const char *sourcepath) = 0;
-        virtual auto addObject(const char *type) -> std::shared_ptr<Object> = 0;
+        virtual auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> = 0;
         virtual void update(float dtSec) = 0;
         
     public:
