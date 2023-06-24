@@ -70,7 +70,32 @@ namespace foundation {
     // TODO:
     struct PlatformGamepadEventArgs {};
     
+    // Classes to control asynchronous work
+    //
+    class AsyncTask {
+    public:
+        virtual void executeInBackground() = 0;
+        virtual void executeInMainThread() = 0;
+        
+    public:
+        virtual ~AsyncTask() = default;
+    };
+
+    template<typename Context> class CommonAsyncTask : public Context, public AsyncTask {
+    public:
+        CommonAsyncTask(std::function<void(Context &context)> &&background, std::function<void(Context &context)> &&main) : _background(background), _main(main) {}
+        ~CommonAsyncTask() override {}
+        
+        void executeInBackground() override { _background(*this); }
+        void executeInMainThread() override { _main(*this); }
+        
+    private:
+        std::function<void(Context &context)> _background;
+        std::function<void(Context &context)> _main;
+    };
     
+    // If some subsystem requires only error output
+    //
     class LoggerInterface {
     public:
         virtual void logMsg(const char *fmt, ...) = 0;
@@ -89,18 +114,30 @@ namespace foundation {
         static std::shared_ptr<PlatformInterface> instance();
 
     public:
+        // Execute task in IO Thread
+        // @task     - task to be executed
+        virtual void executeAsync(std::unique_ptr<AsyncTask> &&task) = 0;
+        
         // Forms std::vector of file paths in @dirPath
         // @dirPath  - target directory. Example: "data/map1"
         // @return   - vector of entries
+        // @completion called from the main thread
         //
-        virtual std::vector<PlatformFileEntry> formFileList(const char *dirPath) = 0;
+        virtual void formFileList(const char *dirPath, std::function<void(const std::vector<PlatformFileEntry> &)> &&completion) = 0;
+
+        // Loads file to memory
+        // @filePath - file path. Example: "data/map1/test.png"
+        // @return   - size != 0 if file opened successfully. Items returned by formFileList should be successfully loaded.
+        // @completion called from the main thread
+        //
+        virtual void loadFile(const char *filePath, std::function<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
 
         // Loads file to memory
         // @filePath - file path. Example: "data/map1/test.png"
         // @return   - true if file successfully loaded. Items returned by formFileList should be successfully loaded.
         //
         virtual bool loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) = 0;
-
+        
         // Returns native screen size in pixels
         //
         virtual float getScreenWidth() const = 0;

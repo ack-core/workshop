@@ -1,14 +1,10 @@
 
 #pragma once
+#include "platform.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <string>
-#include <vector>
-#include <functional>
-
-#include "platform.h"
 
 namespace foundation {
     enum class RenderTopology {
@@ -89,7 +85,7 @@ namespace foundation {
 
     class RenderTarget {
     public:
-        static const size_t MAXCOUNT = 4;
+        static const std::size_t MAXCOUNT = 4;
         
         virtual std::uint32_t getWidth() const = 0;
         virtual std::uint32_t getHeight() const = 0;
