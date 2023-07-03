@@ -1,61 +1,178 @@
 
 #include "stage.h"
 
-#include <cfloat>
-#include <memory>
-#include <vector>
-#include <unordered_map>
+#include "stage_base.h"
+#include "stage_pivot.h"
+#include "stage_image.h"
+#include "stage_text.h"
 
-#include "thirdparty/upng/upng.h"
+#include <list>
+#include <memory>
 
 namespace ui {
-    class StageInterfaceImpl : public StageInterface {
+    class StageInterfaceImpl : public StageInterface, public StageFacility {
     public:
-        StageInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
+        StageInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const resource::TextureProviderPtr &textureProvider);
         ~StageInterfaceImpl() override;
         
     public:
-        ElementToken addRect(ElementToken parent, const math::vector2f &lt, const math::vector2f &size) override;
-        void setActionHandler(ElementToken element, std::function<void(ActionType type)> &handler) override;
-        void removeElement(ElementToken token) override;
+        const foundation::PlatformInterfacePtr &getPlatform() const override { return _platform; }
+        const foundation::RenderingInterfacePtr &getRendering() const override { return _rendering; }
+        const resource::TextureProviderPtr &getTextureProvider() const override { return _textureProvider; }
+        
+    public:
+        auto addPivot(const std::shared_ptr<Element> &parent) -> std::shared_ptr<Pivot> override;
+        auto addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
+        auto addText(const std::shared_ptr<Element> &parent, TextParams &&params) -> std::shared_ptr<Text> override;
+        auto addJoystick(const std::shared_ptr<Element> &parent, JoystickParams &&params) -> std::shared_ptr<StageInterface::Element> override;
+        auto addStepper(const std::shared_ptr<Element> &parent, StepperParams &&params) -> std::shared_ptr<StageInterface::Element> override;
+        void clear() override;
         
         void updateAndDraw(float dtSec) override;
         
     private:
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
+        const resource::TextureProviderPtr _textureProvider;
+        
+        foundation::EventHandlerToken _touchEventsToken;
+        ShaderConstants _shaderConstants;
+        foundation::RenderShaderPtr _uiShader;
+        std::list<std::shared_ptr<ElementImpl>> _topLevelElements;
     };
-
-    std::shared_ptr<StageInterface> StageInterface::instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering) {
-        return std::make_shared<StageInterfaceImpl>(platform, rendering);
+    
+    std::shared_ptr<StageInterface> StageInterface::instance(
+        const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const resource::TextureProviderPtr &textureProvider
+    ) {
+        return std::make_shared<StageInterfaceImpl>(platform, rendering, textureProvider);
     }
 }
 
+namespace {
+    const char *g_uiShaderSrc = R"(
+        const {
+            position_size : float4
+            texcoord : float4
+        }
+        inout {
+            texcoord : float2
+        }
+        vssrc {
+            float2 screenTransform = float2(2.0, -2.0) / frame_rtBounds.xy;
+            float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
+            output_texcoord = _lerp(const_texcoord.xy, const_texcoord.zw, vertexCoord);
+            vertexCoord = vertexCoord * const_position_size.zw + const_position_size.xy;
+            output_position = float4(vertexCoord.xy * screenTransform + float2(-1.0, 1.0), 0.1, 1); //
+        }
+        fssrc {
+            output_color[0] = _tex2nearest(0, input_texcoord);
+        }
+    )";
+}
+
 namespace ui {
-    StageInterfaceImpl::StageInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering)
+    StageInterfaceImpl::StageInterfaceImpl(
+        const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const resource::TextureProviderPtr &textureProvider
+    )
     : _platform(platform)
     , _rendering(rendering)
+    , _textureProvider(textureProvider)
+    , _touchEventsToken(nullptr)
     {
-    
+        _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, {
+            {"ID", foundation::RenderShaderInputFormat::ID}
+        });
+        
+        _touchEventsToken = _platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) {
+            ui::Action action = ui::Action::RELEASE;
+            
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
+                action = ui::Action::CAPTURE;
+            }
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
+                action = ui::Action::MOVE;
+            }
+            
+            for (const auto &topLevelElement : _topLevelElements) {
+                if (topLevelElement->onInteraction(action, args.pointerID, args.coordinateX, args.coordinateY)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        });
     }
     
     StageInterfaceImpl::~StageInterfaceImpl() {
-    
+        _platform->removeEventHandler(_touchEventsToken);
     }
+    
+    std::shared_ptr<StageInterface::Pivot> StageInterfaceImpl::addPivot(const std::shared_ptr<Element> &parent) {
+        std::shared_ptr<PivotImpl> result = std::make_shared<PivotImpl>(*this, parent);
         
-    ElementToken StageInterfaceImpl::addRect(ElementToken parent, const math::vector2f &lt, const math::vector2f &size) {
-    
+        if (parent == nullptr) {
+            _topLevelElements.emplace_back(result);
+        }
+        else {
+            std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
+        }
+        
+        return result;
     }
     
-    void StageInterfaceImpl::setActionHandler(ElementToken element, std::function<void(ActionType type)> &handler) {
-    
+    std::shared_ptr<StageInterface::Image> StageInterfaceImpl::addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) {
+        std::shared_ptr<ImageImpl> result;
+        
+        if (const resource::TextureInfo *info = _textureProvider->getTextureInfo(params.textureBase)) {
+            result = std::make_shared<ImageImpl>(*this, parent, math::vector2f(info->width, info->height), params.capturePointer);
+            result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
+            result->setBaseTexture(params.textureBase);
+            
+            if (params.textureAction && params.textureAction[0]) {
+                result->setActionTexture(params.textureAction);
+            }
+            
+            if (parent == nullptr) {
+                _topLevelElements.emplace_back(result);
+            }
+            else {
+                std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
+            }
+        }
+        else {
+            _platform->logError("[StageInterfaceImpl::addImage] 'textureBase' is not existing texture '%s'\n", params.textureBase);
+        }
+        
+        return result;
     }
-
-    void StageInterfaceImpl::removeElement(ElementToken token) {
+    
+    std::shared_ptr<StageInterface::Text> StageInterfaceImpl::addText(const std::shared_ptr<Element> &parent, TextParams &&params) {
+        return nullptr;
+    }
+    
+    std::shared_ptr<StageInterface::Element> StageInterfaceImpl::addJoystick(const std::shared_ptr<Element> &parent, JoystickParams &&params) {
+        return nullptr;
+    }
+    
+    std::shared_ptr<StageInterface::Element> StageInterfaceImpl::addStepper(const std::shared_ptr<Element> &parent, StepperParams &&params) {
+        return nullptr;    
+    }
+    
+    void StageInterfaceImpl::clear() {
     
     }
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
-    
+        _rendering->applyState(_uiShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
+        
+        for (const auto &topLevelElement : _topLevelElements) {
+            topLevelElement->updateCoordinates();
+            topLevelElement->draw(_shaderConstants);
+        }
     }
+    
 }
