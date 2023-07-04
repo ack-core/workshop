@@ -14,8 +14,8 @@ namespace foundation {
         ~IOSPlatform() override;
         
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
-        void formFileList(const char *dirPath, std::function<void(const std::vector<PlatformFileEntry> &)> &&completion) override;
-        void loadFile(const char *filePath, std::function<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) override;
+        void formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) override;
+        void loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) override;
         bool loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) override;
         
         float getScreenWidth() const override;
@@ -29,15 +29,14 @@ namespace foundation {
         void showKeyboard() override;
         void hideKeyboard() override;
         
-        EventHandlerToken addKeyboardEventHandler(std::function<void(const PlatformKeyboardEventArgs &)> &&handler) override;
-        EventHandlerToken addInputEventHandler(std::function<void(const char(&utf8char)[4])> &&input, std::function<void()> &&backspace) override;
-        EventHandlerToken addMouseEventHandler(std::function<void(const PlatformMouseEventArgs &)> &&handler) override;
-        EventHandlerToken addTouchEventHandler(std::function<void(const PlatformTouchEventArgs &)> &&handler) override;
-        EventHandlerToken addGamepadEventHandler(std::function<void(const PlatformGamepadEventArgs &)> &&handler) override;
+        EventHandlerToken addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) override;
+        EventHandlerToken addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) override;
+        EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) override;
+        EventHandlerToken addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) override;
         
         void removeEventHandler(EventHandlerToken token) override;
         
-        void run(std::function<void(float)> &&updateAndDraw) override;
+        void run(util::callback<void(float)> &&updateAndDraw) override;
         void exit() override;
         
         void logMsg(const char *fmt, ...) override;

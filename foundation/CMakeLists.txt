@@ -3,6 +3,7 @@ get_filename_component(m_source_root "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 set(
 	m_sources_platform_list
+	"${m_source_root}/util.h"
 	"${m_source_root}/math.h"
 	"${m_source_root}/platform.h"
 	"${m_source_root}/platform_windows.h"

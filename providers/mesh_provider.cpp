@@ -10,8 +10,8 @@ namespace resource {
         ~MeshProviderImpl() override;
         
         const MeshInfo *getMeshInfo(const char *voxPath) override;
-        void getOrLoadVoxelMesh(const char *voxPath, std::function<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
-        void getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], std::function<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
@@ -31,13 +31,14 @@ namespace resource {
         return nullptr;
     }
 
-    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, std::function<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
+    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
         std::int16_t zero[3] = {0, 0, 0};
         return getOrLoadVoxelMesh(voxPath, zero, std::move(completion));
     }
 
-    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], std::function<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
-        auto index = _meshes.find(voxPath);
+    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
+        std::string path = std::string(voxPath);
+        auto index = _meshes.find(path);
         if (index != _meshes.end()) {
             completion(index->second);
         }
@@ -46,80 +47,101 @@ namespace resource {
                 std::int16_t x, y, z;
             }
             voxoff{ offset[0], offset[1], offset[2] };
-            std::string path = std::string(voxPath) + ".vox";
             
-            _platform->loadFile(path.data(), [weak = weak_from_this(), voxoff, path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t size) {
+            _platform->loadFile((path + ".vox").data(), [weak = weak_from_this(), voxoff, path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t size) mutable {
                 if (std::shared_ptr<MeshProviderImpl> self = weak.lock()) {
-                    // TODO: parse in async
+                    const foundation::PlatformInterfacePtr &platform = self->_platform;
                     if (size) {
-                        const std::int32_t version = 150;
-                        const std::uint8_t *data = mem.get();
+                        struct AsyncContext {
+                            std::unique_ptr<VoxelMesh> mesh;
+                        };
                         
-                        if (memcmp(data, "VOX ", 4) == 0 && *(std::int32_t *)(data + 4) == version) {
-                            // skip bytes of main chunk to start of the first child ('PACK')
-                            data += 20;
-                            std::int32_t frameCount = 1;
-                            
-                            if (memcmp(data, "PACK", 4) == 0) {
-                                frameCount = *(std::int32_t *)(data + 12);
-                                data += 16;
-                            }
-                            
-                            std::unique_ptr<VoxelMesh> &mesh = self->_meshes.emplace(path, std::make_unique<VoxelMesh>()).first->second;
-                            
-                            mesh->frames = std::make_unique<VoxelMesh::Frame[]>(frameCount);
-                            mesh->frameCount = frameCount;
-                            
-                            for (std::int32_t i = 0; i < frameCount; i++) {
-                                if (memcmp(data, "SIZE", 4) == 0) {
-                                    data += 24;
+                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak, path, voxoff, bin = std::move(mem), size](AsyncContext &ctx) {
+                            if (std::shared_ptr<MeshProviderImpl> self = weak.lock()) {
+                                const std::int32_t version = 150;
+                                const std::uint8_t *data = bin.get();
+                                
+                                if (memcmp(data, "VOX ", 4) == 0 && *(std::int32_t *)(data + 4) == version) {
+                                    // skip bytes of main chunk to start of the first child ('PACK')
+                                    data += 20;
+                                    std::int32_t frameCount = 1;
                                     
-                                    if (memcmp(data, "XYZI", 4) == 0) {
-                                        std::size_t voxelCount = *(std::uint32_t *)(data + 12);
-                                        
+                                    if (memcmp(data, "PACK", 4) == 0) {
+                                        frameCount = *(std::int32_t *)(data + 12);
                                         data += 16;
-                                        
-                                        mesh->frames[i].voxels = std::make_unique<VoxelMesh::Voxel[]>(voxelCount);
-                                        mesh->frames[i].voxelCount = voxelCount;
-                                        
-                                        for (std::size_t c = 0, k = 0; c < voxelCount; c++) {
-                                            std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
-                                            std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
-                                            std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
-                                            
-                                            VoxelMesh::Voxel &targetVoxel = mesh->frames[i].voxels[k++];
-                                            
-                                            targetVoxel.positionZ = std::int16_t(z) + voxoff.z;
-                                            targetVoxel.positionX = std::int16_t(x) + voxoff.x;
-                                            targetVoxel.positionY = std::int16_t(y) + voxoff.y;
-                                            targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3);
-                                        }
-                                        
-                                        data += voxelCount * 4;
                                     }
-                                    else {
-                                        self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] XYZI[%d] chunk is not found in '%s'", i, path.data());
-                                        break;
+                                    
+                                    ctx.mesh = std::make_unique<VoxelMesh>();
+                                    ctx.mesh->frames = std::make_unique<VoxelMesh::Frame[]>(frameCount);
+                                    ctx.mesh->frameCount = frameCount;
+                                    
+                                    for (std::int32_t i = 0; i < frameCount; i++) {
+                                        if (memcmp(data, "SIZE", 4) == 0) {
+                                            data += 24;
+                                            
+                                            if (memcmp(data, "XYZI", 4) == 0) {
+                                                std::size_t voxelCount = *(std::uint32_t *)(data + 12);
+                                                
+                                                data += 16;
+                                                
+                                                ctx.mesh->frames[i].voxels = std::make_unique<VoxelMesh::Voxel[]>(voxelCount);
+                                                ctx.mesh->frames[i].voxelCount = voxelCount;
+                                                
+                                                for (std::size_t c = 0, k = 0; c < voxelCount; c++) {
+                                                    std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
+                                                    std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
+                                                    std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
+                                                    
+                                                    VoxelMesh::Voxel &targetVoxel = ctx.mesh->frames[i].voxels[k++];
+                                                    
+                                                    targetVoxel.positionZ = std::int16_t(z) + voxoff.z;
+                                                    targetVoxel.positionX = std::int16_t(x) + voxoff.x;
+                                                    targetVoxel.positionY = std::int16_t(y) + voxoff.y;
+                                                    targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3);
+                                                }
+                                                
+                                                data += voxelCount * 4;
+                                            }
+                                            else {
+                                                self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] XYZI[%d] chunk is not found in '%s'", i, path.data());
+                                                ctx.mesh = nullptr;
+                                                break;
+                                            }
+                                        }
+                                        else {
+                                            self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] SIZE[%d] chunk is not found in '%s'", i, path.data());
+                                            ctx.mesh = nullptr;
+                                            break;
+                                        }
                                     }
                                 }
                                 else {
-                                    self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] SIZE[%d] chunk is not found in '%s'", i, path.data());
-                                    break;
+                                    self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] Incorrect vox-header in '%s'", path.data());
                                 }
                             }
-                            
-                            completion(mesh);
-                            return;
-                        }
-                        else {
-                            self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] Incorrect vox-header in '%s'", path.data());
-                        }
+                        },
+                        [weak, path, completion = std::move(completion)](AsyncContext &ctx) {
+                            if (std::shared_ptr<MeshProviderImpl> self = weak.lock()) {
+                                if (ctx.mesh) {
+                                    auto index = self->_meshes.find(path);
+                                    if (index != self->_meshes.end()) {
+                                        completion(index->second);
+                                    }
+                                    else {
+                                        const std::unique_ptr<VoxelMesh> &mesh = self->_meshes.emplace(path, std::move(ctx.mesh)).first->second;
+                                        completion(mesh);
+                                    }
+                                }
+                                else {
+                                    completion(nullptr);
+                                }
+                            }
+                        }));
                     }
                     else {
                         self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelMesh] Unable to find file '%s'", path.data());
+                        completion(nullptr);
                     }
-                    
-                    completion(nullptr);
                 }
             });
         }

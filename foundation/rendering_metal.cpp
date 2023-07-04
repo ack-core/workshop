@@ -289,19 +289,19 @@ namespace foundation {
     MetalRendering::MetalRendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
         @autoreleasepool {
             _platform->logMsg("[RENDER] Initialization : Metal");
-
+            
             _device = MTLCreateSystemDefaultDevice();
             _commandQueue = [_device newCommandQueue];
-
+            
             MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
             depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
             depthDesc.depthWriteEnabled = NO;
             _zBehaviorStates[int(foundation::ZBehaviorType::TEST_ONLY)] = [_device newDepthStencilStateWithDescriptor:depthDesc];
-
+            
             depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
             depthDesc.depthWriteEnabled = YES;
             _zBehaviorStates[int(foundation::ZBehaviorType::TEST_AND_WRITE)] = [_device newDepthStencilStateWithDescriptor:depthDesc];
-
+            
             for (std::uint32_t i = 0; i < CONSTANT_BUFFER_FRAMES_MAX; i++) {
                 _constantsBuffers[i] = [_device newBufferWithLength:CONSTANT_BUFFER_OFFSET_MAX options:MTLResourceStorageModeShared];
             }
@@ -309,15 +309,21 @@ namespace foundation {
             _platform->logMsg("[RENDER] Initialization : complete");
         }
     }
-
+    
     MetalRendering::~MetalRendering() {}
-
+    
     void MetalRendering::updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
-        //::memcpy(_frameConstants.vewProjMatrix, VP, 16 * sizeof(float));
         ::memcpy(_frameConstants.viewMatrix, view, 16 * sizeof(float));
         ::memcpy(_frameConstants.projMatrix, proj, 16 * sizeof(float));
         ::memcpy(_frameConstants.cameraPosition, camPos, 3 * sizeof(float));
         ::memcpy(_frameConstants.cameraDirection, camDir, 3 * sizeof(float));
+    }
+    
+    void MetalRendering::getFrameConstants(float(&view)[16], float(&proj)[16], float(&camPos)[3], float(&camDir)[3]) {
+        ::memcpy(view, _frameConstants.viewMatrix, 16 * sizeof(float));
+        ::memcpy(proj, _frameConstants.projMatrix, 16 * sizeof(float));
+        ::memcpy(camPos, _frameConstants.cameraPosition, 3 * sizeof(float));
+        ::memcpy(camDir, _frameConstants.cameraDirection, 3 * sizeof(float));
     }
     
     namespace shaderUtils {

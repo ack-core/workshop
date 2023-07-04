@@ -171,6 +171,11 @@ namespace foundation {
         //
         virtual void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) = 0;
         
+        // Get current frame constants
+        // Matrices are row-major
+        //
+        virtual void getFrameConstants(float(&view)[16], float(&proj)[16], float(&camPos)[3], float(&camDir)[3]) = 0;
+        
         // Create shader from source text
         // @name      - name that is used in error messages
         // @vtx       - input layout for vertex shader. All such variables have 'vertex_' prefix.

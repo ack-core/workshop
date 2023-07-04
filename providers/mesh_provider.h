@@ -1,5 +1,6 @@
 
 #pragma once
+#include "foundation/util.h"
 #include "foundation/math.h"
 #include "foundation/platform.h"
 
@@ -42,14 +43,14 @@ namespace resource {
         // @offset  - value to be added to voxel positions
         // @return  - pointer to Mesh or nullptr
         //
-        virtual void getOrLoadVoxelMesh(const char *voxPath, std::function<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
         
         // Load voxels from file if they aren't loaded yet
         // @voxPath - path to file without extension
         // @offset  - value to be added to voxel positions
         // @return  - pointer to Mesh or nullptr
         //
-        virtual void getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], std::function<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
         
     public:
         virtual ~MeshProvider() = default;

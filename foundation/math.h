@@ -1718,6 +1718,20 @@ namespace math
         return {v0[0] / v1[0], v0[1] / v1[1], v0[2] / v1[2], v0[3] / v1[3]};
     }
     
+    inline vector4f vector4f::transformed(const transform3f &trfm) const {
+        scalar tw = w;
+        scalar tx = x;
+        scalar ty = y;
+        scalar tz = z;
+
+        return {
+            tx * trfm._11 + ty * trfm._21 + tz * trfm._31 + tw * trfm._41,
+            tx * trfm._12 + ty * trfm._22 + tz * trfm._32 + tw * trfm._42,
+            tx * trfm._13 + ty * trfm._23 + tz * trfm._33 + tw * trfm._43,
+            tx * trfm._14 + ty * trfm._24 + tz * trfm._34 + tw * trfm._44
+        };
+    }
+    
     //----------------------------------------------------------------------------------------------------------------------------------------------------------
     // quaternion methods
     

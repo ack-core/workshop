@@ -16,7 +16,7 @@ namespace {
     char g_buffer[BUFFER_SIZE];
     
     std::weak_ptr<foundation::PlatformInterface> g_instance;
-    std::function<void(float)> g_updateAndDraw;
+    util::callback<void(float)> g_updateAndDraw;
     
     float g_nativeScreenWidth = 1.0f;
     float g_nativeScreenHeight = 1.0f;
@@ -25,7 +25,13 @@ namespace {
     MTKView *g_mtkView = nil;
     
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
-    std::unordered_map<foundation::EventHandlerToken, std::function<void(const foundation::PlatformTouchEventArgs &)>> g_touchHandlers;
+    
+    struct Handler {
+        foundation::EventHandlerToken token;
+        util::callback<bool(const foundation::PlatformPointerEventArgs &)> handler;
+    };
+    
+    std::list<Handler> g_pointerHandlers;
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_ioForegroundQueue;
     std::mutex g_ioMutex;
 }
@@ -74,7 +80,7 @@ namespace {
 -(nonnull instancetype)init {
 	self = [super init];
 	if (self) {
-    
+        
 	}
 	
 	return self;
@@ -87,7 +93,7 @@ namespace {
     
     if (g_updateAndDraw) {
         static std::vector<std::unique_ptr<foundation::AsyncTask>> foregroundQueue;
-
+        
         {
             std::unique_lock<std::mutex> guard(g_ioMutex);
             for (auto &task : g_ioForegroundQueue) {
@@ -120,7 +126,6 @@ namespace {
 }
 - (void)loadView
 {
-    //CGRect frame = UIScreen.mainScreen.bounds;
     g_mtkView = [[MTKView alloc] init];
     self.view = g_mtkView;
 }
@@ -150,56 +155,64 @@ namespace {
 - (BOOL)prefersStatusBarHidden { return YES; }
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-        foundation::PlatformTouchEventArgs args;
-        args.type = foundation::PlatformTouchEventArgs::EventType::START;
-        args.touchID = std::size_t(item);
+        foundation::PlatformPointerEventArgs args;
+        args.type = foundation::PlatformPointerEventArgs::EventType::START;
+        args.pointerID = std::size_t(item);
         args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
-        for (auto &index : g_touchHandlers) {
-            index.second(args);
+        for (auto &index : g_pointerHandlers) {
+            if (index.handler(args)) {
+                break;
+            }
         }
     }
 }
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-        foundation::PlatformTouchEventArgs args;
-        args.type = foundation::PlatformTouchEventArgs::EventType::MOVE;
-        args.touchID = std::size_t(item);
+        foundation::PlatformPointerEventArgs args;
+        args.type = foundation::PlatformPointerEventArgs::EventType::MOVE;
+        args.pointerID = std::size_t(item);
         args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
-        for (auto &index : g_touchHandlers) {
-            index.second(args);
+        for (auto &index : g_pointerHandlers) {
+            if (index.handler(args)) {
+                break;
+            }
         }
     }
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-        foundation::PlatformTouchEventArgs args;
-        args.type = foundation::PlatformTouchEventArgs::EventType::FINISH;
-        args.touchID = std::size_t(item);
+        foundation::PlatformPointerEventArgs args;
+        args.type = foundation::PlatformPointerEventArgs::EventType::FINISH;
+        args.pointerID = std::size_t(item);
         args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
-        for (auto &index : g_touchHandlers) {
-            index.second(args);
+        for (auto &index : g_pointerHandlers) {
+            if (index.handler(args)) {
+                break;
+            }
         }
     }
 }
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
     for (UITouch *item in touches) {
-        foundation::PlatformTouchEventArgs args;
-        args.type = foundation::PlatformTouchEventArgs::EventType::CANCEL;
-        args.touchID = std::size_t(item);
+        foundation::PlatformPointerEventArgs args;
+        args.type = foundation::PlatformPointerEventArgs::EventType::CANCEL;
+        args.pointerID = std::size_t(item);
         args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
-        for (auto &index : g_touchHandlers) {
-            index.second(args);
+        for (auto &index : g_pointerHandlers) {
+            if (index.handler(args)) {
+                break;
+            }
         }
     }
 }
@@ -211,7 +224,7 @@ namespace foundation {
     namespace {
         class FileListTask : public AsyncTask {
         public:
-            FileListTask(std::string &&dirPath, std::function<void(const std::vector<PlatformFileEntry> &)> &&completion) : _path(std::move(dirPath)), _completion(std::move(completion)) {}
+            FileListTask(std::string &&dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) : _path(std::move(dirPath)), _completion(std::move(completion)) {}
             ~FileListTask() {}
             
         public:
@@ -226,13 +239,13 @@ namespace foundation {
             
         private:
             std::string _path;
-            std::function<void(const std::vector<PlatformFileEntry> &)> _completion;
             std::vector<PlatformFileEntry> _entries;
+            util::callback<void(const std::vector<PlatformFileEntry> &)> _completion;
         };
         
         class FileLoadTask : public AsyncTask {
         public:
-            FileLoadTask(const char *filePath, std::function<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
+            FileLoadTask(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
             ~FileLoadTask() {}
             
         public:
@@ -253,9 +266,9 @@ namespace foundation {
             
         private:
             std::string _path;
-            std::function<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> _completion;
             std::unique_ptr<uint8_t[]> _data;
             std::size_t _size;
+            util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> _completion;
         };
     }
 }
@@ -287,7 +300,7 @@ namespace foundation {
         _ioNotifier.notify_one();
     }
     
-    void IOSPlatform::formFileList(const char *dirPath, std::function<void(const std::vector<PlatformFileEntry> &)> &&completion) {
+    void IOSPlatform::formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) {
         {
             std::lock_guard<std::mutex> guard(g_ioMutex);
             _ioBackgroundQueue.emplace_back(std::make_unique<FileListTask>((_executableDirectoryPath + "/" + dirPath).data(), std::move(completion)));
@@ -295,74 +308,75 @@ namespace foundation {
         _ioNotifier.notify_one();
     }
     
-    void IOSPlatform::loadFile(const char *filePath, std::function<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) {
+    void IOSPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) {
         {
             std::lock_guard<std::mutex> guard(g_ioMutex);
             _ioBackgroundQueue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));
         }
         _ioNotifier.notify_one();
     }
-
+    
     bool IOSPlatform::loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) {
         std::fstream fileStream(_executableDirectoryPath + "/" + filePath, std::ios::binary | std::ios::in | std::ios::ate);
-
+        
         if (fileStream.is_open() && fileStream.good()) {
             std::size_t fileSize = std::size_t(fileStream.tellg());
             data = std::make_unique<unsigned char[]>(fileSize);
             fileStream.seekg(0);
             fileStream.read((char *)data.get(), fileSize);
             size = fileSize;
-
+            
             return true;
         }
-
+        
         return false;
     }
-
+    
     float IOSPlatform::getScreenWidth() const {
         return g_nativeScreenWidth;
     }
     float IOSPlatform::getScreenHeight() const {
         return g_nativeScreenHeight;
     }
-
+    
     void *IOSPlatform::attachNativeRenderingContext(void *context) {
         g_mtkView.device = (__bridge id<MTLDevice>)context;
         return (__bridge void *)g_mtkView;
     }
-
+    
     void IOSPlatform::showCursor() {}
     void IOSPlatform::hideCursor() {}
     void IOSPlatform::showKeyboard() {}
     void IOSPlatform::hideKeyboard() {}
-
-    EventHandlerToken IOSPlatform::addKeyboardEventHandler(std::function<void(const PlatformKeyboardEventArgs &)> &&handler) {
+    
+    EventHandlerToken IOSPlatform::addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) {
         return nullptr;
     }
     
-    EventHandlerToken IOSPlatform::addInputEventHandler(std::function<void(const char(&utf8char)[4])> &&input, std::function<void()> &&backspace) {
+    EventHandlerToken IOSPlatform::addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) {
         return nullptr;
     }
     
-    EventHandlerToken IOSPlatform::addMouseEventHandler(std::function<void(const PlatformMouseEventArgs &)> &&handler) {
-        return nullptr;
-    }
-    
-    EventHandlerToken IOSPlatform::addTouchEventHandler(std::function<void(const PlatformTouchEventArgs &)> &&handler) {
+    EventHandlerToken IOSPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) {
         EventHandlerToken token = g_tokenCounter++;
-        g_touchHandlers.emplace(token, std::move(handler));
+        g_pointerHandlers.emplace_back(Handler{token, std::move(handler)});
+        return token;
+    }
+    
+    EventHandlerToken IOSPlatform::addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) {
         return nullptr;
     }
     
-    EventHandlerToken IOSPlatform::addGamepadEventHandler(std::function<void(const PlatformGamepadEventArgs &)> &&handler) {
-        return nullptr;
-    }
-
     void IOSPlatform::removeEventHandler(EventHandlerToken token) {
-        g_touchHandlers.erase(token);
+        for (auto index = g_pointerHandlers.begin(); index != g_pointerHandlers.end(); ++index) {
+            if (index->token == token) {
+                g_pointerHandlers.erase(index);
+                return;
+            }
+        }
     }
-
-    void IOSPlatform::run(std::function<void(float)> &&updateAndDraw) {
+    
+    void IOSPlatform::run(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
         
         _ioThread = std::thread([this](){
@@ -399,26 +413,26 @@ namespace foundation {
     void IOSPlatform::exit() {
     
     }
-
+    
     void IOSPlatform::logMsg(const char *fmt, ...) {
         std::lock_guard<std::mutex> guard(_logMutex);
-
+        
         va_list args;
         va_start(args, fmt);
         vsnprintf(g_buffer, BUFFER_SIZE, fmt, args);
         va_end(args);
-
+        
         printf("%s\n", g_buffer);
     }
     
     void IOSPlatform::logError(const char *fmt, ...) {
         std::lock_guard<std::mutex> guard(_logMutex);
-
+        
         va_list args;
         va_start(args, fmt);
         vsnprintf(g_buffer, BUFFER_SIZE, fmt, args);
         va_end(args);
-
+        
         printf("%s\n", g_buffer);
         __builtin_debugtrap();
     }
@@ -427,14 +441,14 @@ namespace foundation {
 namespace foundation {
     std::shared_ptr<PlatformInterface> PlatformInterface::instance() {
         std::shared_ptr<PlatformInterface> result;
-
+        
         if (g_instance.use_count() == 0) {
             g_instance = result = std::make_shared<IOSPlatform>();
         }
         else {
             result = g_instance.lock();
         }
-
+        
         return result;
     }
 }
