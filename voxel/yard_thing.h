@@ -1,11 +1,10 @@
 
 #pragma once
+#include "foundation/math.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-
-#include "foundation/math.h"
 
 namespace voxel {
     class YardThing : public YardStatic {
@@ -14,7 +13,7 @@ namespace voxel {
         ~YardThing() override;
 
     public:
-        void setState(State newState) override;
+        void updateState(State targetState) override;
     };
 }
 

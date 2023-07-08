@@ -1,16 +1,15 @@
 
 #pragma once
-
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
 #include "foundation/math.h"
 
-#include "mesh_provider.h"
-#include "texture_provider.h"
+#include "providers/mesh_provider.h"
+#include "providers/texture_provider.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 namespace voxel {
     class SceneInterface {
@@ -18,7 +17,7 @@ namespace voxel {
         static std::shared_ptr<SceneInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const voxel::TextureProviderPtr &textureProvider,
+            const resource::TextureProviderPtr &textureProvider,
             const char *palette
         );
         
@@ -59,9 +58,9 @@ namespace voxel {
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addStaticModel(const voxel::Mesh &mesh) -> StaticModelPtr = 0;
+        virtual auto addStaticModel(const resource::VoxelMesh &mesh) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
-        virtual auto addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &center, const math::transform3f &transform) -> DynamicModelPtr = 0;
+        virtual auto addDynamicModel(const resource::VoxelMesh &mesh, const math::vector3f &center, const math::transform3f &transform) -> DynamicModelPtr = 0;
         virtual auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual void updateAndDraw(float dtSec) = 0;

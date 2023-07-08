@@ -93,20 +93,18 @@ namespace voxel {
         SceneInterfaceImpl(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const voxel::TextureProviderPtr &textureProvider,
+            const resource::TextureProviderPtr &textureProvider,
             const char *palette
         );
         ~SceneInterfaceImpl() override;
         
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
-        
-        BoundingBoxPtr addBoundingBox(const math::bound3f &bbox) override;
-        StaticModelPtr addStaticModel(const voxel::Mesh &mesh) override;
-        TexturedModelPtr addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) override;
-        DynamicModelPtr addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &center, const math::transform3f &transform) override;
-        LightSourcePtr addLightSource(const math::vector3f &position, float r, float g, float b, float radius) override;
-        
+        auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
+        auto addStaticModel(const resource::VoxelMesh &mesh) -> StaticModelPtr override;
+        auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr override;
+        auto addDynamicModel(const resource::VoxelMesh &mesh, const math::vector3f &center, const math::transform3f &transform) -> DynamicModelPtr override;
+        auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr override;
         void updateAndDraw(float dtSec) override;
         
     private:
@@ -132,9 +130,8 @@ namespace voxel {
         
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
-        const voxel::TextureProviderPtr _textureProvider;
-        const voxel::MeshProviderPtr _factory;
-
+        const resource::TextureProviderPtr _textureProvider;
+        
         foundation::RenderShaderPtr _boundingBoxShader;
         foundation::RenderShaderPtr _staticMeshShader;
         foundation::RenderShaderPtr _texturedMeshShader;
@@ -152,7 +149,7 @@ namespace voxel {
     std::shared_ptr<SceneInterface> SceneInterface::instance(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const voxel::TextureProviderPtr &textureProvider,
+        const resource::TextureProviderPtr &textureProvider,
         const char *palette
     ) {
         return std::make_shared<SceneInterfaceImpl>(platform, rendering, textureProvider, palette);
@@ -281,7 +278,7 @@ namespace voxel {
     SceneInterfaceImpl::SceneInterfaceImpl(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const voxel::TextureProviderPtr &textureProvider,
+        const resource::TextureProviderPtr &textureProvider,
         const char *palette
     )
     : _platform(platform)
@@ -327,7 +324,7 @@ namespace voxel {
         _shaderConstants.observingPointAndRadius = math::vector4f(0.0, 0.0, 0.0, 32.0);
         _shaderConstants.sunColorAndPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
         _shaderConstants.sunDirection = math::vector4f(math::vector3f(0.2, 1.0, 0.3).normalized(), 1.0f);
-        _palette = _textureProvider->getOrLoad2DTexture(palette);
+        _palette = nullptr; 
     }
     
     SceneInterfaceImpl::~SceneInterfaceImpl() {
@@ -383,11 +380,12 @@ namespace voxel {
         return model;
     }
     
-    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const voxel::Mesh &mesh) {
+    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const resource::VoxelMesh &mesh) {
         std::shared_ptr<StaticModelImpl> model = nullptr;
         std::uint32_t voxelCount = mesh.frames[0].voxelCount;
         std::unique_ptr<StaticModelImpl::Voxel[]> positions = std::make_unique<StaticModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
         
+        // TODO: move such loops outside
         for (std::uint32_t i = 0; i < voxelCount; i++) {
             positions[i].positionX = mesh.frames[0].voxels[i].positionX;
             positions[i].positionY = mesh.frames[0].voxels[i].positionY;
@@ -418,7 +416,7 @@ namespace voxel {
         return model;
     }
     
-    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const voxel::Mesh &mesh, const math::vector3f &center, const math::transform3f &transform) {
+    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const resource::VoxelMesh &mesh, const math::vector3f &center, const math::transform3f &transform) {
         std::uint32_t voxelCount = mesh.frames[0].voxelCount;
         std::unique_ptr<DynamicModelImpl::Voxel[]> positions = std::make_unique<DynamicModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
         std::shared_ptr<DynamicModelImpl> model = nullptr;
@@ -485,115 +483,7 @@ namespace voxel {
             _rendering->drawGeometry(nullptr, dynamicModel->voxels, 18, dynamicModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
         }
     }
-    
-//    void SceneInterfaceImpl::_drawPoint(const math::vector3f &p, const math::color &rgba) {
-//        static const char *pointShaderSrc = R"(
-//            const {
-//                coord : float4
-//                color : float4
-//            }
-//            inout {
-//                color : float4
-//            }
-//            vssrc {
-//                output_position = _transform(const_coord, _transform(frame_viewMatrix, frame_projMatrix));
-//                output_color = const_color;
-//            }
-//            fssrc {
-//                output_color[0] = input_color;
-//            }
-//        )";
-//
-//        if (_pointShader == nullptr) {
-//            _pointShader = _rendering->createShader("scene_primitives_point", pointShaderSrc, {
-//                {"ID", foundation::RenderShaderInputFormat::ID}
-//            });
-//        }
-//
-//        struct {
-//            math::vector4f coord;
-//            math::vector4f color;
-//        }
-//        constants {math::vector4f(p, 1.0), rgba};
-//
-//        _rendering->applyState(_pointShader, foundation::RenderPassCommonConfigs::DEFAULT());
-//        _rendering->applyShaderConstants(&constants);
-//        _rendering->drawGeometry(nullptr, 1, foundation::RenderTopology::POINTS);
-//    }
-//
-//    void SceneInterfaceImpl::_drawLine(const math::vector3f &a, const math::vector3f &b, const math::color &rgba) {
-//        static const char *lineShaderSrc = R"(
-//            const {
-//                coords[2] : float4
-//                color : float4
-//            }
-//            inout {
-//                color : float4
-//            }
-//            vssrc {
-//                output_position = _transform(const_coords[vertex_ID], _transform(frame_viewMatrix, frame_projMatrix));
-//                output_color = const_color * vertex_ID;
-//            }
-//            fssrc {
-//                output_color[0] = input_color;
-//            }
-//        )";
-//
-//        if (_lineShader == nullptr) {
-//            _lineShader = _rendering->createShader("scene_primitives_line", lineShaderSrc, {
-//                {"ID", foundation::RenderShaderInputFormat::ID}
-//            });
-//        }
-//
-//        struct {
-//            math::vector4f coordA;
-//            math::vector4f coordB;
-//            math::vector4f color;
-//        }
-//        constants {math::vector4f(a, 1.0), math::vector4f(b, 1.0), rgba};
-//
-//        _rendering->applyState(_lineShader, foundation::RenderPassCommonConfigs::DEFAULT());
-//        _rendering->applyShaderConstants(&constants);
-//        _rendering->drawGeometry(nullptr, 2, foundation::RenderTopology::LINES);
-//    }
-//
-//    void SceneInterfaceImpl::_drawTriangle(const math::vector3f &a, const math::vector3f &b, const math::vector3f &c, const math::color &rgba) {
-//        static const char *triangleShaderSrc = R"(
-//            const {
-//                coords[3] : float4
-//                color : float4
-//            }
-//            inout {
-//                color : float4
-//            }
-//            vssrc {
-//                output_position = _transform(const_coords[vertex_ID], _transform(frame_viewMatrix, frame_projMatrix));
-//                output_color = const_color;
-//            }
-//            fssrc {
-//                output_color[0] = input_color;
-//            }
-//        )";
-//
-//        if (_triangleShader == nullptr) {
-//            _triangleShader = _rendering->createShader("scene_primitives_triangle", triangleShaderSrc, {
-//                {"ID", foundation::RenderShaderInputFormat::ID}
-//            });
-//        }
-//
-//        struct {
-//            math::vector4f coordA;
-//            math::vector4f coordB;
-//            math::vector4f coordC;
-//            math::vector4f color;
-//        }
-//        constants {math::vector4f(a, 1.0), math::vector4f(b, 1.0), math::vector4f(c, 1.0), rgba};
-//
-//        _rendering->applyState(_triangleShader, foundation::RenderPassCommonConfigs::DEFAULT());
-//        _rendering->applyShaderConstants(&constants);
-//        _rendering->drawGeometry(nullptr, 3, foundation::RenderTopology::TRIANGLES);
-//    }
-    
+        
     void SceneInterfaceImpl::_drawAxis() {
         static const char *axisShaderSrc = R"(
             fixed {

@@ -231,16 +231,20 @@ namespace voxel {
     YardSquare::YardSquare(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
     : YardStatic(facility, bbox)
     , _texturePath(std::move(texture))
-    , _heightmapPath(std::move(heightmap))
+    , _hmPath(std::move(heightmap))
     {}
     
     YardSquare::~YardSquare() {
+        _heightmap = nullptr;
+        _texture = nullptr;
         _model = nullptr;
+        _bboxmdl = nullptr;
     }
     
-    void YardSquare::setState(YardStatic::State newState) {
-        if (_currentState != newState) {
-            if (newState == YardStatic::State::NONE) { // unload
+    void YardSquare::updateState(YardStatic::State targetState) {
+        if (_currentState != targetState) {
+            if (targetState == YardStatic::State::NONE) { // unload
+                _currentState = targetState;
                 _heightmap = nullptr;
                 _texture = nullptr;
                 _model = nullptr;
@@ -248,52 +252,82 @@ namespace voxel {
             }
             else {
                 if (_currentState == YardStatic::State::NONE) { // load resources
-                    if (const foundation::RenderTexturePtr &tx = _facility.getTextureProvider()->getOrLoad2DTexture(_texturePath.data())) {
-                        std::uint32_t bbx = std::uint32_t(_bbox.xmax - _bbox.xmin);
-                        std::uint32_t bbz = std::uint32_t(_bbox.zmax - _bbox.zmin);
-                        
-                        if (tx->getWidth() == bbx && tx->getHeight() == bbz) {
-                            if (_heightmapPath[0]) {
-                                std::uint32_t hmwidth, hmheight;
-                                
-                                if (_facility.getTextureProvider()->getOrLoadTextureData(_heightmapPath.data(), _heightmap, hmwidth, hmheight) == false) {
-                                    _facility.getLogger()->logError("[YardSquare::setState] unable to load heightmap '%s'\n", _heightmapPath.data());
-                                }
-                                else if (hmwidth != bbx + 1 || hmheight != bbz + 1) {
-                                    _facility.getLogger()->logError("[YardSquare::setState] heightmap '%s' doesnt fit square bbox\n", _heightmapPath.data());
-                                    _heightmap = nullptr;
-                                }
-                            }
-                            
-                            if (_heightmap == nullptr) {
-                                _heightmap = std::make_unique<std::uint8_t[]>((bbx + 1) * (bbz + 1));
-                            }
-                            
-                            _texture = tx;
-                            _bboxmdl = _facility.getScene()->addBoundingBox(_bbox);
-                        }
-                        else {
-                            _facility.getLogger()->logError("[YardSquare::setState] texture '%s' doesnt fit square bbox\n", _texturePath.data());
-                        }
-                    }
-                    else {
-                        _facility.getLogger()->logError("[YardSquare::setState] unable to load texture '%s'\n", _texturePath.data());
-                    }
-                }
-                if (newState == YardStatic::State::RENDERED) { // add to scene
-                    std::vector<SceneInterface::VTXNRMUV> vertices;
-                    std::vector<std::uint32_t> indices;
+                    _currentState = YardStatic::State::LOADING;
+                    resource::TextureProviderPtr txProvider = _facility.getTextureProvider();
                     
-                    _makeGeometry(_heightmap, _bbox, vertices, indices);
-                    _model = _facility.getScene()->addTexturedModel(vertices, indices, _texture);
+                    txProvider->getOrLoad2DTexture(_texturePath.data(), [txProvider, weak = weak_from_this(), hmPath = _hmPath](const foundation::RenderTexturePtr &tx) {
+                        txProvider->getOrLoadGrayscaleData(hmPath.data(), [weak, &tx](const std::unique_ptr<std::uint8_t[]> &data, std::uint32_t w, std::uint32_t h) {
+                            if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                                const foundation::PlatformInterfacePtr &platform = self->_facility.getPlatform();
+                                const voxel::SceneInterfacePtr &scene = self->_facility.getScene();
+                                const math::bound3f &bbox = self->_bbox;
+                                
+                                if (tx) {
+                                    std::uint32_t bbx = std::uint32_t(bbox.xmax - bbox.xmin);
+                                    std::uint32_t bbz = std::uint32_t(bbox.zmax - bbox.zmin);
+                                    
+                                    if (tx->getWidth() == bbx && tx->getHeight() == bbz) {
+                                        self->_heightmap = std::make_unique<std::uint8_t[]>((bbx + 1) * (bbz + 1));
+                                        self->_bboxmdl = scene->addBoundingBox(bbox);
+                                        self->_texture = tx;
+                                        
+                                        if (self->_hmPath[0]) {
+                                            if (data == nullptr) {
+                                                platform->logError("[YardSquare::setState] unable to load heightmap '%s'\n", self->_hmPath.data());
+                                            }
+                                            else if (w != bbx + 1 || h != bbz + 1) {
+                                                platform->logError("[YardSquare::setState] heightmap '%s' doesnt fit square bbox\n", self->_hmPath.data());
+                                            }
+                                            else {
+                                                std::memcpy(self->_heightmap.get(), data.get(), w * h);
+                                            }
+                                        }
+
+                                        self->_currentState = YardStatic::State::LOADED;
+                                    }
+                                    else {
+                                        platform->logError("[YardSquare::setState] texture '%s' doesnt fit square bbox\n", self->_texturePath.data());
+                                    }
+                                }
+                                else {
+                                    platform->logError("[YardSquare::setState] unable to load texture '%s'\n", self->_texturePath.data());
+                                }
+                            }
+                        });
+                    });
                 }
-                if (newState == YardStatic::State::NEARBY) { // remove from scene
-                    _model = nullptr;
+                if (targetState == YardStatic::State::RENDERING) { // add to scene
+                    if (_currentState == YardStatic::State::LOADED) {
+                        _currentState = YardStatic::State::PREPARING;
+
+                        struct AsyncContext {
+                            std::vector<SceneInterface::VTXNRMUV> vertices;
+                            std::vector<std::uint32_t> indices;
+                        };
+                        
+                        _facility.getPlatform()->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak = weak_from_this()](AsyncContext &ctx) {
+                            if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                                self->_makeGeometry(self->_heightmap, self->_bbox, ctx.vertices, ctx.indices);
+                            }
+                        },
+                        [weak = weak_from_this()](AsyncContext &ctx) {
+                            if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                                if (ctx.vertices.size() && ctx.indices.size()) {
+                                    self->_currentState = YardStatic::State::RENDERING;
+                                    self->_model = self->_facility.getScene()->addTexturedModel(ctx.vertices, ctx.indices, self->_texture);
+                                }
+                            }
+                        }));
+                    }
+                }
+                if (targetState == YardStatic::State::LOADED) { // remove from scene
+                    if (_currentState == YardStatic::State::RENDERING) {
+                        _currentState = targetState;
+                        _model = nullptr;
+                    }
                 }
             }
         }
-        
-        _currentState = newState;
     }
     
 }

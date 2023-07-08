@@ -4,10 +4,6 @@
 namespace voxel {
     YardStatic::YardStatic(const YardFacility &facility, const math::bound3f &bbox) : _facility(facility), _currentState(YardStatic::State::NONE), _bbox(bbox) {}
     
-    YardStatic::State YardStatic::getState() const {
-        return _currentState;
-    }
-    
     math::bound3f YardStatic::getBBox() const {
         return _bbox;
     }

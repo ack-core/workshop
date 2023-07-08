@@ -1,14 +1,11 @@
 
 #pragma once
-
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-
 #include "foundation/math.h"
 
+#include <memory>
+
 namespace voxel {
-    class YardObjectImpl : public YardInterface::Object {
+    class YardObjectImpl : public std::enable_shared_from_this<YardObjectImpl>, public YardInterface::Object {
     public:
         YardObjectImpl(const YardFacility &facility, const YardCollision &collision, const YardObjectType &type, const math::vector3f &position, const math::vector3f &direction);
         ~YardObjectImpl();
@@ -27,13 +24,22 @@ namespace voxel {
         void update(float dtSec) override;
         
     private:
+        enum class State {
+            NONE = 0,
+            LOADING,
+            RENDERING,
+        };
+        
         const YardFacility &_facility;
         const YardCollision &_collision;
+        const YardObjectType &_type;
         
         SceneInterface::DynamicModelPtr _model;
         math::vector3f _currentPosition;
         math::vector3f _currentDirection;
         math::vector3f _targetDirection;
+        
+        State _currentState;
     };
 }
 

@@ -18,34 +18,33 @@ namespace {
 }
 
 namespace voxel {
-    class YardImpl : public YardInterface, public YardFacility, public YardCollision {
+    class YardImpl : public std::enable_shared_from_this<YardImpl>, public YardInterface, public YardFacility, public YardCollision {
     public:
-        YardImpl(const foundation::PlatformInterfacePtr &platform, const MeshProviderPtr &meshProvider, const TextureProviderPtr &textureProvider, const SceneInterfacePtr &scene);
+        YardImpl(const foundation::PlatformInterfacePtr &platform, const resource::MeshProviderPtr &meshProvider, const resource::TextureProviderPtr &textureProvider, const SceneInterfacePtr &scene);
         ~YardImpl() override;
         
     public:
-        const foundation::LoggerInterfacePtr &getLogger() const override { return _logger; }
-        const MeshProviderPtr &getMeshProvider() const override { return _meshProvider; }
-        const TextureProviderPtr &getTextureProvider() const override { return _textureProvider; }
+        const foundation::PlatformInterfacePtr &getPlatform() const override { return _platform; }
+        const resource::MeshProviderPtr &getMeshProvider() const override { return _meshProvider; }
+        const resource::TextureProviderPtr &getTextureProvider() const override { return _textureProvider; }
         const SceneInterfacePtr &getScene() const override { return _scene; }
     
     public:
         void correctMovement(const math::vector3f &position, math::vector3f &movement) const override;
         
     public:
-        bool loadYard(const char *src) override;
+        void loadYard(const char *src, util::callback<void(bool loaded)> &&completion) override;
         auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> override;
         void update(float dtSec) override;
         
     public:
-        void _addStatic(std::uint64_t id, std::unique_ptr<YardStatic> &&object);
+        void _addStatic(std::uint64_t id, const std::shared_ptr<YardStatic> &object);
         void _clearYard();
         
     public:
         const foundation::PlatformInterfacePtr _platform;
-        const foundation::LoggerInterfacePtr _logger;
-        const MeshProviderPtr _meshProvider;
-        const TextureProviderPtr _textureProvider;
+        const resource::MeshProviderPtr _meshProvider;
+        const resource::TextureProviderPtr _textureProvider;
         const SceneInterfacePtr _scene;
         
         struct Node {
@@ -54,7 +53,7 @@ namespace voxel {
         
         bool _partial;
         std::unordered_map<std::uint64_t, Node> _nodes;
-        std::unordered_map<std::uint64_t, std::unique_ptr<YardStatic>> _statics;
+        std::unordered_map<std::uint64_t, std::shared_ptr<YardStatic>> _statics;
         std::unordered_map<std::string, YardObjectType> _objectTypes;
         std::vector<std::shared_ptr<YardObjectImpl>> _objects;
     };
@@ -63,8 +62,8 @@ namespace voxel {
 namespace voxel {
     std::shared_ptr<YardInterface> YardInterface::instance(
         const foundation::PlatformInterfacePtr &platform,
-        const MeshProviderPtr &meshProvider,
-        const TextureProviderPtr &textureProvider,
+        const resource::MeshProviderPtr &meshProvider,
+        const resource::TextureProviderPtr &textureProvider,
         const SceneInterfacePtr &scene
     ) {
         return std::make_shared<YardImpl>(platform, meshProvider, textureProvider, scene);
@@ -74,12 +73,11 @@ namespace voxel {
 namespace voxel {
     YardImpl::YardImpl(
         const foundation::PlatformInterfacePtr &platform,
-        const MeshProviderPtr &meshProvider,
-        const TextureProviderPtr &textureProvider,
+        const resource::MeshProviderPtr &meshProvider,
+        const resource::TextureProviderPtr &textureProvider,
         const SceneInterfacePtr &scene
     )
     : _platform(platform)
-    , _logger(platform)
     , _meshProvider(meshProvider)
     , _textureProvider(textureProvider)
     , _scene(scene)
@@ -95,103 +93,109 @@ namespace voxel {
         // collide
     }
     
-    bool YardImpl::loadYard(const char *sourcepath) {
+    void YardImpl::loadYard(const char *sourcepath, util::callback<void(bool loaded)> &&completion) {
         std::string yardpath = std::string(sourcepath) + ".yard";
-        std::unique_ptr<std::uint8_t[]> binary;
-        std::size_t size;
         
         _clearYard();
-        
-        if (_platform->loadFile(yardpath.data(), binary, size)) {
-            std::istringstream source = std::istringstream((const char *)binary.get());
-            std::uint64_t id;
-            std::string type, block, name, parameter;
-            std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> links;
-            math::bound3f bbox;
-            
-            while (source >> type) {
-                if (type == "options" && bool(source >> expect::braced(block, '{', '}'))) {
-                    std::istringstream input = std::istringstream(block);
+        _platform->loadFile(yardpath.data(), [weak = weak_from_this(), yardpath, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&binary, std::size_t size){
+            if (std::shared_ptr<YardImpl> self = weak.lock()) {
+                const foundation::PlatformInterfacePtr &platform = self->_platform;
+
+                if (size) {
+                    std::istringstream source = std::istringstream((const char *)binary.get());
+                    std::uint64_t id;
+                    std::string type, block, name, parameter;
+                    std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> links;
+                    math::bound3f bbox;
                     
-                    while (input.eof() == false && input >> parameter) {
-                        if (parameter == "partial" && bool(input >> std::boolalpha >> _partial) == false) {
-                            _platform->logError("[YardImpl::loadYard] options block has invalid 'partial' syntax\n", id);
+                    while (source >> type) {
+                        if (type == "options" && bool(source >> expect::braced(block, '{', '}'))) {
+                            std::istringstream input = std::istringstream(block);
+                            
+                            while (input.eof() == false && input >> parameter) {
+                                if (parameter == "partial" && bool(input >> std::boolalpha >> self->_partial) == false) {
+                                    platform->logError("[YardImpl::loadYard] options block has invalid 'partial' syntax\n", id);
+                                }
+                                input >> std::ws;
+                            }
+                            
+                            if (input.fail() != false) {
+                                platform->logError("[YardImpl::loadYard] unable to load 'options' block\n", id);
+                            }
                         }
-                        input >> std::ws;
+                        if (type == "square" && bool(source >> id >> expect::braced(block, '{', '}'))) {
+                            std::istringstream input = std::istringstream(block);
+                            std::string texture, heightmap;
+                            
+                            while (input.eof() == false && input >> parameter) {
+                                if (parameter == "texture" && bool(input >> expect::braced(texture, '"', '"')) == false) {
+                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'texture' syntax\n", id);
+                                }
+                                if (parameter == "heightmap" && bool(input >> expect::braced(heightmap, '"', '"')) == false) {
+                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'heightmap' syntax\n", id);
+                                }
+                                if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin >> bbox.xmax >> bbox.ymax >> bbox.zmax) == false) {
+                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'position' syntax\n", id);
+                                }
+                                if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
+                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'links' syntax\n", id);
+                                }
+                                input >> std::ws;
+                            }
+                            
+                            if (input.fail() == false) {
+                                bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
+                                bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
+                                self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
+                            }
+                            else {
+                                platform->logError("[YardImpl::loadYard] unable to load square with id = '%zu'\n", id);
+                            }
+                        }
+                        if (type == "object" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
+                            std::istringstream input = std::istringstream(block);
+                            std::string model;
+                            math::vector3f center;
+                            
+                            while (input.eof() == false && input >> parameter) {
+                                if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
+                                    platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'model' syntax\n", name.data());
+                                }
+                                if (parameter == "center" && bool(input >> center.x >> center.y >> center.z) == false) {
+                                    platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'center' syntax\n", name.data());
+                                }
+                                input >> std::ws;
+                            }
+                            
+                            if (input.fail() == false) {
+                                self->_objectTypes.emplace(name, YardObjectType{std::move(model), center});
+                            }
+                            else {
+                                platform->logError("[YardImpl::loadYard] unable to load object type '%s'\n", name.data());
+                            }
+                        }
+                        
+                        block.clear();
                     }
                     
-                    if (input.fail() != false) {
-                        _platform->logError("[YardImpl::loadYard] unable to load 'options' block\n", id);
+                    for (auto &item : self->_statics) {
+                        for (auto &link : links[item.first]) {
+                            item.second->linkTo(self->_statics[link].get());
+                        }
+                    }
+                    
+                    if (source.fail() == false) {
+                        completion(true);
+                        return;
                     }
                 }
-                if (type == "square" && bool(source >> id >> expect::braced(block, '{', '}'))) {
-                    std::istringstream input = std::istringstream(block);
-                    std::string texture, heightmap;
-                    
-                    while (input.eof() == false && input >> parameter) {
-                        if (parameter == "texture" && bool(input >> expect::braced(texture, '"', '"')) == false) {
-                            _platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'texture' syntax\n", id);
-                        }
-                        if (parameter == "heightmap" && bool(input >> expect::braced(heightmap, '"', '"')) == false) {
-                            _platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'heightmap' syntax\n", id);
-                        }
-                        if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin >> bbox.xmax >> bbox.ymax >> bbox.zmax) == false) {
-                            _platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'position' syntax\n", id);
-                        }
-                        if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
-                            _platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'links' syntax\n", id);
-                        }
-                        input >> std::ws;
-                    }
-                    
-                    if (input.fail() == false) {
-                        bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
-                        bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
-                        _addStatic(id, std::make_unique<YardSquare>(*this, bbox, std::move(texture), std::move(heightmap)));
-                    }
-                    else {
-                        _platform->logError("[YardImpl::loadYard] unable to load square with id = '%zu'\n", id);
-                    }
+                else {
+                    platform->logError("[YardImpl::loadYard] unable to load yard '%s'\n", yardpath.data());
                 }
-                if (type == "object" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
-                    std::istringstream input = std::istringstream(block);
-                    std::string model;
-                    math::vector3f center;
-                    
-                    while (input.eof() == false && input >> parameter) {
-                        if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
-                            _platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'model' syntax\n", name.data());
-                        }
-                        if (parameter == "center" && bool(input >> center.x >> center.y >> center.z) == false) {
-                            _platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'center' syntax\n", name.data());
-                        }
-                        input >> std::ws;
-                    }
-                    
-                    if (input.fail() == false) {
-                        _objectTypes.emplace(name, YardObjectType{std::move(model), center});
-                    }
-                    else {
-                        _platform->logError("[YardImpl::loadYard] unable to load object type '%s'\n", name.data());
-                    }
-                }
-                
-                block.clear();
+
+                completion(false);
             }
-            
-            for (auto &item : _statics) {
-                for (auto &link : links[item.first]) {
-                    item.second->linkTo(_statics[link].get());
-                }
-            }
-            
-            return true;
-        }
-        else {
-            _platform->logError("[YardImpl::loadYard] unable to load yard '%s'\n", yardpath.data());
-        }
-        
-        return false;
+        });
     }
     
     std::shared_ptr<YardImpl::Object> YardImpl::addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) {
@@ -213,12 +217,16 @@ namespace voxel {
         }
         else {
             for (auto &item : _statics) {
-                item.second->setState(YardStatic::State::RENDERED);
+                item.second->updateState(YardStatic::State::RENDERING);
             }
+        }
+        
+        for (auto &item : _objects) {
+            item->update(dtSec);
         }
     }
     
-    void YardImpl::_addStatic(std::uint64_t id, std::unique_ptr<YardStatic> &&object) {
+    void YardImpl::_addStatic(std::uint64_t id, const std::shared_ptr<YardStatic> &object) {
         const math::bound3f &bbox = object->getBBox();
         int startx = int(bbox.xmin / GLOBAL_COORD_DIV);
         int startz = int(bbox.zmin / GLOBAL_COORD_DIV);
@@ -226,7 +234,7 @@ namespace voxel {
         int endz = int(bbox.zmax / GLOBAL_COORD_DIV);
         
         if (_statics.find(id) == _statics.end()) {
-            auto index = _statics.emplace(id, std::move(object));
+            auto index = _statics.emplace(id, object);
         
             for (int i = startx; i <= endx; i++) {
                 for (int c = startz; c <= endz; c++) {

@@ -11,7 +11,7 @@ namespace voxel {
     
     }
 
-    void YardThing::setState(State newState) {
+    void YardThing::updateState(State targetState) {
     
     }
 }

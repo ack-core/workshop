@@ -7,16 +7,11 @@ namespace voxel {
     YardObjectImpl::YardObjectImpl(const YardFacility &facility, const YardCollision &collision, const YardObjectType &type, const math::vector3f &position, const math::vector3f &direction)
     : _facility(facility)
     , _collision(collision)
+    , _type(type)
     , _currentPosition(position)
+    , _currentDirection(direction)
+    , _currentState(State::NONE)
     {
-        if (const std::unique_ptr<Mesh> &mesh = _facility.getMeshProvider()->getOrLoadVoxelMesh(type.model.data())) {
-            float angle = (direction.x < 0.0f ? 1.0f : -1.0f) * math::vector3f(0.0f, 0.0f, 1.0f).angleTo(direction.normalized());
-            math::transform3f transform = math::transform3f::identity().rotated({0, 1, 0}, angle).translated(position);
-            _model = _facility.getScene()->addDynamicModel(*mesh, type.center, transform);
-        }
-        else {
-            _facility.getLogger()->logError("[YardObjectImpl::YardObjectImpl] unable to load mesh '%s'\n", type.model.data());
-        }
     }
     
     YardObjectImpl::~YardObjectImpl() {
@@ -54,6 +49,22 @@ namespace voxel {
     }
     
     void YardObjectImpl::update(float dtSec) {
-    
+        if (_currentState == State::NONE) {
+            _currentState = State::LOADING;
+            
+            _facility.getMeshProvider()->getOrLoadVoxelMesh(_type.model.data(), [weak = weak_from_this()](const std::unique_ptr<resource::VoxelMesh> &mesh) {
+                if (std::shared_ptr<YardObjectImpl> self = weak.lock()) {
+                    if (mesh) {
+                        float angle = (self->_currentDirection.x < 0.0f ? 1.0f : -1.0f) * math::vector3f(0.0f, 0.0f, 1.0f).angleTo(self->_currentDirection.normalized());
+                        math::transform3f transform = math::transform3f::identity().rotated({0, 1, 0}, angle).translated(self->_currentPosition);
+                        self->_model = self->_facility.getScene()->addDynamicModel(*mesh, self->_type.center, transform);
+                        self->_currentState = State::RENDERING;
+                    }
+                    else {
+                        self->_facility.getPlatform()->logError("[YardObjectImpl::YardObjectImpl] unable to load mesh '%s'\n", self->_type.model.data());
+                    }
+                }
+            });
+        }
     }
 }

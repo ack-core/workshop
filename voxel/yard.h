@@ -1,18 +1,20 @@
 
 #pragma once
+#include "foundation/util.h"
+#include "foundation/math.h"
+#include "foundation/platform.h"
+
+#include "providers/mesh_provider.h"
+#include "providers/texture_provider.h"
+
+#include "voxel/scene.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 
-#include "foundation/platform.h"
-#include "foundation/math.h"
-
-#include "voxel/mesh_provider.h"
-#include "voxel/texture_provider.h"
-#include "voxel/scene.h"
-
 namespace voxel {
+    // TODO:
     // + collision
     // + object list must be separated from statics
     // + 
@@ -20,8 +22,8 @@ namespace voxel {
     public:
         static std::shared_ptr<YardInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
-            const MeshProviderPtr &meshProvider,
-            const TextureProviderPtr &textureProvider,
+            const resource::MeshProviderPtr &meshProvider,
+            const resource::TextureProviderPtr &textureProvider,
             const SceneInterfacePtr &scene
         );
         
@@ -67,7 +69,7 @@ namespace voxel {
         // ...
         // s--------------------------------------
         //
-        virtual bool loadYard(const char *sourcepath) = 0;
+        virtual void loadYard(const char *sourcepath, util::callback<void(bool loaded)> &&completion) = 0;
         virtual auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> = 0;
         virtual void update(float dtSec) = 0;
         
