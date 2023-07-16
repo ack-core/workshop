@@ -27,7 +27,7 @@ namespace game {
     )";
     
     // Rule of states:
-    // Context is created if the next state contains it and previous state does not
+    // Context is created if the next state contains it and current state does not
     // Context is deleted if the next state does not contain it
     static const std::unordered_map<const char *, std::vector<MakeContextFunc>> states = {
         {"default",

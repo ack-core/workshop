@@ -230,7 +230,7 @@ namespace foundation {
         public:
             void executeInBackground() override {
                 for (auto &entry : std::filesystem::directory_iterator(_path)) {
-                    _entries.emplace_back(PlatformFileEntry{ entry.path().generic_u8string(), entry.is_directory()});
+                    _entries.emplace_back(PlatformFileEntry{ entry.path().generic_string(), entry.is_directory()});
                 }
             }
             void executeInMainThread() override {

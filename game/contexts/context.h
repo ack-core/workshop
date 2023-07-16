@@ -23,7 +23,7 @@ namespace game {
     public:
         virtual ~Context() = default;
     };
-
+    
     template <typename Ctx> std::unique_ptr<Context> makeContext(API &&api);
     using MakeContextFunc = std::unique_ptr<Context>(*)(API &&api);
 }

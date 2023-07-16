@@ -39,6 +39,7 @@ include_directories("${m_source_root}")
 
 add_subdirectory("${m_source_root}/thirdparty/upng")
 add_subdirectory("${m_source_root}/thirdparty/expect")
+add_subdirectory("${m_source_root}/thirdparty/stb_mini_ttf")
 
 add_subdirectory("${m_source_root}/foundation")
 add_subdirectory("${m_source_root}/providers")
@@ -55,6 +56,9 @@ source_group("" FILES ${m_sources_list})
 add_executable(workshop ${m_sources_list})
 
 target_link_libraries(workshop PUBLIC upng)
+target_link_libraries(workshop PUBLIC expect)
+target_link_libraries(workshop PUBLIC stb_mini_ttf)
+
 target_link_libraries(workshop PUBLIC foundation)
 target_link_libraries(workshop PUBLIC providers)
 target_link_libraries(workshop PUBLIC voxel)
@@ -71,10 +75,7 @@ get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLU
 get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary" ABSOLUTE)
 get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}" ABSOLUTE)
 
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.list")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.yard")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
+file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.list" PATTERN "*.ttf" PATTERN "*.png" PATTERN "*.yard" PATTERN "*.vox")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
 # specific
