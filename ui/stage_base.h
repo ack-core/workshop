@@ -9,6 +9,8 @@ namespace ui {
     struct ShaderConstants {
         math::vector4f positionAndSize;
         math::vector4f textureCoords;
+        math::vector4f color;
+        math::vector4f flags; // [is R component only, 0, 0, 0]
     };
 
     class StageFacility {
@@ -16,6 +18,7 @@ namespace ui {
         virtual const foundation::PlatformInterfacePtr &getPlatform() const = 0;
         virtual const foundation::RenderingInterfacePtr &getRendering() const = 0;
         virtual const resource::TextureProviderPtr &getTextureProvider() const = 0;
+        virtual const resource::FontAtlasProviderPtr &getFontAtlasProvider() const = 0;
         virtual ~StageFacility() = default;
     };
     
@@ -27,8 +30,8 @@ namespace ui {
         void setAnchor(const std::shared_ptr<Element> &target, HorizontalAnchor h, VerticalAnchor v, float hOffset, float vOffset);
         void attachElement(const std::shared_ptr<ElementImpl> &element);
         
-        const math::vector2f &getPosition() const;
-        const math::vector2f &getSize() const;
+        const math::vector2f &getPosition() const override;
+        const math::vector2f &getSize() const override;
         
         virtual void updateCoordinates();
         virtual bool onInteraction(ui::Action action, std::size_t id, float x, float y);

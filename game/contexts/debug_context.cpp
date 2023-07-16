@@ -8,16 +8,16 @@ namespace game {
     
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
         _api.scene->setCameraLookAt(_center + _orbit, _center);
-        _touchEventHandlerToken = _api.platform->addTouchEventHandler(
-            [this](const foundation::PlatformTouchEventArgs &args) {
-                if (args.type == foundation::PlatformTouchEventArgs::EventType::START) {
-                    _mouseLocked = true;
-                    _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
+        _touchEventHandlerToken = _api.platform->addPointerEventHandler(
+            [this](const foundation::PlatformPointerEventArgs &args) -> bool {
+                if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
+                    _pointerId = args.pointerID;
+                    _lockedCoordinates = { args.coordinateX, args.coordinateY };
                 }
-                if (args.type == foundation::PlatformTouchEventArgs::EventType::MOVE) {
-                    if (_mouseLocked) {
-                        float dx = args.coordinateX - _lockedMouseCoordinates.x;
-                        float dy = args.coordinateY - _lockedMouseCoordinates.y;
+                if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
+                    if (_pointerId != foundation::INVALID_POINTER_ID) {
+                        float dx = args.coordinateX - _lockedCoordinates.x;
+                        float dy = args.coordinateY - _lockedCoordinates.y;
 
                         _orbit.xz = _orbit.xz.rotated(dx / 100.0f);
 
@@ -29,43 +29,102 @@ namespace game {
                         }
 
                         _api.scene->setCameraLookAt(_center + _orbit, _center);
-                        _lockedMouseCoordinates = { args.coordinateX, args.coordinateY };
+                        _lockedCoordinates = { args.coordinateX, args.coordinateY };
                     }
                 }
-//                if (args.type == foundation::PlatformTouchEventArgs::EventType::FINISH) {
-//                    _mouseLocked = false;
-//                    if (args.coordinateX < 50 && args.coordinateY < 50) {
-//                        if (dbg_counter > 0) dbg_counter--;
-//                    }
-//                    if (args.coordinateX > _api.platform->getScreenWidth() - 50 && args.coordinateY < 50) {
-//                        if (dbg_counter < 1000) dbg_counter++;
-//                    }
-//                }
+                if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
+                    _pointerId = foundation::INVALID_POINTER_ID;
+                }
+                if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
+                    _pointerId = foundation::INVALID_POINTER_ID;
+                }
+                
+                return true;
             }
         );
         
-        if (_api.yard->loadYard("debug")) {
+        _api.yard->loadYard("debug", [this](bool loaded){
+            printf("%s\n", loaded ? "loaded" : "not loaded");
             _api.yard->addObject("player", math::vector3f(16, 0, 16), math::vector3f(1.0, 0.0, 0.0));
-        }
+        });
         
-//        {
-//            voxel::Mesh mesh;
-//            int16_t offset[3] = {-22, -1, -8};
-//
-//            if (_api.factory->createMesh("1.vox", offset, mesh)) {
-//                _api.scene->addStaticModel(mesh, {});
-//            }
-//        }
-//
-//        {
-//            voxel::Mesh mesh;
-//            int16_t offset[3] = {-2, 0, -2};
-//
-//            if (_api.factory->createMesh("knight.vox", offset, mesh)) {
-//                _api.scene->addDynamicModel(mesh, {3, 0, 0}, M_PI / 4.0);
-//            }
-//        }
+        
+        auto panel = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
+            .anchorOffset = math::vector2f(50.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::RIGHT,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .capturePointer = true,
+            .textureBase = "textures/ui/panel",
+        });
+        auto btn1 = _api.ui->addImage(panel, ui::StageInterface::ImageParams {
+            .anchorOffset = math::vector2f(30.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::RIGHT,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .textureBase = "textures/ui/button_up",
+            .textureAction = "textures/ui/button_down",
+        });
+        auto btn2 = _api.ui->addImage(panel, ui::StageInterface::ImageParams {
+            .anchorTarget = btn1,
+            .anchorOffset = math::vector2f(0.0f, 10.0f),
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::BOTTOMSIDE,
+            .textureBase = "textures/ui/button_up",
+            .textureAction = "textures/ui/button_down",
+        });
+        auto txt1 = _api.ui->addText(nullptr, ui::StageInterface::TextParams {
+            .anchorTarget = nullptr,
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .anchorH = ui::HorizontalAnchor::RIGHT,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .fontSize = 36,
+            .shadowEnabled = true,
+            .shadowOffset = math::vector2f(2.0f, 2.0f)
+        });
 
+        btn1->setActionHandler(ui::Action::CAPTURE, [](float, float) {
+        
+        });
+        btn2->setActionHandler(ui::Action::CAPTURE, [](float, float) {
+        
+        });
+        txt1->setText("аТёЖи ку_abc^!"); //
+        
+        auto pivot1 = _api.ui->addPivot(nullptr, {});
+        pivot1->setWorldPosition(math::vector3f(0, 10, 0));
+        
+        auto btn3 = _api.ui->addImage(pivot1, ui::StageInterface::ImageParams {
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .textureBase = "textures/ui/button_up",
+            .textureAction = "textures/ui/button_down",
+        });
+        auto txt2 = _api.ui->addText(btn3, ui::StageInterface::TextParams {
+            .anchorOffset = math::vector2f(0.0f, -2.0f),
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::MIDDLE,
+            .shadowEnabled = true,
+            .shadowOffset = math::vector2f(1.0f, 2.0f),
+            .fontSize = 26
+        });
+        txt2->setText("Play!");
+
+        btn3->setActionHandler(ui::Action::CAPTURE, [](float, float) {
+        
+        });
+        
+        auto joystick = _api.ui->addJoystick(nullptr, ui::StageInterface::JoystickParams {
+            .anchorOffset = math::vector2f(50.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::LEFT,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .textureBackground = "textures/ui/joystick_bg",
+            .textureThumb = "textures/ui/joystick_thumb",
+            .maxThumbOffset = 80.0f,
+            .handler = [](const math::vector2f &direction) {
+                printf("--->>> %2.2f %2.2f\n", direction.x, direction.y);
+            }
+        });
+        
         _api.scene->setCameraLookAt(_center + _orbit, _center);
     }
     

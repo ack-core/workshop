@@ -5,6 +5,7 @@
 #include "foundation/math.h"
 
 #include "providers/texture_provider.h"
+#include "providers/fontatlas_provider.h"
 
 #include <memory>
 #include <functional>
@@ -35,7 +36,8 @@ namespace ui {
         static std::shared_ptr<StageInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const resource::TextureProviderPtr &textureProvider
+            const resource::TextureProviderPtr &textureProvider,
+            const resource::FontAtlasProviderPtr &fontAtlasProvider
         );
         
     public:
@@ -57,10 +59,17 @@ namespace ui {
         };
         struct Text : public virtual Element {
             virtual void setText(const char *text) = 0;
+            virtual void setColor(const math::color &rgba) = 0;
             virtual ~Text() = default;
         };
         
     public:
+        struct PivotParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+        };
         struct ImageParams {
             const bool capturePointer = false;
             const char *textureBase = "";
@@ -74,6 +83,8 @@ namespace ui {
         };
         struct TextParams {
             const std::uint8_t fontSize = 10;
+            const bool shadowEnabled = false;
+            const math::vector2f shadowOffset = math::vector2f(1.0f, 1.0f);
             const math::color rgba = math::color(1.0f, 1.0f, 1.0f, 1.0f);
             const std::shared_ptr<StageInterface::Element> anchorTarget;
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
@@ -84,9 +95,10 @@ namespace ui {
             const char *textureBackground = "";
             const char *textureThumb = "";
             const std::shared_ptr<StageInterface::Element> anchorTarget;
-            HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const float maxThumbOffset = 50.0f;
             util::callback<void(const math::vector2f &direction)> handler;
         };
         struct StepperParams {
@@ -95,14 +107,14 @@ namespace ui {
             const char *textureRightBase = "";
             const char *textureRightAction = "";
             const std::shared_ptr<StageInterface::Element> anchorTarget;
-            HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             util::callback<void(float value)> handler;
         };
         
     public:
-        virtual auto addPivot(const std::shared_ptr<Element> &parent) -> std::shared_ptr<Pivot> = 0;
+        virtual auto addPivot(const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
         virtual auto addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> = 0;
         virtual auto addText(const std::shared_ptr<Element> &parent, TextParams &&params) -> std::shared_ptr<Text> = 0;
         

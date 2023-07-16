@@ -42,6 +42,8 @@ namespace ui {
         
         constStorage.positionAndSize = math::vector4f(_globalPosition, _size);
         constStorage.textureCoords = math::vector4f(0, 0, 1, 1);
+        constStorage.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+        constStorage.flags = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
         
         if (_currentAction != ui::Action::RELEASE && _actionTexture) {
             rendering->applyTextures(&_actionTexture, 1);

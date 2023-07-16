@@ -8,5 +8,5 @@ set(
 )
 source_group("" FILES ${m_sources_list})
 add_library(expect ${m_sources_list})
-	
+
 set_property(TARGET expect PROPERTY FOLDER "thirdparty")

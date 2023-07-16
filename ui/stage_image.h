@@ -3,7 +3,7 @@
 #include <functional>
 
 namespace ui {
-    class ImageImpl : public InteractorImpl, public std::enable_shared_from_this<ImageImpl>, public virtual StageInterface::Image {
+    class ImageImpl : public InteractorImpl, public std::enable_shared_from_this<ImageImpl>, public StageInterface::Image {
     public:
         ImageImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size, bool capturePointer);
         ~ImageImpl() override;

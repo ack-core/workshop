@@ -13,8 +13,8 @@ namespace game {
     private:
         const API _api;
     
-        bool _mouseLocked = false;
-        math::vector2f _lockedMouseCoordinates;
+        std::size_t _pointerId = foundation::INVALID_POINTER_ID;
+        math::vector2f _lockedCoordinates;
 
         math::vector3f _center = { 36, 0, 42 };
         math::vector3f _orbit = { 0, 80, 45 };

@@ -68,7 +68,7 @@ namespace ui {
             _globalPosition.x = lt.x + _anchorOffsets.x;
         }
         else if (_hAnchor == HorizontalAnchor::CENTER) {
-            _globalPosition.x = lt.x + std::floor(0.5f * (rb.x - lt.x - _size.x));
+            _globalPosition.x = lt.x + std::floor(0.5f * (rb.x - lt.x - _size.x)) + _anchorOffsets.x;
         }
         else if (_hAnchor == HorizontalAnchor::RIGHT) {
             _globalPosition.x = rb.x - _size.x - _anchorOffsets.x;
@@ -84,7 +84,7 @@ namespace ui {
             _globalPosition.y = lt.y + _anchorOffsets.y;
         }
         else if (_vAnchor == VerticalAnchor::MIDDLE) {
-            _globalPosition.y = lt.y + std::floor(0.5f * (rb.y - lt.y - _size.y));
+            _globalPosition.y = lt.y + std::floor(0.5f * (rb.y - lt.y - _size.y)) + _anchorOffsets.y;
         }
         else if (_vAnchor == VerticalAnchor::BOTTOM) {
             _globalPosition.y = rb.y - _size.y - _anchorOffsets.y;
