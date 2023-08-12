@@ -20,10 +20,12 @@ namespace voxel {
     };
 
     class StaticModelImpl : public SceneInterface::StaticModel {
-    public:
-        struct Voxel {
-            std::int16_t positionX, positionY, positionZ, colorIndex;
-        };
+//    public:
+//        struct Voxel {
+//            std::int16_t positionX, positionY, positionZ;
+//            std::uint8_t colorIndex, mask;
+//        };
+//        static_assert(sizeof(Voxel) == 8, "");
         
     public:
         foundation::RenderDataPtr voxels;
@@ -49,18 +51,26 @@ namespace voxel {
     };
     
     class DynamicModelImpl : public SceneInterface::DynamicModel {
-    public:
-        struct Voxel {
-            float positionX, positionY, positionZ;
-            std::uint32_t colorIndex;
-        };
+//    public:
+//        struct Voxel {
+//            float positionX, positionY, positionZ;
+//            std::uint32_t colorIndex;
+//        };
         
     public:
-        foundation::RenderDataPtr voxels;
+        std::unique_ptr<foundation::RenderDataPtr[]> frames;
+        std::uint32_t frameCount;
         math::transform3f transform;
         
     public:
-        DynamicModelImpl(foundation::RenderDataPtr &&v, const math::transform3f &trfm) : voxels(std::move(v)), transform(trfm) {}
+        DynamicModelImpl(foundation::RenderDataPtr *frameArray, std::uint32_t count, const math::transform3f &trfm) : transform(trfm) {
+            frameCount = count;
+            frames = std::make_unique<foundation::RenderDataPtr[]>(count);
+
+            for (std::uint32_t i = 0; i < count; i++) {
+                frames[i] = std::move(frameArray[i]);
+            }
+        }
         ~DynamicModelImpl() override {}
         
         void setFrame(std::uint16_t index) override {
@@ -101,9 +111,9 @@ namespace voxel {
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
-        auto addStaticModel(const resource::VoxelMesh &mesh) -> StaticModelPtr override;
+        auto addStaticModel(const std::vector<VTXSVOX> &voxels) -> StaticModelPtr override;
         auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr override;
-        auto addDynamicModel(const resource::VoxelMesh &mesh, const math::vector3f &center, const math::transform3f &transform) -> DynamicModelPtr override;
+        auto addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) -> DynamicModelPtr override;
         auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr override;
         void updateAndDraw(float dtSec) override;
         
@@ -138,11 +148,13 @@ namespace voxel {
         foundation::RenderShaderPtr _dynamicMeshShader;
         foundation::RenderShaderPtr _axisShader;
         
+        //foundation::RenderDataPtr _testVoxelData;
+        
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
-        std::vector<std::shared_ptr<StaticModelImpl>> _staticModels;
-        std::vector<std::shared_ptr<TexturedModelImpl>> _texturedModels;
-        std::vector<std::shared_ptr<DynamicModelImpl>> _dynamicModels;
-
+        std::vector<std::shared_ptr<StaticModelImpl>> _staticMeshes;
+        std::vector<std::shared_ptr<TexturedModelImpl>> _texturedMeshes;
+        std::vector<std::shared_ptr<DynamicModelImpl>> _dynamicMeshes;
+        
         foundation::RenderTexturePtr _palette;
     };
     
@@ -165,22 +177,29 @@ namespace {
             output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
         }
     )";
-    
-    const char *g_staticMeshShaderSrc = R"(
-        fixed {
+
+/*
             axs[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
             bnm[7] : float3 = [0.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
             tgt[7] : float3 = [0.0, 0.0, 0.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
 
-            cube[18] : float4 =
-                [-0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
                 [0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
                 [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0]
                 [0.5, -0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
                 [0.5, 0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
                 [0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0]
-            
-            faceUV[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+
+                [0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+                [0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
+ */
+
+    const char *g_staticMeshShaderSrc = R"(
+        fixed {
+            cube[12] : float4 =
+                [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
         }
         const {
             modelTransform : matrix4
@@ -192,26 +211,27 @@ namespace {
             tmp : float4
         }
         vssrc {
-            float3 cubeCenter = float3(instance_position_color.xyz);
+            float3 cubeCenter = float3(instance_position_color_mask.xyz);
             float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
-            float4 relVertexPos = float4(toCamSign, 1.0) * fixed_cube[vertex_ID];
+            
+            int  faceIndex = vertex_ID / 4 + int((toCamSign.zxy[vertex_ID / 4] * 1.5 + 1.5) + 1.0);
+            int  mask = (instance_position_color_mask.w >> (8 + faceIndex)) & 0x1;
+            
+            float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[vertex_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
-            int3 faceIndices = int3(2.0 * _step(0.0, relVertexPos.yzy) + _step(0.0, relVertexPos.zxx));
-            int  faceIndex = vertex_ID / 6 + int((toCamSign.zxy[vertex_ID / 6] * 1.5 + 1.5) + 1.0);
-
-            float3 faceNormal = fixed_axs[faceIndex];
-            float3 dirB = fixed_bnm[faceIndex];
-            float3 dirT = fixed_tgt[faceIndex];
-
-            output_tmp = float4(faceNormal, 1.0);
+            //float3 faceNormal = fixed_axs[faceIndex];
+            //float3 dirB = fixed_bnm[faceIndex];
+            //float3 dirT = fixed_tgt[faceIndex];
+            
+            output_tmp = float4(float(faceIndex) / 6.0, 0.0, 0.0, 1.0);  //float4(1.0, 1.0, 1.0, 1.0); //
             output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
             output_color[0] = input_tmp;
         }
     )";
-
+    
     const char *g_texturedMeshShaderSrc = R"(
         inout {
             uv : float2
@@ -272,6 +292,9 @@ namespace {
             output_color[0] = input_tmp;
         }
     )";
+    
+    
+    
 }
 
 namespace voxel {
@@ -298,7 +321,7 @@ namespace voxel {
                 {"ID", foundation::RenderShaderInputFormat::ID}
             },
             { // instance
-                {"position_color", foundation::RenderShaderInputFormat::SHORT4},
+                {"position_color_mask", foundation::RenderShaderInputFormat::SHORT4},
             }
         );
 
@@ -320,6 +343,16 @@ namespace voxel {
                 {"color", foundation::RenderShaderInputFormat::BYTE4},
             }
         );
+        
+//        struct VoxelData {
+//            std::int16_t x, y, z, m;
+//        }
+//        voxelData[2] = {
+//            {8, 0, 8, 0b0111110},
+//            {8, 2, 8, 0b1010110},
+//        };
+//
+//        _testVoxelData = rendering->createData(voxelData, 2, sizeof(VoxelData));
         
         _shaderConstants.observingPointAndRadius = math::vector4f(0.0, 0.0, 0.0, 32.0);
         _shaderConstants.sunColorAndPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
@@ -380,24 +413,25 @@ namespace voxel {
         return model;
     }
     
-    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const resource::VoxelMesh &mesh) {
+    SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const std::vector<VTXSVOX> &voxels) {
         std::shared_ptr<StaticModelImpl> model = nullptr;
-        std::uint32_t voxelCount = mesh.frames[0].voxelCount;
-        std::unique_ptr<StaticModelImpl::Voxel[]> positions = std::make_unique<StaticModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
+//        std::uint32_t voxelCount = mesh.frames[0].voxelCount;
+//        std::unique_ptr<StaticModelImpl::Voxel[]> positions = std::make_unique<StaticModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
+//
+//        // TODO: move such loops outside
+//        for (std::uint32_t i = 0; i < voxelCount; i++) {
+//            positions[i].positionX = mesh.frames[0].voxels[i].positionX;
+//            positions[i].positionY = mesh.frames[0].voxels[i].positionY;
+//            positions[i].positionZ = mesh.frames[0].voxels[i].positionZ;
+//            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
+//            positions[i].mask = mesh.frames[0].voxels[i].mask;
+//        }
         
-        // TODO: move such loops outside
-        for (std::uint32_t i = 0; i < voxelCount; i++) {
-            positions[i].positionX = mesh.frames[0].voxels[i].positionX;
-            positions[i].positionY = mesh.frames[0].voxels[i].positionY;
-            positions[i].positionZ = mesh.frames[0].voxels[i].positionZ;
-            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
-        }
+        foundation::RenderDataPtr voxData = _rendering->createData(voxels.data(), std::uint32_t(voxels.size()), sizeof(VTXSVOX));
         
-        foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(StaticModelImpl::Voxel));
-        
-        if (voxels) {
-            model = std::make_shared<StaticModelImpl>(std::move(voxels));
-            _staticModels.emplace_back(model);
+        if (voxData) {
+            model = std::make_shared<StaticModelImpl>(std::move(voxData));
+            _staticMeshes.emplace_back(model);
         }
         
         return model;
@@ -410,29 +444,35 @@ namespace voxel {
         
         if (vertexData && indexData && tx) {
             model = std::make_shared<TexturedModelImpl>(std::move(vertexData), std::move(indexData), tx);
-            _texturedModels.emplace_back(model);
+            _texturedMeshes.emplace_back(model);
         }
         
         return model;
     }
     
-    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const resource::VoxelMesh &mesh, const math::vector3f &center, const math::transform3f &transform) {
-        std::uint32_t voxelCount = mesh.frames[0].voxelCount;
-        std::unique_ptr<DynamicModelImpl::Voxel[]> positions = std::make_unique<DynamicModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
+    SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) {
+        //std::uint32_t voxelCount = mesh.frames[0].voxelCount;
+        //std::unique_ptr<DynamicModelImpl::Voxel[]> positions = std::make_unique<DynamicModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
         std::shared_ptr<DynamicModelImpl> model = nullptr;
         
-        for (std::uint32_t i = 0; i < voxelCount; i++) {
-            positions[i].positionX = float(mesh.frames[0].voxels[i].positionX) - center.x;
-            positions[i].positionY = float(mesh.frames[0].voxels[i].positionY) - center.y;
-            positions[i].positionZ = float(mesh.frames[0].voxels[i].positionZ) - center.z;
-            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
+//        for (std::uint32_t i = 0; i < voxelCount; i++) {
+//            positions[i].positionX = float(mesh.frames[0].voxels[i].positionX) - center.x;
+//            positions[i].positionY = float(mesh.frames[0].voxels[i].positionY) - center.y;
+//            positions[i].positionZ = float(mesh.frames[0].voxels[i].positionZ) - center.z;
+//            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
+//        }
+        
+        std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
+        
+        for (std::size_t i = 0; i < frameCount; i++) {
+            voxFrames[i] = _rendering->createData(frames[i].data(), std::uint32_t(frames[i].size()), sizeof(VTXDVOX));
         }
         
-        foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(DynamicModelImpl::Voxel));
+        //foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(DynamicModelImpl::Voxel));
         
-        if (voxels) {
-            model = std::make_shared<DynamicModelImpl>(std::move(voxels), transform);
-            _dynamicModels.emplace_back(model);
+        if (frameCount) {
+            model = std::make_shared<DynamicModelImpl>(voxFrames.get(), frameCount, transform);
+            _dynamicMeshes.emplace_back(model);
         }
         
         return model;
@@ -458,30 +498,40 @@ namespace voxel {
     
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         cleanupUnused(_boundingBoxes);
-        cleanupUnused(_staticModels);
-        cleanupUnused(_texturedModels);
-        cleanupUnused(_dynamicModels);
+        //cleanupUnused(_staticMeshes);
+        cleanupUnused(_texturedMeshes);
+        cleanupUnused(_dynamicMeshes);
         
         _rendering->updateFrameConstants(_camera.viewMatrix.flat16, _camera.projMatrix.flat16, _camera.position.flat3, _camera.forward.flat3);
         _drawAxis();
+
+//        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+//        _rendering->drawGeometry(nullptr, _testVoxelData, 12, _testVoxelData->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
         
+        
+
         _rendering->applyState(_boundingBoxShader, foundation::RenderPassCommonConfigs::DEFAULT());
         for (const auto &boundingBox : _boundingBoxes) {
             _rendering->drawGeometry(boundingBox->lines, 24, foundation::RenderTopology::LINES);
         }
-        
-        _rendering->applyState(_texturedMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
-        for (const auto &texturedModel : _texturedModels) {
-            _rendering->applyTextures(&texturedModel->texture, 1);
-            _rendering->drawGeometry(texturedModel->vertices, texturedModel->indices, texturedModel->indices->getCount(), foundation::RenderTopology::TRIANGLES);
+
+        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        for (const auto &staticMesh : _staticMeshes) {
+            _rendering->drawGeometry(nullptr, staticMesh->voxels, 12, staticMesh->voxels->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
         }
 
-        _rendering->applyState(_dynamicMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
-        for (const auto &dynamicModel : _dynamicModels) {
-            _shaderConstants.modelTransform = dynamicModel->transform;
-            _rendering->applyShaderConstants(&_shaderConstants);
-            _rendering->drawGeometry(nullptr, dynamicModel->voxels, 18, dynamicModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
+        _rendering->applyState(_texturedMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        for (const auto &texturedMesh : _texturedMeshes) {
+            _rendering->applyTextures(&texturedMesh->texture, 1);
+            _rendering->drawGeometry(texturedMesh->vertices, texturedMesh->indices, texturedMesh->indices->getCount(), foundation::RenderTopology::TRIANGLES);
         }
+//
+//        _rendering->applyState(_dynamicMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+//        for (const auto &dynamicModel : _dynamicModels) {
+//            _shaderConstants.modelTransform = dynamicModel->transform;
+//            _rendering->applyShaderConstants(&_shaderConstants);
+//            _rendering->drawGeometry(nullptr, dynamicModel->voxels, 18, dynamicModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
+//        }
     }
         
     void SceneInterfaceImpl::_drawAxis() {

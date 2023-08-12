@@ -40,10 +40,7 @@ namespace resource {
     , _rendering(rendering)
     {
         std::istringstream source = std::istringstream(resourceList);
-        std::string line;
-        std::string path;
-        std::string type;
-        
+        std::string line, path, type;
         TextureInfo info;
         
         while (std::getline(source, line)) {

@@ -257,12 +257,12 @@ namespace ui {
     }
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
-        _rendering->applyState(_uiShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
-        
-        for (const auto &topLevelElement : _topLevelElements) {
-            topLevelElement->updateCoordinates();
-            topLevelElement->draw(_shaderConstants);
-        }
+//        _rendering->applyState(_uiShader, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
+//
+//        for (const auto &topLevelElement : _topLevelElements) {
+//            topLevelElement->updateCoordinates();
+//            topLevelElement->draw(_shaderConstants);
+//        }
     }
     
 }

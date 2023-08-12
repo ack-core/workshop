@@ -1,7 +1,9 @@
 
 #include "mesh_provider.h"
 
+#include <list>
 #include <unordered_map>
+#include <sstream>
 
 namespace resource {
     class MeshProviderImpl : public std::enable_shared_from_this<MeshProviderImpl>, public MeshProvider {
@@ -10,17 +12,42 @@ namespace resource {
         ~MeshProviderImpl() override;
         
         const MeshInfo *getMeshInfo(const char *voxPath) override;
-        void getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
-        void getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *voxPath, bool scaledVoxels, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
+        std::unordered_map<std::string, MeshInfo> _meshInfos;
         std::unordered_map<std::string, std::unique_ptr<VoxelMesh>> _meshes;
         std::unique_ptr<VoxelMesh> _empty;
+        
+        struct QueueEntry {
+            bool scaled;
+            std::string voxPath;
+            util::callback<void(const std::unique_ptr<VoxelMesh> &)> callback;
+        };
+        
+        std::list<QueueEntry> _callsQueue;
+        bool _asyncInProgress;
     };
     
-    MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *resourceList) : _platform(platform) {
-    
+    MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *resourceList) : _platform(platform), _asyncInProgress(false) {
+        std::istringstream source = std::istringstream(resourceList);
+        std::string line, path;
+        MeshInfo info;
+        
+        while (std::getline(source, line)) {
+            printf("-->> %s\n", line.data());
+            std::istringstream input = std::istringstream(line);
+            
+            if (line.length()) {
+                if (input >> path >> info.sizeX >> info.sizeY >> info.sizeZ) {
+                    _meshInfos.emplace(path, info);
+                }
+                else {
+                    _platform->logError("[MeshProviderImpl::MeshProviderImpl] Bad mesh info in '%s'\n", line.data());
+                }
+            }
+        }
     }
     
     MeshProviderImpl::~MeshProviderImpl() {
@@ -28,35 +55,38 @@ namespace resource {
     }
     
     const MeshInfo *MeshProviderImpl::getMeshInfo(const char *voxPath) {
-        return nullptr;
+        auto index = _meshInfos.find(voxPath);
+        return index != _meshInfos.end() ? &index->second : nullptr;
     }
 
-    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
-        std::int16_t zero[3] = {0, 0, 0};
-        return getOrLoadVoxelMesh(voxPath, zero, std::move(completion));
-    }
-
-    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, const std::int16_t(&offset)[3], util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
+    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, bool scaledVoxels, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
+        if (_asyncInProgress) {
+            _callsQueue.emplace_back(QueueEntry {
+                .scaled = scaledVoxels,
+                .voxPath = voxPath,
+                .callback = std::move(completion)
+            });
+            
+            return;
+        }
+        
         std::string path = std::string(voxPath);
+
         auto index = _meshes.find(path);
         if (index != _meshes.end()) {
             completion(index->second);
         }
         else {
-            struct Offset {
-                std::int16_t x, y, z;
-            }
-            voxoff{ offset[0], offset[1], offset[2] };
-            
-            _platform->loadFile((path + ".vox").data(), [weak = weak_from_this(), voxoff, path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t size) mutable {
+            _asyncInProgress = true;
+            _platform->loadFile((path + ".vox").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<MeshProviderImpl> self = weak.lock()) {
                     const foundation::PlatformInterfacePtr &platform = self->_platform;
-                    if (size) {
+                    if (len) {
                         struct AsyncContext {
                             std::unique_ptr<VoxelMesh> mesh;
                         };
                         
-                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak, path, voxoff, bin = std::move(mem), size](AsyncContext &ctx) {
+                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak, path, bin = std::move(mem), len](AsyncContext &ctx) {
                             if (std::shared_ptr<MeshProviderImpl> self = weak.lock()) {
                                 const std::int32_t version = 150;
                                 const std::uint8_t *data = bin.get();
@@ -77,27 +107,80 @@ namespace resource {
                                     
                                     for (std::int32_t i = 0; i < frameCount; i++) {
                                         if (memcmp(data, "SIZE", 4) == 0) {
-                                            data += 24;
+                                            data += 12;
+                                            int sizeZ = *(int *)(data + 0) + 2;
+                                            int sizeX = *(int *)(data + 4) + 2;
+                                            int sizeY = *(int *)(data + 8) + 2;
+                                            data += 12;
                                             
                                             if (memcmp(data, "XYZI", 4) == 0) {
+                                                std::unique_ptr<std::uint8_t[]> voxMap = std::make_unique<std::uint8_t[]>(sizeX * sizeY * sizeZ);
                                                 std::size_t voxelCount = *(std::uint32_t *)(data + 12);
                                                 
                                                 data += 16;
                                                 
-                                                ctx.mesh->frames[i].voxels = std::make_unique<VoxelMesh::Voxel[]>(voxelCount);
-                                                ctx.mesh->frames[i].voxelCount = voxelCount;
-                                                
-                                                for (std::size_t c = 0, k = 0; c < voxelCount; c++) {
+                                                for (std::size_t c = 0; c < voxelCount; c++) {
                                                     std::uint8_t z = *(std::uint8_t *)(data + c * 4 + 0);
                                                     std::uint8_t x = *(std::uint8_t *)(data + c * 4 + 1);
                                                     std::uint8_t y = *(std::uint8_t *)(data + c * 4 + 2);
-                                                    
-                                                    VoxelMesh::Voxel &targetVoxel = ctx.mesh->frames[i].voxels[k++];
-                                                    
-                                                    targetVoxel.positionZ = std::int16_t(z) + voxoff.z;
-                                                    targetVoxel.positionX = std::int16_t(x) + voxoff.x;
-                                                    targetVoxel.positionY = std::int16_t(y) + voxoff.y;
-                                                    targetVoxel.colorIndex = *(std::uint8_t *)(data + c * 4 + 3);
+                                                    voxMap[(z + 1) + (x + 1) * sizeZ + (y + 1) * sizeX * sizeZ] = 0x80;
+                                                }
+                                                
+                                                std::size_t optimizedCount = 0;
+                                                for (int x = 1; x < sizeX - 1; x++) {
+                                                    for (int y = 1; y < sizeY - 1; y++) {
+                                                        for (int z = 1; z < sizeZ - 1; z++) {
+                                                            if (voxMap[z + x * sizeZ + y * sizeX * sizeZ] & 0x80) {
+                                                                std::uint8_t mask = 0b1111110;
+                                                                
+                                                                if (voxMap[(z - 1) + (x + 0) * sizeZ + (y + 0) * sizeX * sizeZ] & 0x80) {
+                                                                    mask &= 0b1111100;
+                                                                }
+                                                                if (voxMap[(z + 0) + (x - 1) * sizeZ + (y + 0) * sizeX * sizeZ] & 0x80) {
+                                                                    mask &= 0b1111010;
+                                                                }
+                                                                if (voxMap[(z + 0) + (x + 0) * sizeZ + (y - 1) * sizeX * sizeZ] & 0x80) {
+                                                                    mask &= 0b1110110;
+                                                                }
+                                                                if (voxMap[(z + 1) + (x + 0) * sizeZ + (y + 0) * sizeX * sizeZ] & 0x80) {
+                                                                    mask &= 0b1101110;
+                                                                }
+                                                                if (voxMap[(z + 0) + (x + 1) * sizeZ + (y + 0) * sizeX * sizeZ] & 0x80) {
+                                                                    mask &= 0b1011110;
+                                                                }
+                                                                if (voxMap[(z + 0) + (x + 0) * sizeZ + (y + 1) * sizeX * sizeZ] & 0x80) {
+                                                                    mask &= 0b0111110;
+                                                                }
+                                                                
+                                                                voxMap[z + x * sizeZ + y * sizeX * sizeZ] = mask | 0x80;
+                                                                
+                                                                if (mask) {
+                                                                    optimizedCount++;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                ctx.mesh->frames[i].voxels = std::make_unique<VoxelMesh::Voxel[]>(optimizedCount);
+                                                ctx.mesh->frames[i].voxelCount = optimizedCount;
+                                                
+                                                std::size_t voxelIndex = 0;
+                                                for (int x = 1; x < sizeX - 1; x++) {
+                                                    for (int y = 1; y < sizeY - 1; y++) {
+                                                        for (int z = 1; z < sizeZ - 1; z++) {
+                                                            if (voxMap[z + x * sizeZ + y * sizeX * sizeZ] & 0x7f) {
+                                                                VoxelMesh::Voxel &targetVoxel = ctx.mesh->frames[i].voxels[voxelIndex++];
+                                                                targetVoxel.positionX = std::int16_t(x - 1);
+                                                                targetVoxel.positionY = std::int16_t(y - 1);
+                                                                targetVoxel.positionZ = std::int16_t(z - 1);
+                                                                targetVoxel.scaleX = 1;
+                                                                targetVoxel.scaleY = 1;
+                                                                targetVoxel.scaleZ = 1;
+                                                                targetVoxel.mask = voxMap[z + x * sizeZ + y * sizeX * sizeZ];
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                                 
                                                 data += voxelCount * 4;
@@ -122,6 +205,8 @@ namespace resource {
                         },
                         [weak, path, completion = std::move(completion)](AsyncContext &ctx) {
                             if (std::shared_ptr<MeshProviderImpl> self = weak.lock()) {
+                                self->_asyncInProgress = false;
+
                                 if (ctx.mesh) {
                                     auto index = self->_meshes.find(path);
                                     if (index != self->_meshes.end()) {
@@ -134,6 +219,12 @@ namespace resource {
                                 }
                                 else {
                                     completion(nullptr);
+                                }
+                                
+                                while (self->_asyncInProgress == false && self->_callsQueue.size()) {
+                                    QueueEntry &entry = self->_callsQueue.front();                                    
+                                    self->getOrLoadVoxelMesh(entry.voxPath.data(), entry.scaled, std::move(entry.callback));
+                                    self->_callsQueue.pop_front();
                                 }
                             }
                         }));

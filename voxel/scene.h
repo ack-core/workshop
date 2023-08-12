@@ -4,7 +4,7 @@
 #include "foundation/rendering.h"
 #include "foundation/math.h"
 
-#include "providers/mesh_provider.h"
+//#include "providers/mesh_provider.h"
 #include "providers/texture_provider.h"
 
 #include <cstddef>
@@ -22,6 +22,15 @@ namespace voxel {
         );
         
     public:
+        struct VTXSVOX {
+            std::int16_t positionX, positionY, positionZ;
+            std::uint8_t colorIndex, mask;
+            //std::uint8_t scaleX, scaleY, scaleZ;
+        };
+        struct VTXDVOX {
+            float positionX, positionY, positionZ;
+            std::uint8_t colorIndex, mask, r1, r2;
+        };
         struct VTXNRMUV {
             float x, y, z, u;
             float nx, ny, nz, v;
@@ -58,9 +67,9 @@ namespace voxel {
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addStaticModel(const resource::VoxelMesh &mesh) -> StaticModelPtr = 0;
+        virtual auto addStaticModel(const std::vector<VTXSVOX> &voxels) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
-        virtual auto addDynamicModel(const resource::VoxelMesh &mesh, const math::vector3f &center, const math::transform3f &transform) -> DynamicModelPtr = 0;
+        virtual auto addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) -> DynamicModelPtr = 0;
         virtual auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual void updateAndDraw(float dtSec) = 0;

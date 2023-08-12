@@ -52,12 +52,18 @@ namespace voxel {
         if (_currentState == State::NONE) {
             _currentState = State::LOADING;
             
-            _facility.getMeshProvider()->getOrLoadVoxelMesh(_type.model.data(), [weak = weak_from_this()](const std::unique_ptr<resource::VoxelMesh> &mesh) {
+            _facility.getMeshProvider()->getOrLoadVoxelMesh(_type.model.data(), false, [weak = weak_from_this()](const std::unique_ptr<resource::VoxelMesh> &mesh) {
                 if (std::shared_ptr<YardObjectImpl> self = weak.lock()) {
                     if (mesh) {
                         float angle = (self->_currentDirection.x < 0.0f ? 1.0f : -1.0f) * math::vector3f(0.0f, 0.0f, 1.0f).angleTo(self->_currentDirection.normalized());
                         math::transform3f transform = math::transform3f::identity().rotated({0, 1, 0}, angle).translated(self->_currentPosition);
-                        self->_model = self->_facility.getScene()->addDynamicModel(*mesh, self->_type.center, transform);
+                        
+                        std::vector<SceneInterface::VTXDVOX> voxData;
+                        for (std::uint16_t i = 0; i < mesh->frames[0].voxelCount; i++) {
+                            voxData.emplace_back(SceneInterface::VTXDVOX{}); // TODO:
+                        }
+                        
+                        self->_model = self->_facility.getScene()->addDynamicModel(&voxData, 1, transform);
                         self->_currentState = State::RENDERING;
                     }
                     else {

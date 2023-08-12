@@ -96,10 +96,10 @@ namespace voxel {
     void YardImpl::loadYard(const char *sourcepath, util::callback<void(bool loaded)> &&completion) {
         std::string yardpath = std::string(sourcepath) + ".yard";
         
-        _clearYard();
         _platform->loadFile(yardpath.data(), [weak = weak_from_this(), yardpath, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&binary, std::size_t size){
             if (std::shared_ptr<YardImpl> self = weak.lock()) {
                 const foundation::PlatformInterfacePtr &platform = self->_platform;
+                self->_clearYard();
 
                 if (size) {
                     std::istringstream source = std::istringstream((const char *)binary.get());
@@ -108,7 +108,7 @@ namespace voxel {
                     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> links;
                     math::bound3f bbox;
                     
-                    while (source >> type) {
+                    while (!source.eof() && (source >> type)) {
                         if (type == "options" && bool(source >> expect::braced(block, '{', '}'))) {
                             std::istringstream input = std::istringstream(block);
                             
@@ -134,7 +134,7 @@ namespace voxel {
                                 if (parameter == "heightmap" && bool(input >> expect::braced(heightmap, '"', '"')) == false) {
                                     platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'heightmap' syntax\n", id);
                                 }
-                                if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin >> bbox.xmax >> bbox.ymax >> bbox.zmax) == false) {
+                                if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin) == false) {
                                     platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'position' syntax\n", id);
                                 }
                                 if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
@@ -144,12 +144,54 @@ namespace voxel {
                             }
                             
                             if (input.fail() == false) {
-                                bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
-                                bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
-                                self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
+                                if (const resource::TextureInfo *info = self->_textureProvider->getTextureInfo(texture.data())) {
+                                    bbox.xmax = bbox.xmin + info->width - 1;
+                                    bbox.zmax = bbox.zmin + info->height - 1;
+                                    bbox.ymax = bbox.ymin;
+                                    bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
+                                    bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
+                                    self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
+                                }
+                                else {
+                                    platform->logError("[YardImpl::loadYard] texture '%s' for square with id = '%zu' has no info\n", texture.data(), id);
+                                }
                             }
                             else {
                                 platform->logError("[YardImpl::loadYard] unable to load square with id = '%zu'\n", id);
+                            }
+                        }
+                        if (type == "thing" && bool(source >> id >> expect::braced(block, '{', '}'))) {
+                            std::istringstream input = std::istringstream(block);
+                            std::string model;
+                            
+                            while (input.eof() == false && input >> parameter) {
+                                if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
+                                    platform->logError("[YardImpl::loadYard] thing with id = '%zu' has invalid 'model' syntax\n", id);
+                                }
+                                if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin) == false) {
+                                    platform->logError("[YardImpl::loadYard] thing with id = '%zu' has invalid 'position' syntax\n", id);
+                                }
+                                if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
+                                    platform->logError("[YardImpl::loadYard] thing with id = '%zu' has invalid 'links' syntax\n", id);
+                                }
+                                input >> std::ws;
+                            }
+                            
+                            if (input.fail() == false) {
+                                if (const resource::MeshInfo *info = self->_meshProvider->getMeshInfo(model.data())) {
+                                    bbox.xmax = bbox.xmin + info->sizeX - 1;
+                                    bbox.ymax = bbox.ymin + info->sizeY - 1;
+                                    bbox.zmax = bbox.zmin + info->sizeZ - 1;
+                                    bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
+                                    bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
+                                    self->_addStatic(id, std::make_shared<YardThing>(*self, bbox, std::move(model)));
+                                }
+                                else {
+                                    platform->logError("[YardImpl::loadYard] mesh '%s' for thing with id = '%zu' has no info\n", model.data(), id);
+                                }
+                            }
+                            else {
+                                platform->logError("[YardImpl::loadYard] unable to load thing with id = '%zu'\n", id);
                             }
                         }
                         if (type == "object" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
@@ -176,6 +218,7 @@ namespace voxel {
                         }
                         
                         block.clear();
+                        source >> std::ws;
                     }
                     
                     for (auto &item : self->_statics) {
@@ -187,6 +230,9 @@ namespace voxel {
                     if (source.fail() == false) {
                         completion(true);
                         return;
+                    }
+                    else {
+                        platform->logError("[YardImpl::loadYard] yard '%s' isn't complete\n", yardpath.data());
                     }
                 }
                 else {

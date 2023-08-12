@@ -1073,6 +1073,7 @@ namespace foundation {
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
+            [_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
             [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
             [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
         }

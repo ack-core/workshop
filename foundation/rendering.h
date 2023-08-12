@@ -217,22 +217,22 @@ namespace foundation {
         // Textures. There 4 texture slots. Example of getting color from the last slot: float4 color = _tex2linear(3, float2(0, 0));
         //
         // Global functions:
-        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(k, v, v), _tex2nearest/_tex2linear/_tex2raw(index, v)
+        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2nearest/_tex2linear/_tex2raw(index, v)
         //
         virtual RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc = {}) = 0;
-
+        
         // Create texture from binary data or empty
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr. Array can be empty if there is only one mip-level
         //
         virtual RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
-
+        
         // Create render target texture
         // @count       - color targets count
         // @w and @h    - width and height
         //
         virtual RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) = 0;
-
+        
         // Create geometry
         // @data        - pointer to data (array of structures)
         // @count       - count of structures in array
@@ -240,7 +240,9 @@ namespace foundation {
         // @return      - handle
         //
         virtual RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
-
+        
+        // Return actual rendering area size
+        //
         virtual float getBackBufferWidth() const = 0;
         virtual float getBackBufferHeight() const = 0;
 
@@ -249,38 +251,38 @@ namespace foundation {
         // @cfg         - render pass configuration
         //
         virtual void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg = RenderPassCommonConfigs::DEFAULT()) = 0;
-
+        
         // Apply textures
         // @textures    - textures[i] can be nullptr (texture at i-th position will not be set)
         // @count       - number of textures
         //
         virtual void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) = 0;
-
+        
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
         //
         virtual void applyShaderConstants(const void *constants) = 0;
-
+        
         // Draw vertexes from RenderData
         // @vertexData has layout set by current shader. Can be nullptr
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) = 0;
-
+        
         // Draw vertexes from RenderData with indices
         // @vertexData  - vertex data that has layout set by current shader
         // @indexData   - indeces (uint32)
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) = 0;
-
+        
         // Draw instanced vertexes from RenderData
         // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //
         virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) = 0;
-                
+        
         // Frame finalization
         //
         virtual void presentFrame() = 0;
-
+        
     public:
         virtual ~RenderingInterface() = default;
     };

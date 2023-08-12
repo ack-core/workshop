@@ -305,6 +305,7 @@ namespace voxel {
                             std::vector<std::uint32_t> indices;
                         };
                         
+                        // TODO: move geometry making to loading
                         _facility.getPlatform()->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak = weak_from_this()](AsyncContext &ctx) {
                             if (std::shared_ptr<YardSquare> self = weak.lock()) {
                                 self->_makeGeometry(self->_heightmap, self->_bbox, ctx.vertices, ctx.indices);

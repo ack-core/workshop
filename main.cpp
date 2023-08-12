@@ -3,7 +3,6 @@
 // + python tools: png -> vox, png -> png + palette, 2x large png -> .yard + pngs
 // + dh to scene
 // + meshProvider/textureProvider need 'update' to remove resources
-//
 // plan:
 // + YardThing
 // + palette

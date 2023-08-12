@@ -54,9 +54,9 @@ namespace resource {
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         const std::shared_ptr<foundation::RenderingInterface> _rendering;
-        
         const std::unique_ptr<std::uint8_t[]> _ttfData;
         const std::uint32_t _ttfLen;
+        
         stbtt_fontinfo _ttfInfo;
         
         struct {
@@ -83,8 +83,6 @@ namespace resource {
         
         std::unordered_map<std::uint32_t, FontAtlas> _atlases;
         std::list<QueueEntry> _callsQueue;
-        
-        bool _initialized;
         bool _asyncInProgress;
     };
     
@@ -98,16 +96,12 @@ namespace resource {
     , _rendering(rendering)
     , _ttfData(std::move(ttfData))
     , _ttfLen(ttfLen)
-    , _initialized(false)
     , _asyncInProgress(false)
     {
         if (stbtt_InitFont(&_ttfInfo, _ttfData.get(), 0) != 0) {
             _missingCharacter.glyphIndex = stbtt_FindGlyphIndex(&_ttfInfo, 0xFFFD);
             
-            if (_missingCharacter.glyphIndex != 0) {
-                _initialized = true;
-            }
-            else {
+            if (_missingCharacter.glyphIndex == 0) {
                 _platform->logError("[FontAtlasProviderImpl::FontAtlasProviderImpl] ttf doesn't contain 'missing symbol' glyph\n");
             }
         }
@@ -280,9 +274,8 @@ namespace resource {
                     self->_asyncInProgress = false;
                     self->getTextFontAtlas(txt.data(), size, std::move(completion));
                     
-                    if (self->_callsQueue.size()) {
-                        QueueEntry &entry = self->_callsQueue.front();
-                        
+                    while (self->_asyncInProgress == false && self->_callsQueue.size()) {
+                        QueueEntry &entry = self->_callsQueue.front();                        
                         self->getTextFontAtlas(entry.text.data(), entry.size, std::move(entry.callback));
                         self->_callsQueue.pop_front();
                     }

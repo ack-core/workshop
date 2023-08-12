@@ -43,11 +43,9 @@ namespace game {
             }
         );
         
-        _api.yard->loadYard("debug", [this](bool loaded){
+        _api.yard->loadYard("dev", [this](bool loaded){
             printf("%s\n", loaded ? "loaded" : "not loaded");
-            _api.yard->addObject("player", math::vector3f(16, 0, 16), math::vector3f(1.0, 0.0, 0.0));
         });
-        
         
         auto panel = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
             .anchorOffset = math::vector2f(50.0f, 50.0f),
@@ -74,8 +72,8 @@ namespace game {
         auto txt1 = _api.ui->addText(nullptr, ui::StageInterface::TextParams {
             .anchorTarget = nullptr,
             .anchorOffset = math::vector2f(0.0f, 0.0f),
-            .anchorH = ui::HorizontalAnchor::RIGHT,
-            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .anchorH = ui::HorizontalAnchor::LEFT,
+            .anchorV = ui::VerticalAnchor::MIDDLE,
             .fontSize = 36,
             .shadowEnabled = true,
             .shadowOffset = math::vector2f(2.0f, 2.0f)
@@ -87,7 +85,7 @@ namespace game {
         btn2->setActionHandler(ui::Action::CAPTURE, [](float, float) {
         
         });
-        txt1->setText("аТёЖи ку_abc^!"); //
+        txt1->setText("Gætirðu skrifað þetta upp?"); //
         
         auto pivot1 = _api.ui->addPivot(nullptr, {});
         pivot1->setWorldPosition(math::vector3f(0, 10, 0));
@@ -126,6 +124,8 @@ namespace game {
         });
         
         _api.scene->setCameraLookAt(_center + _orbit, _center);
+        
+        
     }
     
     DebugContext::~DebugContext() {
