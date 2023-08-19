@@ -19,8 +19,8 @@ namespace game {
 //        math::vector3f _center = { 36, 0, 42 };
 //        math::vector3f _orbit = { 0, 80, 45 };
 
-        math::vector3f _center = { 8, 0, 8 };
-        math::vector3f _orbit = { 0, 48, 42 };
+        math::vector3f _center = { 8, 10, 8 };
+        math::vector3f _orbit = { 0, 58, 42 };
 
         foundation::EventHandlerToken _touchEventHandlerToken;
     };

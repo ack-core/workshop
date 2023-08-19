@@ -25,7 +25,7 @@ namespace voxel {
         struct VTXSVOX {
             std::int16_t positionX, positionY, positionZ;
             std::uint8_t colorIndex, mask;
-            //std::uint8_t scaleX, scaleY, scaleZ;
+            std::uint8_t scaleX, scaleY, scaleZ, reserved;
         };
         struct VTXDVOX {
             float positionX, positionY, positionZ;

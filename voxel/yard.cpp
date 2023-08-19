@@ -106,6 +106,8 @@ namespace voxel {
                     std::uint64_t id;
                     std::string type, block, name, parameter;
                     std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> links;
+
+                    math::vector3f position;
                     math::bound3f bbox;
                     
                     while (!source.eof() && (source >> type)) {
@@ -134,7 +136,7 @@ namespace voxel {
                                 if (parameter == "heightmap" && bool(input >> expect::braced(heightmap, '"', '"')) == false) {
                                     platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'heightmap' syntax\n", id);
                                 }
-                                if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin) == false) {
+                                if (parameter == "position" && bool(input >> position.x >> position.y >> position.z) == false) {
                                     platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'position' syntax\n", id);
                                 }
                                 if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
@@ -145,11 +147,12 @@ namespace voxel {
                             
                             if (input.fail() == false) {
                                 if (const resource::TextureInfo *info = self->_textureProvider->getTextureInfo(texture.data())) {
-                                    bbox.xmax = bbox.xmin + info->width - 1;
-                                    bbox.zmax = bbox.zmin + info->height - 1;
-                                    bbox.ymax = bbox.ymin;
-                                    bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
-                                    bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
+                                    bbox.xmin = position.x - 0.5;
+                                    bbox.ymin = position.y - 0.5;
+                                    bbox.zmin = position.z - 0.5;
+                                    bbox.xmax = bbox.xmin + info->width;
+                                    bbox.ymax = bbox.ymin + 1.0;
+                                    bbox.zmax = bbox.zmin + info->height;
                                     self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
                                 }
                                 else {
@@ -168,7 +171,7 @@ namespace voxel {
                                 if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
                                     platform->logError("[YardImpl::loadYard] thing with id = '%zu' has invalid 'model' syntax\n", id);
                                 }
-                                if (parameter == "position" && bool(input >> bbox.xmin >> bbox.ymin >> bbox.zmin) == false) {
+                                if (parameter == "position" && bool(input >> position.x >> position.y >> position.z) == false) {
                                     platform->logError("[YardImpl::loadYard] thing with id = '%zu' has invalid 'position' syntax\n", id);
                                 }
                                 if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
@@ -179,11 +182,12 @@ namespace voxel {
                             
                             if (input.fail() == false) {
                                 if (const resource::MeshInfo *info = self->_meshProvider->getMeshInfo(model.data())) {
-                                    bbox.xmax = bbox.xmin + info->sizeX - 1;
-                                    bbox.ymax = bbox.ymin + info->sizeY - 1;
-                                    bbox.zmax = bbox.zmin + info->sizeZ - 1;
-                                    bbox.xmin -= 0.5f; bbox.ymin -= 0.5f; bbox.zmin -= 0.5f;
-                                    bbox.xmax += 0.5f; bbox.ymax += 0.5f; bbox.zmax += 0.5f;
+                                    bbox.xmin = position.x - 0.5;
+                                    bbox.ymin = position.y - 0.5;
+                                    bbox.zmin = position.z - 0.5;
+                                    bbox.xmax = bbox.xmin + info->sizeX;
+                                    bbox.ymax = bbox.ymin + info->sizeY;
+                                    bbox.zmax = bbox.zmin + info->sizeZ;
                                     self->_addStatic(id, std::make_shared<YardThing>(*self, bbox, std::move(model)));
                                 }
                                 else {

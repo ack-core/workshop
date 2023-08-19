@@ -20,13 +20,6 @@ namespace voxel {
     };
 
     class StaticModelImpl : public SceneInterface::StaticModel {
-//    public:
-//        struct Voxel {
-//            std::int16_t positionX, positionY, positionZ;
-//            std::uint8_t colorIndex, mask;
-//        };
-//        static_assert(sizeof(Voxel) == 8, "");
-        
     public:
         foundation::RenderDataPtr voxels;
         
@@ -51,12 +44,6 @@ namespace voxel {
     };
     
     class DynamicModelImpl : public SceneInterface::DynamicModel {
-//    public:
-//        struct Voxel {
-//            float positionX, positionY, positionZ;
-//            std::uint32_t colorIndex;
-//        };
-        
     public:
         std::unique_ptr<foundation::RenderDataPtr[]> frames;
         std::uint32_t frameCount;
@@ -218,13 +205,13 @@ namespace {
             int  mask = (instance_position_color_mask.w >> (8 + faceIndex)) & 0x1;
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[vertex_ID], float(mask));
-            float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
+            float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(instance_scale.xyz), 0.0);
             
             //float3 faceNormal = fixed_axs[faceIndex];
             //float3 dirB = fixed_bnm[faceIndex];
             //float3 dirT = fixed_tgt[faceIndex];
             
-            output_tmp = float4(float(faceIndex) / 6.0, 0.0, 0.0, 1.0);  //float4(1.0, 1.0, 1.0, 1.0); //
+            output_tmp = float4(1.0, 1.0, 1.0, 1.0); //float4(float(faceIndex) / 6.0, 0.0, 0.0, 1.0);  //
             output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
@@ -322,6 +309,7 @@ namespace voxel {
             },
             { // instance
                 {"position_color_mask", foundation::RenderShaderInputFormat::SHORT4},
+                {"scale", foundation::RenderShaderInputFormat::BYTE4},
             }
         );
 
@@ -415,18 +403,6 @@ namespace voxel {
     
     SceneInterface::StaticModelPtr SceneInterfaceImpl::addStaticModel(const std::vector<VTXSVOX> &voxels) {
         std::shared_ptr<StaticModelImpl> model = nullptr;
-//        std::uint32_t voxelCount = mesh.frames[0].voxelCount;
-//        std::unique_ptr<StaticModelImpl::Voxel[]> positions = std::make_unique<StaticModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
-//
-//        // TODO: move such loops outside
-//        for (std::uint32_t i = 0; i < voxelCount; i++) {
-//            positions[i].positionX = mesh.frames[0].voxels[i].positionX;
-//            positions[i].positionY = mesh.frames[0].voxels[i].positionY;
-//            positions[i].positionZ = mesh.frames[0].voxels[i].positionZ;
-//            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
-//            positions[i].mask = mesh.frames[0].voxels[i].mask;
-//        }
-        
         foundation::RenderDataPtr voxData = _rendering->createData(voxels.data(), std::uint32_t(voxels.size()), sizeof(VTXSVOX));
         
         if (voxData) {
@@ -451,24 +427,12 @@ namespace voxel {
     }
     
     SceneInterface::DynamicModelPtr SceneInterfaceImpl::addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) {
-        //std::uint32_t voxelCount = mesh.frames[0].voxelCount;
-        //std::unique_ptr<DynamicModelImpl::Voxel[]> positions = std::make_unique<DynamicModelImpl::Voxel[]>(mesh.frames[0].voxelCount);
         std::shared_ptr<DynamicModelImpl> model = nullptr;
-        
-//        for (std::uint32_t i = 0; i < voxelCount; i++) {
-//            positions[i].positionX = float(mesh.frames[0].voxels[i].positionX) - center.x;
-//            positions[i].positionY = float(mesh.frames[0].voxels[i].positionY) - center.y;
-//            positions[i].positionZ = float(mesh.frames[0].voxels[i].positionZ) - center.z;
-//            positions[i].colorIndex = mesh.frames[0].voxels[i].colorIndex;
-//        }
-        
         std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
         
         for (std::size_t i = 0; i < frameCount; i++) {
             voxFrames[i] = _rendering->createData(frames[i].data(), std::uint32_t(frames[i].size()), sizeof(VTXDVOX));
         }
-        
-        //foundation::RenderDataPtr voxels = _rendering->createData(positions.get(), voxelCount, sizeof(DynamicModelImpl::Voxel));
         
         if (frameCount) {
             model = std::make_shared<DynamicModelImpl>(voxFrames.get(), frameCount, transform);

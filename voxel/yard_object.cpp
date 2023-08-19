@@ -3,6 +3,10 @@
 #include "yard_base.h"
 #include "yard_object.h"
 
+namespace {
+    static const resource::MeshOptimization MESH_OPT = resource::MeshOptimization::DISABLED;
+}
+
 namespace voxel {
     YardObjectImpl::YardObjectImpl(const YardFacility &facility, const YardCollision &collision, const YardObjectType &type, const math::vector3f &position, const math::vector3f &direction)
     : _facility(facility)
@@ -52,7 +56,7 @@ namespace voxel {
         if (_currentState == State::NONE) {
             _currentState = State::LOADING;
             
-            _facility.getMeshProvider()->getOrLoadVoxelMesh(_type.model.data(), false, [weak = weak_from_this()](const std::unique_ptr<resource::VoxelMesh> &mesh) {
+            _facility.getMeshProvider()->getOrLoadVoxelMesh(_type.model.data(), MESH_OPT, [weak = weak_from_this()](const std::unique_ptr<resource::VoxelMesh> &mesh) {
                 if (std::shared_ptr<YardObjectImpl> self = weak.lock()) {
                     if (mesh) {
                         float angle = (self->_currentDirection.x < 0.0f ? 1.0f : -1.0f) * math::vector3f(0.0f, 0.0f, 1.0f).angleTo(self->_currentDirection.normalized());

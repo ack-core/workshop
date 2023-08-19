@@ -9,6 +9,12 @@
 #include <memory>
 
 namespace resource {
+    enum class MeshOptimization {
+        DISABLED,
+        VISIBLE,
+        OPTIMIZED
+    };
+    
     struct MeshInfo {
         int sizeX;
         int sizeY;
@@ -45,7 +51,7 @@ namespace resource {
         // @scaledVoxels  - optimization using scaled voxels
         // @return  - pointer to Mesh or nullptr
         //
-        virtual void getOrLoadVoxelMesh(const char *voxPath, bool scaledVoxels, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
                 
     public:
         virtual ~MeshProvider() = default;

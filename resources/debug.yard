@@ -26,6 +26,11 @@ square 1003 {
     link 1 1002
 }
 
+thing 2000 {
+    model "meshes/dev/cube"
+    position 0 0 0
+}
+
 object "player" {
     model "models/characters/knight"
     center 2.0 0.0 2.0
