@@ -21,6 +21,7 @@ namespace voxel {
     class YardFacility {
     public:
         virtual const foundation::PlatformInterfacePtr &getPlatform() const = 0;
+        virtual const foundation::RenderingInterfacePtr &getRendering() const = 0;
         virtual const resource::MeshProviderPtr &getMeshProvider() const = 0;
         virtual const resource::TextureProviderPtr &getTextureProvider() const = 0;
         virtual const SceneInterfacePtr &getScene() const = 0;
@@ -39,7 +40,6 @@ namespace voxel {
             NONE = 0,
             LOADING,
             LOADED,
-            PREPARING,
             RENDERING,
         };
         

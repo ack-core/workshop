@@ -12,10 +12,11 @@ namespace ui {
     }
     
     void ImageImpl::setBaseTexture(const char *texturePath) {
-        _facility.getTextureProvider()->getOrLoad2DTexture(texturePath, [weak = weak_from_this(), path = std::string(texturePath)](const foundation::RenderTexturePtr &texture) {
+        std::string path = texturePath;
+        _facility.getTextureProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const std::unique_ptr<std::uint8_t[]> &data, std::uint32_t w, std::uint32_t h) {
             if (std::shared_ptr<ImageImpl> self = weak.lock()) {
-                if (texture->getWidth() == int(self->_size.x) && texture->getHeight() == int(self->_size.y)) {
-                    self->_baseTexture = texture;
+                if (w == int(self->_size.x) && h == int(self->_size.y)) {
+                    self->_baseTexture = self->_facility.getRendering()->createTexture(foundation::RenderTextureFormat::RGBA8UN, w, h, {data.get()});
                 }
                 else {
                     self->_facility.getPlatform()->logError("[ImageImpl::setActionTexture] Texture '%s' doesn't fit image size\n", path.data());
@@ -25,10 +26,11 @@ namespace ui {
     }
     
     void ImageImpl::setActionTexture(const char *texturePath) {
-        _facility.getTextureProvider()->getOrLoad2DTexture(texturePath, [weak = weak_from_this(), path = std::string(texturePath)](const foundation::RenderTexturePtr &texture) {
+        std::string path = texturePath;
+        _facility.getTextureProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const std::unique_ptr<std::uint8_t[]> &data, std::uint32_t w, std::uint32_t h) {
             if (std::shared_ptr<ImageImpl> self = weak.lock()) {
-                if (texture->getWidth() == int(self->_size.x) && texture->getHeight() == int(self->_size.y)) {
-                    self->_actionTexture = texture;
+                if (w == int(self->_size.x) && h == int(self->_size.y)) {
+                    self->_actionTexture = self->_facility.getRendering()->createTexture(foundation::RenderTextureFormat::RGBA8UN, w, h, {data.get()});
                 }
                 else {
                     self->_facility.getPlatform()->logError("[ImageImpl::setActionTexture] Texture '%s' doesn't fit image size\n", path.data());

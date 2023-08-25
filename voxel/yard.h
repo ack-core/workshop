@@ -22,6 +22,7 @@ namespace voxel {
     public:
         static std::shared_ptr<YardInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
             const resource::MeshProviderPtr &meshProvider,
             const resource::TextureProviderPtr &textureProvider,
             const SceneInterfacePtr &scene

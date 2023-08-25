@@ -51,7 +51,7 @@ int main(int argc, const char * argv[]) {
         auto textureProvider = resource::TextureProvider::instance(platform, rendering, texturesList.data());
         auto fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(ttfData), std::uint32_t(ttfSize));
         auto scene = voxel::SceneInterface::instance(platform, rendering, textureProvider, "palette");
-        auto yard = voxel::YardInterface::instance(platform, meshProvider, textureProvider, scene);
+        auto yard = voxel::YardInterface::instance(platform, rendering, meshProvider, textureProvider, scene);
         auto ui = ui::StageInterface::instance(platform, rendering, textureProvider, fontAtlasProvider);
         auto datahub = dh::DataHub::instance(platform, game::datahub);
         auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);

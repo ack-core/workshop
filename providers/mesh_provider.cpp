@@ -18,7 +18,6 @@ namespace resource {
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         std::unordered_map<std::string, MeshInfo> _meshInfos;
         std::unordered_map<std::string, std::unique_ptr<VoxelMesh>> _meshes;
-        std::unique_ptr<VoxelMesh> _empty;
         
         struct QueueEntry {
             MeshOptimization optimization;

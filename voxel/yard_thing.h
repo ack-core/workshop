@@ -13,7 +13,7 @@ namespace voxel {
         ~YardThing() override;
 
     public:
-        void updateState(State targetState) override;
+        void updateState(YardStatic::State targetState) override;
         
     private:
         const std::string _modelPath;

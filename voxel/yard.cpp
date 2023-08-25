@@ -20,11 +20,18 @@ namespace {
 namespace voxel {
     class YardImpl : public std::enable_shared_from_this<YardImpl>, public YardInterface, public YardFacility, public YardCollision {
     public:
-        YardImpl(const foundation::PlatformInterfacePtr &platform, const resource::MeshProviderPtr &meshProvider, const resource::TextureProviderPtr &textureProvider, const SceneInterfacePtr &scene);
+        YardImpl(
+            const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
+            const resource::MeshProviderPtr &meshProvider,
+            const resource::TextureProviderPtr &textureProvider,
+            const SceneInterfacePtr &scene
+        );
         ~YardImpl() override;
         
     public:
         const foundation::PlatformInterfacePtr &getPlatform() const override { return _platform; }
+        const foundation::RenderingInterfacePtr &getRendering() const override { return _rendering; }
         const resource::MeshProviderPtr &getMeshProvider() const override { return _meshProvider; }
         const resource::TextureProviderPtr &getTextureProvider() const override { return _textureProvider; }
         const SceneInterfacePtr &getScene() const override { return _scene; }
@@ -43,6 +50,7 @@ namespace voxel {
         
     public:
         const foundation::PlatformInterfacePtr _platform;
+        const foundation::RenderingInterfacePtr _rendering;
         const resource::MeshProviderPtr _meshProvider;
         const resource::TextureProviderPtr _textureProvider;
         const SceneInterfacePtr _scene;
@@ -62,22 +70,25 @@ namespace voxel {
 namespace voxel {
     std::shared_ptr<YardInterface> YardInterface::instance(
         const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
         const resource::MeshProviderPtr &meshProvider,
         const resource::TextureProviderPtr &textureProvider,
         const SceneInterfacePtr &scene
     ) {
-        return std::make_shared<YardImpl>(platform, meshProvider, textureProvider, scene);
+        return std::make_shared<YardImpl>(platform, rendering, meshProvider, textureProvider, scene);
     }
 }
 
 namespace voxel {
     YardImpl::YardImpl(
         const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
         const resource::MeshProviderPtr &meshProvider,
         const resource::TextureProviderPtr &textureProvider,
         const SceneInterfacePtr &scene
     )
     : _platform(platform)
+    , _rendering(rendering)
     , _meshProvider(meshProvider)
     , _textureProvider(textureProvider)
     , _scene(scene)
@@ -146,14 +157,37 @@ namespace voxel {
                             }
                             
                             if (input.fail() == false) {
-                                if (const resource::TextureInfo *info = self->_textureProvider->getTextureInfo(texture.data())) {
+                                if (const resource::TextureInfo *txInfo = self->_textureProvider->getTextureInfo(texture.data())) {
+                                    const resource::TextureInfo *hmInfo = self->_textureProvider->getTextureInfo(heightmap.data());
+                                    
                                     bbox.xmin = position.x - 0.5;
                                     bbox.ymin = position.y - 0.5;
                                     bbox.zmin = position.z - 0.5;
-                                    bbox.xmax = bbox.xmin + info->width;
+                                    bbox.xmax = bbox.xmin + txInfo->width;
                                     bbox.ymax = bbox.ymin + 1.0;
-                                    bbox.zmax = bbox.zmin + info->height;
-                                    self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
+                                    bbox.zmax = bbox.zmin + txInfo->height;
+                                    
+                                    if (heightmap[0]) {
+                                        if (hmInfo) {
+                                            if (txInfo->type == resource::TextureInfo::Type::RGBA8 && hmInfo->type == resource::TextureInfo::Type::GRAYSCALE8) {
+                                                if (txInfo->width == hmInfo->width + 1 && txInfo->height == hmInfo->height + 1) {
+                                                    self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
+                                                }
+                                                else {
+                                                    platform->logError("[YardImpl::loadYard] texture and heightmap doesn't fit each other for square with id = '%zu'\n", id);
+                                                }
+                                            }
+                                            else {
+                                                platform->logError("[YardImpl::loadYard] texture or heightmap has bad format for square with id = '%zu'\n", id);
+                                            }
+                                        }
+                                        else {
+                                            platform->logError("[YardImpl::loadYard] heightmap '%s' for square with id = '%zu' has no info\n", heightmap.data(), id);
+                                        }
+                                    }
+                                    else {
+                                        self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::string()));
+                                    }
                                 }
                                 else {
                                     platform->logError("[YardImpl::loadYard] texture '%s' for square with id = '%zu' has no info\n", texture.data(), id);

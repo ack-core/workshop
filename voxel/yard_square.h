@@ -25,6 +25,8 @@ namespace voxel {
         
         foundation::RenderTexturePtr _texture;
         std::unique_ptr<std::uint8_t[]> _heightmap;
+        std::vector<SceneInterface::VTXNRMUV> _vertices;
+        std::vector<std::uint32_t> _indices;
         
         SceneInterface::TexturedModelPtr _model;
         SceneInterface::BoundingBoxPtr _bboxmdl;
