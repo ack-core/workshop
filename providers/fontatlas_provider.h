@@ -36,6 +36,10 @@ namespace resource {
         //
         virtual void getTextFontAtlas(const char *text, std::uint8_t size, util::callback<void(std::vector<FontCharInfo> &&)> &&completion) = 0;
         
+        // Provider tracks resources life time and tries to free them
+        //
+        virtual void update(float dtSec) = 0;
+        
     public:
         virtual ~FontAtlasProvider() = default;
     };

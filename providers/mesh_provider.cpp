@@ -13,6 +13,7 @@ namespace resource {
         
         const MeshInfo *getMeshInfo(const char *voxPath) override;
         void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
+        void update(float dtSec) override;
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
@@ -398,12 +399,6 @@ namespace resource {
                                 else {
                                     completion(nullptr);
                                 }
-                                
-                                while (self->_asyncInProgress == false && self->_callsQueue.size()) {
-                                    QueueEntry &entry = self->_callsQueue.front();                                    
-                                    self->getOrLoadVoxelMesh(entry.voxPath.data(), entry.optimization, std::move(entry.callback));
-                                    self->_callsQueue.pop_front();
-                                }
                             }
                         }));
                     }
@@ -413,6 +408,14 @@ namespace resource {
                     }
                 }
             });
+        }
+    }
+    
+    void MeshProviderImpl::update(float dtSec) {
+        while (_asyncInProgress == false && _callsQueue.size()) {
+            QueueEntry &entry = _callsQueue.front();
+            getOrLoadVoxelMesh(entry.voxPath.data(), entry.optimization, std::move(entry.callback));
+            _callsQueue.pop_front();
         }
     }
 }

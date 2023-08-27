@@ -32,8 +32,8 @@ namespace {
     };
     
     std::list<Handler> g_pointerHandlers;
-    std::vector<std::unique_ptr<foundation::AsyncTask>> g_ioForegroundQueue;
-    std::mutex g_ioMutex;
+    std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
+    std::mutex g_foregroundMutex;
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
@@ -95,11 +95,11 @@ namespace {
         static std::vector<std::unique_ptr<foundation::AsyncTask>> foregroundQueue;
         
         {
-            std::unique_lock<std::mutex> guard(g_ioMutex);
-            for (auto &task : g_ioForegroundQueue) {
+            std::unique_lock<std::mutex> guard(g_foregroundMutex);
+            for (auto &task : g_foregroundQueue) {
                 foregroundQueue.emplace_back(std::move(task));
             }
-            g_ioForegroundQueue.clear();
+            g_foregroundQueue.clear();
         }
         
         for (auto &task : foregroundQueue) {
@@ -288,32 +288,34 @@ namespace foundation {
     }
     
     IOSPlatform::~IOSPlatform() {
-        _ioNotifier.notify_one();
-        _ioThread.join();
+        _io.notifier.notify_one();
+        _io.thread.join();
+        _worker.notifier.notify_one();
+        _worker.thread.join();
     }
     
     void IOSPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
         {
-            std::lock_guard<std::mutex> guard(g_ioMutex);
-            _ioBackgroundQueue.emplace_back(std::move(task));
+            std::lock_guard<std::mutex> guard(_io.mutex);
+            _io.queue.emplace_back(std::move(task));
         }
-        _ioNotifier.notify_one();
+        _io.notifier.notify_one();
     }
     
     void IOSPlatform::formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) {
         {
-            std::lock_guard<std::mutex> guard(g_ioMutex);
-            _ioBackgroundQueue.emplace_back(std::make_unique<FileListTask>((_executableDirectoryPath + "/" + dirPath).data(), std::move(completion)));
+            std::lock_guard<std::mutex> guard(_io.mutex);
+            _io.queue.emplace_back(std::make_unique<FileListTask>((_executableDirectoryPath + "/" + dirPath).data(), std::move(completion)));
         }
-        _ioNotifier.notify_one();
+        _io.notifier.notify_one();
     }
     
     void IOSPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) {
         {
-            std::lock_guard<std::mutex> guard(g_ioMutex);
-            _ioBackgroundQueue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));
+            std::lock_guard<std::mutex> guard(_io.mutex);
+            _io.queue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));
         }
-        _ioNotifier.notify_one();
+        _io.notifier.notify_one();
     }
     
     bool IOSPlatform::loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) {
@@ -379,30 +381,8 @@ namespace foundation {
     void IOSPlatform::run(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
         
-        _ioThread = std::thread([this](){
-            logMsg("[PLATFORM] IO Thread started\n");
-            
-            while (g_instance.use_count() != 0) {
-                std::unique_ptr<AsyncTask> task = nullptr;
-                
-                {
-                    std::unique_lock<std::mutex> guard(g_ioMutex);
-                    
-                    while (_ioBackgroundQueue.empty()) {
-                        _ioNotifier.wait(guard);
-                    }
-                    
-                    task = std::move(_ioBackgroundQueue.front());
-                    _ioBackgroundQueue.pop_front();
-                }
-                
-                if (task) {
-                    task->executeInBackground();
-                    std::unique_lock<std::mutex> guard(g_ioMutex);
-                    g_ioForegroundQueue.emplace_back(std::move(task));
-                }
-            }
-        });
+        _io.thread = std::thread(&IOSPlatform::_backgroundThreadLoop, this, std::ref(_io));
+        _worker.thread = std::thread(&IOSPlatform::_backgroundThreadLoop, this, std::ref(_worker));
         
         @autoreleasepool {
             char *argv[] = {0};
@@ -435,6 +415,31 @@ namespace foundation {
         
         printf("%s\n", g_buffer);
         __builtin_debugtrap();
+    }
+    
+    void IOSPlatform::_backgroundThreadLoop(BackgroundThread &threadData) {
+        logMsg("[PLATFORM] Background Thread started");
+        
+        while (g_instance.use_count() != 0) {
+            std::unique_ptr<AsyncTask> task = nullptr;
+            
+            {
+                std::unique_lock<std::mutex> guard(threadData.mutex);
+                
+                while (threadData.queue.empty()) {
+                    threadData.notifier.wait(guard);
+                }
+                
+                task = std::move(threadData.queue.front());
+                threadData.queue.pop_front();
+            }
+            
+            if (task) {
+                task->executeInBackground();
+                std::unique_lock<std::mutex> guard(g_foregroundMutex);
+                g_foregroundQueue.emplace_back(std::move(task));
+            }
+        }
     }
 }
 

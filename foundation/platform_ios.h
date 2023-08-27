@@ -41,14 +41,23 @@ namespace foundation {
         
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;
-        
+
     private:
         std::mutex _logMutex;
         std::string _executableDirectoryPath;
 
     private:
-        std::thread _ioThread;
-        std::condition_variable _ioNotifier;
-        std::list<std::unique_ptr<AsyncTask>> _ioBackgroundQueue;
+        struct BackgroundThread {
+            std::thread thread;
+            std::mutex mutex;
+            std::condition_variable notifier;
+            std::list<std::unique_ptr<AsyncTask>> queue;
+        };
+        
+        BackgroundThread _io;
+        BackgroundThread _worker;
+
+    private:
+        void _backgroundThreadLoop(BackgroundThread &data);
     };
 }

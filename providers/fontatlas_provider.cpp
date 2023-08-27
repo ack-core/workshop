@@ -47,6 +47,7 @@ namespace resource {
         
         float getTextWidth(const char *text, std::uint8_t size) const override;
         void getTextFontAtlas(const char *text, std::uint8_t size, util::callback<void(std::vector<FontCharInfo> &&)> &&completion) override;
+        void update(float dtSec) override;
         
     private:
         std::uint32_t _calculateAtlasSize(std::uint32_t atlasStart, std::uint32_t fontSize);
@@ -273,18 +274,18 @@ namespace resource {
 
                     self->_asyncInProgress = false;
                     self->getTextFontAtlas(txt.data(), size, std::move(completion));
-                    
-                    while (self->_asyncInProgress == false && self->_callsQueue.size()) {
-                        QueueEntry &entry = self->_callsQueue.front();                        
-                        self->getTextFontAtlas(entry.text.data(), entry.size, std::move(entry.callback));
-                        self->_callsQueue.pop_front();
-                    }
                 }
             }));
         }
     }
     
-    
+    void FontAtlasProviderImpl::update(float dtSec) {
+        while (_asyncInProgress == false && _callsQueue.size()) {
+            QueueEntry &entry = _callsQueue.front();
+            getTextFontAtlas(entry.text.data(), entry.size, std::move(entry.callback));
+            _callsQueue.pop_front();
+        }
+    }
 }
 
 namespace resource {

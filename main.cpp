@@ -2,12 +2,11 @@
 // Main TODO:
 // + python tools: png -> vox, png -> png + palette, 2x large png -> .yard + pngs
 // + dh to scene
-// + meshProvider/textureProvider need 'update' to remove resources
+// + \n at the end of logMsg
 // plan:
-// + YardThing
 // + palette
 // + tool png -> png + palette
-// + ui
+//
 
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
@@ -57,6 +56,9 @@ int main(int argc, const char * argv[]) {
         auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);
         
         platform->run([&](float dtSec) {
+            textureProvider->update(dtSec);
+            meshProvider->update(dtSec);
+            fontAtlasProvider->update(dtSec);
             states->update(dtSec);
             datahub->update(dtSec);
             yard->update(dtSec);
@@ -67,6 +69,7 @@ int main(int argc, const char * argv[]) {
         
         ui->clear();
         
+        // TODO: errors if destruction is not happened
         states = nullptr;
         yard = nullptr;
         scene = nullptr;
