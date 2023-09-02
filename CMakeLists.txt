@@ -71,12 +71,28 @@ set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY_RELEASE "${m_sour
 
 # resources
 
+get_filename_component(m_tools_root "${PROJECT_SOURCE_DIR}/tools" ABSOLUTE)
 get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLUTE)
 get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary" ABSOLUTE)
 get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}" ABSOLUTE)
 
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.list" PATTERN "*.ttf" PATTERN "*.png" PATTERN "*.yard" PATTERN "*.vox")
+
+file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.ttf")
+file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
+file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.yard")
+file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
+
+message(STATUS "Generating resource lists...")
+execute_process(
+	COMMAND python ${m_tools_root}/resource_list.py -r ${m_resources_root} -e .png -d ${m_binary_root}/data/textures.list
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+execute_process(
+	COMMAND python ${m_tools_root}/resource_list.py -r ${m_resources_root} -e .vox -d ${m_binary_root}/data/meshes.list
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
 
 # specific
 
