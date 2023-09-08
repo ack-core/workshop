@@ -1,0 +1,3 @@
+resources/** linguist-vendored
+docs/** linguist-documentation
+tools/*.py linguist-detectable
