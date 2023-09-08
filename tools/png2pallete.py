@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Tool to correct a png in accordance with palette
 """
@@ -43,7 +45,7 @@ def main(file: str, palette: str, material: int, mask: str):
 
         file_img[pixel_start:pixel_end] = array('B', color)
 
-    with open(file + "1", 'wb') as f:
+    with open(file.replace(".png", "_corrected.png"), 'wb') as f:
         writer = png.Writer(width=file_w, height=file_h, greyscale=False, alpha=True)
         writer.write_array(f, pixels=file_img)
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Tool to make engine resources list
 Example of output:
@@ -33,7 +35,7 @@ def list_png(root: str, file: str, out: typing.BinaryIO):
                 if color_type in color_types:
                     file = file.replace(".png", "")
                     msg = "{} {} {} {}\r\n".format(file, color_types[color_type], w, h)
-                    print(msg, end="")
+                    print("---->", msg, end="")
                     out.write(msg.encode("utf-8"))
 
         except (Exception,):
@@ -68,7 +70,7 @@ def list_vox(root: str, file: str, out: typing.BinaryIO):
 
             file = file.replace(".vox", "")
             msg = "{} {} {} {}\r\n".format(file, mx, my, mz)
-            print(msg, end="")
+            print("---->", msg, end="")
             out.write(msg.encode("utf-8"))
 
 def main(root: str, dst: str, ext: str):
