@@ -40,6 +40,7 @@ namespace voxel {
         void correctMovement(const math::vector3f &position, math::vector3f &movement) const override;
         
     public:
+        void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) override;
         void loadYard(const char *src, util::callback<void(bool loaded)> &&completion) override;
         auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> override;
         void update(float dtSec) override;
@@ -102,6 +103,10 @@ namespace voxel {
     
     void YardImpl::correctMovement(const math::vector3f &position, math::vector3f &movement) const {
         // collide
+    }
+    
+    void YardImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &target) {
+        _scene->setCameraLookAt(position, target);
     }
     
     void YardImpl::loadYard(const char *sourcepath, util::callback<void(bool loaded)> &&completion) {

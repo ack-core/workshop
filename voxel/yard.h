@@ -42,6 +42,8 @@ namespace voxel {
         };
         
     public:
+        virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) = 0;
+        
         // Yard source format:
         // s--------------------------------------
         // options {

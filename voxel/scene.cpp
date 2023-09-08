@@ -135,8 +135,6 @@ namespace voxel {
         foundation::RenderShaderPtr _dynamicMeshShader;
         foundation::RenderShaderPtr _axisShader;
         
-        //foundation::RenderDataPtr _testVoxelData;
-        
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<StaticModelImpl>> _staticMeshes;
         std::vector<std::shared_ptr<TexturedModelImpl>> _texturedMeshes;
@@ -164,22 +162,6 @@ namespace {
             output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
         }
     )";
-
-/*
-            axs[7] : float3 = [0.0, 0.0, 0.0][0.0, 0.0, -1.0][-1.0, 0.0, 0.0][0.0, -1.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][0.0, 1.0, 0.0]
-            bnm[7] : float3 = [0.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0][1.0, 0.0, 0.0][0.0, 0.0, 1.0][1.0, 0.0, 0.0]
-            tgt[7] : float3 = [0.0, 0.0, 0.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0][0.0, 1.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]
-
-                [0.5, -0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0]
-                [0.5, -0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0]
-
-                [0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
-                [0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0]
- */
 
     const char *g_staticMeshShaderSrc = R"(
         fixed {
@@ -211,7 +193,7 @@ namespace {
             //float3 dirB = fixed_bnm[faceIndex];
             //float3 dirT = fixed_tgt[faceIndex];
             
-            output_tmp = float4(1.0, 1.0, 1.0, 1.0); //float4(float(faceIndex) / 6.0, 0.0, 0.0, 1.0);  //
+            output_tmp = float4(float(faceIndex) / 6.0, 0.0, 0.0, 1.0);  //float4(1.0, 1.0, 1.0, 1.0); //
             output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
@@ -331,17 +313,7 @@ namespace voxel {
                 {"color", foundation::RenderShaderInputFormat::BYTE4},
             }
         );
-        
-//        struct VoxelData {
-//            std::int16_t x, y, z, m;
-//        }
-//        voxelData[2] = {
-//            {8, 0, 8, 0b0111110},
-//            {8, 2, 8, 0b1010110},
-//        };
-//
-//        _testVoxelData = rendering->createData(voxelData, 2, sizeof(VoxelData));
-        
+                
         _shaderConstants.observingPointAndRadius = math::vector4f(0.0, 0.0, 0.0, 32.0);
         _shaderConstants.sunColorAndPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
         _shaderConstants.sunDirection = math::vector4f(math::vector3f(0.2, 1.0, 0.3).normalized(), 1.0f);
@@ -462,24 +434,14 @@ namespace voxel {
     
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         cleanupUnused(_boundingBoxes);
-        //cleanupUnused(_staticMeshes);
+        cleanupUnused(_staticMeshes);
         cleanupUnused(_texturedMeshes);
         cleanupUnused(_dynamicMeshes);
         
         _rendering->updateFrameConstants(_camera.viewMatrix.flat16, _camera.projMatrix.flat16, _camera.position.flat3, _camera.forward.flat3);
-        _drawAxis();
+        //_drawAxis();
 
-//        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
-//        _rendering->drawGeometry(nullptr, _testVoxelData, 12, _testVoxelData->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
-        
-        
-
-        _rendering->applyState(_boundingBoxShader, foundation::RenderPassCommonConfigs::DEFAULT());
-        for (const auto &boundingBox : _boundingBoxes) {
-            _rendering->drawGeometry(boundingBox->lines, 24, foundation::RenderTopology::LINES);
-        }
-
-        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::CLEAR(0.0, 0.0, 0.0));
         for (const auto &staticMesh : _staticMeshes) {
             _rendering->drawGeometry(nullptr, staticMesh->voxels, 12, staticMesh->voxels->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
         }
@@ -489,6 +451,12 @@ namespace voxel {
             _rendering->applyTextures(&texturedMesh->texture, 1);
             _rendering->drawGeometry(texturedMesh->vertices, texturedMesh->indices, texturedMesh->indices->getCount(), foundation::RenderTopology::TRIANGLES);
         }
+        
+        _rendering->applyState(_boundingBoxShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        for (const auto &boundingBox : _boundingBoxes) {
+            _rendering->drawGeometry(boundingBox->lines, 24, foundation::RenderTopology::LINES);
+        }
+        
 //
 //        _rendering->applyState(_dynamicMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
 //        for (const auto &dynamicModel : _dynamicModels) {
@@ -497,7 +465,7 @@ namespace voxel {
 //            _rendering->drawGeometry(nullptr, dynamicModel->voxels, 18, dynamicModel->voxels->getCount(), foundation::RenderTopology::TRIANGLES);
 //        }
     }
-        
+    
     void SceneInterfaceImpl::_drawAxis() {
         static const char *axisShaderSrc = R"(
             fixed {
