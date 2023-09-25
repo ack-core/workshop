@@ -1,6 +1,7 @@
 
 #pragma once
 #include "platform.h"
+#include "math.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -155,6 +156,13 @@ namespace foundation {
                 ZBehaviorType::DISABLED, blendType,
             };
         }
+        static const RenderPassConfig OVERLAY(BlendType blendType, ZBehaviorType zBehaviorType) {
+            return RenderPassConfig {
+                nullptr, false, false,
+                {0, 0, 0, 0}, 0.0f,
+                zBehaviorType, blendType,
+            };
+        }
     };
     
     // Interface provides 3D-visualization methods
@@ -171,11 +179,14 @@ namespace foundation {
         //
         virtual void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) = 0;
         
-        // Get current frame constants
-        // Matrices are row-major
+        // Get screen coords from world position
         //
-        virtual void getFrameConstants(float(&view)[16], float(&proj)[16], float(&camPos)[3], float(&camDir)[3]) = 0;
-        
+        virtual auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f = 0;
+
+        // Get ray direction from screen coords (start point is camera position)
+        //
+        virtual auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f = 0;
+
         // Create shader from source text
         // @name      - name that is used in error messages
         // @vtx       - input layout for vertex shader. All such variables have 'vertex_' prefix.

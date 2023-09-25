@@ -1,5 +1,6 @@
 #pragma once
 
+// TODO: refine all ops to v4f if possible
 // TODO: +=, *=, etc
 // TODO: xOz
 // TODO: at(index, index) -> xy
@@ -1830,6 +1831,24 @@ namespace math
     static_assert(sizeof(transform3f) == 16 * sizeof(scalar), "layout error");
 }
 
+namespace math {
+    // Assuming @dir and @planeNormal are normalised
+    //
+    inline bool linePlaneIntersect(const vector3f &origin, const vector3f &dir, const vector3f &planeRef, const vector3f &planeNormal, vector3f &out) {
+        float d = planeRef.dot(planeNormal);
+        float n = dir.dot(planeNormal);
 
+        if (std::fabs(n) > std::numeric_limits<float>::epsilon()) {
+            float k = (d - origin.dot(planeNormal)) / n;
+            
+            if (k > 0.0f) {
+                out = origin + k * dir;
+                return true;
+            }
+        }
+        
+        return false;
+    }
+}
 
 

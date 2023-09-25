@@ -1,4 +1,6 @@
 
+// TODO: screen safe zones
+
 #pragma once
 #include "util.h"
 

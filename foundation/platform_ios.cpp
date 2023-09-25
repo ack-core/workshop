@@ -66,7 +66,8 @@ namespace {
         _window.rootViewController = _controller;
         
         CGRect frame = UIScreen.mainScreen.bounds;
-        g_nativeScreenScale = UIScreen.mainScreen.nativeScale;
+
+        g_nativeScreenScale = UIScreen.mainScreen.scale;
         g_nativeScreenWidth = frame.size.width * g_nativeScreenScale;
         g_nativeScreenHeight = frame.size.height * g_nativeScreenScale;
         
@@ -176,6 +177,8 @@ namespace {
         args.pointerID = std::size_t(item);
         args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
+        
+        printf("--->> %f %f\n", args.coordinateX, args.coordinateY);
         
         for (auto &index : g_pointerHandlers) {
             if (index.handler(args)) {

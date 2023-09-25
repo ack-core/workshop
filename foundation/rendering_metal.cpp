@@ -65,6 +65,7 @@ namespace {
     
     std::uint32_t roundTo256(std::uint32_t value) {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
+        //std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(63)) + 64;
         return result;
     }
     
@@ -292,6 +293,7 @@ namespace foundation {
             
             _device = MTLCreateSystemDefaultDevice();
             _commandQueue = [_device newCommandQueue];
+            _constBufferSemaphore = dispatch_semaphore_create(CONSTANT_BUFFER_FRAMES_MAX);
             
             MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
             depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
@@ -319,11 +321,37 @@ namespace foundation {
         ::memcpy(_frameConstants.cameraDirection, camDir, 3 * sizeof(float));
     }
     
-    void MetalRendering::getFrameConstants(float(&view)[16], float(&proj)[16], float(&camPos)[3], float(&camDir)[3]) {
-        ::memcpy(view, _frameConstants.viewMatrix, 16 * sizeof(float));
-        ::memcpy(proj, _frameConstants.projMatrix, 16 * sizeof(float));
-        ::memcpy(camPos, _frameConstants.cameraPosition, 3 * sizeof(float));
-        ::memcpy(camDir, _frameConstants.cameraDirection, 3 * sizeof(float));
+    math::vector2f MetalRendering::getScreenCoordinates(const math::vector3f &worldPosition) {
+        const math::transform3f &view = *reinterpret_cast<const math::transform3f *>(_frameConstants.viewMatrix);
+        const math::transform3f &proj = *reinterpret_cast<const math::transform3f *>(_frameConstants.projMatrix);
+        const math::transform3f vp = view * proj;
+        math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
+        
+        tpos = tpos.transformed(vp);
+        tpos.x /= tpos.w;
+        tpos.y /= tpos.w;
+        tpos.z /= tpos.w;
+        
+        math::vector2f result = math::vector2f(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
+        
+        if (tpos.z > 0.0f) {
+            result.x = (tpos.x + 1.0f) * 0.5f * _platform->getScreenWidth();
+            result.y = (1.0f - tpos.y) * 0.5f * _platform->getScreenHeight();
+        }
+        
+        return result;
+    }
+    
+    math::vector3f MetalRendering::getWorldDirection(const math::vector2f &screenPosition) {
+        const math::transform3f &view = *reinterpret_cast<const math::transform3f *>(_frameConstants.viewMatrix);
+        const math::transform3f &proj = *reinterpret_cast<const math::transform3f *>(_frameConstants.projMatrix);
+        const math::transform3f inv = (view * proj).inverted();
+        
+        float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
+        float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
+        
+        const math::vector4f worldPos = math::vector4f(relScreenPosX, relScreenPosY, 0.0f, 1.0f).transformed(inv);
+        return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
     namespace shaderUtils {
@@ -751,7 +779,11 @@ namespace foundation {
                 replacePattern(codeBlock, "const_", "constants.", "._");
                 replacePattern(codeBlock, "input_", "input.", "._");
                 nativeShader += codeBlock;
-                nativeShader += "    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n}\n";
+                nativeShader += "    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";
+                nativeShader += "    (void)fragment_coord;\n";
+                nativeShader += "    (void)_nearestSampler;\n";
+                nativeShader += "    (void)_linearSampler;\n";
+                nativeShader += "}\n";
                 fssrcBlockDone = true;
                 continue;
             }
@@ -908,18 +940,23 @@ namespace foundation {
         if (_view) {
             if (_currentCommandBuffer == nil) {
                 _currentCommandBuffer = [_commandQueue commandBuffer];
+
+                dispatch_semaphore_wait(_constBufferSemaphore, DISPATCH_TIME_FOREVER);
+                _constantsBuffersIndex = (_constantsBuffersIndex + 1) % CONSTANT_BUFFER_FRAMES_MAX;
+                _constantsBufferOffset = 0;
             }
 
             MTLClearColor clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
-            MTLLoadAction loadAction = cfg.clearColorEnabled ? MTLLoadActionClear : MTLLoadActionDontCare;
+            MTLLoadAction loadAction = cfg.clearColorEnabled ? MTLLoadActionClear : MTLLoadActionLoad;
             
-            _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+            _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor]; //_view.currentRenderPassDescriptor;//
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
-            _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionDontCare;
+            _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
             _currentPassDescriptor.colorAttachments[0].loadAction = loadAction;
             _currentPassDescriptor.colorAttachments[0].clearColor = clearColor;
             _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
-            _currentPassDescriptor.depthAttachment.loadAction = cfg.clearDepthEnabled ? MTLLoadActionClear : MTLLoadActionDontCare;
+            _currentPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+            _currentPassDescriptor.depthAttachment.loadAction = cfg.clearDepthEnabled ? MTLLoadActionClear : MTLLoadActionLoad;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
             
             if (cfg.target) {
@@ -932,6 +969,7 @@ namespace foundation {
                 
                 if (cfg.target->hasDepthBuffer() == false) {
                     _currentPassDescriptor.depthAttachment.texture = nil;
+                    _currentPassDescriptor.depthAttachment.loadAction = cfg.clearDepthEnabled ? MTLLoadActionClear : MTLLoadActionLoad;
                 }
             }
             
@@ -980,8 +1018,8 @@ namespace foundation {
             _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
 
             if (state) {
-                double rtWidth = _view.currentDrawable.texture.width;
-                double rtHeight = _view.currentDrawable.texture.height;
+                double rtWidth = _platform->getScreenWidth();// _view.currentDrawable.texture.width; //
+                double rtHeight = _platform->getScreenHeight(); //_view.currentDrawable.texture.height; //
                 
                 if (cfg.target) {
                     rtWidth = double(cfg.target->getWidth());
@@ -989,7 +1027,7 @@ namespace foundation {
                 }
                 
                 _frameConstants.rtBounds[0] = rtWidth;
-                _frameConstants.rtBounds[1] = rtHeight;                
+                _frameConstants.rtBounds[1] = rtHeight;
                 
                 _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), 3, 1);
 
@@ -1073,7 +1111,7 @@ namespace foundation {
             NSUInteger offsets[2] = {0, 0};
             NSRange vrange {0, 2};
             
-            [_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
+            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
             [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
             [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
         }
@@ -1086,40 +1124,28 @@ namespace foundation {
             _currentShader = nullptr;
         }
         if (_view && _currentCommandBuffer) {
-            const std::uint32_t bufferIndex = _constantsBuffersIndex;
             MetalRendering *m = this;
+            
             [_currentCommandBuffer presentDrawable:_view.currentDrawable];
             [_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
-                m->_constantsBuffersInUse[bufferIndex] = false;
+                dispatch_semaphore_signal(m->_constBufferSemaphore);
             }];
             [_currentCommandBuffer commit];
             _currentCommandBuffer = nil;
-
-            _constantsBuffersInUse[_constantsBuffersIndex] = true;
-            _constantsBufferOffset = 0;
-            
-            for (std::uint32_t i = 0; i < CONSTANT_BUFFER_FRAMES_MAX; i++) {
-                if (_constantsBuffersInUse[_constantsBuffersIndex] == false) {
-                    _constantsBuffersIndex = i;
-                    break;
-                }
-            }
-
-            if (_constantsBuffersIndex >= CONSTANT_BUFFER_FRAMES_MAX) {
-                _platform->logError("[MetalRendering::presentFrame] Global constant buffer in flight\n");
-            }
         }
     }
     
     void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex) {
-        if (_constantsBufferOffset + size < CONSTANT_BUFFER_OFFSET_MAX) {
+        std::uint32_t roundedSize = roundTo256(size);
+        
+        if (_constantsBufferOffset + roundedSize < CONSTANT_BUFFER_OFFSET_MAX) {
             std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
             std::memcpy(constantsMemory + _constantsBufferOffset, buffer, size);
             
             [_currentRenderCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:vIndex];
             [_currentRenderCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:fIndex];
             
-            _constantsBufferOffset+= roundTo256(sizeof(FrameConstants));
+            _constantsBufferOffset+= roundedSize;
             return true;
         }
         else {

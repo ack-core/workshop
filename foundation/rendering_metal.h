@@ -118,7 +118,9 @@ namespace foundation {
         ~MetalRendering() override;
         
         void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) override;
-        void getFrameConstants(float(&view)[16], float(&proj)[16], float(&camPos)[3], float(&camDir)[3]) override;
+        
+        auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
+        auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
         
         RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
@@ -142,7 +144,7 @@ namespace foundation {
         void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex);
         
         static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
-        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024 * 16;
+        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024 * 4;
         
         struct FrameConstants {
             float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // view matrix
@@ -158,6 +160,7 @@ namespace foundation {
         
         id<MTLDevice> _device = nil;
         id<MTLCommandQueue> _commandQueue = nil;
+        dispatch_semaphore_t _constBufferSemaphore;
         
         std::unordered_set<std::string> _shaderNames;
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _renderPipelineStates;
@@ -171,7 +174,6 @@ namespace foundation {
         id<MTLComputeCommandEncoder> _currentComputeCommandEncoder = nil;
         MTLRenderPassDescriptor *_currentPassDescriptor = nil;
         
-        bool _constantsBuffersInUse[CONSTANT_BUFFER_FRAMES_MAX] = {false};
         id<MTLBuffer> _constantsBuffers[CONSTANT_BUFFER_FRAMES_MAX];
         std::uint32_t _constantsBuffersIndex = 0;
         std::uint32_t _constantsBufferOffset = 0;
