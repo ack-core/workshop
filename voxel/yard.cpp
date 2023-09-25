@@ -94,7 +94,7 @@ namespace voxel {
     , _textureProvider(textureProvider)
     , _scene(scene)
     , _partial(false)
-    {
+    {    
     }
     
     YardImpl::~YardImpl() {
@@ -275,7 +275,7 @@ namespace voxel {
                         return;
                     }
                     else {
-                        platform->logError("[YardImpl::loadYard] yard '%s' isn't complete\n", yardpath.data());
+                        //platform->logError("[YardImpl::loadYard] yard '%s' isn't complete\n", yardpath.data());
                     }
                 }
                 else {

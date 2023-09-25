@@ -13,7 +13,8 @@ namespace voxel {
     public:
         void attach(const char *helper, const char *type, const math::transform3f &trfm) override;
         void detach(const char *helper) override;
-    
+        bool isHelperOccupied(const char *helper) const override;
+                
         void instantMove(const math::vector3f &position) override;
         void continuousMove(const math::vector3f &increment) override;
         void rotate(const math::vector3f &targetDirection) override;
@@ -21,7 +22,7 @@ namespace voxel {
         const math::vector3f &getPosition() const override;
         const math::vector3f &getDirection() const override;
         
-        void update(float dtSec) override;
+        void update(float dtSec);
         
     private:
         enum class State {

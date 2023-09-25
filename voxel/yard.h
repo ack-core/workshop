@@ -16,7 +16,6 @@
 namespace voxel {
     // TODO:
     // + collision
-    // + object list must be separated from statics
     // + 
     class YardInterface {
     public:
@@ -29,15 +28,25 @@ namespace voxel {
         );
         
     public:
+        struct Square {
+            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual auto getPosition() const -> const math::vector3f & = 0;
+            virtual ~Square() = default;
+        };
+        struct Thing {
+            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual auto getPosition() const -> const math::vector3f & = 0;
+            virtual ~Thing() = default;
+        };
         struct Object {
-            virtual void attach(const char *helper, const char *type, const math::transform3f &trfm) = 0;
+            virtual void attach(const char *helper, const char *model, const math::transform3f &trfm) = 0;
             virtual void detach(const char *helper) = 0;
+            virtual bool isHelperOccupied(const char *helper) const = 0;
             virtual void instantMove(const math::vector3f &position) = 0;
             virtual void continuousMove(const math::vector3f &increment) = 0;
             virtual void rotate(const math::vector3f &targetDirection) = 0;
             virtual auto getPosition() const -> const math::vector3f & = 0;
             virtual auto getDirection() const -> const math::vector3f & = 0;
-            virtual void update(float dtSec) = 0;
             virtual ~Object() = default;
         };
         
@@ -75,6 +84,7 @@ namespace voxel {
         virtual void loadYard(const char *sourcepath, util::callback<void(bool loaded)> &&completion) = 0;
         virtual auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> = 0;
         virtual void update(float dtSec) = 0;
+        
         
     public:
         virtual ~YardInterface() = default;

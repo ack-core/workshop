@@ -20,26 +20,7 @@ namespace ui {
                 _globalPosition = _screenPosition;
             }
             else if (_state == CoordinateState::WORLD) {
-                math::transform3f view, proj;
-                math::vector3f camPos, camDir;
-                
-                _facility.getRendering()->getFrameConstants(view.flat16, proj.flat16, camPos.flat3, camDir.flat3);
-                
-                math::transform3f vp = view * proj;
-                math::vector4f tpos = math::vector4f(_worldPosition, 1.0f);
-
-                tpos = tpos.transformed(vp);
-                tpos.x /= tpos.w;
-                tpos.y /= tpos.w;
-                tpos.z /= tpos.w;
-                
-                if (tpos.z > 0.0f) {
-                    _globalPosition.x = (tpos.x + 1.0f) * 0.5f * _facility.getRendering()->getBackBufferWidth();
-                    _globalPosition.y = (1.0f - tpos.y) * 0.5f * _facility.getRendering()->getBackBufferHeight();
-                }
-                else {
-                    _globalPosition = math::vector2f(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
-                }
+                _globalPosition = _facility.getRendering()->getScreenCoordinates(_worldPosition);
             }
             
             for (auto &item : _attachedElements) {

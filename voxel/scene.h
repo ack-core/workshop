@@ -4,7 +4,6 @@
 #include "foundation/rendering.h"
 #include "foundation/math.h"
 
-//#include "providers/mesh_provider.h"
 #include "providers/texture_provider.h"
 
 #include <cstddef>
@@ -37,6 +36,13 @@ namespace voxel {
         };
         
     public:
+        struct LineSet {
+            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual auto addLine(const math::vector3f &start, const math::vector3f &end, const math::color &rgba) -> std::uint32_t = 0;
+            virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
+            virtual void clear() = 0;
+            virtual ~LineSet() = default;
+        };
         struct BoundingBox {
             virtual ~BoundingBox() = default;
         };
@@ -56,6 +62,7 @@ namespace voxel {
             virtual ~LightSource() = default;
         };
         
+        using LineSetPtr = std::shared_ptr<LineSet>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using StaticModelPtr = std::shared_ptr<StaticModel>;
         using TexturedModelPtr = std::shared_ptr<TexturedModel>;
@@ -65,13 +72,15 @@ namespace voxel {
     public:
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
-        
+        virtual auto addLineSet(bool depthTested, std::uint32_t startCount = 0) -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
         virtual auto addStaticModel(const std::vector<VTXSVOX> &voxels) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
         virtual auto addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) -> DynamicModelPtr = 0;
         virtual auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr = 0;
-        
+        virtual auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f = 0;
+        virtual auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f = 0;
+
         virtual void updateAndDraw(float dtSec) = 0;
         
     public:

@@ -30,6 +30,10 @@ namespace voxel {
     
     }
     
+    bool YardObjectImpl::isHelperOccupied(const char *helper) const {
+        return false;
+    }
+    
     void YardObjectImpl::instantMove(const math::vector3f &position) {
         _currentPosition = position;
     }

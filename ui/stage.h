@@ -1,4 +1,6 @@
 
+// TODO: dpi-scaling
+
 #pragma once
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
@@ -55,6 +57,7 @@ namespace ui {
             virtual void setWorldPosition(const math::vector3f &position) = 0;
         };
         struct Image : public virtual Interactor {
+            virtual void setColor(const math::color &rgba) = 0;
             virtual ~Image() = default;
         };
         struct Text : public virtual Element {
@@ -129,5 +132,9 @@ namespace ui {
     };
     
     using StageInterfacePtr = std::shared_ptr<StageInterface>;
+    using ElementPtr = std::shared_ptr<StageInterface::Element>;
+    using PivotPtr = std::shared_ptr<StageInterface::Pivot>;
+    using ImagePtr = std::shared_ptr<StageInterface::Image>;
+    using TextPtr = std::shared_ptr<StageInterface::Text>;
 }
 

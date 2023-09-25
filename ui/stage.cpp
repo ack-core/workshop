@@ -78,7 +78,7 @@ namespace {
         }
         fssrc {
             float4 texcolor = _tex2nearest(0, input_texcoord);
-            output_color[0] = _lerp(texcolor, float4(1.0, 1.0, 1.0, texcolor.r) * const_color, const_flags.r);
+            output_color[0] = _lerp(texcolor, float4(1.0, 1.0, 1.0, texcolor.r), const_flags.r) * const_color;
         }
     )";
 }
