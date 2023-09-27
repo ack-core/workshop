@@ -189,7 +189,7 @@ namespace ui {
         if (const resource::TextureInfo *info = _textureProvider->getTextureInfo(params.textureBackground)) {
             bg = addImage(nullptr, ui::StageInterface::ImageParams {
                 .activeAreaOffset = 0.5f * info->width,
-                .activeAreaRadius = 0.7f * info->width,
+                .activeAreaRadius = 0.75f * info->width,
                 .anchorTarget = params.anchorTarget,
                 .anchorOffset = params.anchorOffset,
                 .anchorH = params.anchorH,

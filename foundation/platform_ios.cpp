@@ -178,8 +178,6 @@ namespace {
         args.coordinateX = [item locationInView:nil].x * g_nativeScreenScale;
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
-        printf("--->> %f %f\n", args.coordinateX, args.coordinateY);
-        
         for (auto &index : g_pointerHandlers) {
             if (index.handler(args)) {
                 break;

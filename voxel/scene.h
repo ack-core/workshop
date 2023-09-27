@@ -72,7 +72,7 @@ namespace voxel {
     public:
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
-        virtual auto addLineSet(bool depthTested, std::uint32_t startCount = 0) -> LineSetPtr = 0;
+        virtual auto addLineSet(bool depthTested, std::uint32_t startCount) -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
         virtual auto addStaticModel(const std::vector<VTXSVOX> &voxels) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;

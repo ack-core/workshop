@@ -1,6 +1,6 @@
 
 // Main TODO:
-// + python tools: png -> vox, png -> png + palette, 2x large png -> .yard + pngs
+// + python tools: png -> vox, png -> png + palette, 2x large png -> .yard + pngs, check that all png have colors from palette
 // + dh to scene
 // + \n at the end of logMsg
 // plan:
@@ -41,6 +41,7 @@ int main(int argc, const char * argv[]) {
     bool textureListLoaded = platform->loadFile("textures.list", textureListData, textureListSize);
     bool meshListLoaded = platform->loadFile("meshes.list", meshListData, meshListSize);
     bool ttfLoaded = platform->loadFile("arial.ttf", ttfData, ttfSize);
+    
     
     if (textureListLoaded && meshListLoaded && ttfLoaded) {
         std::string texturesList = std::string(reinterpret_cast<const char *>(textureListData.get()), textureListSize);

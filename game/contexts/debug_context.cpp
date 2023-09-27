@@ -7,7 +7,7 @@ namespace game {
     }
     
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
-        _api.scene->setCameraLookAt(_center + _orbit, _center);
+        _api.yard->setCameraLookAt(_center + _orbit, _center);
         _touchEventHandlerToken = _api.platform->addPointerEventHandler(
             [this](const foundation::PlatformPointerEventArgs &args) -> bool {
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
@@ -28,7 +28,7 @@ namespace game {
                             _orbit = rotatedOrbit;
                         }
                         
-                        _api.scene->setCameraLookAt(_center + _orbit, _center);
+                        _api.yard->setCameraLookAt(_center + _orbit, _center);
                         _lockedCoordinates = { args.coordinateX, args.coordinateY };
                     }
                 }
@@ -47,119 +47,84 @@ namespace game {
             printf("%s\n", loaded ? "loaded" : "not loaded");
         });
         
-//        auto panel = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
-//            .anchorOffset = math::vector2f(50.0f, 50.0f),
-//            .anchorH = ui::HorizontalAnchor::RIGHT,
-//            .anchorV = ui::VerticalAnchor::BOTTOM,
-//            .capturePointer = true,
-//            .textureBase = "textures/ui/panel",
-//        });
-//        auto btn1 = _api.ui->addImage(panel, ui::StageInterface::ImageParams {
-//            .anchorOffset = math::vector2f(30.0f, 50.0f),
-//            .anchorH = ui::HorizontalAnchor::RIGHT,
-//            .anchorV = ui::VerticalAnchor::TOP,
-//            .textureBase = "textures/ui/button_up",
-//            .textureAction = "textures/ui/button_down",
-//        });
-//        auto btn2 = _api.ui->addImage(panel, ui::StageInterface::ImageParams {
-//            .anchorTarget = btn1,
-//            .anchorOffset = math::vector2f(0.0f, 10.0f),
-//            .anchorH = ui::HorizontalAnchor::CENTER,
-//            .anchorV = ui::VerticalAnchor::BOTTOMSIDE,
-//            .textureBase = "textures/ui/button_up",
-//            .textureAction = "textures/ui/button_down",
-//        });
-//        auto txt1 = _api.ui->addText(nullptr, ui::StageInterface::TextParams {
-//            .anchorTarget = nullptr,
-//            .anchorOffset = math::vector2f(0.0f, 0.0f),
-//            .anchorH = ui::HorizontalAnchor::LEFT,
-//            .anchorV = ui::VerticalAnchor::MIDDLE,
-//            .fontSize = 36,
-//            .shadowEnabled = true,
-//            .shadowOffset = math::vector2f(2.0f, 2.0f)
-//        });
-//
-//        btn1->setActionHandler(ui::Action::CAPTURE, [](float, float) {
-//
-//        });
-//        btn2->setActionHandler(ui::Action::CAPTURE, [](float, float) {
-//
-//        });
-//        txt1->setText("Gætirðu skrifað þetta upp?"); //
-//
-//        auto pivot1 = _api.ui->addPivot(nullptr, {});
-//        pivot1->setWorldPosition(math::vector3f(0, 10, 0));
-//
-//        auto btn3 = _api.ui->addImage(pivot1, ui::StageInterface::ImageParams {
-//            .anchorOffset = math::vector2f(0.0f, 0.0f),
-//            .anchorH = ui::HorizontalAnchor::CENTER,
-//            .anchorV = ui::VerticalAnchor::BOTTOM,
-//            .textureBase = "textures/ui/button_up",
-//            .textureAction = "textures/ui/button_down",
-//        });
-//        auto txt2 = _api.ui->addText(btn3, ui::StageInterface::TextParams {
-//            .anchorOffset = math::vector2f(0.0f, -2.0f),
-//            .anchorH = ui::HorizontalAnchor::CENTER,
-//            .anchorV = ui::VerticalAnchor::MIDDLE,
-//            .shadowEnabled = true,
-//            .shadowOffset = math::vector2f(1.0f, 2.0f),
-//            .fontSize = 26
-//        });
-//        txt2->setText("Play!");
-//
-//        btn3->setActionHandler(ui::Action::CAPTURE, [](float, float) {
-//
-//        });
-//
-//        auto joystick = _api.ui->addJoystick(nullptr, ui::StageInterface::JoystickParams {
-//            .anchorOffset = math::vector2f(50.0f, 50.0f),
-//            .anchorH = ui::HorizontalAnchor::LEFT,
-//            .anchorV = ui::VerticalAnchor::BOTTOM,
-//            .textureBackground = "textures/ui/joystick_bg",
-//            .textureThumb = "textures/ui/joystick_thumb",
-//            .maxThumbOffset = 80.0f,
-//            .handler = [](const math::vector2f &direction) {
-//                printf("--->>> %2.2f %2.2f\n", direction.x, direction.y);
-//            }
-//        });
-        
-        _api.scene->setCameraLookAt(_center + _orbit, _center);
-        
-//        auto pivot1 = _api.ui->addPivot(nullptr, {});
-//        pivot1->setWorldPosition(math::vector3f(-32 + 8, 24, 0));
-//
-//        auto pivot2 = _api.ui->addPivot(nullptr, {});
-//        pivot2->setWorldPosition(math::vector3f(0 + 8, 22, 0));
-//
-//        auto pivot3 = _api.ui->addPivot(nullptr, {});
-//        pivot3->setWorldPosition(math::vector3f(32 + 8, 20, 0));
+        auto panel = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
+            .anchorOffset = math::vector2f(50.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::RIGHT,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .capturePointer = true,
+            .textureBase = "textures/ui/panel",
+        });
+        auto btn1 = _api.ui->addImage(panel, ui::StageInterface::ImageParams {
+            .anchorOffset = math::vector2f(30.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::RIGHT,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .textureBase = "textures/ui/button_up",
+            .textureAction = "textures/ui/button_down",
+        });
+        auto btn2 = _api.ui->addImage(panel, ui::StageInterface::ImageParams {
+            .anchorTarget = btn1,
+            .anchorOffset = math::vector2f(0.0f, 10.0f),
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::BOTTOMSIDE,
+            .textureBase = "textures/ui/button_up",
+            .textureAction = "textures/ui/button_down",
+        });
+        auto txt1 = _api.ui->addText(nullptr, ui::StageInterface::TextParams {
+            .anchorTarget = nullptr,
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .anchorH = ui::HorizontalAnchor::LEFT,
+            .anchorV = ui::VerticalAnchor::MIDDLE,
+            .fontSize = 36,
+            .shadowEnabled = true,
+            .shadowOffset = math::vector2f(2.0f, 2.0f)
+        });
 
-//        auto txt1 = _api.ui->addText(pivot1, ui::StageInterface::TextParams {
-//            .anchorH = ui::HorizontalAnchor::CENTER,
-//            .anchorV = ui::VerticalAnchor::MIDDLE,
-//            .shadowEnabled = true,
-//            .shadowOffset = math::vector2f(1.0f, 2.0f),
-//            .fontSize = 26
-//        });
-//        txt1->setText("No voxel mesh optimization");
-//
-//        auto txt2 = _api.ui->addText(pivot2, ui::StageInterface::TextParams {
-//            .anchorH = ui::HorizontalAnchor::CENTER,
-//            .anchorV = ui::VerticalAnchor::MIDDLE,
-//            .shadowEnabled = true,
-//            .shadowOffset = math::vector2f(1.0f, 2.0f),
-//            .fontSize = 26
-//        });
-//        txt2->setText("Removed invisible voxels");
-//
-//        auto txt3 = _api.ui->addText(pivot3, ui::StageInterface::TextParams {
-//            .anchorH = ui::HorizontalAnchor::CENTER,
-//            .anchorV = ui::VerticalAnchor::MIDDLE,
-//            .shadowEnabled = true,
-//            .shadowOffset = math::vector2f(1.0f, 2.0f),
-//            .fontSize = 26
-//        });
-//        txt3->setText("Rectangular voxel optimization");
+        btn1->setActionHandler(ui::Action::CAPTURE, [](float, float) {
+
+        });
+        btn2->setActionHandler(ui::Action::CAPTURE, [](float, float) {
+
+        });
+        txt1->setText("Gætirðu skrifað þetta upp?"); //
+
+        auto pivot1 = _api.ui->addPivot(nullptr, {});
+        pivot1->setWorldPosition(math::vector3f(0, 10, 0));
+
+        auto btn3 = _api.ui->addImage(pivot1, ui::StageInterface::ImageParams {
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .textureBase = "textures/ui/button_up",
+            .textureAction = "textures/ui/button_down",
+        });
+        auto txt2 = _api.ui->addText(btn3, ui::StageInterface::TextParams {
+            .anchorOffset = math::vector2f(0.0f, -2.0f),
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::MIDDLE,
+            .shadowEnabled = true,
+            .shadowOffset = math::vector2f(1.0f, 2.0f),
+            .fontSize = 26
+        });
+        txt2->setText("Play!");
+
+        btn3->setActionHandler(ui::Action::CAPTURE, [](float, float) {
+
+        });
+
+        auto joystick = _api.ui->addJoystick(nullptr, ui::StageInterface::JoystickParams {
+            .anchorOffset = math::vector2f(50.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::LEFT,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .textureBackground = "textures/ui/joystick_bg",
+            .textureThumb = "textures/ui/joystick_thumb",
+            .maxThumbOffset = 80.0f,
+            .handler = [](const math::vector2f &direction) {
+                printf("--->>> %2.2f %2.2f\n", direction.x, direction.y);
+            }
+        });
+        
+        _api.yard->setCameraLookAt(_center + _orbit, _center);
+        
 
         
     }

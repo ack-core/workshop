@@ -19,7 +19,7 @@ namespace game {
     class Context {
     public:
         virtual void update(float dtSec) = 0;
-    
+        
     public:
         virtual ~Context() = default;
     };
