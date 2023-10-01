@@ -21,7 +21,7 @@ namespace game {
                         
                         _orbit.xz = _orbit.xz.rotated(dx / 100.0f);
                         
-                        math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit);
+                        math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit).normalized();
                         math::vector3f rotatedOrbit = _orbit.rotated(right, dy / 100.0f);
                         
                         if (fabs(math::vector3f(0, 1, 0).dot(rotatedOrbit.normalized())) < 0.96f) {

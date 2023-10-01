@@ -16,8 +16,6 @@ set(
 	"${m_source_root}/contexts/debug_context.cpp"
 	"${m_source_root}/contexts/yard_editor_context.h"
 	"${m_source_root}/contexts/yard_editor_context.cpp"
-	"${m_source_root}/contexts/swordsman.h"
-	"${m_source_root}/contexts/swordsman.cpp"
 )
 source_group("contexts" FILES ${m_contexts_list})
 

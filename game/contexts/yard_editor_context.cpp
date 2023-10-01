@@ -42,13 +42,13 @@ namespace game {
             const math::vector3f wdir = _api.scene->getWorldDirection(math::vector2f(x, y));
             _capturedPosition = _position;
             _capturedPlaneNormal = std::fabs(wdir.y) > std::fabs(wdir.z) ? math::vector3f(0, 1, 0) : math::vector3f(0, 0, 1);
-            math::linePlaneIntersect(_camPos, wdir, _position, _capturedPlaneNormal, _capturedIntersectPos);
+            math::intersectRayPlane(_camPos, wdir, _position, _capturedPlaneNormal, _capturedIntersectPos);
         });
         _tipX->setActionHandler(ui::Action::MOVE, [this](float x, float y) {
             const math::vector3f wdir = _api.scene->getWorldDirection(math::vector2f(x, y));
             math::vector3f intersectPos = {0, 0, 0};
             
-            if (math::linePlaneIntersect(_camPos, wdir, _position, _capturedPlaneNormal, intersectPos)) {
+            if (math::intersectRayPlane(_camPos, wdir, _position, _capturedPlaneNormal, intersectPos)) {
                 _position = _capturedPosition + math::vector3f((intersectPos - _capturedIntersectPos).dot(math::vector3f(1, 0, 0)), 0.0f, 0.0f);
             }
         });
@@ -56,13 +56,13 @@ namespace game {
             const math::vector3f wdir = _api.scene->getWorldDirection(math::vector2f(x, y));
             _capturedPosition = _position;
             _capturedPlaneNormal = std::fabs(wdir.x) > std::fabs(wdir.z) ? math::vector3f(1, 0, 0) : math::vector3f(0, 0, 1);
-            math::linePlaneIntersect(_camPos, wdir, _position, _capturedPlaneNormal, _capturedIntersectPos);
+            math::intersectRayPlane(_camPos, wdir, _position, _capturedPlaneNormal, _capturedIntersectPos);
         });
         _tipY->setActionHandler(ui::Action::MOVE, [this](float x, float y) {
             const math::vector3f wdir = _api.scene->getWorldDirection(math::vector2f(x, y));
             math::vector3f intersectPos = {0, 0, 0};
             
-            if (math::linePlaneIntersect(_camPos, wdir, _position, _capturedPlaneNormal, intersectPos)) {
+            if (math::intersectRayPlane(_camPos, wdir, _position, _capturedPlaneNormal, intersectPos)) {
                 _position = _capturedPosition + math::vector3f(0.0f, (intersectPos - _capturedIntersectPos).dot(math::vector3f(0, 1, 0)), 0.0f);
             }
         });
@@ -70,13 +70,13 @@ namespace game {
             const math::vector3f wdir = _api.scene->getWorldDirection(math::vector2f(x, y));
             _capturedPosition = _position;
             _capturedPlaneNormal = std::fabs(wdir.x) > std::fabs(wdir.y) ? math::vector3f(1, 0, 0) : math::vector3f(0, 1, 0);
-            math::linePlaneIntersect(_camPos, wdir, _position, _capturedPlaneNormal, _capturedIntersectPos);
+            math::intersectRayPlane(_camPos, wdir, _position, _capturedPlaneNormal, _capturedIntersectPos);
         });
         _tipZ->setActionHandler(ui::Action::MOVE, [this](float x, float y) {
             const math::vector3f wdir = _api.scene->getWorldDirection(math::vector2f(x, y));
             math::vector3f intersectPos = {0, 0, 0};
             
-            if (math::linePlaneIntersect(_camPos, wdir, _position, _capturedPlaneNormal, intersectPos)) {
+            if (math::intersectRayPlane(_camPos, wdir, _position, _capturedPlaneNormal, intersectPos)) {
                 _position = _capturedPosition + math::vector3f(0.0f, 0.0f, (intersectPos - _capturedIntersectPos).dot(math::vector3f(0, 0, 1)));
             }
         });
@@ -119,7 +119,7 @@ namespace game {
                         float dy = args.coordinateY - _lockedCoordinates.y;
 
                         _orbit.xz = _orbit.xz.rotated(dx / 100.0f);
-                        math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit);
+                        math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit).normalized();
                         math::vector3f rotatedOrbit = _orbit.rotated(right, dy / 100.0f);
 
                         if (fabs(math::vector3f(0, 1, 0).dot(rotatedOrbit.normalized())) < 0.96f) {

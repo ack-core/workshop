@@ -421,12 +421,12 @@ namespace voxel {
         _camera.position = position;
         _camera.target = sceneCenter;
         
-        math::vector3f right = math::vector3f(0, 1, 0).cross(position - sceneCenter);
+        math::vector3f right = math::vector3f(0, 1, 0).cross(position - sceneCenter).normalized();
         math::vector3f nrmlook = (sceneCenter - position).normalized();
         math::vector3f nrmright = right.normalized();
         
         _camera.forward = nrmlook;
-        _camera.up = nrmright.cross(nrmlook);
+        _camera.up = nrmright.cross(nrmlook).normalized();
         
         float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
         _camera.viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
@@ -528,7 +528,7 @@ namespace voxel {
         _cleanupUnused(_staticMeshes);
         _cleanupUnused(_texturedMeshes);
         _cleanupUnused(_dynamicMeshes);
-        _rendering->updateFrameConstants(_camera.viewMatrix.flat16, _camera.projMatrix.flat16, _camera.position.flat3, _camera.forward.flat3);
+        _rendering->updateFrameConstants(_camera.viewMatrix.flat, _camera.projMatrix.flat, _camera.position.flat, _camera.forward.flat);
         
         _rendering->applyState(_lineSetShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.1));
         for (const auto &set : _lineSets) {

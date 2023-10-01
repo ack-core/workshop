@@ -63,8 +63,8 @@ namespace voxel {
             _facility.getMeshProvider()->getOrLoadVoxelMesh(_type.model.data(), MESH_OPT, [weak = weak_from_this()](const std::unique_ptr<resource::VoxelMesh> &mesh) {
                 if (std::shared_ptr<YardObjectImpl> self = weak.lock()) {
                     if (mesh) {
-                        float angle = (self->_currentDirection.x < 0.0f ? 1.0f : -1.0f) * math::vector3f(0.0f, 0.0f, 1.0f).angleTo(self->_currentDirection.normalized());
-                        math::transform3f transform = math::transform3f::identity().rotated({0, 1, 0}, angle).translated(self->_currentPosition);
+                        float angle = 0.0f; //(self->_currentDirection.x < 0.0f ? 1.0f : -1.0f) * math::vector3f(0.0f, 0.0f, 1.0f).angleTo(self->_currentDirection.normalized());
+                        math::transform3f transform = math::transform3f({0, 1, 0}, angle).translated(self->_currentPosition);
                         
                         std::vector<SceneInterface::VTXDVOX> voxData;
                         for (std::uint16_t i = 0; i < mesh->frames[0].voxelCount; i++) {

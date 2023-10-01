@@ -3,4 +3,4 @@ package/** linguist-vendored=true
 resources/** linguist-vendored=true
 screens/** linguist-documentation=true
 thirdparty/** linguist-vendored=true
-tools/*.py linguist-detectable=true
+foundation/old_to_remake/** linguist-detectable=false

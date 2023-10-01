@@ -127,7 +127,7 @@ namespace voxel {
                     const math::vector2f dirA = ap.normalized();
                     const math::vector2f dirB = math::vector2f(pp.x - eb.x, pp.z - eb.z).normalized();
                     const float currentDot = dirA.dot(dirB);
-
+                    
                     if (currentDot < minDot - std::numeric_limits<float>::epsilon()) {
                         minDot = currentDot;
                         minIndexCount = 0;
