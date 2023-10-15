@@ -679,7 +679,7 @@ namespace math {
     
     //---
     
-    transform3f transform3f::lookAtRH(const vector3f &eye, const vector3f &at, const vector3f &up) {
+    inline transform3f transform3f::lookAtRH(const vector3f &eye, const vector3f &at, const vector3f &up) {
         vector3f tmpz = vector3f(eye.x - at.x, eye.y - at.y, eye.z - at.z).normalized(1.0);
         vector3f tmpx = up.cross(tmpz).normalized(1.0);
         vector3f tmpy = tmpz.cross(tmpx).normalized(1.0);
@@ -692,7 +692,7 @@ namespace math {
         };
     }
     
-    transform3f transform3f::perspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar) {
+    inline transform3f transform3f::perspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar) {
         scalar yS = scalar(1.0f) / std::tan(fovY * scalar(0.5));
         scalar xS = yS / aspect;
         
@@ -794,29 +794,29 @@ namespace math {
         };
     }
     
-    transform3f operator *(const transform3f &t0, const transform3f &t1) {
+    inline transform3f operator *(const transform3f &t0, const transform3f &t1) {
         vector4f r0, r1, r2, r3;
-
+        
         r0.flat[0] = t0.row0[0] * t1.row0[0] + t0.row0[1] * t1.row1[0] + t0.row0[2] * t1.row2[0] + t0.row0[3] * t1.row3[0];
         r0.flat[1] = t0.row0[0] * t1.row0[1] + t0.row0[1] * t1.row1[1] + t0.row0[2] * t1.row2[1] + t0.row0[3] * t1.row3[1];
         r0.flat[2] = t0.row0[0] * t1.row0[2] + t0.row0[1] * t1.row1[2] + t0.row0[2] * t1.row2[2] + t0.row0[3] * t1.row3[2];
         r0.flat[3] = t0.row0[0] * t1.row0[3] + t0.row0[1] * t1.row1[3] + t0.row0[2] * t1.row2[3] + t0.row0[3] * t1.row3[3];
-
+        
         r1.flat[0] = t0.row1[0] * t1.row0[0] + t0.row1[1] * t1.row1[0] + t0.row1[2] * t1.row2[0] + t0.row1[3] * t1.row3[0];
         r1.flat[1] = t0.row1[0] * t1.row0[1] + t0.row1[1] * t1.row1[1] + t0.row1[2] * t1.row2[1] + t0.row1[3] * t1.row3[1];
         r1.flat[2] = t0.row1[0] * t1.row0[2] + t0.row1[1] * t1.row1[2] + t0.row1[2] * t1.row2[2] + t0.row1[3] * t1.row3[2];
         r1.flat[3] = t0.row1[0] * t1.row0[3] + t0.row1[1] * t1.row1[3] + t0.row1[2] * t1.row2[3] + t0.row1[3] * t1.row3[3];
-
+        
         r2.flat[0] = t0.row2[0] * t1.row0[0] + t0.row2[1] * t1.row1[0] + t0.row2[2] * t1.row2[0] + t0.row2[3] * t1.row3[0];
         r2.flat[1] = t0.row2[0] * t1.row0[1] + t0.row2[1] * t1.row1[1] + t0.row2[2] * t1.row2[1] + t0.row2[3] * t1.row3[1];
         r2.flat[2] = t0.row2[0] * t1.row0[2] + t0.row2[1] * t1.row1[2] + t0.row2[2] * t1.row2[2] + t0.row2[3] * t1.row3[2];
         r2.flat[3] = t0.row2[0] * t1.row0[3] + t0.row2[1] * t1.row1[3] + t0.row2[2] * t1.row2[3] + t0.row2[3] * t1.row3[3];
-
+        
         r3.flat[0] = t0.row3[0] * t1.row0[0] + t0.row3[1] * t1.row1[0] + t0.row3[2] * t1.row2[0] + t0.row3[3] * t1.row3[0];
         r3.flat[1] = t0.row3[0] * t1.row0[1] + t0.row3[1] * t1.row1[1] + t0.row3[2] * t1.row2[1] + t0.row3[3] * t1.row3[1];
         r3.flat[2] = t0.row3[0] * t1.row0[2] + t0.row3[1] * t1.row1[2] + t0.row3[2] * t1.row2[2] + t0.row3[3] * t1.row3[2];
         r3.flat[3] = t0.row3[0] * t1.row0[3] + t0.row3[1] * t1.row1[3] + t0.row3[2] * t1.row2[3] + t0.row3[3] * t1.row3[3];
-
+        
         return transform3f(r0, r1, r2, r3);
     }
 }

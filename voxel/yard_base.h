@@ -13,9 +13,17 @@
 #include <memory>
 
 namespace voxel {
-    struct YardObjectType {
-        std::string model;
+    enum class YardLoadingState {
+        NONE = 0,
+        LOADING,
+        LOADED,
+        RENDERING,
+    };
+    
+    struct YardActorType {
+        std::string modelPath;
         math::vector3f center;
+        float radius;
     };
     
     class YardFacility {
@@ -27,37 +35,23 @@ namespace voxel {
         virtual const SceneInterfacePtr &getScene() const = 0;
         virtual ~YardFacility() = default;
     };
-
-    class YardCollision {
-    public:
-        virtual void correctMovement(const math::vector3f &position, math::vector3f &movement) const = 0;
-        virtual ~YardCollision() = default;
-    };
     
     class YardStatic {
     public:
-        enum class State {
-            NONE = 0,
-            LOADING,
-            LOADED,
-            RENDERING,
-        };
-        
-    public:
         YardStatic(const YardFacility &facility, const math::bound3f &bbox);
         virtual ~YardStatic() = default;    
-        virtual void updateState(State targetState) = 0;
+        virtual void updateState(YardLoadingState targetState) = 0;
         
         auto getBBox() const -> math::bound3f;
         auto getLinks() const -> const std::vector<YardStatic *> &;
         void linkTo(YardStatic *object);
-
+        
     protected:
         const YardFacility &_facility;
         const math::bound3f _bbox;
 
         std::vector<YardStatic *> _links;
-        State _currentState;
+        YardLoadingState _currentState;
     };
 }
 

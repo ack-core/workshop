@@ -1,6 +1,7 @@
 
+#include "yard.h"
 #include "yard_base.h"
-#include "yard_square.h"
+#include "yard_stead.h"
 
 #include <list>
 #include <unordered_set>
@@ -39,7 +40,7 @@ namespace voxel {
             return true;
     }
 
-    void YardSquare::_makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices) {
+    void YardSteadImpl::_makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices) {
         std::vector<Edge> completeEdges;
         std::list<Edge> computingEdges;
     
@@ -184,7 +185,7 @@ namespace voxel {
         }
     }
     
-    void YardSquare::_makeGeometry(const std::unique_ptr<std::uint8_t[]> &hm, const math::bound3f &bbox, std::vector<SceneInterface::VTXNRMUV> &ov, std::vector<std::uint32_t> &oi) {
+    void YardSteadImpl::_makeGeometry(const std::unique_ptr<std::uint8_t[]> &hm, const math::bound3f &bbox, std::vector<SceneInterface::VTXNRMUV> &ov, std::vector<std::uint32_t> &oi) {
         int w = int(bbox.xmax - bbox.xmin) + 1;
         int h = int(bbox.zmax - bbox.zmin) + 1;
         
@@ -228,22 +229,37 @@ namespace voxel {
 }
 
 namespace voxel {
-    YardSquare::YardSquare(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
+    YardSteadImpl::YardSteadImpl(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
     : YardStatic(facility, bbox)
     , _texturePath(std::move(texture))
     , _hmPath(std::move(heightmap))
-    {}
+    {
+    }
     
-    YardSquare::~YardSquare() {
+    YardSteadImpl::~YardSteadImpl() {
         _heightmap = nullptr;
         _texture = nullptr;
         _model = nullptr;
         _bboxmdl = nullptr;
     }
     
-    void YardSquare::updateState(YardStatic::State targetState) {
+    void YardSteadImpl::setPosition(const math::vector3f &position) {
+        _position = position;
+        if (_bboxmdl) {
+            _bboxmdl->setPosition(position);
+        }
+        if (_model) {
+            _model->setPosition(position);
+        }
+    }
+    
+    const math::vector3f &YardSteadImpl::getPosition() const {
+        return _position;
+    }
+    
+    void YardSteadImpl::updateState(YardLoadingState targetState) {
         if (_currentState != targetState) {
-            if (targetState == YardStatic::State::NONE) { // unload
+            if (targetState == YardLoadingState::NONE) { // unload
                 _vertices = {};
                 _indices = {};
                 _currentState = targetState;
@@ -253,15 +269,15 @@ namespace voxel {
                 _bboxmdl = nullptr;
             }
             else {
-                if (_currentState == YardStatic::State::NONE) { // load resources
-                    _currentState = YardStatic::State::LOADING;
+                if (_currentState == YardLoadingState::NONE) { // load resources
+                    _currentState = YardLoadingState::LOADING;
                     
-                    std::weak_ptr<YardSquare> weak = weak_from_this();
+                    std::weak_ptr<YardSteadImpl> weak = weak_from_this();
                     _facility.getTextureProvider()->getOrLoadTexture(_texturePath.data(), [weak, hmPath = _hmPath](const foundation::RenderTexturePtr &texture) {
-                        if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                        if (std::shared_ptr<YardSteadImpl> self = weak.lock()) {
                             if ((self->_texture = texture) != nullptr) {
                                 auto loading = [weak](const std::unique_ptr<std::uint8_t[]> &data, const resource::TextureInfo &info) {
-                                    if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                                    if (std::shared_ptr<YardSteadImpl> self = weak.lock()) {
                                         if (self->_hmPath[0] && data == nullptr) {
                                             self->_facility.getPlatform()->logError("[YardSquare::setState] unable to load heightmap '%s'\n", self->_hmPath.data());
                                         }
@@ -272,7 +288,7 @@ namespace voxel {
                                         };
                                         
                                         self->_facility.getPlatform()->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak, &data, info](AsyncContext &ctx) {
-                                            if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                                            if (std::shared_ptr<YardSteadImpl> self = weak.lock()) {
                                                 const std::uint32_t bbx = std::uint32_t(self->_bbox.xmax - self->_bbox.xmin);
                                                 const std::uint32_t bbz = std::uint32_t(self->_bbox.zmax - self->_bbox.zmin);
                                                 
@@ -286,12 +302,12 @@ namespace voxel {
                                             }
                                         },
                                         [weak](AsyncContext &ctx) {
-                                            if (std::shared_ptr<YardSquare> self = weak.lock()) {
+                                            if (std::shared_ptr<YardSteadImpl> self = weak.lock()) {
                                                 if (ctx.vertices.size() && ctx.indices.size()) {
                                                     self->_bboxmdl = self->_facility.getScene()->addBoundingBox(self->_bbox);
                                                     self->_vertices = std::move(ctx.vertices);
                                                     self->_indices = std::move(ctx.indices);
-                                                    self->_currentState = YardStatic::State::LOADED;
+                                                    self->_currentState = YardLoadingState::LOADED;
                                                 }
                                             }
                                         }));
@@ -311,13 +327,13 @@ namespace voxel {
                         }
                     });
                 }
-                if (targetState == YardStatic::State::RENDERING) { // add to scene
-                    if (_currentState == YardStatic::State::LOADED) {
+                if (targetState == YardLoadingState::RENDERING) { // add to scene
+                    if (_currentState == YardLoadingState::LOADED) {
                         _model = _facility.getScene()->addTexturedModel(_vertices, _indices, _texture);
                     }
                 }
-                if (targetState == YardStatic::State::LOADED) { // remove from scene
-                    if (_currentState == YardStatic::State::RENDERING) {
+                if (targetState == YardLoadingState::LOADED) { // remove from scene
+                    if (_currentState == YardLoadingState::RENDERING) {
                         _currentState = targetState;
                         _model = nullptr;
                     }

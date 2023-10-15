@@ -5,7 +5,6 @@
 #include "contexts/context.h"
 #include "contexts/debug_context.h"
 #include "contexts/yard_editor_context.h"
-#include "contexts/swordsman.h"
 
 namespace game {
     // Main datahub description
@@ -34,7 +33,7 @@ namespace game {
     static const std::unordered_map<const char *, std::vector<MakeContextFunc>> states = {
         {"default",
             {
-                &makeContext<SwordsmanContext> //&makeContext<DebugContext>
+                &makeContext<DebugContext>
             }
         },
     };

@@ -17,7 +17,7 @@ namespace voxel {
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
             const resource::TextureProviderPtr &textureProvider,
-            const char *palette
+            const foundation::RenderTexturePtr &palette
         );
         
     public:
@@ -40,16 +40,19 @@ namespace voxel {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual auto addLine(const math::vector3f &start, const math::vector3f &end, const math::color &rgba) -> std::uint32_t = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
-            virtual void clear() = 0;
+            virtual void removeAllLines() = 0;
             virtual ~LineSet() = default;
         };
         struct BoundingBox {
+            virtual void setPosition(const math::vector3f &position) = 0;
             virtual ~BoundingBox() = default;
         };
         struct StaticModel {
+            virtual void setPosition(const math::vector3f &position) = 0;
             virtual ~StaticModel() = default;
         };
         struct TexturedModel {
+            virtual void setPosition(const math::vector3f &position) = 0;
             virtual ~TexturedModel() = default;
         };
         struct DynamicModel {

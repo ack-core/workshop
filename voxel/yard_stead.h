@@ -7,13 +7,16 @@
 #include <memory>
 
 namespace voxel {
-    class YardSquare : public YardStatic, public std::enable_shared_from_this<YardSquare> {
+    class YardSteadImpl : public YardStatic, public std::enable_shared_from_this<YardSteadImpl>, public YardInterface::Stead {
     public:
-        YardSquare(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
-        ~YardSquare() override;
+        YardSteadImpl(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
+        ~YardSteadImpl() override;
         
     public:
-        void updateState(YardStatic::State targetState) override;
+        void setPosition(const math::vector3f &position) override;
+        auto getPosition() const -> const math::vector3f & override;
+    
+        void updateState(YardLoadingState targetState) override;
         
     private:
         static void _makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices);
@@ -23,6 +26,7 @@ namespace voxel {
         const std::string _texturePath;
         const std::string _hmPath;
         
+        math::vector3f _position = {0, 0, 0};
         foundation::RenderTexturePtr _texture;
         std::unique_ptr<std::uint8_t[]> _heightmap;
         std::vector<SceneInterface::VTXNRMUV> _vertices;

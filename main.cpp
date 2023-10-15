@@ -1,11 +1,8 @@
 
 // Main TODO:
-// + python tools: png -> vox, png -> png + palette, 2x large png -> .yard + pngs, check that all png have colors from palette
+// + python tools: xxx large png -> .yard + pngs, check that all png have colors from palette, texture + heightmap + collision -> rgba png
 // + dh to scene
 // + \n at the end of logMsg
-// plan:
-// + palette
-// + tool png -> png + palette
 //
 
 #include "foundation/platform.h"
@@ -50,32 +47,37 @@ int main(int argc, const char * argv[]) {
         auto meshProvider = resource::MeshProvider::instance(platform, meshesList.data());
         auto textureProvider = resource::TextureProvider::instance(platform, rendering, texturesList.data());
         auto fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(ttfData), std::uint32_t(ttfSize));
-        auto scene = voxel::SceneInterface::instance(platform, rendering, textureProvider, "palette");
-        auto yard = voxel::YardInterface::instance(platform, rendering, meshProvider, textureProvider, scene);
-        auto ui = ui::StageInterface::instance(platform, rendering, textureProvider, fontAtlasProvider);
-        auto datahub = dh::DataHub::instance(platform, game::datahub);
-        auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);
         
-        platform->run([&](float dtSec) {
-            textureProvider->update(dtSec);
-            meshProvider->update(dtSec);
-            fontAtlasProvider->update(dtSec);
-            states->update(dtSec);
-            datahub->update(dtSec);
-            yard->update(dtSec);
-            scene->updateAndDraw(dtSec);
-            ui->updateAndDraw(dtSec);
-            rendering->presentFrame();
-        });
+        if (foundation::RenderTexturePtr palette = textureProvider->getOrLoadTexture("palette")) {
+            auto datahub = dh::DataHub::instance(platform, game::datahub);
+            auto scene = voxel::SceneInterface::instance(platform, rendering, textureProvider, palette);
+            auto yard = voxel::YardInterface::instance(platform, rendering, meshProvider, textureProvider, scene);
+            auto ui = ui::StageInterface::instance(platform, rendering, textureProvider, fontAtlasProvider);
+            auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);
+            
+            platform->run([&](float dtSec) {
+                textureProvider->update(dtSec);
+                meshProvider->update(dtSec);
+                fontAtlasProvider->update(dtSec);
+                states->update(dtSec);
+                datahub->update(dtSec);
+                yard->update(dtSec);
+                scene->updateAndDraw(dtSec);
+                ui->updateAndDraw(dtSec);
+                rendering->presentFrame();
+            });
+            
+            ui->clear();
+            
+            // TODO: errors if destruction is not happened
+            states = nullptr;
+            yard = nullptr;
+            scene = nullptr;
+            ui = nullptr;
+            datahub = nullptr;
         
-        ui->clear();
+        }
         
-        // TODO: errors if destruction is not happened
-        states = nullptr;
-        yard = nullptr;
-        scene = nullptr;
-        ui = nullptr;
-        datahub = nullptr;
         fontAtlasProvider = nullptr;
         textureProvider = nullptr;
         meshProvider = nullptr;

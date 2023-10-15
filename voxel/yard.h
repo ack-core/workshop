@@ -16,7 +16,7 @@
 namespace voxel {
     // TODO:
     // + collision
-    // + 
+    
     class YardInterface {
     public:
         static std::shared_ptr<YardInterface> instance(
@@ -28,27 +28,27 @@ namespace voxel {
         );
         
     public:
-        struct Square {
+        struct Actor {
+            virtual void rotate(const math::vector3f &targetDirection) = 0;
+            virtual auto getRadius() const -> float = 0;
+            virtual auto getPosition() const -> const math::vector3f & = 0;
+            virtual auto getDirection() const -> const math::vector3f & = 0;
+            virtual ~Actor() = default;
+        };
+        struct Stead {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual auto getPosition() const -> const math::vector3f & = 0;
-            virtual ~Square() = default;
+            virtual ~Stead() = default;
         };
         struct Thing {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual auto getPosition() const -> const math::vector3f & = 0;
             virtual ~Thing() = default;
         };
-        struct Object {
-            virtual void attach(const char *helper, const char *model, const math::transform3f &trfm) = 0;
-            virtual void detach(const char *helper) = 0;
-            virtual bool isHelperOccupied(const char *helper) const = 0;
-            virtual void instantMove(const math::vector3f &position) = 0;
-            virtual void continuousMove(const math::vector3f &increment) = 0;
-            virtual void rotate(const math::vector3f &targetDirection) = 0;
-            virtual auto getPosition() const -> const math::vector3f & = 0;
-            virtual auto getDirection() const -> const math::vector3f & = 0;
-            virtual ~Object() = default;
-        };
+        
+        using SteadPtr = std::shared_ptr<YardInterface::Stead>;
+        using ThingPtr = std::shared_ptr<YardInterface::Thing>;
+        using ActorPtr = std::shared_ptr<YardInterface::Actor>;
         
     public:
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) = 0;
@@ -60,7 +60,7 @@ namespace voxel {
         //     skybox "name"
         // }
         // ...
-        // square <id> {
+        // stead <id> {
         //     heightmap "name"
         //     texture "name"
         //     link <N> <id_1> .. <id_N>
@@ -74,17 +74,23 @@ namespace voxel {
         //     link <N> <id_1> .. <id_N>
         // }
         // ...
-        // object "type" {
+        // actor "type" {
         //     model "name"
         //     center 3 0 3
+        //     radius 2.5
         // }
         // ...
         // s--------------------------------------
         //
-        virtual void loadYard(const char *sourcepath, util::callback<void(bool loaded)> &&completion) = 0;
-        virtual auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> = 0;
-        virtual void update(float dtSec) = 0;
+        virtual void loadYard(const char *sourcePath, util::callback<void(bool loaded)> &&completion) = 0;
+        virtual void saveYard(const char *outputPath, util::callback<void(bool saved)> &&completion) = 0;
+        virtual void addActorType(const char *type, const char *model, const math::vector3f &offset, float radius) = 0;
         
+        virtual auto addThing(const char *model, const math::vector3f &position) -> std::shared_ptr<Thing> = 0;
+        virtual auto addStead(const char *heightmap, const char *texture, const math::vector3f &position) -> std::shared_ptr<Stead> = 0;
+        virtual auto addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Actor> = 0;
+        
+        virtual void update(float dtSec) = 0;
         
     public:
         virtual ~YardInterface() = default;

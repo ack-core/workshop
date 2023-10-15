@@ -7,17 +7,21 @@
 #include <memory>
 
 namespace voxel {
-    class YardThing : public YardStatic, public std::enable_shared_from_this<YardThing> {
+    class YardThingImpl : public YardStatic, public std::enable_shared_from_this<YardThingImpl>, public YardInterface::Thing {
     public:
-        YardThing(const YardFacility &facility, const math::bound3f &bbox, std::string &&model);
-        ~YardThing() override;
+        YardThingImpl(const YardFacility &facility, const math::vector3f &position, const math::bound3f &bbox, std::string &&model);
+        ~YardThingImpl() override;
 
     public:
-        void updateState(YardStatic::State targetState) override;
+        void setPosition(const math::vector3f &position) override;
+        auto getPosition() const -> const math::vector3f & override;
+
+        void updateState(YardLoadingState targetState) override;
         
     private:
         const std::string _modelPath;
         std::vector<SceneInterface::VTXSVOX> _voxData;
+        math::vector3f _position = {0, 0, 0};
         
         SceneInterface::StaticModelPtr _model;
         SceneInterface::BoundingBoxPtr _bboxmdl;

@@ -421,6 +421,7 @@ namespace foundation {
                 std::size_t packedSize;
             }
             typeSizeTable[] = {
+                {"float",   "float",    "float",           4},
                 {"float1",  "float",    "float",           4},
                 {"float2",  "float2",   "packed_float2",   8}, // TODO: decline in 'const' block
                 {"float3",  "float3",   "packed_float3",   12},
@@ -530,22 +531,23 @@ namespace foundation {
             "#define _frac(a) fract(a)\n"
             "#define _asFloat(a) as_type<float>(a)\n"
             "#define _asUint(a) as_type<uint>(a)\n"
-            "#define _transform(a, b) (b * a)\n"
-            "#define _dot(a, b) dot(a, b)\n"
-            "#define _cross(a, b) cross(a, b)\n"
+            "#define _transform(a, b) ((b) * (a))\n"
+            "#define _dot(a, b) dot((a), (b))\n"
+            "#define _cross(a, b) cross((a), (b))\n"
             "#define _len(a) length(a)\n"
-            "#define _pow(a, b) pow(a, b)\n"
+            "#define _pow(a, b) pow((a), (b))\n"
             "#define _fract(a) fract(a)\n"
             "#define _floor(a) floor(a)\n"
             "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
             "#define _norm(a) normalize(a)\n"
-            "#define _lerp(a, b, k) mix(a, b, k)\n"
-            "#define _step(k, a) step(k, a)\n"
-            "#define _smooth(a, b, k) smoothstep(a, b, k)\n"
-            "#define _min(a, b) min(a, b)\n"
-            "#define _max(a, b) max(a, b)\n"
+            "#define _lerp(a, b, k) mix((a), (b), k)\n"
+            "#define _step(k, a) step((k), (a))\n"
+            "#define _smooth(a, b, k) smoothstep((a), (b), (k))\n"
+            "#define _min(a, b) min((a), (b))\n"
+            "#define _max(a, b) max((a), (b))\n"
             "#define _tex2nearest(i, a) _texture##i.sample(_nearestSampler, a)\n"
             "#define _tex2linear(i, a) _texture##i.sample(_linearSampler, a)\n"
+            "#define _tex2raw(i, a) _texture##i.read(ushort2(a.x * (_texture##i.get_width() - 1), a.y * (_texture##i.get_height() - 1)), 0)\n"
             "\n"
             "const sampler _nearestSampler(mag_filter::nearest, min_filter::nearest);\n"
             "const sampler _linearSampler(mag_filter::linear, min_filter::linear);\n"

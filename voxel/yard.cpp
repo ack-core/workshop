@@ -1,24 +1,24 @@
 
 #include "yard.h"
 #include "yard_base.h"
-#include "yard_square.h"
+#include "yard_stead.h"
 #include "yard_thing.h"
-#include "yard_object.h"
+#include "yard_actor.h"
 
 #include "thirdparty/expect/expect.h"
+
+#include "simulation.h"
 
 #include <unordered_map>
 #include <vector>
 #include <sstream>
 
-namespace {
-    static const std::size_t LOADING_DEPTH = 3;
-    static const std::size_t RENDERING_DEPTH = 2;
-    static const float GLOBAL_COORD_DIV = 16.0f;
-}
-
 namespace voxel {
-    class YardImpl : public std::enable_shared_from_this<YardImpl>, public YardInterface, public YardFacility, public YardCollision {
+    class YardImpl : public std::enable_shared_from_this<YardImpl>, public YardInterface, public YardFacility {
+    public:
+        static const std::uint64_t INVALID_ID = std::uint64_t(-1);
+        static constexpr float GLOBAL_COORD_DIV = 16.0f;
+        
     public:
         YardImpl(
             const foundation::PlatformInterfacePtr &platform,
@@ -35,17 +35,21 @@ namespace voxel {
         const resource::MeshProviderPtr &getMeshProvider() const override { return _meshProvider; }
         const resource::TextureProviderPtr &getTextureProvider() const override { return _textureProvider; }
         const SceneInterfacePtr &getScene() const override { return _scene; }
-    
-    public:
-        void correctMovement(const math::vector3f &position, math::vector3f &movement) const override;
         
     public:
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) override;
         void loadYard(const char *src, util::callback<void(bool loaded)> &&completion) override;
-        auto addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Object> override;
+        void saveYard(const char *outputPath, util::callback<void(bool saved)> &&completion) override;
+        void addActorType(const char *type, const char *model, const math::vector3f &offset, float radius) override;
+        
+        auto addThing(const char *model, const math::vector3f &position) -> std::shared_ptr<Thing> override;
+        auto addStead(const char *heightmap, const char *texture, const math::vector3f &position) -> std::shared_ptr<Stead> override;
+        auto addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Actor> override;
+
         void update(float dtSec) override;
         
     public:
+        auto _addThing(const char *model, const math::vector3f &position, std::uint64_t id = INVALID_ID) -> std::shared_ptr<Thing>;
         void _addStatic(std::uint64_t id, const std::shared_ptr<YardStatic> &object);
         void _clearYard();
         
@@ -54,17 +58,21 @@ namespace voxel {
         const foundation::RenderingInterfacePtr _rendering;
         const resource::MeshProviderPtr _meshProvider;
         const resource::TextureProviderPtr _textureProvider;
+
+        const SimulationInterfacePtr _simulation;
         const SceneInterfacePtr _scene;
         
         struct Node {
             std::vector<YardStatic *> items;
         };
         
-        bool _partial;
         std::unordered_map<std::uint64_t, Node> _nodes;
         std::unordered_map<std::uint64_t, std::shared_ptr<YardStatic>> _statics;
-        std::unordered_map<std::string, YardObjectType> _objectTypes;
-        std::vector<std::shared_ptr<YardObjectImpl>> _objects;
+
+        std::unordered_map<std::string, YardActorType> _actorTypes;
+        std::vector<std::shared_ptr<YardActorImpl>> _actors;
+        
+        std::uint64_t _lastId = 0x1000;
     };
 }
 
@@ -92,17 +100,13 @@ namespace voxel {
     , _rendering(rendering)
     , _meshProvider(meshProvider)
     , _textureProvider(textureProvider)
+    , _simulation(SimulationInterface::instance())
     , _scene(scene)
-    , _partial(false)
     {    
     }
     
     YardImpl::~YardImpl() {
     
-    }
-    
-    void YardImpl::correctMovement(const math::vector3f &position, math::vector3f &movement) const {
-        // collide
     }
     
     void YardImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &target) {
@@ -131,9 +135,9 @@ namespace voxel {
                             std::istringstream input = std::istringstream(block);
                             
                             while (input.eof() == false && input >> parameter) {
-                                if (parameter == "partial" && bool(input >> std::boolalpha >> self->_partial) == false) {
-                                    platform->logError("[YardImpl::loadYard] options block has invalid 'partial' syntax\n", id);
-                                }
+                                //if (parameter == "partial" && bool(input >> std::boolalpha >> self->_partial) == false) {
+                                //    platform->logError("[YardImpl::loadYard] options block has invalid 'partial' syntax\n", id);
+                                //}
                                 input >> std::ws;
                             }
                             
@@ -141,7 +145,7 @@ namespace voxel {
                                 platform->logError("[YardImpl::loadYard] unable to load 'options' block\n", id);
                             }
                         }
-                        if (type == "square" && bool(source >> id >> expect::braced(block, '{', '}'))) {
+                        if (type == "stead" && bool(source >> id >> expect::braced(block, '{', '}'))) {
                             std::istringstream input = std::istringstream(block);
                             std::string texture, heightmap;
                             
@@ -176,7 +180,7 @@ namespace voxel {
                                         if (hmInfo) {
                                             if (txInfo->type == resource::TextureInfo::Type::RGBA8 && hmInfo->type == resource::TextureInfo::Type::GRAYSCALE8) {
                                                 if (txInfo->width == hmInfo->width + 1 && txInfo->height == hmInfo->height + 1) {
-                                                    self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::move(heightmap)));
+                                                    self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, bbox, std::move(texture), std::move(heightmap)));
                                                 }
                                                 else {
                                                     platform->logError("[YardImpl::loadYard] texture and heightmap doesn't fit each other for square with id = '%zu'\n", id);
@@ -191,7 +195,7 @@ namespace voxel {
                                         }
                                     }
                                     else {
-                                        self->_addStatic(id, std::make_shared<YardSquare>(*self, bbox, std::move(texture), std::string()));
+                                        self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, bbox, std::move(texture), std::string()));
                                     }
                                 }
                                 else {
@@ -220,27 +224,17 @@ namespace voxel {
                             }
                             
                             if (input.fail() == false) {
-                                if (const resource::MeshInfo *info = self->_meshProvider->getMeshInfo(model.data())) {
-                                    bbox.xmin = position.x - 0.5;
-                                    bbox.ymin = position.y - 0.5;
-                                    bbox.zmin = position.z - 0.5;
-                                    bbox.xmax = bbox.xmin + info->sizeX;
-                                    bbox.ymax = bbox.ymin + info->sizeY;
-                                    bbox.zmax = bbox.zmin + info->sizeZ;
-                                    self->_addStatic(id, std::make_shared<YardThing>(*self, bbox, std::move(model)));
-                                }
-                                else {
-                                    platform->logError("[YardImpl::loadYard] mesh '%s' for thing with id = '%zu' has no info\n", model.data(), id);
-                                }
+                                self->_addThing(model.data(), position, id);
                             }
                             else {
                                 platform->logError("[YardImpl::loadYard] unable to load thing with id = '%zu'\n", id);
                             }
                         }
-                        if (type == "object" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
+                        if (type == "actor" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
                             std::istringstream input = std::istringstream(block);
                             std::string model;
                             math::vector3f center;
+                            float radius;
                             
                             while (input.eof() == false && input >> parameter) {
                                 if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
@@ -249,11 +243,14 @@ namespace voxel {
                                 if (parameter == "center" && bool(input >> center.x >> center.y >> center.z) == false) {
                                     platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'center' syntax\n", name.data());
                                 }
+                                if (parameter == "radius" && bool(input >> radius) == false) {
+                                    platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'radius' syntax\n", name.data());
+                                }
                                 input >> std::ws;
                             }
                             
                             if (input.fail() == false) {
-                                self->_objectTypes.emplace(name, YardObjectType{std::move(model), center});
+                                self->_actorTypes.emplace(name, YardActorType{std::move(model), center, radius});
                             }
                             else {
                                 platform->logError("[YardImpl::loadYard] unable to load object type '%s'\n", name.data());
@@ -287,11 +284,27 @@ namespace voxel {
         });
     }
     
-    std::shared_ptr<YardImpl::Object> YardImpl::addObject(const char *type, const math::vector3f &position, const math::vector3f &direction) {
-        auto index = _objectTypes.find(type);
-        if (index != _objectTypes.end()) {
-            std::shared_ptr<YardObjectImpl> object = std::make_shared<YardObjectImpl>(*this, *this, index->second, position, direction);
-            _objects.emplace_back(object);
+    void YardImpl::saveYard(const char *outputPath, util::callback<void(bool saved)> &&completion) {
+    
+    }
+    
+    void YardImpl::addActorType(const char *type, const char *model, const math::vector3f &offset, float radius) {
+    
+    }
+    
+    std::shared_ptr<YardInterface::Thing> YardImpl::addThing(const char *model, const math::vector3f &position) {
+        return _addThing(model, position, _lastId++);
+    }
+
+    std::shared_ptr<YardInterface::Stead> YardImpl::addStead(const char *heightmap, const char *texture, const math::vector3f &position) {
+    
+    }
+    
+    std::shared_ptr<YardInterface::Actor> YardImpl::addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) {
+        auto index = _actorTypes.find(type);
+        if (index != _actorTypes.end()) {
+            std::shared_ptr<YardActorImpl> actor = std::make_shared<YardActorImpl>(*this, index->second, position, direction);
+            return _actors.emplace_back(actor);
         }
         else {
             _platform->logError("[YardImpl::addObject] unknown object type '%s'\n", type);
@@ -301,22 +314,38 @@ namespace voxel {
     }
     
     void YardImpl::update(float dtSec) {
-        if (_partial) {
-        
+        for (auto &item : _statics) {
+            item.second->updateState(YardLoadingState::RENDERING);
         }
-        else {
-            for (auto &item : _statics) {
-                item.second->updateState(YardStatic::State::RENDERING);
-            }
-        }
-        
-        for (auto &item : _objects) {
+        for (auto &item : _actors) {
             item->update(dtSec);
         }
     }
     
+    std::shared_ptr<YardInterface::Thing> YardImpl::_addThing(const char *model, const math::vector3f &position, std::uint64_t id) {
+        std::shared_ptr<YardThingImpl> thing = nullptr;
+        
+        if (const resource::MeshInfo *info = _meshProvider->getMeshInfo(model)) {
+            math::bound3f bbox;
+            bbox.xmin = 0.5;
+            bbox.ymin = 0.5;
+            bbox.zmin = 0.5;
+            bbox.xmax = bbox.xmin + info->sizeX;
+            bbox.ymax = bbox.ymin + info->sizeY;
+            bbox.zmax = bbox.zmin + info->sizeZ;
+            thing = std::make_shared<YardThingImpl>(*this, position, bbox, std::move(model));
+            _addStatic(id, thing);
+        }
+        else {
+            _platform->logError("[YardImpl::loadYard] mesh '%s' has no info\n", model);
+        }
+        
+        return thing;
+    }
+    
     void YardImpl::_addStatic(std::uint64_t id, const std::shared_ptr<YardStatic> &object) {
         const math::bound3f &bbox = object->getBBox();
+        
         int startx = int(bbox.xmin / GLOBAL_COORD_DIV);
         int startz = int(bbox.zmin / GLOBAL_COORD_DIV);
         int endx = int(bbox.xmax / GLOBAL_COORD_DIV);

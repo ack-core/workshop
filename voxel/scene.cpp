@@ -16,7 +16,7 @@ namespace voxel {
     
     public:
         struct LinesBlock {
-            math::vector4f position;
+            math::vector4f position = {0, 0, 0, 1};
             math::vector4f positions[LINES_IN_BLOCK_MAX * 2];
             math::color colors[LINES_IN_BLOCK_MAX];
             std::uint32_t lineCount;
@@ -27,13 +27,13 @@ namespace voxel {
     public:
         void setPosition(const math::vector3f &position) override {
             for (auto &block : blocks) {
-                block.position = math::vector4f(position, 0.0f);
+                block.position = math::vector4f(position, 1.0f);
             }
         }
         std::uint32_t addLine(const math::vector3f &start, const math::vector3f &end, const math::color &rgba) override {
             LinesBlock &block = blocks.size() == 0 || blocks.back().lineCount >= LINES_IN_BLOCK_MAX ? blocks.emplace_back() : blocks.back();
-            block.positions[block.lineCount * 2 + 0] = math::vector4f(start, 1.0f);
-            block.positions[block.lineCount * 2 + 1] = math::vector4f(end, 1.0f);
+            block.positions[block.lineCount * 2 + 0] = math::vector4f(start, 0.0f);
+            block.positions[block.lineCount * 2 + 1] = math::vector4f(end, 0.0f);
             block.colors[block.lineCount] = rgba;
             return std::uint32_t(blocks.size() - 1) * LINES_IN_BLOCK_MAX + block.lineCount++;
         }
@@ -42,12 +42,12 @@ namespace voxel {
             std::uint32_t offset = index % LINES_IN_BLOCK_MAX;
             
             if (bindex < blocks.size()) {
-                blocks[bindex].positions[offset * 2 + 0] = math::vector4f(start, 1.0f);
-                blocks[bindex].positions[offset * 2 + 1] = math::vector4f(end, 1.0f);
+                blocks[bindex].positions[offset * 2 + 0] = math::vector4f(start, 0.0f);
+                blocks[bindex].positions[offset * 2 + 1] = math::vector4f(end, 0.0f);
                 blocks[bindex].colors[offset] = rgba;
             }
         }
-        void clear() override {
+        void removeAllLines() override {
             blocks.clear();
         }
 
@@ -67,7 +67,13 @@ namespace voxel {
     class BoundingBoxImpl : public SceneInterface::BoundingBox {
     public:
         foundation::RenderDataPtr lines;
-
+        math::vector4f position = {0, 0, 0, 1};
+        
+    public:
+        void setPosition(const math::vector3f &position) override {
+            this->position = position.atv4start(1.0f);
+        }
+        
     public:
         BoundingBoxImpl(foundation::RenderDataPtr &&v) : lines(std::move(v)) {}
         ~BoundingBoxImpl() override {}
@@ -76,6 +82,12 @@ namespace voxel {
     class StaticModelImpl : public SceneInterface::StaticModel {
     public:
         foundation::RenderDataPtr voxels;
+        math::vector4f position = {0, 0, 0, 1};
+        
+    public:
+        void setPosition(const math::vector3f &position) override {
+            this->position = position.atv4start(1.0f);
+        }
         
     public:
         StaticModelImpl(foundation::RenderDataPtr &&v) : voxels(std::move(v)) {}
@@ -87,6 +99,12 @@ namespace voxel {
         foundation::RenderDataPtr vertices;
         foundation::RenderDataPtr indices;
         foundation::RenderTexturePtr texture;
+        math::vector4f position = {0, 0, 0, 1};
+        
+    public:
+        void setPosition(const math::vector3f &position) override {
+            this->position = position.atv4start(1.0f);
+        }
     
     public:
         TexturedModelImpl(foundation::RenderDataPtr &&v, foundation::RenderDataPtr &&i, const foundation::RenderTexturePtr &t) {
@@ -145,7 +163,7 @@ namespace voxel {
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
             const resource::TextureProviderPtr &textureProvider,
-            const char *palette
+            const foundation::RenderTexturePtr &palette
         );
         ~SceneInterfaceImpl() override;
         
@@ -216,7 +234,7 @@ namespace voxel {
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
         const resource::TextureProviderPtr &textureProvider,
-        const char *palette
+        const foundation::RenderTexturePtr &palette
     ) {
         return std::make_shared<SceneInterfaceImpl>(platform, rendering, textureProvider, palette);
     }
@@ -243,8 +261,11 @@ namespace {
     )";
     
     const char *g_boundingBoxShaderSrc = R"(
+        const {
+            globalPosition : float4
+        }
         vssrc {
-            output_position = _transform(vertex_position, _transform(frame_viewMatrix, frame_projMatrix));
+            output_position = _transform(const_globalPosition + vertex_position, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
             output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
@@ -259,33 +280,27 @@ namespace {
                 [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
         }
         const {
-            modelTransform : matrix4
-            sunDirection : float4
-            sunColorAndPower : float4
-            observingPointAndRadius : float4
+            globalPosition : float4
         }
         inout {
-            tmp : float4
+            albedo : float2
         }
         vssrc {
             float3 cubeCenter = float3(instance_position_color_mask.xyz);
             float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
             
             int  faceIndex = vertex_ID / 4 + int((toCamSign.zxy[vertex_ID / 4] * 1.5 + 1.5) + 1.0);
+            int  colorIndex = instance_position_color_mask.w & 0xff;
             int  mask = (instance_position_color_mask.w >> (8 + faceIndex)) & 0x1;
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[vertex_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(instance_scale.xyz), 0.0);
             
-            //float3 faceNormal = fixed_axs[faceIndex];
-            //float3 dirB = fixed_bnm[faceIndex];
-            //float3 dirT = fixed_tgt[faceIndex];
-            
-            output_tmp = float4(float(faceIndex) / 6.0, 0.0, 0.0, 1.0);  //float4(1.0, 1.0, 1.0, 1.0); //
+            output_albedo = float2(colorIndex & 7, (256 - colorIndex) >> 3) / float2(7.0, 31.0); //
             output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
-            output_color[0] = input_tmp;
+            output_color[0] = _tex2nearest(0, input_albedo);
         }
     )";
     
@@ -358,11 +373,12 @@ namespace voxel {
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
         const resource::TextureProviderPtr &textureProvider,
-        const char *palette
+        const foundation::RenderTexturePtr &palette
     )
     : _platform(platform)
     , _rendering(rendering)
     , _textureProvider(textureProvider)
+    , _palette(palette)
     {
         _lineSetShader = rendering->createShader("scene_static_lineset", g_lineSetShaderSrc,
             { // vertex
@@ -408,7 +424,6 @@ namespace voxel {
         _shaderConstants.observingPointAndRadius = math::vector4f(0.0, 0.0, 0.0, 32.0);
         _shaderConstants.sunColorAndPower = math::vector4f(1.0, 0.0, 0.0, 1.0);
         _shaderConstants.sunDirection = math::vector4f(math::vector3f(0.2, 1.0, 0.3).normalized(), 1.0f);
-        _palette = nullptr;
         
         setCameraLookAt({45, 45, 45}, {0, 0, 0});
     }
@@ -444,22 +459,22 @@ namespace voxel {
     SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::bound3f &bbox) {
         std::shared_ptr<BoundingBoxImpl> model = nullptr;
         math::vector4f data[24] = {
-            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 1.0f), math::vector4f(bbox.xmax, bbox.ymin, bbox.zmin, 1.0f),
-            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 1.0f), math::vector4f(bbox.xmin, bbox.ymin, bbox.zmax, 1.0f),
-            math::vector4f(bbox.xmax, bbox.ymin, bbox.zmin, 1.0f), math::vector4f(bbox.xmax, bbox.ymin, bbox.zmax, 1.0f),
-            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmax, 1.0f), math::vector4f(bbox.xmax, bbox.ymin, bbox.zmax, 1.0f),
-
-            math::vector4f(bbox.xmin, bbox.ymax, bbox.zmin, 1.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmin, 1.0f),
-            math::vector4f(bbox.xmin, bbox.ymax, bbox.zmin, 1.0f), math::vector4f(bbox.xmin, bbox.ymax, bbox.zmax, 1.0f),
-            math::vector4f(bbox.xmax, bbox.ymax, bbox.zmin, 1.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 1.0f),
-            math::vector4f(bbox.xmin, bbox.ymax, bbox.zmax, 1.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 1.0f),
-
-            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 1.0f), math::vector4f(bbox.xmin, bbox.ymax, bbox.zmin, 1.0f),
-            math::vector4f(bbox.xmax, bbox.ymin, bbox.zmin, 1.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmin, 1.0f),
-            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmax, 1.0f), math::vector4f(bbox.xmin, bbox.ymax, bbox.zmax, 1.0f),
-            math::vector4f(bbox.xmax, bbox.ymin, bbox.zmax, 1.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 1.0f),
+            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 0.0f), math::vector4f(bbox.xmax, bbox.ymin, bbox.zmin, 0.0f),
+            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 0.0f), math::vector4f(bbox.xmin, bbox.ymin, bbox.zmax, 0.0f),
+            math::vector4f(bbox.xmax, bbox.ymin, bbox.zmin, 0.0f), math::vector4f(bbox.xmax, bbox.ymin, bbox.zmax, 0.0f),
+            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmax, 0.0f), math::vector4f(bbox.xmax, bbox.ymin, bbox.zmax, 0.0f),
+            
+            math::vector4f(bbox.xmin, bbox.ymax, bbox.zmin, 0.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmin, 0.0f),
+            math::vector4f(bbox.xmin, bbox.ymax, bbox.zmin, 0.0f), math::vector4f(bbox.xmin, bbox.ymax, bbox.zmax, 0.0f),
+            math::vector4f(bbox.xmax, bbox.ymax, bbox.zmin, 0.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 0.0f),
+            math::vector4f(bbox.xmin, bbox.ymax, bbox.zmax, 0.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 0.0f),
+            
+            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 0.0f), math::vector4f(bbox.xmin, bbox.ymax, bbox.zmin, 0.0f),
+            math::vector4f(bbox.xmax, bbox.ymin, bbox.zmin, 0.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmin, 0.0f),
+            math::vector4f(bbox.xmin, bbox.ymin, bbox.zmax, 0.0f), math::vector4f(bbox.xmin, bbox.ymax, bbox.zmax, 0.0f),
+            math::vector4f(bbox.xmax, bbox.ymin, bbox.zmax, 0.0f), math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 0.0f),
         };
-
+        
         foundation::RenderDataPtr vertexData = _rendering->createData(data, 24, sizeof(math::vector4f));
         
         if (vertexData) {
@@ -542,6 +557,7 @@ namespace voxel {
         }
         
         _rendering->applyState(_staticMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        _rendering->applyTextures(&_palette, 1);
         for (const auto &staticMesh : _staticMeshes) {
             _rendering->drawGeometry(nullptr, staticMesh->voxels, 12, staticMesh->voxels->getCount(), foundation::RenderTopology::TRIANGLESTRIP);
         }
@@ -554,6 +570,7 @@ namespace voxel {
 
         _rendering->applyState(_boundingBoxShader, foundation::RenderPassCommonConfigs::DEFAULT());
         for (const auto &boundingBox : _boundingBoxes) {
+            _rendering->applyShaderConstants(&boundingBox->position);
             _rendering->drawGeometry(boundingBox->lines, 24, foundation::RenderTopology::LINES);
         }
         

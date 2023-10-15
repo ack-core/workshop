@@ -13,8 +13,11 @@ namespace resource {
         ~TextureProviderImpl() override;
         
         const TextureInfo *getTextureInfo(const char *texPath) override;
+
         void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const TextureInfo &)> &&completion) override;
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
+        auto getOrLoadTexture(const char *texPath) -> const foundation::RenderTexturePtr override;
+
         void update(float dtSec) override;
         
     private:
@@ -51,7 +54,7 @@ namespace resource {
         std::string line, path, type;
         
         while (std::getline(source, line)) {
-            printf("-->> %s\n", line.data());
+            printf("-->> %s", line.data());
             std::istringstream input = std::istringstream(line);
             TextureData data = {};
             
@@ -124,6 +127,8 @@ namespace resource {
                 else {
                     platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' must have a valid format (rgba8, lum8)", path);
                 }
+                
+                upng_free(upng);
             }
             else {
                 platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' is not a valid png file", path);
@@ -214,7 +219,7 @@ namespace resource {
                                 
                                 if (ctx.data) {
                                     TextureData &texture = self->_textures.emplace(path, TextureData{ctx.w, ctx.h, ctx.type}).first->second;
-                                    texture.ptr = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, ctx.w, ctx.h, {ctx.data.get()});;
+                                    texture.ptr = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, ctx.w, ctx.h, {ctx.data.get()});
                                     completion(texture.ptr);
                                 }
                                 else {
@@ -232,6 +237,38 @@ namespace resource {
                 }
             });
         }
+    }
+
+    const foundation::RenderTexturePtr TextureProviderImpl::getOrLoadTexture(const char *texPath) {
+        std::unique_ptr<uint8_t[]> data;
+        std::size_t size;
+        
+        if (_platform->loadFile((std::string(texPath) + ".png").data(), data, size)) {
+            upng_t *upng = upng_new_from_bytes(data.get(), (unsigned long)(size));
+            
+            if (upng != nullptr && *reinterpret_cast<const unsigned *>(data.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
+                if (upng_get_format(upng) == UPNG_RGBA8) {
+                    TextureData &texture = _textures.emplace(texPath, TextureData{upng_get_width(upng), upng_get_height(upng), TextureInfo::Type::RGBA8}).first->second;
+                    texture.ptr = _rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, upng_get_width(upng), upng_get_height(upng), { upng_get_buffer(upng) });
+                    return texture.ptr;
+                }
+                else if (upng_get_format(upng) == UPNG_LUMINANCE8) {
+                    TextureData &texture = _textures.emplace(texPath, TextureData{upng_get_width(upng), upng_get_height(upng), TextureInfo::Type::GRAYSCALE8}).first->second;
+                    texture.ptr = _rendering->createTexture(foundation::RenderTextureFormat::R8UN, upng_get_width(upng), upng_get_height(upng), { upng_get_buffer(upng) });
+                    return texture.ptr;
+                }
+                else {
+                    _platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' must have a valid format (rgba8, lum8)", texPath);
+                }
+                
+                upng_free(upng);
+            }
+            else {
+                _platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' is not a valid png file", texPath);
+            }
+        }
+        
+        return nullptr;
     }
     
     void TextureProviderImpl::update(float dtSec) {

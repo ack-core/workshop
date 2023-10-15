@@ -36,7 +36,7 @@ namespace resource {
         MeshInfo info;
         
         while (std::getline(source, line)) {
-            printf("-->> %s\n", line.data());
+            printf("-->> %s", line.data());
             std::istringstream input = std::istringstream(line);
             
             if (line.length()) {
@@ -133,7 +133,7 @@ namespace resource {
                                                     std::uint8_t r = *(std::uint8_t *)(data + c * 4 + 3);
                                                     
                                                     int off = (z + 1) + (x + 1) * sizeZ + (y + 1) * sizeX * sizeZ;
-                                                    voxMap[off].colorIndex = r;
+                                                    voxMap[off].colorIndex = r - 1;
                                                     voxMap[off].exist = 1;
                                                     voxMap[off].mask = 0b111111;
                                                 }
