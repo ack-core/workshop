@@ -105,6 +105,7 @@ namespace {
                 data = std::move(_queue.front().data);
                 length = _queue.front().length;
                 _queue.pop();
+                return true;
             }
             
             return false;
@@ -612,7 +613,8 @@ namespace dh {
             if (_scopeTemplates[i].first.find('.') == std::string::npos) {
                 ScopeId id = getNextScopeId();
                 std::shared_ptr<ScopeImpl> scope = std::make_shared<ScopeImpl>(*_logger, id, i, _scopeTemplates, _queue);
-                _roots.emplace(_scopeTemplates[i].first, std::move(scope));
+                _scopes.emplace(id, scope);
+                _roots.emplace(_scopeTemplates[i].first, scope);
             }
         }
         

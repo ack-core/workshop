@@ -26,6 +26,12 @@ namespace resource {
         struct Voxel {
             std::int16_t positionX, positionY, positionZ;
             std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ;
+            std::uint8_t px : 4; // distance on plane (0 - 15)
+            std::uint8_t nx : 4;
+            std::uint8_t py : 4;
+            std::uint8_t ny : 4;
+            std::uint8_t pz : 4;
+            std::uint8_t nz : 4;
         };
         struct Frame {
             std::unique_ptr<Voxel[]> voxels;

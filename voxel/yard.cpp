@@ -40,11 +40,14 @@ namespace voxel {
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &target) override;
         void loadYard(const char *src, util::callback<void(bool loaded)> &&completion) override;
         void saveYard(const char *outputPath, util::callback<void(bool saved)> &&completion) override;
-        void addActorType(const char *type, const char *model, const math::vector3f &offset, float radius) override;
+        void addActorType(const char *type, ActorTypeDesc &&desc) override;
         
         auto addThing(const char *model, const math::vector3f &position) -> std::shared_ptr<Thing> override;
         auto addStead(const char *heightmap, const char *texture, const math::vector3f &position) -> std::shared_ptr<Stead> override;
         auto addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Actor> override;
+
+        void remove(std::uint64_t id) override;
+        void remove(const std::shared_ptr<Actor> &actor) override;
 
         void update(float dtSec) override;
         
@@ -69,7 +72,7 @@ namespace voxel {
         std::unordered_map<std::uint64_t, Node> _nodes;
         std::unordered_map<std::uint64_t, std::shared_ptr<YardStatic>> _statics;
 
-        std::unordered_map<std::string, YardActorType> _actorTypes;
+        std::unordered_map<std::string, ActorTypeDesc> _actorTypes;
         std::vector<std::shared_ptr<YardActorImpl>> _actors;
         
         std::uint64_t _lastId = 0x1000;
@@ -180,7 +183,7 @@ namespace voxel {
                                         if (hmInfo) {
                                             if (txInfo->type == resource::TextureInfo::Type::RGBA8 && hmInfo->type == resource::TextureInfo::Type::GRAYSCALE8) {
                                                 if (txInfo->width == hmInfo->width + 1 && txInfo->height == hmInfo->height + 1) {
-                                                    self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, bbox, std::move(texture), std::move(heightmap)));
+                                                    self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, id, bbox, std::move(texture), std::move(heightmap)));
                                                 }
                                                 else {
                                                     platform->logError("[YardImpl::loadYard] texture and heightmap doesn't fit each other for square with id = '%zu'\n", id);
@@ -195,7 +198,7 @@ namespace voxel {
                                         }
                                     }
                                     else {
-                                        self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, bbox, std::move(texture), std::string()));
+                                        self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, id, bbox, std::move(texture), std::string()));
                                     }
                                 }
                                 else {
@@ -208,10 +211,10 @@ namespace voxel {
                         }
                         if (type == "thing" && bool(source >> id >> expect::braced(block, '{', '}'))) {
                             std::istringstream input = std::istringstream(block);
-                            std::string model;
+                            std::string modelPath;
                             
                             while (input.eof() == false && input >> parameter) {
-                                if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
+                                if (parameter == "model" && bool(input >> expect::braced(modelPath, '"', '"')) == false) {
                                     platform->logError("[YardImpl::loadYard] thing with id = '%zu' has invalid 'model' syntax\n", id);
                                 }
                                 if (parameter == "position" && bool(input >> position.x >> position.y >> position.z) == false) {
@@ -224,7 +227,7 @@ namespace voxel {
                             }
                             
                             if (input.fail() == false) {
-                                self->_addThing(model.data(), position, id);
+                                self->_addThing(modelPath.data(), position, id);
                             }
                             else {
                                 platform->logError("[YardImpl::loadYard] unable to load thing with id = '%zu'\n", id);
@@ -232,15 +235,15 @@ namespace voxel {
                         }
                         if (type == "actor" && bool(source >> expect::braced(name, '"', '"') >> expect::braced(block, '{', '}'))) {
                             std::istringstream input = std::istringstream(block);
-                            std::string model;
-                            math::vector3f center;
+                            std::string modelPath;
+                            math::vector3f centerPoint;
                             float radius;
                             
                             while (input.eof() == false && input >> parameter) {
-                                if (parameter == "model" && bool(input >> expect::braced(model, '"', '"')) == false) {
+                                if (parameter == "model" && bool(input >> expect::braced(modelPath, '"', '"')) == false) {
                                     platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'model' syntax\n", name.data());
                                 }
-                                if (parameter == "center" && bool(input >> center.x >> center.y >> center.z) == false) {
+                                if (parameter == "center" && bool(input >> centerPoint.x >> centerPoint.y >> centerPoint.z) == false) {
                                     platform->logError("[YardImpl::loadYard] object type '%s' has invalid 'center' syntax\n", name.data());
                                 }
                                 if (parameter == "radius" && bool(input >> radius) == false) {
@@ -250,7 +253,11 @@ namespace voxel {
                             }
                             
                             if (input.fail() == false) {
-                                self->_actorTypes.emplace(name, YardActorType{std::move(model), center, radius});
+                                self->addActorType(name.data(), ActorTypeDesc {
+                                    .modelPath = modelPath,
+                                    .centerPoint = centerPoint,
+                                    .radius = radius
+                                });
                             }
                             else {
                                 platform->logError("[YardImpl::loadYard] unable to load object type '%s'\n", name.data());
@@ -288,8 +295,8 @@ namespace voxel {
     
     }
     
-    void YardImpl::addActorType(const char *type, const char *model, const math::vector3f &offset, float radius) {
-    
+    void YardImpl::addActorType(const char *type, ActorTypeDesc &&desc) {
+        _actorTypes.emplace(type, std::move(desc));
     }
     
     std::shared_ptr<YardInterface::Thing> YardImpl::addThing(const char *model, const math::vector3f &position) {
@@ -313,6 +320,14 @@ namespace voxel {
         return nullptr;
     }
     
+    void YardImpl::remove(std::uint64_t id) {
+    
+    }
+    
+    void YardImpl::remove(const std::shared_ptr<Actor> &actor) {
+    
+    }
+    
     void YardImpl::update(float dtSec) {
         for (auto &item : _statics) {
             item.second->updateState(YardLoadingState::RENDERING);
@@ -327,13 +342,13 @@ namespace voxel {
         
         if (const resource::MeshInfo *info = _meshProvider->getMeshInfo(model)) {
             math::bound3f bbox;
-            bbox.xmin = 0.5;
-            bbox.ymin = 0.5;
-            bbox.zmin = 0.5;
+            bbox.xmin = -0.5;
+            bbox.ymin = -0.5;
+            bbox.zmin = -0.5;
             bbox.xmax = bbox.xmin + info->sizeX;
             bbox.ymax = bbox.ymin + info->sizeY;
             bbox.zmax = bbox.zmin + info->sizeZ;
-            thing = std::make_shared<YardThingImpl>(*this, position, bbox, std::move(model));
+            thing = std::make_shared<YardThingImpl>(*this, id, position, bbox, std::move(model));
             _addStatic(id, thing);
         }
         else {

@@ -7,7 +7,7 @@
 namespace voxel {
     class YardActorImpl : public std::enable_shared_from_this<YardActorImpl>, public YardInterface::Actor {
     public:
-        YardActorImpl(const YardFacility &facility, const YardActorType &type, const math::vector3f &position, const math::vector3f &direction);
+        YardActorImpl(const YardFacility &facility, const YardInterface::ActorTypeDesc &type, const math::vector3f &position, const math::vector3f &direction);
         ~YardActorImpl() override;
         
     public:
@@ -21,7 +21,7 @@ namespace voxel {
         
     private:
         const YardFacility &_facility;
-        const YardActorType &_type;
+        const YardInterface::ActorTypeDesc &_type;
         
         math::vector3f _currentPosition;
         math::vector3f _currentDirection;

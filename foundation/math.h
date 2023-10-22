@@ -1,4 +1,8 @@
 
+// TODO: + default transform enum constant
+//       + +=, *=, etc
+//       + xOz
+
 // Basic math for games
 // key features:
 //
@@ -6,6 +10,7 @@
 #pragma once
 #include <limits>
 #include <cmath>
+#include <algorithm>
 
 namespace math {
     using scalar = float;
@@ -43,6 +48,7 @@ namespace math {
         auto atv4end(scalar x, scalar y) const -> vector4f;
         auto dot(const vector2f &other) const -> scalar;
         auto cross(const vector2f &other) const -> scalar;
+        auto angleTo(const vector2f &other) const -> scalar;
         auto rotated(scalar radians) const -> vector2f;
         auto distanceTo(const vector2f &other) const -> scalar;
         auto transformed(const transform2f &trfm, bool likePosition = false) const -> vector2f;
@@ -69,6 +75,7 @@ namespace math {
         auto atv4end(scalar x) const -> vector4f;
         auto dot(const vector3f &other) const -> scalar;
         auto cross(const vector3f &other) const -> vector3f;
+        auto angleTo(const vector3f &other) const -> scalar;
         auto rotated(const vector3f &axis, scalar radians) const -> vector3f;
         auto distanceTo(const vector3f &other) const -> scalar;
         auto transformed(const transform3f &trfm, bool likePosition = false) const -> vector3f;
@@ -570,6 +577,10 @@ namespace math {
         return {rx, ry};
     }
     template<int Ix, int Iy>
+    inline scalar swizzle2f<Ix, Iy>::angleTo(const vector2f &other) const {
+        return std::acos(std::min(scalar(1.0), std::max(scalar(-1.0), dot(other) / sqrtf(lengthSq() * other.lengthSq()))));
+    }
+    template<int Ix, int Iy>
     inline scalar swizzle2f<Ix, Iy>::distanceTo(const vector2f &other) const {
         const vector2f diff = other - *this;
         return std::sqrt(diff.dot(diff));
@@ -624,6 +635,10 @@ namespace math {
         return {
             flat[Iy] * other.z - flat[Iz] * other.y, flat[Iz] * other.x - flat[Ix] * other.z, flat[Ix] * other.y - flat[Iy] * other.x
         };
+    }
+    template<int Ix, int Iy, int Iz>
+    inline scalar swizzle3f<Ix, Iy, Iz>::angleTo(const vector3f &other) const {
+        return std::acos(std::min(scalar(1.0), std::max(scalar(-1.0), dot(other) / sqrtf(lengthSq() * other.lengthSq()))));
     }
     template<int Ix, int Iy, int Iz>
     inline vector3f swizzle3f<Ix, Iy, Iz>::rotated(const vector3f &axis, scalar radians) const {

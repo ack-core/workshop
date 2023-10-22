@@ -22,8 +22,8 @@ namespace game {
             }
         }
         
-        additional {
-            testA : vector3f = 10 20 0
+        graphics {
+            drawBBoxes : bool = true
         }
     )";
     

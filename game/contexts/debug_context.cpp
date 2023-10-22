@@ -7,6 +7,11 @@ namespace game {
     }
     
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
+        _axis = _api.scene->addLineSet(true, 3);
+        _axis->addLine({0.0f, 0.0f, 0.0f}, {1000.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
+        _axis->addLine({0.0f, 0.0f, 0.0f}, {0.0f, 1000.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f});
+        _axis->addLine({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1000.0f}, {0.0f, 0.0f, 1.0f, 1.0f});
+        
         _api.yard->setCameraLookAt(_center + _orbit, _center);
         _touchEventHandlerToken = _api.platform->addPointerEventHandler(
             [this](const foundation::PlatformPointerEventArgs &args) -> bool {
@@ -43,7 +48,21 @@ namespace game {
             }
         );
         
-        _api.yard->addThing("meshes/dev/castle_00", math::vector3f(0, 0, 0));
+        _api.yard->addActorType("knight", voxel::YardInterface::ActorTypeDesc {
+            .modelPath = "meshes/dev/knight_00",
+            .centerPoint = math::vector3f(3, 0, 3),
+            .radius = 4.0f,
+            .animFPS = 10.0f,
+            .animations = {
+                voxel::YardInterface::ActorTypeDesc::Animation {
+                    .name = "idle",
+                    .firstFrameIndex = 0,
+                    .lastFrameIndex = 5
+                }
+            }
+        });
+        _api.yard->addThing("meshes/dev/castle_01", math::vector3f(-50, 0, 0));
+        _api.yard->addActor("knight", math::vector3f(15, 0, 0), math::vector3f(-1, 0, -1));       
     }
     
     DebugContext::~DebugContext() {

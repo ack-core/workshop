@@ -20,12 +20,6 @@ namespace voxel {
         RENDERING,
     };
     
-    struct YardActorType {
-        std::string modelPath;
-        math::vector3f center;
-        float radius;
-    };
-    
     class YardFacility {
     public:
         virtual const foundation::PlatformInterfacePtr &getPlatform() const = 0;
@@ -38,7 +32,7 @@ namespace voxel {
     
     class YardStatic {
     public:
-        YardStatic(const YardFacility &facility, const math::bound3f &bbox);
+        YardStatic(const YardFacility &facility, std::uint64_t id, const math::bound3f &bbox);
         virtual ~YardStatic() = default;    
         virtual void updateState(YardLoadingState targetState) = 0;
         
@@ -48,6 +42,7 @@ namespace voxel {
         
     protected:
         const YardFacility &_facility;
+        const std::uint64_t _id;
         const math::bound3f _bbox;
 
         std::vector<YardStatic *> _links;

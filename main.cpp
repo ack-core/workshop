@@ -39,7 +39,6 @@ int main(int argc, const char * argv[]) {
     bool meshListLoaded = platform->loadFile("meshes.list", meshListData, meshListSize);
     bool ttfLoaded = platform->loadFile("arial.ttf", ttfData, ttfSize);
     
-    
     if (textureListLoaded && meshListLoaded && ttfLoaded) {
         std::string texturesList = std::string(reinterpret_cast<const char *>(textureListData.get()), textureListSize);
         std::string meshesList = std::string(reinterpret_cast<const char *>(meshListData.get()), meshListSize);
@@ -50,10 +49,12 @@ int main(int argc, const char * argv[]) {
         
         if (foundation::RenderTexturePtr palette = textureProvider->getOrLoadTexture("palette")) {
             auto datahub = dh::DataHub::instance(platform, game::datahub);
-            auto scene = voxel::SceneInterface::instance(platform, rendering, textureProvider, palette);
+            auto scene = voxel::SceneInterface::instance(platform, rendering, textureProvider, palette, datahub);
             auto yard = voxel::YardInterface::instance(platform, rendering, meshProvider, textureProvider, scene);
             auto ui = ui::StageInterface::instance(platform, rendering, textureProvider, fontAtlasProvider);
             auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);
+            
+            //datahub->getRootScope("graphics")->setBool("drawBBoxes", false);
             
             platform->run([&](float dtSec) {
                 textureProvider->update(dtSec);

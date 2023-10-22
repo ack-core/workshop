@@ -28,6 +28,18 @@ namespace voxel {
         );
         
     public:
+        struct ActorTypeDesc {
+            struct Animation {
+                std::string name;
+                std::uint32_t firstFrameIndex;
+                std::uint32_t lastFrameIndex;
+            };
+            const std::string modelPath = "";
+            const math::vector3f centerPoint = {0, 0, 0};
+            const std::vector<Animation> animations = {};
+            const float radius = 0.0;
+            const float animFPS = 1.0;
+        };
         struct Actor {
             virtual void rotate(const math::vector3f &targetDirection) = 0;
             virtual auto getRadius() const -> float = 0;
@@ -38,11 +50,13 @@ namespace voxel {
         struct Stead {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual auto getPosition() const -> const math::vector3f & = 0;
+            virtual auto getId() const -> std::uint64_t = 0;
             virtual ~Stead() = default;
         };
         struct Thing {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual auto getPosition() const -> const math::vector3f & = 0;
+            virtual auto getId() const -> std::uint64_t = 0;
             virtual ~Thing() = default;
         };
         
@@ -84,11 +98,14 @@ namespace voxel {
         //
         virtual void loadYard(const char *sourcePath, util::callback<void(bool loaded)> &&completion) = 0;
         virtual void saveYard(const char *outputPath, util::callback<void(bool saved)> &&completion) = 0;
-        virtual void addActorType(const char *type, const char *model, const math::vector3f &offset, float radius) = 0;
+        virtual void addActorType(const char *type, ActorTypeDesc &&desc) = 0;
         
         virtual auto addThing(const char *model, const math::vector3f &position) -> std::shared_ptr<Thing> = 0;
         virtual auto addStead(const char *heightmap, const char *texture, const math::vector3f &position) -> std::shared_ptr<Stead> = 0;
         virtual auto addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Actor> = 0;
+
+        virtual void remove(std::uint64_t id) = 0;
+        virtual void remove(const std::shared_ptr<Actor> &actor) = 0;
         
         virtual void update(float dtSec) = 0;
         

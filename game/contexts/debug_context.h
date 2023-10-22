@@ -16,9 +16,10 @@ namespace game {
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
 
-        math::vector3f _center = { 8, 10, 8 };
-        math::vector3f _orbit = { 0, 98, 42 };
+        math::vector3f _center = { 0, 0, 0 };
+        math::vector3f _orbit = { 0, 48, 22 };
 
         foundation::EventHandlerToken _touchEventHandlerToken;
+        voxel::SceneInterface::LineSetPtr _axis;
     };
 }

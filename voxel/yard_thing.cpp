@@ -4,8 +4,8 @@
 #include "yard_thing.h"
 
 namespace voxel {
-    YardThingImpl::YardThingImpl(const YardFacility &facility, const math::vector3f &position, const math::bound3f &bbox, std::string &&model)
-    : YardStatic(facility, bbox)
+    YardThingImpl::YardThingImpl(const YardFacility &facility, std::uint64_t id, const math::vector3f &position, const math::bound3f &bbox, std::string &&model)
+    : YardStatic(facility, id, bbox)
     , _position(position)
     , _modelPath(std::move(model))
     {
@@ -30,7 +30,11 @@ namespace voxel {
     const math::vector3f &YardThingImpl::getPosition() const {
         return _position;
     }
-    
+
+    std::uint64_t YardThingImpl::getId() const {
+        return _id;
+    }
+
     void YardThingImpl::updateState(YardLoadingState targetState) {
         if (_currentState != targetState) {
             if (targetState == YardLoadingState::NONE) { // unload
@@ -54,15 +58,16 @@ namespace voxel {
                                         ctx.voxels.reserve(mesh->frames[0].voxelCount);
                                         
                                         for (std::uint16_t i = 0; i < mesh->frames[0].voxelCount; i++) {
+                                            const resource::VoxelMesh::Voxel &src = mesh->frames[0].voxels[i];
                                             SceneInterface::VTXSVOX &voxel = ctx.voxels.emplace_back(SceneInterface::VTXSVOX{});
-                                            voxel.positionX = mesh->frames[0].voxels[i].positionX + std::uint16_t(self->_bbox.xmin + 0.5f + std::numeric_limits<float>::epsilon());
-                                            voxel.positionY = mesh->frames[0].voxels[i].positionY + std::uint16_t(self->_bbox.ymin + 0.5f + std::numeric_limits<float>::epsilon());
-                                            voxel.positionZ = mesh->frames[0].voxels[i].positionZ + std::uint16_t(self->_bbox.zmin + 0.5f + std::numeric_limits<float>::epsilon());
-                                            voxel.colorIndex = mesh->frames[0].voxels[i].colorIndex;
-                                            voxel.mask = mesh->frames[0].voxels[i].mask;
-                                            voxel.scaleX = mesh->frames[0].voxels[i].scaleX;
-                                            voxel.scaleY = mesh->frames[0].voxels[i].scaleY;
-                                            voxel.scaleZ = mesh->frames[0].voxels[i].scaleZ;
+                                            voxel.positionX = src.positionX;
+                                            voxel.positionY = src.positionY;
+                                            voxel.positionZ = src.positionZ;
+                                            voxel.colorIndex = src.colorIndex;
+                                            voxel.mask = src.mask;
+                                            voxel.scaleX = src.scaleX;
+                                            voxel.scaleY = src.scaleY;
+                                            voxel.scaleZ = src.scaleZ;
                                             voxel.reserved = 0;
                                         }
                                     }
@@ -88,6 +93,7 @@ namespace voxel {
                     if (_currentState == YardLoadingState::LOADED) {
                         _currentState = targetState;
                         _model = _facility.getScene()->addStaticModel(_voxData);
+                        _model->setPosition(_position);
                     }
                 }
                 if (targetState == YardLoadingState::LOADED) { // remove from scene

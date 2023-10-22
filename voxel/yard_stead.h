@@ -9,12 +9,13 @@
 namespace voxel {
     class YardSteadImpl : public YardStatic, public std::enable_shared_from_this<YardSteadImpl>, public YardInterface::Stead {
     public:
-        YardSteadImpl(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
+        YardSteadImpl(const YardFacility &facility, std::uint64_t id, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
         ~YardSteadImpl() override;
         
     public:
         void setPosition(const math::vector3f &position) override;
         auto getPosition() const -> const math::vector3f & override;
+        auto getId() const -> std::uint64_t override;
     
         void updateState(YardLoadingState targetState) override;
         

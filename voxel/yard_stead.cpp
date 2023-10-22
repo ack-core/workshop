@@ -229,8 +229,8 @@ namespace voxel {
 }
 
 namespace voxel {
-    YardSteadImpl::YardSteadImpl(const YardFacility &facility, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
-    : YardStatic(facility, bbox)
+    YardSteadImpl::YardSteadImpl(const YardFacility &facility, std::uint64_t id, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap)
+    : YardStatic(facility, id, bbox)
     , _texturePath(std::move(texture))
     , _hmPath(std::move(heightmap))
     {
@@ -255,6 +255,10 @@ namespace voxel {
     
     const math::vector3f &YardSteadImpl::getPosition() const {
         return _position;
+    }
+    
+    std::uint64_t YardSteadImpl::getId() const {
+        return _id;
     }
     
     void YardSteadImpl::updateState(YardLoadingState targetState) {

@@ -4,6 +4,7 @@
 #include "foundation/rendering.h"
 #include "foundation/math.h"
 
+#include "datahub/datahub.h"
 #include "providers/texture_provider.h"
 
 #include <cstddef>
@@ -17,7 +18,8 @@ namespace voxel {
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
             const resource::TextureProviderPtr &textureProvider,
-            const foundation::RenderTexturePtr &palette
+            const foundation::RenderTexturePtr &palette,
+            const dh::DataHubPtr &dh
         );
         
     public:
@@ -28,7 +30,7 @@ namespace voxel {
         };
         struct VTXDVOX {
             float positionX, positionY, positionZ;
-            std::uint8_t colorIndex, mask, r1, r2;
+            std::uint8_t colorIndex, mask, r0, r1;
         };
         struct VTXNRMUV {
             float x, y, z, u;
@@ -56,7 +58,7 @@ namespace voxel {
             virtual ~TexturedModel() = default;
         };
         struct DynamicModel {
-            virtual void setFrame(std::uint16_t index) = 0;
+            virtual void setFrame(std::uint32_t index) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual ~DynamicModel() = default;
         };
