@@ -9,7 +9,13 @@
 namespace voxel {
     class YardSteadImpl : public YardStatic, public std::enable_shared_from_this<YardSteadImpl>, public YardInterface::Stead {
     public:
-        YardSteadImpl(const YardFacility &facility, std::uint64_t id, const math::bound3f &bbox, std::string &&texture, std::string &&heightmap);
+        // @source - stead encoded to 32-bit png:
+        //     R : color index in palette
+        //     G : flags [128 - is vertex, 64 - wall point, 32 - wall direction, 16..1 - reserved]
+        //     B : heightmap
+        //     A : reserved
+        //
+        YardSteadImpl(const YardFacility &facility, std::uint64_t id, const math::vector3f &position, const math::bound3f &bbox, std::string &&source);
         ~YardSteadImpl() override;
         
     public:
@@ -20,19 +26,16 @@ namespace voxel {
         void updateState(YardLoadingState targetState) override;
         
     private:
-        static void _makeIndices(std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices);
-        static void _makeGeometry(const std::unique_ptr<std::uint8_t[]> &hm, const math::bound3f &bbox, std::vector<SceneInterface::VTXNRMUV> &ov, std::vector<std::uint32_t> &oi);
+        static void _makeIndices(const std::vector<voxel::SceneInterface::VTXNRMUV> &points, std::vector<std::uint32_t> &indices);
             
     private:
-        const std::string _texturePath;
-        const std::string _hmPath;
+        const std::string _sourcePath;
         
         math::vector3f _position = {0, 0, 0};
-        foundation::RenderTexturePtr _texture;
-        std::unique_ptr<std::uint8_t[]> _heightmap;
         std::vector<SceneInterface::VTXNRMUV> _vertices;
         std::vector<std::uint32_t> _indices;
         
+        foundation::RenderTexturePtr _texture;
         SceneInterface::TexturedModelPtr _model;
         SceneInterface::BoundingBoxPtr _bboxmdl;
     };

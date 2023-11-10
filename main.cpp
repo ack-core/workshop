@@ -27,6 +27,8 @@ int main(int argc, const char * argv[]) {
     auto platform = foundation::PlatformInterface::instance();
     auto rendering = foundation::RenderingInterface::instance(platform);
     
+    std::default_delete<float[]> t;
+    
     std::unique_ptr<std::uint8_t[]> textureListData;
     std::unique_ptr<std::uint8_t[]> meshListData;
     std::unique_ptr<std::uint8_t[]> ttfData;
@@ -54,7 +56,7 @@ int main(int argc, const char * argv[]) {
             auto ui = ui::StageInterface::instance(platform, rendering, textureProvider, fontAtlasProvider);
             auto states = game::StateManager::instance(platform, scene, yard, ui, datahub);
             
-            //datahub->getRootScope("graphics")->setBool("drawBBoxes", false);
+            //datahub->getRootScope("graphics")->setBool("drawBoundBoxes", false);
             
             platform->run([&](float dtSec) {
                 textureProvider->update(dtSec);

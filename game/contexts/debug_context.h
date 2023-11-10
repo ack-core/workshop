@@ -17,7 +17,7 @@ namespace game {
         math::vector2f _lockedCoordinates;
 
         math::vector3f _center = { 0, 0, 0 };
-        math::vector3f _orbit = { 0, 48, 22 };
+        math::vector3f _orbit = { 0, 78, 42 };
 
         foundation::EventHandlerToken _touchEventHandlerToken;
         voxel::SceneInterface::LineSetPtr _axis;

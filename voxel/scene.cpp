@@ -135,7 +135,7 @@ namespace voxel {
         ~DynamicModelImpl() override {}
         
         void setFrame(std::uint32_t index) override {
-            frameIndex = std::min(index, frameCount);
+            frameIndex = std::min(index, frameCount - 1);
         }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
@@ -276,6 +276,26 @@ namespace {
         }
     )";
     
+    const char *g_texturedMeshShaderSrc = R"(
+        const {
+            globalPosition : float4
+        }
+        inout {
+            uv : float2
+            nrm : float3
+        }
+        vssrc {
+            output_position = _transform(float4(vertex_position_u.xyz + const_globalPosition.xyz, 1.0), _transform(frame_viewMatrix, frame_projMatrix));
+            output_uv = float2(vertex_position_u.w, vertex_normal_v.w);
+            output_nrm = vertex_normal_v.xyz;
+        }
+        fssrc {
+            int colorIndex = int(_tex2nearest(1, input_uv).r * 255.0);
+            float2 paletteCoordinates = float2(colorIndex & 7, (256 - colorIndex) >> 3) / float2(7.0, 31.0); //
+            output_color[0] = _tex2nearest(0, paletteCoordinates);
+        }
+    )";
+    
     const char *g_staticMeshShaderSrc = R"(
         fixed {
             cube[12] : float4 =
@@ -287,39 +307,24 @@ namespace {
             globalPosition : float4
         }
         inout {
-            albedo : float2
+            paletteCoordinates : float2
         }
         vssrc {
             float3 cubeCenter = float3(instance_position_color_mask.xyz) + const_globalPosition.xyz;
             float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
             
-            int  faceIndex = vertex_ID / 4 + int((toCamSign.zxy[vertex_ID / 4] * 1.5 + 1.5) + 1.0);
-            int  colorIndex = instance_position_color_mask.w & 0xff;
-            int  mask = (instance_position_color_mask.w >> (8 + faceIndex)) & 0x1;
+            int faceIndex = vertex_ID / 4 + int((toCamSign.zxy[vertex_ID / 4] * 1.5 + 1.5) + 1.0);
+            int colorIndex = instance_position_color_mask.w & 0xff;
+            int mask = (instance_position_color_mask.w >> (8 + faceIndex)) & 0x1;
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[vertex_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(instance_scale.xyz), 0.0);
             
-            output_albedo = float2(colorIndex & 7, (256 - colorIndex) >> 3) / float2(7.0, 31.0); //
+            output_paletteCoordinates = float2(colorIndex & 7, (256 - colorIndex) >> 3) / float2(7.0, 31.0); //
             output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
         }
         fssrc {
-            output_color[0] = _tex2nearest(0, input_albedo);
-        }
-    )";
-    
-    const char *g_texturedMeshShaderSrc = R"(
-        inout {
-            uv : float2
-            nrm : float3
-        }
-        vssrc {
-            output_position = _transform(float4(vertex_position_u.xyz, 1.0), _transform(frame_viewMatrix, frame_projMatrix));
-            output_uv = float2(vertex_position_u.w, vertex_normal_v.w);
-            output_nrm = vertex_normal_v.xyz;
-        }
-        fssrc {
-            output_color[0] = _tex2nearest(0, input_uv);
+            output_color[0] = _tex2nearest(0, input_paletteCoordinates);
         }
     )";
     
@@ -334,25 +339,25 @@ namespace {
             modelTransform : matrix4
         }
         inout {
-            albedo : float2
+            paletteCoordinates : float2
         }
         vssrc {
             float3 cubeCenter = float3(instance_position.xyz);
             float3 worldCubePos = _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
             float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - worldCubePos, 0.0)).xyz);
             
-            int  faceIndex = vertex_ID / 4 + int((toCamSign.zxy[vertex_ID / 4] * 1.5 + 1.5) + 1.0);
-            int  colorIndex = instance_color_mask.r;
-            int  mask = (instance_color_mask.g >> faceIndex) & 0x1;
+            int faceIndex = vertex_ID / 4 + int((toCamSign.zxy[vertex_ID / 4] * 1.5 + 1.5) + 1.0);
+            int colorIndex = instance_color_mask.r;
+            int mask = (instance_color_mask.g >> faceIndex) & 0x1;
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[vertex_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
-            output_albedo = float2(colorIndex & 7, (256 - colorIndex) >> 3) / float2(7.0, 31.0); //
+            output_paletteCoordinates = float2(colorIndex & 7, (256 - colorIndex) >> 3) / float2(7.0, 31.0); //
             output_position = _transform(absVertexPos, _transform(const_modelTransform, _transform(frame_viewMatrix, frame_projMatrix)));
         }
         fssrc {
-            output_color[0] = _tex2nearest(0, input_albedo);
+            output_color[0] = _tex2nearest(0, input_paletteCoordinates);
         }
     )";
     
@@ -598,7 +603,12 @@ namespace voxel {
         if (_texturedMeshes.empty() == false) {
             _rendering->applyState(_texturedMeshShader, foundation::RenderPassCommonConfigs::DEFAULT());
             for (const auto &texturedMesh : _texturedMeshes) {
-                _rendering->applyTextures(&texturedMesh->texture, 1);
+                foundation::RenderTexturePtr textures[] = {
+                    _palette,
+                    texturedMesh->texture
+                };
+                _rendering->applyTextures(textures, 2);
+                _rendering->applyShaderConstants(&texturedMesh->position);
                 _rendering->drawGeometry(texturedMesh->vertices, texturedMesh->indices, texturedMesh->indices->getCount(), foundation::RenderTopology::TRIANGLES);
             }
         }
@@ -621,7 +631,7 @@ namespace voxel {
             }
         }
 
-        if (_dh->getRootScope("graphics")->getBool("drawBBoxes")) {
+        if (_dh->getRootScope("graphics")->getBool("drawBoundBoxes")) {
             _rendering->applyState(_boundingBoxShader, foundation::RenderPassCommonConfigs::DEFAULT());
             for (const auto &boundingBox : _boundingBoxes) {
                 _rendering->applyShaderConstants(&boundingBox->position);

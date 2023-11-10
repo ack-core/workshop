@@ -23,7 +23,9 @@ namespace game {
         }
         
         graphics {
-            drawBBoxes : bool = true
+            drawBoundBoxes : bool = true
+            drawActorCircles : bool = true
+            drawCollisionLines : bool = true
         }
     )";
     

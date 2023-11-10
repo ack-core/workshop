@@ -43,7 +43,7 @@ namespace voxel {
         void addActorType(const char *type, ActorTypeDesc &&desc) override;
         
         auto addThing(const char *model, const math::vector3f &position) -> std::shared_ptr<Thing> override;
-        auto addStead(const char *heightmap, const char *texture, const math::vector3f &position) -> std::shared_ptr<Stead> override;
+        auto addStead(const char *source, const math::vector3f &position) -> std::shared_ptr<Stead> override;
         auto addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) -> std::shared_ptr<Actor> override;
 
         void remove(std::uint64_t id) override;
@@ -53,6 +53,7 @@ namespace voxel {
         
     public:
         auto _addThing(const char *model, const math::vector3f &position, std::uint64_t id = INVALID_ID) -> std::shared_ptr<Thing>;
+        auto _addStead(const char *source, const math::vector3f &position, std::uint64_t id = INVALID_ID) -> std::shared_ptr<Stead>;
         void _addStatic(std::uint64_t id, const std::shared_ptr<YardStatic> &object);
         void _clearYard();
         
@@ -153,60 +154,23 @@ namespace voxel {
                             std::string texture, heightmap;
                             
                             while (input.eof() == false && input >> parameter) {
-                                if (parameter == "texture" && bool(input >> expect::braced(texture, '"', '"')) == false) {
-                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'texture' syntax\n", id);
-                                }
-                                if (parameter == "heightmap" && bool(input >> expect::braced(heightmap, '"', '"')) == false) {
-                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'heightmap' syntax\n", id);
+                                if (parameter == "source" && bool(input >> expect::braced(texture, '"', '"')) == false) {
+                                    platform->logError("[YardImpl::loadYard] stead with id = '%zu' has invalid 'source' syntax\n", id);
                                 }
                                 if (parameter == "position" && bool(input >> position.x >> position.y >> position.z) == false) {
-                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'position' syntax\n", id);
+                                    platform->logError("[YardImpl::loadYard] stead with id = '%zu' has invalid 'position' syntax\n", id);
                                 }
                                 if (parameter == "link" && bool(input >> expect::nlist(links[id])) == false) {
-                                    platform->logError("[YardImpl::loadYard] square with id = '%zu' has invalid 'links' syntax\n", id);
+                                    platform->logError("[YardImpl::loadYard] stead with id = '%zu' has invalid 'links' syntax\n", id);
                                 }
                                 input >> std::ws;
                             }
                             
                             if (input.fail() == false) {
-                                if (const resource::TextureInfo *txInfo = self->_textureProvider->getTextureInfo(texture.data())) {
-                                    const resource::TextureInfo *hmInfo = self->_textureProvider->getTextureInfo(heightmap.data());
-                                    
-                                    bbox.xmin = position.x - 0.5;
-                                    bbox.ymin = position.y - 0.5;
-                                    bbox.zmin = position.z - 0.5;
-                                    bbox.xmax = bbox.xmin + txInfo->width;
-                                    bbox.ymax = bbox.ymin + 1.0;
-                                    bbox.zmax = bbox.zmin + txInfo->height;
-                                    
-                                    if (heightmap[0]) {
-                                        if (hmInfo) {
-                                            if (txInfo->type == resource::TextureInfo::Type::RGBA8 && hmInfo->type == resource::TextureInfo::Type::GRAYSCALE8) {
-                                                if (txInfo->width == hmInfo->width + 1 && txInfo->height == hmInfo->height + 1) {
-                                                    self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, id, bbox, std::move(texture), std::move(heightmap)));
-                                                }
-                                                else {
-                                                    platform->logError("[YardImpl::loadYard] texture and heightmap doesn't fit each other for square with id = '%zu'\n", id);
-                                                }
-                                            }
-                                            else {
-                                                platform->logError("[YardImpl::loadYard] texture or heightmap has bad format for square with id = '%zu'\n", id);
-                                            }
-                                        }
-                                        else {
-                                            platform->logError("[YardImpl::loadYard] heightmap '%s' for square with id = '%zu' has no info\n", heightmap.data(), id);
-                                        }
-                                    }
-                                    else {
-                                        self->_addStatic(id, std::make_shared<YardSteadImpl>(*self, id, bbox, std::move(texture), std::string()));
-                                    }
-                                }
-                                else {
-                                    platform->logError("[YardImpl::loadYard] texture '%s' for square with id = '%zu' has no info\n", texture.data(), id);
-                                }
+                                // TODO:
                             }
                             else {
-                                platform->logError("[YardImpl::loadYard] unable to load square with id = '%zu'\n", id);
+                                platform->logError("[YardImpl::loadYard] unable to load stead with id = '%zu'\n", id);
                             }
                         }
                         if (type == "thing" && bool(source >> id >> expect::braced(block, '{', '}'))) {
@@ -303,8 +267,8 @@ namespace voxel {
         return _addThing(model, position, _lastId++);
     }
 
-    std::shared_ptr<YardInterface::Stead> YardImpl::addStead(const char *heightmap, const char *texture, const math::vector3f &position) {
-    
+    std::shared_ptr<YardInterface::Stead> YardImpl::addStead(const char *source, const math::vector3f &position) {
+        return _addStead(source, position, _lastId++);
     }
     
     std::shared_ptr<YardInterface::Actor> YardImpl::addActor(const char *type, const math::vector3f &position, const math::vector3f &direction) {
@@ -314,7 +278,7 @@ namespace voxel {
             return _actors.emplace_back(actor);
         }
         else {
-            _platform->logError("[YardImpl::addObject] unknown object type '%s'\n", type);
+            _platform->logError("[YardImpl::addActor] unknown object type '%s'\n", type);
         }
         
         return nullptr;
@@ -348,14 +312,40 @@ namespace voxel {
             bbox.xmax = bbox.xmin + info->sizeX;
             bbox.ymax = bbox.ymin + info->sizeY;
             bbox.zmax = bbox.zmin + info->sizeZ;
-            thing = std::make_shared<YardThingImpl>(*this, id, position, bbox, std::move(model));
+            thing = std::make_shared<YardThingImpl>(*this, id, position, bbox, model);
             _addStatic(id, thing);
         }
         else {
-            _platform->logError("[YardImpl::loadYard] mesh '%s' has no info\n", model);
+            _platform->logError("[YardImpl::_addThing] mesh '%s' has no info\n", model);
         }
         
         return thing;
+    }
+    
+    std::shared_ptr<YardInterface::Stead> YardImpl::_addStead(const char *source, const math::vector3f &position, std::uint64_t id) {
+        std::shared_ptr<YardSteadImpl> stead = nullptr;
+        
+        if (const resource::TextureInfo *info = _textureProvider->getTextureInfo(source)) {
+            if (info->type == resource::TextureInfo::Type::RGBA8) {
+                math::bound3f bbox;
+                bbox.xmin = -0.5;
+                bbox.ymin = -0.5;
+                bbox.zmin = -0.5;
+                bbox.xmax = bbox.xmin + float(info->width - 1);
+                bbox.ymax = bbox.ymin + 0.5;
+                bbox.zmax = bbox.zmin + float(info->height - 1);
+                stead = std::make_shared<YardSteadImpl>(*this, id, position, bbox, source);
+                _addStatic(id, stead);
+            }
+            else {
+                _platform->logError("[YardImpl::_addStead] stead source '%s' is not 32-bit png\n", source);
+            }
+        }
+        else {
+            _platform->logError("[YardImpl::_addStead] stead source '%s' has no info\n", source);
+        }
+        
+        return stead;
     }
     
     void YardImpl::_addStatic(std::uint64_t id, const std::shared_ptr<YardStatic> &object) {

@@ -52,17 +52,23 @@ namespace game {
             .modelPath = "meshes/dev/knight_00",
             .centerPoint = math::vector3f(3, 0, 3),
             .radius = 4.0f,
-            .animFPS = 10.0f,
+            .animFPS = 7.0f,
             .animations = {
-                voxel::YardInterface::ActorTypeDesc::Animation {
-                    .name = "idle",
+                {"idle", voxel::YardInterface::ActorTypeDesc::Animation {
+                    .firstFrameIndex = 0,
+                    .lastFrameIndex = 0
+                }},
+                {"walk", voxel::YardInterface::ActorTypeDesc::Animation {
                     .firstFrameIndex = 0,
                     .lastFrameIndex = 5
-                }
+                }}
             }
         });
         _api.yard->addThing("meshes/dev/castle_01", math::vector3f(-50, 0, 0));
-        _api.yard->addActor("knight", math::vector3f(15, 0, 0), math::vector3f(-1, 0, -1));       
+        auto actor = _api.yard->addActor("knight", math::vector3f(15, 0, 10), math::vector3f(-1, 0, -1));
+
+        actor->playAnimation("walk", true);
+        _api.yard->addStead("textures/stead/floor_00", {32, 0, 0});
     }
     
     DebugContext::~DebugContext() {

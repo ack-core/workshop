@@ -7,8 +7,9 @@ namespace voxel {
     YardActorImpl::YardActorImpl(const YardFacility &facility, const YardInterface::ActorTypeDesc &type, const math::vector3f &position, const math::vector3f &direction)
     : _facility(facility)
     , _type(type)
-    , _currentPosition(position)
-    , _currentDirection(direction)
+    , _position(position)
+    , _direction(direction)
+    , _currentAnimation(nullptr)
     , _currentState(YardLoadingState::NONE)
     {
     }
@@ -17,8 +18,21 @@ namespace voxel {
     
     }
     
+    void YardActorImpl::playAnimation(const char *animation, bool cycled, util::callback<void(Actor &)> &&completion) {
+        auto index = _type.animations.find(animation);
+        if (index != _type.animations.end()) {
+            _currentAnimation = &index->second;
+            _animationFinished = std::move(completion);
+            _animationCycled = cycled;
+            _animationAccumulatedTime = 0.0f;
+        }
+        else {
+            _facility.getPlatform()->logError("[YardActorImpl::playAnimation] animation '%s' is not found\n", animation);
+        }
+    }
+    
     void YardActorImpl::rotate(const math::vector3f &targetDirection) {
-        _targetDirection = targetDirection;
+        _direction = targetDirection;
     }
     
     float YardActorImpl::getRadius() const {
@@ -26,17 +40,42 @@ namespace voxel {
     }
     
     const math::vector3f &YardActorImpl::getPosition() const {
-        return _currentPosition;
+        return _position;
     }
     
     const math::vector3f &YardActorImpl::getDirection() const {
-        return _currentDirection;
+        return _direction;
     }
     
     void YardActorImpl::update(float dtSec) {
         if (_currentState == YardLoadingState::RENDERING) {
-            const float angle = (_currentDirection.x < 0.0f ? 1.0f : -1.0f) * math::vector2f(0.0f, 1.0f).angleTo(_currentDirection.xz.normalized());
-            _model->setTransform(math::transform3f({0, 1, 0}, angle).translated(_currentPosition));
+            const float angle = (_direction.x < 0.0f ? 1.0f : -1.0f) * math::vector2f(0.0f, 1.0f).angleTo(_direction.xz.normalized());
+            _model->setTransform(math::transform3f({0, 1, 0}, angle).translated(_position));
+            _bound->setPosition(_position);
+
+            if (_currentAnimation) {
+                _animationAccumulatedTime += dtSec;
+
+                const std::uint32_t frameIndex = std::uint32_t(_animationAccumulatedTime * _type.animFPS);
+                const std::uint32_t frameCount = _currentAnimation->lastFrameIndex - _currentAnimation->firstFrameIndex + 1;
+                
+                if (frameIndex >= frameCount) {
+                    if (_animationCycled) {
+                        _animationAccumulatedTime -= float(frameCount) / _type.animFPS;
+                        _model->setFrame(_currentAnimation->firstFrameIndex);
+                    }
+                    else {
+                        _animationAccumulatedTime = float(frameCount - 1) / _type.animFPS;
+                        _model->setFrame(_currentAnimation->lastFrameIndex);
+                    }
+                    if (_animationFinished) {
+                        _animationFinished(*this);
+                    }
+                }
+                else {
+                    _model->setFrame(_currentAnimation->firstFrameIndex + frameIndex);
+                }
+            }
         }
         if (_currentState == YardLoadingState::NONE) {
             _currentState = YardLoadingState::LOADING;
@@ -58,10 +97,20 @@ namespace voxel {
                         }
                         
                         self->_model = self->_facility.getScene()->addDynamicModel(voxData.data(), mesh->frameCount, math::transform3f({0, 1, 0}, 0.0f));
+                        self->_bound = self->_facility.getScene()->addLineSet(true, 12);
                         self->_currentState = YardLoadingState::RENDERING;
+                        
+                        for (int i = 0; i < 12; i++) {
+                            const float a0 = float(i) / 6.0f * M_PI;
+                            const float a1 = float(i + 1) / 6.0f * M_PI;
+                            const float radius = self->_type.radius;
+                            const math::vector3f start = math::vector3f(radius * std::sin(a0), 0, radius * std::cos(a0));
+                            const math::vector3f end = math::vector3f(radius * std::sin(a1), 0, radius * std::cos(a1));
+                            self->_bound->addLine(start, end, math::color(1.0f, 1.0f, 1.0f, 1.0f));
+                        }
                     }
                     else {
-                        self->_facility.getPlatform()->logError("[YardActorImpl::YardActorImpl] unable to load mesh '%s'\n", self->_type.modelPath.data());
+                        self->_facility.getPlatform()->logError("[YardActorImpl::update] unable to load mesh '%s'\n", self->_type.modelPath.data());
                     }
                 }
             });
