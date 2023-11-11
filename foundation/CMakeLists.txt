@@ -10,6 +10,8 @@ set(
 	"${m_source_root}/platform_windows.cpp"
 	"${m_source_root}/platform_ios.h"
 	"${m_source_root}/platform_ios.cpp"
+	"${m_source_root}/platform_wasm.h"
+	"${m_source_root}/platform_wasm.cpp"
 )
 source_group("" FILES ${m_sources_platform_list})
 

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.fullscreen {
+    position: absolute;
+    top: 5px;
+    border: 0;
+    width: 98%;
+    height: height * 1.777;
+    overflow: hidden;
+    display: block;
+}
+</style>    
+</head>
+<body>
+    <canvas class="fullscreen" id="render_target" oncontextmenu="event.preventDefault()"></canvas>
+    <script type='text/javascript'>
+        var module = {};
+        var memory = new WebAssembly.Memory({ initial: 4, maximum: 1024 });
+
+        const g_imports = {
+            env: {
+                memory: memory,
+                __cxa_atexit: function() {}, // do not call static dtors
+                abort: function() {
+                    console.log("aborted");
+                },
+                js_log: function(ptr, sz) {
+                    const u16array = new Uint16Array(memory.buffer, ptr, sz);
+                    console.log(String.fromCharCode(...u16array));
+                    module.instance.exports.free(ptr);
+                },
+                consoleLog: function(n) {
+                    console.log(n);
+                }
+            }
+        };
+
+        WebAssembly.instantiateStreaming(fetch('workshop.wasm'), g_imports).then(m => {
+            module = m;
+
+            if (module.instance.exports.__wasm_call_ctors) {
+                module.instance.exports.__wasm_call_ctors();
+            }
+
+            module.instance.exports.initialize();
+            //render_target.addEventListener('click', module.instance.exports.test, false);
+        });
+    </script>
+</body>
+</html>

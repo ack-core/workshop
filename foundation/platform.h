@@ -180,7 +180,7 @@ namespace foundation {
         // This method blocks execution until application exited
         // Argument of @updateAndDraw is delta time in seconds
         //
-        virtual void run(util::callback<void(float)> &&updateAndDraw) = 0;
+        virtual void setLoop(util::callback<void(float)> &&updateAndDraw) = 0;
         
         // Breaks platform update cycle
         //
