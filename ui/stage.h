@@ -69,50 +69,50 @@ namespace ui {
     public:
         struct PivotParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
         };
         struct ImageParams {
-            const bool capturePointer = false;
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const char *textureBase = "";
             const char *textureAction = "";
             const float activeAreaOffset = 0.0f;
             const float activeAreaRadius = 0.0f;
-            const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const bool capturePointer = false;
         };
         struct TextParams {
-            const std::uint8_t fontSize = 10;
-            const bool shadowEnabled = false;
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f shadowOffset = math::vector2f(1.0f, 1.0f);
             const math::color rgba = math::color(1.0f, 1.0f, 1.0f, 1.0f);
-            const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const std::uint8_t fontSize = 10;
+            const bool shadowEnabled = false;
         };
         struct JoystickParams {
-            const char *textureBackground = "";
-            const char *textureThumb = "";
             const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const char *textureBackground = "";
+            const char *textureThumb = "";
             const float maxThumbOffset = 50.0f;
             util::callback<void(const math::vector2f &direction)> handler;
         };
         struct StepperParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const char *textureLeftBase = "";
             const char *textureLeftAction = "";
             const char *textureRightBase = "";
             const char *textureRightAction = "";
-            const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
             util::callback<void(float value)> handler;
         };
         

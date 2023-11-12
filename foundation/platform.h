@@ -112,25 +112,12 @@ namespace foundation {
         // @task     - task to be executed
         virtual void executeAsync(std::unique_ptr<AsyncTask> &&task) = 0;
         
-        // Forms std::vector of file paths in @dirPath
-        // @dirPath  - target directory. Example: "data/map1"
-        // @return   - vector of entries
-        // @completion called from the main thread
-        //
-        virtual void formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) = 0;
-        
         // Loads file to memory
         // @filePath - file path. Example: "data/map1/test.png"
         // @return   - size != 0 if file opened successfully. Items returned by formFileList should be successfully loaded.
         // @completion called from the main thread
         //
-        virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
-        
-        // Loads file to memory
-        // @filePath - file path. Example: "data/map1/test.png"
-        // @return   - true if file successfully loaded. Items returned by formFileList should be successfully loaded.
-        //
-        virtual bool loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) = 0;
+        virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
         
         // Returns native screen size in pixels
         //

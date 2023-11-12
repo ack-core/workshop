@@ -2,29 +2,34 @@
 #include "foundation/platform.h"
 
 foundation::PlatformInterfacePtr platform;
+int dbg_loading = 0;
 
 extern "C" void initialize() {
-	//int* x0 = (int *)malloc(4096);
-		// x0[100] = 999;
-		// consoleLog(int(x0));
-	//memset(x0, 0, 4096);
-
-		// memcpy(x0, x0 + 100, 100);
-
     platform = foundation::PlatformInterface::instance();
-    //platform->setLoop([&](float dtSec) {
-
-	//memset(x0, 1, 4096);
-
-    //});
-
-    platform->logMsg("[WASM]_Hello %s -->>> %s -->>> %f", "ewfwegwegwegweggew", "foundation::PlatformInterface::instance", 66.11);
-}
-
-extern "C" void test() {
-	//consoleLog(111);
+    platform->logMsg("[PLATFORM] initializing...");
+//    platform->loadFile("textures/ui/panel.png", [p = platform](std::unique_ptr<std::uint8_t[]> &&data, std::size_t size) {
+//        if (data) {
+//            p->logMsg("-->>> yep 1\n");
+//        }
+//    });
+    platform->setLoop([&](float dtSec) {
+//        if (dbg_loading == 0) {
+//            dbg_loading = 1;
+//            
+//            platform->loadFile("arial.ttf", [](std::unique_ptr<std::uint8_t[]> &&data, std::size_t size) {
+//                if (data) {
+//                    platform->logMsg("-->>> yep2\n");
+//                    dbg_loading = 2;
+//                }
+//            });
+//        }
+//        
+//        if (dbg_loading == 2) {
+//            dbg_loading = 0;
+//        }
+    });
 }
 
 extern "C" void deinitialize() {
-
+    platform->logMsg("[Platform] deinitializing...");
 }

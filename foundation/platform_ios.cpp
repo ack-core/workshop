@@ -34,6 +34,42 @@ namespace {
     std::list<Handler> g_pointerHandlers;
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
+    
+    struct BackgroundThread {
+        std::thread thread;
+        std::mutex mutex;
+        std::condition_variable notifier;
+        std::list<std::unique_ptr<foundation::AsyncTask>> queue;
+    };
+    
+    BackgroundThread g_io;
+    BackgroundThread g_worker;
+    
+    void backgroundThreadLoop(BackgroundThread &threadData) {
+        printf("[PLATFORM] Background Thread started\n");
+        
+        while (g_instance.use_count() != 0) {
+            std::unique_ptr<foundation::AsyncTask> task = nullptr;
+            
+            {
+                std::unique_lock<std::mutex> guard(threadData.mutex);
+                
+                while (threadData.queue.empty()) {
+                    threadData.notifier.wait(guard);
+                }
+                
+                task = std::move(threadData.queue.front());
+                threadData.queue.pop_front();
+            }
+            
+            if (task) {
+                task->executeInBackground();
+                std::unique_lock<std::mutex> guard(g_foregroundMutex);
+                g_foregroundQueue.emplace_back(std::move(task));
+            }
+        }
+    }
+    
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
@@ -246,7 +282,7 @@ namespace foundation {
         
         class FileLoadTask : public AsyncTask {
         public:
-            FileLoadTask(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
+            FileLoadTask(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)> &&completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
             ~FileLoadTask() {}
             
         public:
@@ -267,9 +303,9 @@ namespace foundation {
             
         private:
             std::string _path;
-            std::unique_ptr<uint8_t[]> _data;
+            std::unique_ptr<std::uint8_t[]> _data;
             std::size_t _size;
-            util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> _completion;
+            util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)> _completion;
         };
     }
 }
@@ -289,52 +325,36 @@ namespace foundation {
     }
     
     IOSPlatform::~IOSPlatform() {
-        _io.notifier.notify_one();
-        _io.thread.join();
-        _worker.notifier.notify_one();
-        _worker.thread.join();
+        g_io.notifier.notify_one();
+        g_io.thread.join();
+        g_worker.notifier.notify_one();
+        g_worker.thread.join();
     }
     
     void IOSPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
         {
-            std::lock_guard<std::mutex> guard(_io.mutex);
-            _io.queue.emplace_back(std::move(task));
+            std::lock_guard<std::mutex> guard(g_worker.mutex);
+            g_worker.queue.emplace_back(std::move(task));
         }
-        _io.notifier.notify_one();
+        g_worker.notifier.notify_one();
     }
     
-    void IOSPlatform::formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) {
+//    void IOSPlatform::formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) {
+//        {
+//            std::lock_guard<std::mutex> guard(g_io.mutex);
+//            g_io.queue.emplace_back(std::make_unique<FileListTask>((_executableDirectoryPath + "/" + dirPath).data(), std::move(completion)));
+//        }
+//        g_io.notifier.notify_one();
+//    }
+    
+    void IOSPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
         {
-            std::lock_guard<std::mutex> guard(_io.mutex);
-            _io.queue.emplace_back(std::make_unique<FileListTask>((_executableDirectoryPath + "/" + dirPath).data(), std::move(completion)));
+            std::lock_guard<std::mutex> guard(g_io.mutex);
+            g_io.queue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));
         }
-        _io.notifier.notify_one();
+        g_io.notifier.notify_one();
     }
-    
-    void IOSPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) {
-        {
-            std::lock_guard<std::mutex> guard(_io.mutex);
-            _io.queue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));
-        }
-        _io.notifier.notify_one();
-    }
-    
-    bool IOSPlatform::loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) {
-        std::fstream fileStream(_executableDirectoryPath + "/" + filePath, std::ios::binary | std::ios::in | std::ios::ate);
         
-        if (fileStream.is_open() && fileStream.good()) {
-            std::size_t fileSize = std::size_t(fileStream.tellg());
-            data = std::make_unique<unsigned char[]>(fileSize);
-            fileStream.seekg(0);
-            fileStream.read((char *)data.get(), fileSize);
-            size = fileSize;
-            
-            return true;
-        }
-        
-        return false;
-    }
-    
     float IOSPlatform::getScreenWidth() const {
         return g_nativeScreenWidth;
     }
@@ -379,16 +399,8 @@ namespace foundation {
         }
     }
     
-    void IOSPlatform::run(util::callback<void(float)> &&updateAndDraw) {
+    void IOSPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
-        
-        _io.thread = std::thread(&IOSPlatform::_backgroundThreadLoop, this, std::ref(_io));
-        _worker.thread = std::thread(&IOSPlatform::_backgroundThreadLoop, this, std::ref(_worker));
-        
-        @autoreleasepool {
-            char *argv[] = {0};
-            UIApplicationMain(0, argv, nil, NSStringFromClass([AppDelegate class]));
-        }
     }
     
     void IOSPlatform::exit() {
@@ -417,31 +429,6 @@ namespace foundation {
         printf("%s\n", g_buffer);
         __builtin_debugtrap();
     }
-    
-    void IOSPlatform::_backgroundThreadLoop(BackgroundThread &threadData) {
-        logMsg("[PLATFORM] Background Thread started");
-        
-        while (g_instance.use_count() != 0) {
-            std::unique_ptr<AsyncTask> task = nullptr;
-            
-            {
-                std::unique_lock<std::mutex> guard(threadData.mutex);
-                
-                while (threadData.queue.empty()) {
-                    threadData.notifier.wait(guard);
-                }
-                
-                task = std::move(threadData.queue.front());
-                threadData.queue.pop_front();
-            }
-            
-            if (task) {
-                task->executeInBackground();
-                std::unique_lock<std::mutex> guard(g_foregroundMutex);
-                g_foregroundQueue.emplace_back(std::move(task));
-            }
-        }
-    }
 }
 
 namespace foundation {
@@ -457,6 +444,23 @@ namespace foundation {
         
         return result;
     }
+}
+
+extern "C" void initialize();
+extern "C" void deinitialize();
+
+int main(int argc, const char * argv[]) {
+    initialize();
+    
+    g_io.thread = std::thread(&backgroundThreadLoop, std::ref(g_io));
+    g_worker.thread = std::thread(&backgroundThreadLoop, std::ref(g_worker));
+    
+    @autoreleasepool {
+        char *argv[] = {0};
+        UIApplicationMain(0, argv, nil, NSStringFromClass([AppDelegate class]));
+    }
+    
+    deinitialize();
 }
 
 #endif // PLATFORM_IOS

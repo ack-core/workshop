@@ -36,9 +36,9 @@ namespace voxel {
             };
             const std::string modelPath = "";
             const math::vector3f centerPoint = {0, 0, 0};
-            const std::unordered_map<std::string, Animation> animations = {};
             const float radius = 0.0;
             const float animFPS = 1.0;
+            const std::unordered_map<std::string, Animation> animations = {};
         };
         struct Actor {
             virtual void playAnimation(const char *animation, bool cycled, util::callback<void(Actor &)> &&completion = {}) = 0;

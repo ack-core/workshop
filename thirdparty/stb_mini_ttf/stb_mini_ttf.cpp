@@ -2565,11 +2565,6 @@ STBTT_DEF int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, in
    return stbtt_InitFont_internal(info, (unsigned char *) data, offset);
 }
 
-
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-
 #ifdef __cplusplus
 }
 #endif

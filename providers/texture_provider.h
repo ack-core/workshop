@@ -51,7 +51,7 @@ namespace resource {
         // @texPath - path to file without extension
         // @return  - texture object or nullptr
         //
-        virtual auto getOrLoadTexture(const char *texPath) -> const foundation::RenderTexturePtr = 0;
+        //virtual auto getOrLoadTexture(const char *texPath) -> const foundation::RenderTexturePtr = 0;
 
         // Provider tracks resources life time and tries to free them
         //

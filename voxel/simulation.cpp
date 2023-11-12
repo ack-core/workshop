@@ -26,10 +26,10 @@ namespace voxel {
     }
         
     SimulationInterface::HoopPtr SimulationImpl::addHoop(const math::vector3f &position, float radius) {
-        
+        return nullptr;
     }
     SimulationInterface::WallPtr SimulationImpl::addWall() {
-        
+        return nullptr;        
     }
     void SimulationImpl::updateAndDraw(float dtSec) {
         

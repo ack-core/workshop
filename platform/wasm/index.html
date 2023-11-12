@@ -1,23 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-<style>
-.fullscreen {
-    position: absolute;
-    top: 5px;
-    border: 0;
-    width: 98%;
-    height: height * 1.777;
-    overflow: hidden;
-    display: block;
-}
-</style>    
+    <link rel="icon" href="data:;base64,=">
+    <style>
+    .fullscreen {
+        position: absolute;
+        top: 5px;
+        border: 0;
+        width: 98%;
+        height: height * 1.777;
+        overflow: hidden;
+        display: block;
+    }
+    </style>
 </head>
 <body>
     <canvas class="fullscreen" id="render_target" oncontextmenu="event.preventDefault()"></canvas>
     <script type='text/javascript'>
         var module = {};
         var memory = new WebAssembly.Memory({ initial: 4, maximum: 1024 });
+        var prevFrameTimeStamp = 0;
 
         const g_imports = {
             env: {
@@ -26,13 +28,33 @@
                 abort: function() {
                     console.log("aborted");
                 },
-                js_log: function(ptr, sz) {
-                    const u16array = new Uint16Array(memory.buffer, ptr, sz);
-                    console.log(String.fromCharCode(...u16array));
-                    module.instance.exports.free(ptr);
+                js_print: function(p) {
+                    console.log(p);
                 },
-                consoleLog: function(n) {
-                    console.log(n);
+                js_log: function(str, len) {
+                    const u16str = new Uint16Array(memory.buffer, str, len);
+                    console.log(String.fromCharCode(...u16str));
+                    module.instance.exports.free(u16str);
+                },
+                js_fetch: function(block, pathLen) {
+                    const u16path = new Uint16Array(memory.buffer, block, pathLen);
+                    const path = String.fromCharCode(...u16path)
+                    
+                    fetch(path).then(response => {
+                        if (response.ok) {
+                            return response.arrayBuffer();
+                        }
+                        throw response.status + " " + response.statusText;
+                    }).then(buffer => {
+                        console.log(path + " loaded successfully");
+                        const data = module.instance.exports.malloc(buffer.byteLength);
+                        const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
+                        u8data.set(new Uint8Array(buffer));
+                        module.instance.exports.file(block, pathLen, data, buffer.byteLength);
+                    }).catch(error => {
+                        console.log(path + " loading failed with " + error);
+                        module.instance.exports.file(block, pathLen, 0, 0);
+                    });
                 }
             }
         };
@@ -45,6 +67,17 @@
             }
 
             module.instance.exports.initialize();
+
+            function onFrame(timestamp) {
+                const dt = timestamp - prevFrameTimeStamp;
+                prevFrameTimeStamp = timestamp;
+                module.instance.exports.frame(dt);
+                window.requestAnimationFrame(onFrame);
+            }
+            window.requestAnimationFrame(timestamp => {
+                prevFrameTimeStamp = timestamp;
+                window.requestAnimationFrame(onFrame);
+            });
             //render_target.addEventListener('click', module.instance.exports.test, false);
         });
     </script>

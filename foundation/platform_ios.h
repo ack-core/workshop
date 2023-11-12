@@ -14,9 +14,7 @@ namespace foundation {
         ~IOSPlatform() override;
         
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
-        void formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) override;
-        void loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) override;
-        bool loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) override;
+        void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) override;
         
         float getScreenWidth() const override;
         float getScreenHeight() const override;
@@ -36,7 +34,7 @@ namespace foundation {
         
         void removeEventHandler(EventHandlerToken token) override;
         
-        void run(util::callback<void(float)> &&updateAndDraw) override;
+        void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void exit() override;
         
         void logMsg(const char *fmt, ...) override;
@@ -45,19 +43,5 @@ namespace foundation {
     private:
         std::mutex _logMutex;
         std::string _executableDirectoryPath;
-
-    private:
-        struct BackgroundThread {
-            std::thread thread;
-            std::mutex mutex;
-            std::condition_variable notifier;
-            std::list<std::unique_ptr<AsyncTask>> queue;
-        };
-        
-        BackgroundThread _io;
-        BackgroundThread _worker;
-
-    private:
-        void _backgroundThreadLoop(BackgroundThread &data);
     };
 }

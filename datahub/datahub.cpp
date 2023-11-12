@@ -40,7 +40,7 @@ namespace {
         return braceCounter == 0;
     };
 
-    bool readUntilChar(std::istringstream &stream, char ch, std::string &output) {
+    void readUntilChar(std::istringstream &stream, char ch, std::string &output) {
         char next;
         while ((next = stream.get()) && stream) {
             output += next;
@@ -91,15 +91,12 @@ namespace {
     
     public:
         void enqueue( const MsgHeader &header, const void *data, std::size_t length ) {
-            std::lock_guard<std::mutex> guard(_mutex);
             std::unique_ptr<std::uint8_t[]> m = std::make_unique<std::uint8_t[]>(length);
             memcpy(m.get(), data, length);
             _queue.emplace(Msg{header, std::move(m), length});
         }
         
         bool dequeue( MsgHeader &header, std::unique_ptr<std::uint8_t[]> &data, std::size_t &length ) {
-            std::lock_guard<std::mutex> guard(_mutex);
-            
             if (_queue.empty() == false) {
                 header = _queue.front().header;
                 data = std::move(_queue.front().data);
@@ -112,7 +109,6 @@ namespace {
         }
         
     private:
-        std::mutex _mutex;
         std::queue<Msg> _queue;
     };
 }
@@ -409,6 +405,7 @@ namespace dh {
     }
 
     template<typename T> const T &ScopeImpl::_getValue(const char *name) const {
+        static T dummy = {};
         for (auto &element : _elements) {
             if (element.first == name) {
                 if (const Value<T> *ptr = std::get_if<Value<T>>(&element.second.data)) {
@@ -416,12 +413,13 @@ namespace dh {
                 }
                 else {
                     _logger.logError("[ScopeImpl::getValue] '%s' is not a value\n", name);
-                    return;
+                    return dummy;
                 }
             }
         }
         
         _logger.logError("[ScopeImpl::getValue] Value '%s' not found\n", name);
+        return dummy;
     }
 
 }

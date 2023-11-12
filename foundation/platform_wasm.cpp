@@ -5,8 +5,6 @@
 #ifdef PLATFORM_WASM
 #include "platform_wasm.h"
 
-//#include <list>
-//#include <algorithm>
 #include <stdarg.h>
 #include <cstdio>
 
@@ -19,15 +17,16 @@ namespace {
 
 // From js
 extern "C" {
-    extern void js_log(const std::uint16_t *ptr, int length);
+    void js_log(const std::uint16_t *ptr, int length);
+    void js_fetch(const void *ptr, int pathLen);
+    void js_print(void *p);
 }
 
-// To js or missing import
+// Missing part of libc
 extern "C" {
     int *__errno_location(void) {
         return 0;
     }
-
     void *sbrk(intptr_t increment) {
         if (increment == 0) {
             return (void *)(__builtin_wasm_memory_size(0) * PAGESIZE);
@@ -35,44 +34,49 @@ extern "C" {
         if (increment < 0) {
             increment = 0;
         }
-
+        
         std::size_t oldOffset = g_currentMemoryOffset;
         g_currentMemoryOffset += increment;
-
+        
         std::size_t incMemoryPages = ((g_currentMemoryOffset + PAGESIZE - 1) / PAGESIZE) - g_currentMemoryPages;
-
+        
         if (incMemoryPages) {
             std::size_t oldMemoryPages = __builtin_wasm_memory_grow(0, incMemoryPages);
-
+            
             if (oldMemoryPages == std::size_t(-1)) {
                 abort();
             }
-
+            
             g_currentMemoryPages += incMemoryPages;
         }
-
+        
         return (void *)oldOffset;
     }
-
-    void frame() {
-        
+    void *aligned_alloc(size_t alignment, size_t size) {
+        return malloc(size);
     }
-
     void *memset(void *m, int c, size_t n) {
-        unsigned char *p = (unsigned char *)m;
-        while (n--) *p++ = (unsigned char)c;
+        std::uint8_t *p = reinterpret_cast<std::uint8_t *>(m);
+        while (n--) *p++ = std::uint8_t(c);
         return m;
     }
-
-    std::size_t strlen(const char* str) {
+    void* memcpy(void *dest, const void *src, std::size_t count) {
+        const std::uint8_t *s = reinterpret_cast<const std::uint8_t *>(src);
+        std::uint8_t *d = reinterpret_cast<std::uint8_t *>(dest);
+        while (count--) *d++ = *s++;
+        return dest;
+    }
+    void* memmove(void *dest, const void *src, std::size_t count) {
+        return memcpy(dest, src, count);
+    }
+    std::size_t strlen(const char *str) {
         const char *s = str;
-        while (*s++ != 0);
+        while (*s != 0) s++;
         return s - str;
     }
-
-    int strcmp(const char *l, const char *r) {
-        for (; *l == *r && *l; l++, r++);
-        return *(unsigned char *)l - *(unsigned char *)r;
+    int strcmp(const char *left, const char *right) {
+        for (; *left == *right && *left; left++, right++);
+        return *reinterpret_cast<const char *>(left) - *reinterpret_cast<const char *>(right);
     }
 }
 
@@ -84,11 +88,10 @@ namespace {
     std::size_t align64(std::size_t len) {
         return (len + 63) & ~std::size_t(63);
     }
-
     std::size_t ptoa(std::uint16_t *output, const void *p) {
         std::uint16_t *buffer = output + sizeof(std::size_t) - 1;
         std::size_t n = std::size_t(p);
-
+        
         for (int i = 0; i < sizeof(std::size_t); i++) {
             *buffer-- = alphabet[n % 16];
             n /= 16;
@@ -96,7 +99,6 @@ namespace {
         
         return sizeof(std::size_t);
     }
-
     std::size_t ntoa(std::uint16_t *output, std::intptr_t n, int base) {
         std::intptr_t an = std::abs(n);
         std::uint16_t buffer[CONVERSION_BUFFER_MAX];
@@ -114,7 +116,6 @@ namespace {
         memcpy(output, ptr, sizeof(std::uint16_t) * tocopy);
         return tocopy;
     }
-    
     std::size_t ftoa(std::uint16_t *output, double f) {
         const double af = std::abs(f);
         std::int64_t ipart = std::int64_t(af);
@@ -142,7 +143,6 @@ namespace {
         memcpy(output, ptr, sizeof(std::uint16_t) * tocopy);
         return tocopy;
     }
-    
     void msgFormat(std::uint16_t *output, const char *fmt, va_list arglist) {
         while (*fmt != '\0') {
             if (*fmt == '%') {
@@ -175,7 +175,6 @@ namespace {
         }
         *output++ = 0;
     }
-
     std::size_t msgLength(const char *fmt, va_list arglist) {
         std::size_t result = 0;
         while (*fmt != '\0') {
@@ -222,12 +221,21 @@ namespace foundation {
     WASMPlatform::~WASMPlatform() {
         
     }
-
+    
     void WASMPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {}
-    void WASMPlatform::formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) {}
-    void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<uint8_t[]> &&data, std::size_t size)> &&completion) {}
-    bool WASMPlatform::loadFile(const char *filePath, std::unique_ptr<uint8_t[]> &data, std::size_t &size) {
-        return false;
+    void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
+        using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
+        const std::string fullPath = "data/" + std::string(filePath);
+        const std::size_t len = fullPath.length() + 1;
+        std::uint16_t *block = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * len + sizeof(cbtype)));
+        
+        for (std::size_t i = 0; i < len; i++) {
+            block[i] = fullPath[i];
+        }
+        
+        cbtype *cb = reinterpret_cast<cbtype *>(block + len);
+        new (cb) cbtype(std::move(completion));
+        js_fetch(block, len);
     }
     
     float WASMPlatform::getScreenWidth() const {
@@ -250,15 +258,15 @@ namespace foundation {
     EventHandlerToken WASMPlatform::addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) {
         return nullptr;
     }
-
+    
     EventHandlerToken WASMPlatform::addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) {
         return nullptr;
     }
-
+    
     EventHandlerToken WASMPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) {
         return nullptr;
     }
-
+    
     EventHandlerToken WASMPlatform::addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) {
         return nullptr;
     }
@@ -266,11 +274,11 @@ namespace foundation {
     void WASMPlatform::removeEventHandler(EventHandlerToken token) {
 
     }
-
+    
     void WASMPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
     }
-
+    
     void WASMPlatform::exit() {
 
     }
@@ -279,24 +287,37 @@ namespace foundation {
         va_list arglist;
         va_start(arglist, fmt);
         const std::size_t length = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = (std::uint16_t *)malloc(sizeof(std::uint16_t) * length);
+        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * length));
         va_end(arglist);
         va_start(arglist, fmt);
         msgFormat(logBuffer, fmt, arglist);
         va_end(arglist);
         js_log(logBuffer, length);
     }
-
     void WASMPlatform::logError(const char *fmt, ...) {
         va_list arglist;
         va_start(arglist, fmt);
         const std::size_t length = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = (std::uint16_t *)malloc(sizeof(std::uint16_t) * length);
+        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * length));
         va_end(arglist);
         va_start(arglist, fmt);
         msgFormat(logBuffer, fmt, arglist);
         va_end(arglist);
         js_log(logBuffer, length);
+        abort();
+    }
+}
+
+extern "C" {
+    void frame(float dt) {
+        g_updateAndDraw(dt);
+    }
+    
+    void file(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
+        using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
+        cbtype *cb = reinterpret_cast<cbtype *>(block + pathLen);
+        cb->operator()(std::unique_ptr<std::uint8_t[]>(data), length);
+        ::free(block);
     }
 }
 
@@ -316,3 +337,4 @@ namespace foundation {
 }
 
 #endif // PLATFORM_WASM
+
