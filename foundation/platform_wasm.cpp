@@ -7,24 +7,40 @@
 
 #include <stdarg.h>
 #include <cstdio>
+#include <pthread.h>
 
 namespace {
     const std::size_t PAGESIZE = 65536;
 
     std::size_t g_currentMemoryPages = __builtin_wasm_memory_size(0);
     std::size_t g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
+    std::atomic<bool> g_memoryLock {false};
+}
+
+// These function shouldn't be called
+extern "C" {
+    void *realloc(void *ptr, size_t size) {
+        abort();
+    }
+    void *aligned_alloc(size_t alignment, size_t size) {
+        abort();
+    }
 }
 
 // From js
 extern "C" {
+    void js_waiting();
     void js_log(const std::uint16_t *ptr, int length);
+    void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
-    void js_print(void *p);
+
+    float js_canvas_width();
+    float js_canvas_height();
 }
 
-// Missing part of libc
+// Missing part of runtime
 extern "C" {
-    int *__errno_location(void) {
+    int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle) {
         return 0;
     }
     void *sbrk(intptr_t increment) {
@@ -52,23 +68,27 @@ extern "C" {
         
         return (void *)oldOffset;
     }
-    void *aligned_alloc(size_t alignment, size_t size) {
-        return malloc(size);
+        
+    void *__real_malloc(size_t size);
+    void *__wrap_malloc(size_t size) {
+        while (g_memoryLock.exchange(true) == true) {
+            js_waiting();
+        }
+        void *result = __real_malloc(size);
+        g_memoryLock.store(false);
+        return result;
     }
-    void *memset(void *m, int c, size_t n) {
-        std::uint8_t *p = reinterpret_cast<std::uint8_t *>(m);
-        while (n--) *p++ = std::uint8_t(c);
-        return m;
+    void __real_free(void *ptr);
+    void __wrap_free(void *ptr) {
+        if (ptr) {
+            while (g_memoryLock.exchange(true) == true) {
+                js_waiting();
+            }
+            __real_free(ptr);
+            g_memoryLock.store(false);
+        }
     }
-    void* memcpy(void *dest, const void *src, std::size_t count) {
-        const std::uint8_t *s = reinterpret_cast<const std::uint8_t *>(src);
-        std::uint8_t *d = reinterpret_cast<std::uint8_t *>(dest);
-        while (count--) *d++ = *s++;
-        return dest;
-    }
-    void* memmove(void *dest, const void *src, std::size_t count) {
-        return memcpy(dest, src, count);
-    }
+    
     std::size_t strlen(const char *str) {
         const char *s = str;
         while (*s != 0) s++;
@@ -143,7 +163,8 @@ namespace {
         memcpy(output, ptr, sizeof(std::uint16_t) * tocopy);
         return tocopy;
     }
-    void msgFormat(std::uint16_t *output, const char *fmt, va_list arglist) {
+    std::size_t msgFormat(std::uint16_t *output, const char *fmt, va_list arglist) {
+        const std::uint16_t *start = output;
         while (*fmt != '\0') {
             if (*fmt == '%') {
                 if (*++fmt == 'p') {
@@ -174,6 +195,7 @@ namespace {
             fmt++;
         }
         *output++ = 0;
+        return output - start;
     }
     std::size_t msgLength(const char *fmt, va_list arglist) {
         std::size_t result = 0;
@@ -222,7 +244,9 @@ namespace foundation {
         
     }
     
-    void WASMPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {}
+    void WASMPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
+        js_task(task.release());
+    }
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         const std::string fullPath = "data/" + std::string(filePath);
@@ -239,10 +263,10 @@ namespace foundation {
     }
     
     float WASMPlatform::getScreenWidth() const {
-        return 0.0f;
+        return js_canvas_width();
     }
     float WASMPlatform::getScreenHeight() const {
-        return 0.0f;
+        return js_canvas_height();
     }
     
     void *WASMPlatform::attachNativeRenderingContext(void *context) {
@@ -286,22 +310,22 @@ namespace foundation {
     void WASMPlatform::logMsg(const char *fmt, ...) {
         va_list arglist;
         va_start(arglist, fmt);
-        const std::size_t length = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * length));
+        const std::size_t capacity = msgLength(fmt, arglist);
+        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * capacity));
         va_end(arglist);
         va_start(arglist, fmt);
-        msgFormat(logBuffer, fmt, arglist);
+        const std::size_t length = msgFormat(logBuffer, fmt, arglist);
         va_end(arglist);
         js_log(logBuffer, length);
     }
     void WASMPlatform::logError(const char *fmt, ...) {
         va_list arglist;
         va_start(arglist, fmt);
-        const std::size_t length = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * length));
+        const std::size_t capacity = msgLength(fmt, arglist);
+        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * capacity));
         va_end(arglist);
         va_start(arglist, fmt);
-        msgFormat(logBuffer, fmt, arglist);
+        const std::size_t length = msgFormat(logBuffer, fmt, arglist);
         va_end(arglist);
         js_log(logBuffer, length);
         abort();
@@ -310,14 +334,26 @@ namespace foundation {
 
 extern "C" {
     void frame(float dt) {
-        g_updateAndDraw(dt);
+        if (g_updateAndDraw) {
+            g_updateAndDraw(dt);
+        }
     }
     
     void file(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         cbtype *cb = reinterpret_cast<cbtype *>(block + pathLen);
         cb->operator()(std::unique_ptr<std::uint8_t[]>(data), length);
+        cb->~cbtype();
         ::free(block);
+    }
+    
+    void task_execute(foundation::AsyncTask *ptr) {
+        ptr->executeInBackground();
+    }
+    
+    void task_complete(foundation::AsyncTask *ptr) {
+        ptr->executeInMainThread();
+        delete ptr;
     }
 }
 

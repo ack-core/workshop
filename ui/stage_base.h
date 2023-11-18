@@ -22,6 +22,7 @@ namespace ui {
         virtual ~StageFacility() = default;
     };
     
+    // TODO: make it working without rtti
     class ElementImpl : public virtual StageInterface::Element {
     public:
         ElementImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent);

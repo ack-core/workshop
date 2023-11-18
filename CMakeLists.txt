@@ -116,7 +116,8 @@ elseif(${PLATFORM} STREQUAL "PLATFORM_IOS")
 	set_property(TARGET workshop PROPERTY XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.ack-games.workshop")
 	set_property(TARGET workshop PROPERTY MACOSX_BUNDLE_INFO_PLIST "${m_binary_root}/info.plist")
 elseif(${PLATFORM} STREQUAL "PLATFORM_WASM")
-	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free --export=frame --export=file)
+	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free --wrap=malloc --wrap=free)
+	target_link_options(workshop PUBLIC --export=frame --export=file --export=task_execute --export=task_complete)
 endif()
 
 
