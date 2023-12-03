@@ -331,6 +331,7 @@ namespace math {
             block;
         };
         
+        static transform3f identity();
         static transform3f lookAtRH(const vector3f &eye, const vector3f &at, const vector3f &up);
         static transform3f perspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar);
         
@@ -694,6 +695,15 @@ namespace math {
     
     //---
     
+    inline transform3f transform3f::identity() {
+        return {
+            vector4f(1, 0, 0, 0),
+            vector4f(0, 1, 0, 0),
+            vector4f(0, 0, 1, 0),
+            vector4f(0, 0, 0, 1),
+        };
+    }
+
     inline transform3f transform3f::lookAtRH(const vector3f &eye, const vector3f &at, const vector3f &up) {
         vector3f tmpz = vector3f(eye.x - at.x, eye.y - at.y, eye.z - at.z).normalized(1.0);
         vector3f tmpx = up.cross(tmpz).normalized(1.0);

@@ -35,7 +35,6 @@ namespace foundation {
     };
     
     enum class RenderShaderInputFormat {
-        ID = 0,
         HALF2, HALF4,
         FLOAT1, FLOAT2, FLOAT3, FLOAT4,
         SHORT2, SHORT4,
@@ -177,7 +176,7 @@ namespace foundation {
         // @view  - view matrix
         // Matrices are row-major
         //
-        virtual void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) = 0;
+        virtual void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
         
         // Get screen coords from world position
         //

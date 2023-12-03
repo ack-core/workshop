@@ -117,7 +117,7 @@ namespace foundation {
         MetalRendering(const std::shared_ptr<PlatformInterface> &platform);
         ~MetalRendering() override;
         
-        void updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) override;
+        void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) override;
         
         auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
         auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
@@ -147,11 +147,11 @@ namespace foundation {
         static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024 * 4;
         
         struct FrameConstants {
-            float viewMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // view matrix
-            float projMatrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};        // proj matrix
-            float cameraPosition[4] = {0, 0, 0, 1};
-            float cameraDirection[4] = {1, 0, 0, 1};
-            float rtBounds[4] = {0, 0, 0, 0};
+            math::transform3f viewMatrix = math::transform3f::identity();
+            math::transform3f projMatrix = math::transform3f::identity();
+            math::vector4f cameraPosition = math::vector4f(0, 0, 0, 1);
+            math::vector4f cameraDirection = math::vector4f(1, 0, 0, 0);
+            math::vector4f rtBounds = {0, 0, 0, 0};
         }
         _frameConstants;
         

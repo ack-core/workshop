@@ -98,70 +98,104 @@ extern "C" {
         for (; *left == *right && *left; left++, right++);
         return *reinterpret_cast<const char *>(left) - *reinterpret_cast<const char *>(right);
     }
+    int memcmp(const void *lhs, const void *rhs, std::size_t count) {
+        const unsigned char *l = reinterpret_cast<const unsigned char *>(lhs);
+        const unsigned char *r = reinterpret_cast<const unsigned char *>(rhs);
+        for (; count && *l == *r; count--, l++, r++);
+        return count ? *l - *r : 0;
+    }
+    void *memchr(const void *ptr, int ch, std::size_t count) {
+        const unsigned char *mem = reinterpret_cast<const unsigned char *>(ptr);
+        while (count--) {
+            if (*mem == (unsigned char)ch) {
+                return (void *)mem;
+            }
+            mem++;
+        }
+        return nullptr;
+    }
+    int isalpha(int c) {
+        return (((unsigned)c | 32) - 'a') < 26;
+    }
+    int isdigit(int c) {
+        return ((unsigned)c - '0') < 10;
+    }
+    int isgraph(int c) {
+        return ((unsigned)c - 0x21) < 0x5e;
+    }
+    int isalnum(int c) {
+        return isalpha(c) || isdigit(c);
+    }
 }
 
 // Message formatting
 namespace {
-    const char alphabet[] = "0123456789ABCDEF";
-    const std::size_t CONVERSION_BUFFER_MAX = 32;
-    
     std::size_t align64(std::size_t len) {
         return (len + 63) & ~std::size_t(63);
     }
-    std::size_t ptoa(std::uint16_t *output, const void *p) {
-        std::uint16_t *buffer = output + sizeof(std::size_t) - 1;
-        std::size_t n = std::size_t(p);
+    std::size_t ptoa(std::uint16_t *p, const void *ptr) {
+        const int len = 2 * sizeof(std::size_t);
+        std::uint16_t *output = p + len - 1;
+        std::size_t n = std::size_t(ptr);
         
-        for (int i = 0; i < sizeof(std::size_t); i++) {
-            *buffer-- = alphabet[n % 16];
+        for (int i = 0; i < len; i++) {
+            *output-- = "0123456789ABCDEF"[n % 16];
             n /= 16;
         }
-        
         return sizeof(std::size_t);
     }
-    std::size_t ntoa(std::uint16_t *output, std::intptr_t n, int base) {
-        std::intptr_t an = std::abs(n);
-        std::uint16_t buffer[CONVERSION_BUFFER_MAX];
-        std::uint16_t *ptr = buffer + CONVERSION_BUFFER_MAX;
+    std::size_t ltoa(std::uint16_t* p, std::int64_t value) {
+        std::int64_t absvalue = value < 0 ? -value : value;
+        std::uint16_t *output = p;
+
         do {
-            *--ptr = alphabet[an % base];
-            an /= base;
+            *output++ = "0123456789ABCDEF"[absvalue % 10];
+            absvalue /= 10;
         }
-        while (an != 0);
-        if (n < 0) {
-            *--ptr = '-';
-        }
+        while (absvalue);
+
+        if (value < 0) *output++ = '-';
+        std::size_t result = output - p;
+        output--;
         
-        const std::size_t tocopy = buffer + CONVERSION_BUFFER_MAX - ptr;
-        memcpy(output, ptr, sizeof(std::uint16_t) * tocopy);
-        return tocopy;
+        while(p < output) {
+            char tmp = *output;
+            *output-- = *p;
+            *p++ = tmp;
+        }
+
+        return result;
     }
-    std::size_t ftoa(std::uint16_t *output, double f) {
+    std::size_t ftoa(std::uint16_t *p, double f) {
+        std::uint16_t *output = p;
         const double af = std::abs(f);
         std::int64_t ipart = std::int64_t(af);
-        std::int64_t fpart = std::int64_t(10000.0 * (af - double(ipart)));
+        double remainder = 1000000000.0 * (af - double(ipart));
+        std::int64_t fpart = std::int64_t(remainder);
         
-        std::uint16_t buffer[CONVERSION_BUFFER_MAX];
-        std::uint16_t *ptr = buffer + CONVERSION_BUFFER_MAX;
-        int fleft = 4;
-        do {
-            std::int64_t digit = fpart % 10;
-            *--ptr = alphabet[digit];
+        if ((remainder - double(fpart)) > 0.5) {
+            fpart++;
+            if (fpart > 1000000000) {
+                fpart = 0;
+                ipart++;
+            }
+        }
+        
+        if (f < 0.0) *output++ = '-';
+        output += ltoa(output, ipart);
+        
+        int width = 9;
+        while (fpart % 10 == 0 && width-- > 0) {
             fpart /= 10;
         }
-        while (--fleft);
-        *--ptr = '.';
-        do {
-            *--ptr = alphabet[ipart % 10];
-            ipart /= 10;
+        output += width + 1;
+        std::size_t result = output - p;
+        while (width--) {
+            *--output = fpart % 10 + '0';
+            fpart /= 10;
         }
-        while (ipart != 0);
-        if (f < 0.0f) {
-            *--ptr = '-';
-        }
-        const std::size_t tocopy = buffer + CONVERSION_BUFFER_MAX - ptr;
-        memcpy(output, ptr, sizeof(std::uint16_t) * tocopy);
-        return tocopy;
+        *--output = '.';
+        return result;
     }
     std::size_t msgFormat(std::uint16_t *output, const char *fmt, va_list arglist) {
         const std::uint16_t *start = output;
@@ -173,7 +207,7 @@ namespace {
                 }
                 else if (*fmt == 'd') {
                     const std::intptr_t d = va_arg(arglist, std::intptr_t);
-                    output += ntoa(output, d, 10);
+                    output += ltoa(output, d);
                 }
                 else if (*fmt == 'f') {
                     const double f = va_arg(arglist, double);
@@ -207,11 +241,11 @@ namespace {
                 }
                 else if (*fmt == 'd') {
                     va_arg(arglist, std::intptr_t);
-                    result += CONVERSION_BUFFER_MAX;
+                    result += 32;
                 }
                 else if (*fmt == 'f') {
                     va_arg(arglist, double);
-                    result += CONVERSION_BUFFER_MAX;
+                    result += 48;
                 }
                 else if (*fmt == 's') {
                     const char *s = va_arg(arglist, const char *);
@@ -237,7 +271,7 @@ namespace {
 }
 
 namespace foundation {
-    WASMPlatform::WASMPlatform() {
+    WASMPlatform::WASMPlatform() : _dataPath("data/") {
         
     }
     WASMPlatform::~WASMPlatform() {
@@ -249,7 +283,7 @@ namespace foundation {
     }
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
-        const std::string fullPath = "data/" + std::string(filePath);
+        const std::string fullPath = _dataPath + filePath;
         const std::size_t len = fullPath.length() + 1;
         std::uint16_t *block = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * len + sizeof(cbtype)));
         

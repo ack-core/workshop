@@ -35,6 +35,6 @@ namespace foundation {
         void logError(const char *fmt, ...) override;
 
     private:
-        std::string _executableDirectoryPath;
+        std::string _dataPath;
     };
 }

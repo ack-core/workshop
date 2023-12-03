@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 
 /*
 TODO:
@@ -74,4 +75,291 @@ namespace util {
         callback(const callback &) = delete;
         callback& operator =(const callback &) = delete;
     };
+}
+
+namespace util {
+    class strstream {
+    public:
+        strstream(const char *start, std::size_t length) : _current(start), _end(start + length), _error(false) {}
+        ~strstream() {}
+        
+        char getChar() {
+            return _current < _end ? *_current++ : 0;
+        }
+        char peekChar() const {
+            return *_current;
+        }
+        void skipws() {
+            while (_current < _end && std::isgraph(*_current) == false) _current++;
+        }
+        
+        void setError() {
+            _error = true;
+        }
+        bool isError() const {
+            return _error;
+        }
+        
+        operator bool() const {
+            return _current < _end && !_error;
+        }
+        
+        template<typename T, typename std::enable_if_t<std::is_integral_v<T>>* = nullptr> strstream &operator >> (T& value) {
+            skipws();
+            std::size_t len = 0;
+            const std::int64_t v = atoi(_current, len);
+            if (len) {
+                value = T(v);
+            }
+            else {
+                _error = true;
+            }
+            return *this;
+        }
+        template<typename T, typename std::enable_if_t<std::is_floating_point_v<T>>* = nullptr> strstream &operator >> (T& value) {
+            skipws();
+            std::size_t len = 0;
+            const double v = atof(_current, len);
+            if (len) {
+                value = T(v);
+            }
+            else {
+                _error = true;
+            }
+            return *this;
+        }
+        template<typename T, typename std::enable_if_t<std::is_base_of_v<std::basic_string<char>, T>>* = nullptr> strstream &operator >> (T& value) {
+            skipws();
+            value = "";
+            while (_current < _end && std::isgraph(*_current)) {
+                value.append(1, *_current++);
+            }
+            if (value.length() == 0) {
+                _error = true;
+            }
+            return *this;
+        }
+        
+        static std::int64_t atoi(const char *s, std::size_t &len) {
+            const char *input = s;
+            std::int64_t sign = 1;
+            std::int64_t out = 0;
+            
+            if (*input == '+') input++;
+            if (*input == '-' && std::isdigit(*(input + 1))) {
+                sign = -1;
+                input++;
+            }
+            while (std::isdigit(*input)) {
+                out = out * 10 + (*input - '0');
+                input++;
+            }
+            
+            len = input - s;
+            return out * sign;
+        }
+        static double atof(const char *s, std::size_t &len) {
+            const char *input = s;
+            std::size_t length = 0;
+            std::int64_t ipart = atoi(input, length);
+            
+            double power = ipart < 0 ? -1.0 : 1.0;
+            double out = 0.0;
+            
+            if (length) {
+                input += length;
+                if (*input == '.') {
+                    while (std::isdigit(*++input)) {
+                        power *= 10.0;
+                        out += (*input - '0') / power;
+                    }
+                }
+            }
+            
+            len = input - s;
+            return out + double(ipart);
+        }
+        
+        const char *_end;
+        const char *_current;
+        bool _error;
+    };
+    
+    namespace details {
+        template<typename T> struct nlist {
+            std::vector<T> &_output;
+            
+            inline friend strstream &operator >>(strstream &stream, const nlist &target) {
+                stream.skipws();
+                int count;
+                T temp;
+                
+                if (stream >> count) {
+                    for (int i = 0; i < count; i++) {
+                        if (stream >> temp) {
+                            target._output.emplace_back(std::move(temp));
+                        }
+                        else break;
+                    }
+                }
+                
+                return stream;
+            }
+        };
+        
+        struct sequence {
+            const char *_current;
+            
+            inline friend strstream &operator >>(strstream &stream, const sequence &target) {
+                stream.skipws();
+                const char *cur = target._current;
+                
+                while (stream.isError() == false && *cur != 0) {
+                    char ch = stream.peekChar();
+                    stream.peekChar() == *cur++ ? (void)stream.getChar() : stream.setError();
+                }
+                
+                return stream;
+            }
+        };
+        
+        struct braced {
+            std::string &_out;
+            char _opening, _closing;
+            
+            inline friend strstream &operator >>(strstream &stream, const braced &target) {
+                int counter = 1;
+                stream.skipws();
+                stream.peekChar() == target._opening ? (void)stream.getChar() : stream.setError();
+                
+                while (stream.isError() == false) {
+                    char ch = stream.peekChar();
+                    if (stream.peekChar() == target._closing) {
+                        if (--counter == 0) {
+                            stream.getChar();
+                            break;
+                        }
+                    }
+                    if (stream.peekChar() == target._opening) {
+                        counter++;
+                    }
+                    
+                    target._out.push_back(stream.getChar());
+                }
+                
+                return stream;
+            }
+        };
+        
+        struct word {
+            std::string &_out;
+
+            inline friend strstream &operator >>(strstream &stream, const word &target) {
+                stream.skipws();
+                if (std::isgraph(stream.peekChar())) {
+                    while (std::isalnum(stream.peekChar())) {
+                        target._out.push_back(stream.getChar());
+                    }
+                }
+                else {
+                    stream.setError();
+                }
+
+                return stream;
+            }
+        };
+    }
+    
+    inline auto braced(std::string &output, char opening, char closing) {
+        return details::braced{output, opening, closing};
+    }
+    template<std::size_t N> inline auto sequence(const char (&seq)[N]) {
+        return details::sequence{seq};
+    }
+    template<typename T> inline auto nlist(std::vector<T> &output) {
+        return details::nlist<T>{output};
+    }
+    inline auto word(std::string &output) {
+        return details::word{output};
+    }
+}
+
+namespace shaderUtils {
+    struct ShaderTypeInfo{
+        const char *typeName;
+        const char *nativeTypeName;
+        std::size_t sizeInBytes;
+    };
+    inline int getArrayMultiply(const std::string &varname) {
+        int  multiply = 1;
+        auto braceStart = varname.find('[');
+        auto braceEnd = varname.rfind(']');
+        
+        if (braceStart != std::string::npos && braceEnd != std::string::npos) {
+            std::size_t len;
+            std::int64_t value = util::strstream::atoi(varname.data() + braceStart + 1, len);
+            multiply = std::max(int(value), multiply);
+        }
+        
+        return multiply;
+    }
+    inline bool shaderGetTypeSize(const std::string &typeName, const ShaderTypeInfo *types, std::size_t typeCount, std::string &outNativeTypeName, std::size_t &outSize) {
+        for (std::size_t i = 0; i < typeCount; i++) {
+            if (types[i].typeName == typeName) {
+                outNativeTypeName = types[i].nativeTypeName;
+                outSize = types[i].sizeInBytes;
+                return true;
+            }
+        }
+        
+        return false;
+    };
+    inline void replacePattern(std::string &target, const std::string &pattern, const std::string &replacement, const std::string &prevChExc, const std::string &exception = {}) {
+        std::size_t start_pos = 0;
+        while((start_pos = target.find(pattern, start_pos)) != std::string::npos) {
+            if (exception.length() == 0 || ::memcmp(target.data() + start_pos, exception.data(), exception.length()) != 0) {
+                if (prevChExc.find(target.data()[start_pos - 1]) == std::string::npos) {
+                    target.replace(start_pos, pattern.length(), replacement);
+                    start_pos += replacement.length();
+                    continue;
+                }
+            }
+            
+            start_pos++;
+        }
+    }
+    inline bool formCodeBlock(const std::string &indent, util::strstream &stream, std::string &output) {
+        stream.skipws();
+        int  braceCounter = 1;
+        char prev = '\n', next;
+        
+        while (stream && ((next = stream.getChar()) != '}' || --braceCounter > 0)) {
+            if (prev == '\n') output += indent;
+            if (next == '{') braceCounter++;
+            output += next;
+            if (next == '\n')  stream.skipws();
+            prev = next;
+        }
+        
+        return braceCounter == 0;
+    }
+    inline std::string makeLines(const std::string &src) {
+        std::string result;
+        std::string::const_iterator left = std::begin(src);
+        std::string::const_iterator right;
+        char line[] = "/* 0000 */  ";
+        int counter = 1;
+
+        while ((right = std::find(left, std::end(src), '\n')) != std::end(src)) {
+            line[6] = '0' + counter % 10;
+            line[5] = '0' + (counter / 10) % 10;
+            line[4] = '0' + (counter / 100) % 10;
+            line[3] = '0' + (counter / 1000) % 10;
+            result += std::string(line) + std::string(left, ++right);
+            left = right;
+            counter++;
+        }
+
+        return result;
+    }
 }

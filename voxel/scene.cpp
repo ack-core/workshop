@@ -587,7 +587,7 @@ namespace voxel {
         _cleanupUnused(_staticMeshes);
         _cleanupUnused(_texturedMeshes);
         _cleanupUnused(_dynamicMeshes);
-        _rendering->updateFrameConstants(_camera.viewMatrix.flat, _camera.projMatrix.flat, _camera.position.flat, _camera.forward.flat);
+        _rendering->updateFrameConstants(_camera.viewMatrix, _camera.projMatrix, _camera.position, _camera.forward);
         
         _rendering->applyState(_lineSetShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.1));
         for (const auto &set : _lineSets) {

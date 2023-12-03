@@ -1,12 +1,6 @@
 
-
-#include <cctype>
-#include <string>
 #include <vector>
-#include <sstream>
-#include <iomanip>
 #include <algorithm>
-#include <regex>
 
 #ifdef PLATFORM_IOS
 
@@ -14,45 +8,10 @@
 #error "ARC is off"
 #endif
 
+#include "util.h"
 #include "rendering_metal.h"
 
 namespace {
-    template <typename = void> std::istream &expect(std::istream &stream) {
-        return stream;
-    }
-    template <char Ch, char... Chs> std::istream &expect(std::istream &stream) {
-        if ((stream >> std::ws).peek() == Ch) {
-            stream.ignore();
-        }
-        else {
-            stream.setstate(std::ios_base::failbit);
-        }
-        return expect<Chs...>(stream);
-    }
-    
-    struct braced {
-        explicit braced(std::string &out, char opening, char closing) : _opening(opening), _closing(closing), _out(out) {}
-        
-        inline friend std::istream &operator >>(std::istream &stream, const braced &target) {
-            (stream >> std::ws).peek();
-            (stream >> std::ws).peek() == target._opening ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
-            
-            while (stream.fail() == false && stream.peek() != target._closing) {
-                target._out.push_back(stream.get());
-            }
-            if (stream.fail() == false) {
-                (stream >> std::ws).peek() == target._closing ? (void)stream.ignore() : stream.setstate(std::ios_base::failbit);
-            }
-            
-            return stream;
-        }
-        
-    private:
-        char _opening;
-        char _closing;
-        std::string &_out;
-    };
-    
     static const MTLPrimitiveType g_topologies[] = {
         MTLPrimitiveTypePoint,
         MTLPrimitiveTypeLine,
@@ -314,17 +273,15 @@ namespace foundation {
     
     MetalRendering::~MetalRendering() {}
     
-    void MetalRendering::updateFrameConstants(const float(&view)[16], const float(&proj)[16], const float(&camPos)[3], const float(&camDir)[3]) {
-        ::memcpy(_frameConstants.viewMatrix, view, 16 * sizeof(float));
-        ::memcpy(_frameConstants.projMatrix, proj, 16 * sizeof(float));
-        ::memcpy(_frameConstants.cameraPosition, camPos, 3 * sizeof(float));
-        ::memcpy(_frameConstants.cameraDirection, camDir, 3 * sizeof(float));
+    void MetalRendering::updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) {
+        _frameConstants.viewMatrix = view;
+        _frameConstants.projMatrix = proj;
+        _frameConstants.cameraPosition.xyz = camPos;
+        _frameConstants.cameraDirection.xyz = camDir;
     }
     
     math::vector2f MetalRendering::getScreenCoordinates(const math::vector3f &worldPosition) {
-        const math::transform3f &view = *reinterpret_cast<const math::transform3f *>(_frameConstants.viewMatrix);
-        const math::transform3f &proj = *reinterpret_cast<const math::transform3f *>(_frameConstants.projMatrix);
-        const math::transform3f vp = view * proj;
+        const math::transform3f vp = _frameConstants.viewMatrix * _frameConstants.projMatrix;
         math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
         
         tpos = tpos.transformed(vp);
@@ -343,9 +300,7 @@ namespace foundation {
     }
     
     math::vector3f MetalRendering::getWorldDirection(const math::vector2f &screenPosition) {
-        const math::transform3f &view = *reinterpret_cast<const math::transform3f *>(_frameConstants.viewMatrix);
-        const math::transform3f &proj = *reinterpret_cast<const math::transform3f *>(_frameConstants.projMatrix);
-        const math::transform3f inv = (view * proj).inverted();
+        const math::transform3f inv = (_frameConstants.viewMatrix * _frameConstants.projMatrix).inverted();
         
         float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
         float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
@@ -354,44 +309,9 @@ namespace foundation {
         return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
-    namespace shaderUtils {
-        bool formCodeBlock(const std::string &indent, std::istringstream &stream, std::string &output) {
-            stream >> std::ws;
-            int  braceCounter = 1;
-            char prev = '\n', next;
-
-            while (stream && ((next = stream.get()) != '}' || --braceCounter > 0)) {
-                if (prev == '\n') output += indent;
-                if (next == '{') braceCounter++;
-                output += next;
-                if (next == '\n')  stream >> std::ws;
-                prev = next;
-            }
-            
-            return braceCounter == 0;
-        };
-        
-        std::string makeLines(const std::string &src) {
-            std::string result;
-            std::string::const_iterator left = std::begin(src);
-            std::string::const_iterator right;
-            int counter = 0;
-
-            while ((right = std::find(left, std::end(src), '\n')) != std::end(src)) {
-                right++;
-                char line[64];
-                std::snprintf(line, 64, "/* %3d */  ", ++counter);
-                result += std::string(line) + std::string(left, right);
-                left = right;
-            }
-
-            return result;
-        };
-    }
-
     RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const RenderShaderInputDesc &vertex, const RenderShaderInputDesc &instance) {
         std::shared_ptr<RenderShader> result;
-        std::istringstream input(shadersrc);
+        util::strstream input(shadersrc, strlen(shadersrc));
         const std::string indent = "    ";
         
         if (_shaderNames.find(name) == _shaderNames.end()) {
@@ -401,70 +321,41 @@ namespace foundation {
             _platform->logError("[MetalRendering::createShader] shader name '%s' already used\n", name);
         }
         
-        auto getArrayMultiply = [](const std::string &varname) {
-            int  multiply = 1;
-            auto braceStart = varname.find('[');
-            auto braceEnd = varname.rfind(']');
-
-            if (braceStart != std::string::npos && braceEnd != std::string::npos) {
-                multiply = std::max(std::stoi(varname.substr(braceStart + 1, braceEnd - braceStart - 1)), multiply);
-            }
-            
-            return multiply;
+        static const std::size_t TYPES_COUNT = 14;
+        static const std::size_t TYPES_PASS_COUNT = 4;
+        static const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
+            // Passing from App side
+            {"float4",  "float4",   16},
+            {"int4",    "int4",     16},
+            {"uint4",   "uint4",    16},
+            {"matrix4", "float4x4", 64},
+            // Internal shader types
+            {"float1",  "float",    4},
+            {"float2",  "float2",   8},
+            {"float3",  "float3",   12},
+            {"int1",    "int",      4},
+            {"int2",    "int2",     8},
+            {"int3",    "int3",     12},
+            {"uint1",   "uint",     4},
+            {"uint2",   "uint2",    8},
+            {"uint3",   "uint3",    12},
+            {"matrix3", "float3x3", 36},
         };
         
-        auto shaderGetTypeSize = [&getArrayMultiply](const std::string &varname, const std::string &typeName, bool packed, std::string &nativeTypeName, std::size_t &size, std::size_t &count) {
-            struct {
-                const char *typeName;
-                const char *nativeTypeName;
-                const char *nativeTypeNamePacked;
-                std::size_t packedSize;
-            }
-            typeSizeTable[] = {
-                {"float",   "float",    "float",           4},
-                {"float1",  "float",    "float",           4},
-                {"float2",  "float2",   "packed_float2",   8}, // TODO: decline in 'const' block
-                {"float3",  "float3",   "packed_float3",   12},
-                {"float4",  "float4",   "float4",          16},
-                {"int1",    "int",      "int",             4},
-                {"int2",    "int2",     "packed_int2",     8},
-                {"int3",    "int3",     "packed_int3",     12},
-                {"int4",    "int4",     "int4",            16},
-                {"uint1",   "uint",     "uint",            4},
-                {"uint2",   "uint2",    "packed_uint2",    8},
-                {"uint3",   "uint3",    "packed_uint3",    12},
-                {"uint4",   "uint4",    "uint4",           16},
-                {"matrix3", "float3x3", "packed_float3x3", 36},
-                {"matrix4", "float4x4", "float4x4",        64},
-            };
-            
-            int  multiply = getArrayMultiply(varname);
-            for (auto index = std::begin(typeSizeTable); index != std::end(typeSizeTable); ++index) {
-                if (index->typeName == typeName) {
-                    nativeTypeName = packed ? index->nativeTypeNamePacked : index->nativeTypeName;
-                    size = index->packedSize;
-                    count = multiply;
-                    return true;
-                }
-            }
-
-            return false;
-        };
-        
-        auto formFixedBlock = [&shaderGetTypeSize, &indent](std::istringstream &stream, std::string &output) {
+        auto formFixedBlock = [&indent](util::strstream &stream, std::string &output) {
             std::string varname, arg;
             
             while (stream >> varname && varname[0] != '}') {
-                if (stream >> expect<':'> >> arg >> expect<'='>) {
-                    std::size_t elementSize, elementCount;
+                if (stream >> util::sequence(":") >> arg >> util::sequence("=")) {
+                    std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
                     std::string nativeTypeName;
                     
-                    if (shaderGetTypeSize(varname, arg, false, nativeTypeName, elementSize, elementCount)) {
+                    if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, TYPES_COUNT, nativeTypeName, elementSize)) {
                         output += "constant " + nativeTypeName + " fixed_" + varname + " = {\n";
                         for (std::size_t i = 0; i < elementCount; i++) {
                             output += indent + nativeTypeName + "(";
 
-                            if (stream >> braced(output, '[', ']')) {
+                            if (stream >> util::braced(output, '[', ']')) {
                                 output += "),\n";
                             }
                             else return false;
@@ -481,16 +372,16 @@ namespace foundation {
             return true;
         };
 
-        auto formVarsBlock = [&shaderGetTypeSize, &indent](std::istringstream &stream, std::string &output, bool packed) {
+        auto formVarsBlock = [&indent](util::strstream &stream, std::string &output, std::size_t allowedTypeCount) {
             std::string varname, arg;
             std::uint32_t totalLength = 0;
             
             while (stream >> varname && varname[0] != '}') {
-                if (stream >> expect<':'> >> arg) {
-                    std::size_t elementSize, elementCount;
+                if (stream >> util::sequence(":") >> arg) {
+                    std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
                     std::string nativeTypeName;
                     
-                    if (shaderGetTypeSize(varname, arg, packed, nativeTypeName, elementSize, elementCount)) {
+                    if (shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
                         output += indent + nativeTypeName + " " + varname + ";\n";
                         totalLength += elementSize * elementCount;
                         continue;
@@ -503,21 +394,6 @@ namespace foundation {
             return totalLength;
         };
         
-        auto replacePattern = [](std::string &target, const std::string &pattern, const std::string &replacement, const std::string &prevChExc, const std::string &exception = {}) {
-            std::size_t start_pos = 0;
-            while((start_pos = target.find(pattern, start_pos)) != std::string::npos) {
-                if (exception.length() == 0 || ::memcmp(target.data() + start_pos, exception.data(), exception.length()) != 0) {
-                    if (prevChExc.find(target.data()[start_pos - 1]) == std::string::npos) {
-                        target.replace(start_pos, pattern.length(), replacement);
-                        start_pos += replacement.length();
-                        continue;
-                    }
-                }
-                
-                start_pos++;
-            }
-        };
-
         MTLVertexDescriptor *vdesc = [MTLVertexDescriptor vertexDescriptor];
         std::string nativeShader =
             "#include <metal_stdlib>\n"
@@ -529,8 +405,6 @@ namespace foundation {
             "#define _abs(a) abs(a)\n"
             "#define _sat(a) saturate(a)\n"
             "#define _frac(a) fract(a)\n"
-            "#define _asFloat(a) as_type<float>(a)\n"
-            "#define _asUint(a) as_type<uint>(a)\n"
             "#define _transform(a, b) ((b) * (a))\n"
             "#define _dot(a, b) dot((a), (b))\n"
             "#define _cross(a, b) cross((a), (b))\n"
@@ -571,7 +445,7 @@ namespace foundation {
         bool fssrcBlockDone = false;
         
         while (input >> blockName) {
-            if (fixedBlockDone == false && blockName == "fixed" && (input >> expect<'{'>)) {
+            if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
                 if (formFixedBlock(input, nativeShader) == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'fixed' block\n", name);
                     completed = false;
@@ -581,10 +455,10 @@ namespace foundation {
                 fixedBlockDone = true;
                 continue;
             }
-            if (constBlockDone == false && blockName == "const" && (input >> expect<'{'>)) {
+            if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
                 nativeShader += "struct _Constants {\n";
                 
-                if ((constBlockLength = formVarsBlock(input, nativeShader, true)) == 0) {
+                if ((constBlockLength = formVarsBlock(input, nativeShader, TYPES_PASS_COUNT)) == 0) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'const' block\n", name);
                     completed = false;
                     break;
@@ -593,10 +467,10 @@ namespace foundation {
                 constBlockDone = true;
                 continue;
             }
-            if (inoutBlockDone == false && blockName == "inout" && (input >> expect<'{'>)) {
+            if (inoutBlockDone == false && blockName == "inout" && (input >> util::sequence("{"))) {
                 nativeShader += "struct _InOut {\n    float4 position [[position]];\n";
                 
-                if (formVarsBlock(input, nativeShader, false) == 0) {
+                if (formVarsBlock(input, nativeShader, TYPES_COUNT) == 0) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'inout' block\n", name);
                     completed = false;
                     break;
@@ -610,7 +484,7 @@ namespace foundation {
                 std::string funcSignature;
                 std::string funcReturnType;
 
-                if (input >> funcName >> braced(funcSignature, '(', ')') >> expect<'-', '>'> >> funcReturnType >> expect<'{'>) {
+                if (input >> util::word(funcName) >> util::braced(funcSignature, '(', ')') >> util::sequence("->") >> funcReturnType >> util::sequence("{")) {
                     std::string codeBlock;
                     
                     if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
@@ -631,7 +505,7 @@ namespace foundation {
                 }
                 continue;
             }
-            if (vssrcBlockDone == false && blockName == "vssrc" && (input >> expect<'{'>)) {
+            if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
                 if (inoutBlockDone == false) {
                     inoutBlockDone = true;
                     nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n";
@@ -644,7 +518,6 @@ namespace foundation {
                     MTLVertexFormat nativeFormat;
                 }
                 formatTable[] = { // index is RenderShaderInputFormat value
-                    {"uint",   0,  MTLVertexFormatInvalid},
                     {"float2", 4,  MTLVertexFormatHalf2},
                     {"float4", 8,  MTLVertexFormatHalf4},
                     {"float1", 4,  MTLVertexFormatFloat},
@@ -667,47 +540,38 @@ namespace foundation {
                     {"uint4",  16, MTLVertexFormatUInt4}
                 };
 
-                std::string vertexIDName;
-                std::string instanceIDName;
                 std::size_t index = 0;
                 std::uint32_t offset = 0;
                 
-                auto formInput = [&](const RenderShaderInputDesc &desc, const std::string &prefix, std::uint32_t bufferIndex, std::string &idout, std::string &output) {
+                auto formInput = [&](const RenderShaderInputDesc &desc, const std::string &prefix, std::uint32_t bufferIndex, std::string &output) {
                     offset = 0;
                                 
                     for (const auto &item : desc) {
-                        if (item.format == RenderShaderInputFormat::ID) {
-                            idout = prefix + item.name;
-                        }
-                        else {
-                            NativeFormat &fmt = formatTable[int(item.format)];
-                            vdesc.attributes[index].bufferIndex = bufferIndex;
-                            vdesc.attributes[index].offset = offset;
-                            vdesc.attributes[index].format = fmt.nativeFormat;
-                            
-                            output += indent + fmt.nativeTypeName + " " + item.name + " [[attribute(" + std::to_string(index) + ")]];\n";
-                            offset += fmt.size;
-                            index++;
-                        }
+                        NativeFormat &fmt = formatTable[int(item.format)];
+                        vdesc.attributes[index].bufferIndex = bufferIndex;
+                        vdesc.attributes[index].offset = offset;
+                        vdesc.attributes[index].format = fmt.nativeFormat;
+                        
+                        output += indent + fmt.nativeTypeName + " " + item.name + " [[attribute(" + std::to_string(index) + ")]];\n";
+                        offset += fmt.size;
+                        index++;
                     }
                     vdesc.layouts[bufferIndex].stride = offset;
                     vdesc.layouts[bufferIndex].stepRate = 1;
                 };
                 
-                formInput(vertex, "vertex_", 0, vertexIDName, nativeShader);
-                formInput(instance, "instance_", 1, instanceIDName, nativeShader);
+                formInput(vertex, "vertex_", 0, nativeShader);
+                formInput(instance, "instance_", 1, nativeShader);
 
                 vdesc.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
                 vdesc.layouts[1].stepFunction = MTLVertexStepFunctionPerInstance;
 
-                nativeShader += "};\nvertex _InOut main_vertex(\n";
+                nativeShader +=
+                    "};\n"
+                    "vertex _InOut main_vertex(\n"
+                    "    unsigned int vertex_ID [[vertex_id]],\n"
+                    "    unsigned int instance_ID [[instance_id]],\n";
 
-                if (vertexIDName.length()) {
-                    nativeShader += "    unsigned int " + vertexIDName + " [[vertex_id]],\n";
-                }
-                if (instanceIDName.length()) {
-                    nativeShader += "    unsigned int " + instanceIDName + " [[instance_id]],\n";
-                }
                 if (vdesc.layouts[0].stride || vdesc.layouts[1].stride) { // if there is something but vertex_id/instance_id
                     nativeShader += "    _VSIn input [[stage_in]],\n";
                 }
@@ -730,17 +594,18 @@ namespace foundation {
                     break;
                 }
   
-                replacePattern(codeBlock, "vertex_", "input.", "._", vertexIDName);
-                replacePattern(codeBlock, "instance_", "input.", "._", instanceIDName);
-                replacePattern(codeBlock, "output_", "output.", "._");
-                replacePattern(codeBlock, "const_", "constants.", "._");
-                replacePattern(codeBlock, "frame_", "framedata.", "._");
+                shaderUtils::replacePattern(codeBlock, "vertex_", "input.", "._", "vertex_ID");
+                shaderUtils::replacePattern(codeBlock, "instance_", "input.", "._", "instance_ID");
+                shaderUtils::replacePattern(codeBlock, "output_", "output.", "._");
+                shaderUtils::replacePattern(codeBlock, "const_", "constants.", "._");
+                shaderUtils::replacePattern(codeBlock, "frame_", "framedata.", "._");
+                
                 nativeShader += codeBlock;
                 nativeShader += "    return output;\n}\n";
                 vssrcBlockDone = true;
                 continue;
             }
-            if (fssrcBlockDone == false && blockName == "fssrc" && (input >> expect<'{'>)) {
+            if (fssrcBlockDone == false && blockName == "fssrc" && (input >> util::sequence("{"))) {
                 if (vssrcBlockDone == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' : 'vssrc' block must be defined before 'fssrc'\n", name);
                     completed = false;
@@ -777,9 +642,10 @@ namespace foundation {
                     break;
                 }
                 
-                replacePattern(codeBlock, "frame_", "framedata.", "._");
-                replacePattern(codeBlock, "const_", "constants.", "._");
-                replacePattern(codeBlock, "input_", "input.", "._");
+                shaderUtils::replacePattern(codeBlock, "frame_", "framedata.", "._");
+                shaderUtils::replacePattern(codeBlock, "const_", "constants.", "._");
+                shaderUtils::replacePattern(codeBlock, "input_", "input.", "._");
+                
                 nativeShader += codeBlock;
                 nativeShader += "    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";
                 nativeShader += "    (void)fragment_coord;\n";
@@ -794,7 +660,7 @@ namespace foundation {
         }
         
         nativeShader = shaderUtils::makeLines(nativeShader);
-        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
+        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -1028,8 +894,8 @@ namespace foundation {
                     rtHeight = double(cfg.target->getHeight());
                 }
                 
-                _frameConstants.rtBounds[0] = rtWidth;
-                _frameConstants.rtBounds[1] = rtHeight;
+                _frameConstants.rtBounds.x = rtWidth;
+                _frameConstants.rtBounds.y = rtHeight;
                 
                 _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), 3, 1);
 

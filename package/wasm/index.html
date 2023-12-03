@@ -29,15 +29,16 @@
         var memory = new WebAssembly.Memory({ initial: 4, maximum: 1024, shared: true });
         var worker = new Worker("worker.js");
         var canvas = document.getElementById("render_target");
-        var target_width = canvas.scrollWidth;
-        var target_height = canvas.scrollHeight;
+        var targetWidth = canvas.scrollWidth;
+        var targetheight = canvas.scrollHeight;
+        var prevFrameTimeStamp = 0;
 
+        var glIDCounter = 0x10000000;
+        var glshaders = {};
         var glcontext = canvas.getContext("webgl2");
         if (glcontext == null) {
             console.log("Failed to create GL Context");
         }
-
-        var prevFrameTimeStamp = 0;
 
         const imports = {
             env: {
@@ -74,8 +75,49 @@
                         instance.exports.file(block, pathLen, 0, 0);
                     });
                 },
-                js_canvas_width: () => target_width,
-                js_canvas_height: () => target_height
+                js_canvas_width: () => targetWidth,
+                js_canvas_height: () => targetHeight,
+                glMakeProgram: function(vsrc, vlen, fsrc, flen) {
+                    const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
+                    const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
+                    instance.exports.__wrap_free(vsrc);
+                    instance.exports.__wrap_free(fsrc);
+                    
+                    var vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
+                    var fshader = glcontext.createShader(glcontext.FRAGMENT_SHADER);
+                    var program = glcontext.createProgram();
+
+                    glcontext.shaderSource(vshader, vsstr);
+                    glcontext.shaderSource(fshader, fsstr);
+                    glcontext.compileShader(vshader);
+                    glcontext.compileShader(fshader);
+
+                    if (glcontext.getShaderParameter(vshader, glcontext.COMPILE_STATUS)) {
+                        if (glcontext.getShaderParameter(fshader, glcontext.COMPILE_STATUS)) {
+                            glcontext.attachShader(program, vshader);
+                            glcontext.attachShader(program, fshader);
+                            glcontext.linkProgram(program);
+                            
+                            if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
+                                glshaders[glIDCounter] = program;
+                                return glIDCounter++;
+                            }
+                            else {
+                                console.log("[WebGL] " + glcontext.getProgramInfoLog(program));
+                            }
+                        }
+                        else {
+                            console.log("[WebGL] " + glcontext.getShaderInfoLog(fshader));
+                        }
+                    }
+                    else {
+                        console.log("[WebGL] " + glcontext.getShaderInfoLog(vshader));
+                    }
+
+                    glcontext.deleteShader(vshader);
+                    glcontext.deleteShader(fshader);
+                    glcontext.deleteProgram(program);
+                }
             }
         };
 
@@ -110,8 +152,8 @@
                 window.requestAnimationFrame(onFrame);
             });
             window.addEventListener("resize", () => {
-                target_width = canvas.scrollWidth;
-                target_height = canvas.scrollHeight;
+                targetWidth = canvas.scrollWidth;
+                targetHeight = canvas.scrollHeight;
             });
         });
 

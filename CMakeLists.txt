@@ -32,15 +32,15 @@ get_filename_component(m_source_root "${PROJECT_SOURCE_DIR}" ABSOLUTE)
 include_directories("${m_source_root}")
 
 add_subdirectory("${m_source_root}/thirdparty/upng")
-add_subdirectory("${m_source_root}/thirdparty/expect")
+#add_subdirectory("${m_source_root}/thirdparty/expect")
 add_subdirectory("${m_source_root}/thirdparty/stb_mini_ttf")
 
 add_subdirectory("${m_source_root}/foundation")
-add_subdirectory("${m_source_root}/providers")
-add_subdirectory("${m_source_root}/voxel")
-add_subdirectory("${m_source_root}/ui")
-add_subdirectory("${m_source_root}/datahub")
-add_subdirectory("${m_source_root}/game")
+#add_subdirectory("${m_source_root}/providers")
+#add_subdirectory("${m_source_root}/voxel")
+#add_subdirectory("${m_source_root}/ui")
+#add_subdirectory("${m_source_root}/datahub")
+#add_subdirectory("${m_source_root}/game")
 
 set(
 	m_sources_list
@@ -50,15 +50,15 @@ source_group("" FILES ${m_sources_list})
 add_executable(workshop ${m_sources_list})
 
 target_link_libraries(workshop PUBLIC upng)
-target_link_libraries(workshop PUBLIC expect)
+#target_link_libraries(workshop PUBLIC expect)
 target_link_libraries(workshop PUBLIC stb_mini_ttf)
 
 target_link_libraries(workshop PUBLIC foundation)
-target_link_libraries(workshop PUBLIC providers)
-target_link_libraries(workshop PUBLIC voxel)
-target_link_libraries(workshop PUBLIC ui)
-target_link_libraries(workshop PUBLIC datahub)
-target_link_libraries(workshop PUBLIC game)
+#target_link_libraries(workshop PUBLIC providers)
+#target_link_libraries(workshop PUBLIC voxel)
+#target_link_libraries(workshop PUBLIC ui)
+#target_link_libraries(workshop PUBLIC datahub)
+#target_link_libraries(workshop PUBLIC game)
 
 set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary")
 
@@ -67,7 +67,7 @@ set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}
 get_filename_component(m_tools_root "${PROJECT_SOURCE_DIR}/tools" ABSOLUTE)
 get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLUTE)
 get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary" ABSOLUTE)
-get_filename_component(m_platform_root "${PROJECT_SOURCE_DIR}/platform/${PLATFORM_POSTFIX}" ABSOLUTE)
+get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}" ABSOLUTE)
 
 #file(REMOVE_RECURSE "${m_binary_root}")
 #file(MAKE_DIRECTORY "${m_binary_root}")
@@ -77,7 +77,7 @@ file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCH
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.yard")
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt")
-file(COPY "${m_platform_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
+file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
 message(STATUS "Generating resource lists...")
 execute_process(
