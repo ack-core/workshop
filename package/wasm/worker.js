@@ -35,6 +35,9 @@ onmessage = (msg) => {
                 js_canvas_height: function() {
                     throw "can't access canvas from background";
                 },
+                webgl_makeProgram: function(vsrc, vlen, fsrc, flen) {
+                    throw "can't access webgl from background";
+                }
             }
         };
 

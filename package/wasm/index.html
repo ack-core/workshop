@@ -43,9 +43,6 @@
         const imports = {
             env: {
                 memory: memory,
-                abort: function() {
-                    throw "aborted";
-                },
                 js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
                 js_log: function(str, len) {
                     const u16str = new Uint16Array(memory.buffer, str, len);
@@ -77,7 +74,10 @@
                 },
                 js_canvas_width: () => targetWidth,
                 js_canvas_height: () => targetHeight,
-                glMakeProgram: function(vsrc, vlen, fsrc, flen) {
+                abort: function() {
+                    throw "aborted";
+                },                
+                webgl_makeProgram: function(vsrc, vlen, fsrc, flen) {
                     const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
                     const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
                     instance.exports.__wrap_free(vsrc);
@@ -103,20 +103,22 @@
                                 return glIDCounter++;
                             }
                             else {
-                                console.log("[WebGL] " + glcontext.getProgramInfoLog(program));
+                                console.log("[WebGL link] " + glcontext.getProgramInfoLog(program));
                             }
                         }
                         else {
-                            console.log("[WebGL] " + glcontext.getShaderInfoLog(fshader));
+                            console.log("[WebGL fs] " + glcontext.getShaderInfoLog(fshader));
                         }
                     }
                     else {
-                        console.log("[WebGL] " + glcontext.getShaderInfoLog(vshader));
+                        console.log("[WebGL vs] " + glcontext.getShaderInfoLog(vshader));
                     }
 
                     glcontext.deleteShader(vshader);
                     glcontext.deleteShader(fshader);
                     glcontext.deleteProgram(program);
+
+                    return 0;
                 }
             }
         };

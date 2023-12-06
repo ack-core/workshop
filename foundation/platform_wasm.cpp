@@ -142,7 +142,7 @@ namespace {
             *output-- = "0123456789ABCDEF"[n % 16];
             n /= 16;
         }
-        return sizeof(std::size_t);
+        return len;
     }
     std::size_t ltoa(std::uint16_t* p, std::int64_t value) {
         std::int64_t absvalue = value < 0 ? -value : value;

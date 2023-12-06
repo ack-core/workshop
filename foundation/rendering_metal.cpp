@@ -321,6 +321,7 @@ namespace foundation {
             _platform->logError("[MetalRendering::createShader] shader name '%s' already used\n", name);
         }
         
+        static const std::string SEPARATORS = " ;,=-+*/{(\n\t\r";
         static const std::size_t TYPES_COUNT = 14;
         static const std::size_t TYPES_PASS_COUNT = 4;
         static const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
@@ -488,9 +489,9 @@ namespace foundation {
                     std::string codeBlock;
                     
                     if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
-                        nativeShader += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
+                        nativeShader += "\n" + funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
                         nativeShader += codeBlock;
-                        nativeShader += "}\n";
+                        nativeShader += "}\n\n";
                     }
                     else {
                         _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
@@ -593,12 +594,12 @@ namespace foundation {
                     completed = false;
                     break;
                 }
-  
-                shaderUtils::replacePattern(codeBlock, "vertex_", "input.", "._", "vertex_ID");
-                shaderUtils::replacePattern(codeBlock, "instance_", "input.", "._", "instance_ID");
-                shaderUtils::replacePattern(codeBlock, "output_", "output.", "._");
-                shaderUtils::replacePattern(codeBlock, "const_", "constants.", "._");
-                shaderUtils::replacePattern(codeBlock, "frame_", "framedata.", "._");
+                
+                shaderUtils::replace(codeBlock, "vertex_", "input.", SEPARATORS, {"vertex_ID"});
+                shaderUtils::replace(codeBlock, "instance_", "input.", SEPARATORS, {"instance_ID"});
+                shaderUtils::replace(codeBlock, "output_", "output.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 
                 nativeShader += codeBlock;
                 nativeShader += "    return output;\n}\n";
@@ -642,9 +643,9 @@ namespace foundation {
                     break;
                 }
                 
-                shaderUtils::replacePattern(codeBlock, "frame_", "framedata.", "._");
-                shaderUtils::replacePattern(codeBlock, "const_", "constants.", "._");
-                shaderUtils::replacePattern(codeBlock, "input_", "input.", "._");
+                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "input_", "input.", SEPARATORS);
                 
                 nativeShader += codeBlock;
                 nativeShader += "    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";

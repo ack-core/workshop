@@ -5,6 +5,11 @@
 
 #include <GLES3/gl3.h>
 
+// From js
+extern "C" {
+    void *webgl_makeProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen);
+}
+
 namespace {
     static const GLenum g_topologies[] = {
         GL_POINTS,
@@ -103,6 +108,7 @@ namespace foundation {
             _platform->logError("[WASMRendering::createShader] shader name '%s' already used\n", name);
         }
         
+        static const char *SEPARATORS = " ;,=-+*/{(\n\t\r";
         static const std::size_t TYPES_COUNT = 14;
         static const std::size_t TYPES_PASS_COUNT = 4;
         static const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
@@ -124,6 +130,19 @@ namespace foundation {
             {"matrix3", "mat3",   36},
         };
         
+        struct ShaderSrc {
+            const std::uint16_t *src;
+            std::size_t length;
+        }
+        nativeShaderVS, nativeShaderFS;
+        
+        auto createNativeSrc = [](const std::string &src) {
+            std::uint16_t *buffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * src.length()));
+            for (std::size_t i = 0; i < src.length(); i++) {
+                buffer[i] = src[i];
+            }
+            return ShaderSrc {buffer, src.length()};
+        };
         auto formFixedBlock = [&indent](util::strstream &stream, std::string &output) {
             std::string varname, arg;
             
@@ -133,17 +152,17 @@ namespace foundation {
                     std::string nativeTypeName;
                     
                     if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, TYPES_COUNT, nativeTypeName, elementSize)) {
-                        output += "const highp " + nativeTypeName + " fixed_" + varname + " = {\n";
+                        output += "const mediump " + nativeTypeName + " fixed_" + varname + " = " + nativeTypeName + "[](\n";
                         for (std::size_t i = 0; i < elementCount; i++) {
                             output += indent + nativeTypeName + "(";
 
                             if (stream >> util::braced(output, '[', ']')) {
-                                output += "),\n";
+                                output += i == elementCount -1 ? ")\n" : "),\n";
                             }
                             else return false;
                         }
                         
-                        output += "};\n";
+                        output += ");\n";
                         continue;
                     }
                 }
@@ -153,7 +172,6 @@ namespace foundation {
             
             return true;
         };
-
         auto formVarsBlock = [&indent](util::strstream &stream, std::string &output, std::size_t allowedTypeCount) {
             std::string varname, arg;
             std::uint32_t totalLength = 0;
@@ -176,7 +194,7 @@ namespace foundation {
             return totalLength;
         };
         
-        std::string nativeShader =
+        std::string shaderDefines =
             "#version 300 es\n"
             "\n"
             "#define _sign(a) (2.0 * step(0.0, a) - 1.0)\n"
@@ -200,11 +218,9 @@ namespace foundation {
             "#define _min(a, b) min((a), (b))\n"
             "#define _max(a, b) max((a), (b))\n"
             "\n"
-            "#define vertex_ID gl_VertexID\n"
-            "#define instance_ID gl_InstanceID\n"
-            "#define output_position gl_Position\n"
+            "precision mediump float;\n"
             "\n"
-            "layout(binding = 0, std140) uniform _FrameData {\n"
+            "layout(std140) uniform _FrameData {\n"
             "    mediump mat4 viewMatrix;\n"
             "    mediump mat4 projMatrix;\n"
             "    mediump vec4 cameraPosition;\n"
@@ -212,6 +228,11 @@ namespace foundation {
             "    mediump vec4 rtBounds;\n"
             "}\n"
             "framedata;\n\n";
+            
+        std::string shaderFixed;
+        std::string shaderFunctions;
+        std::string shaderVSOutput;
+        std::string shaderFSInput;
         
         std::string blockName;
         std::uint32_t constBlockLength = 0;
@@ -223,41 +244,44 @@ namespace foundation {
         bool vssrcBlockDone = false;
         bool fssrcBlockDone = false;
         
-        std::string nativeShaderVS, nativeShaderFS;
-        
         while (input >> blockName) {
+            if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
+                shaderDefines += "layout(std140) uniform _Constants {\n";
+                
+                if ((constBlockLength = formVarsBlock(input, shaderDefines, TYPES_PASS_COUNT)) == 0) {
+                    _platform->logError("[WASMRendering::createShader] shader '%s' has ill-formed 'const' block\n", name);
+                    completed = false;
+                    break;
+                }
+                shaderDefines += "}\nconstants;\n\n";
+                constBlockDone = true;
+                continue;
+            }
             if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
-                if (formFixedBlock(input, nativeShader) == false) {
+                if (formFixedBlock(input, shaderFixed) == false) {
                     _platform->logError("[WASMRendering::createShader] shader '%s' has ill-formed 'fixed' block\n", name);
                     completed = false;
                     break;
                 }
                 
-                nativeShader += "\n";
                 fixedBlockDone = true;
                 continue;
             }
-            if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
-                nativeShader += "layout(binding = 1, std140) uniform _Constants {\n";
-                
-                if ((constBlockLength = formVarsBlock(input, nativeShader, TYPES_PASS_COUNT)) == 0) {
-                    _platform->logError("[WASMRendering::createShader] shader '%s' has ill-formed 'const' block\n", name);
-                    completed = false;
-                    break;
-                }
-                nativeShader += "}\nconstants;\n\n";
-                constBlockDone = true;
-                continue;
-            }
             if (inoutBlockDone == false && blockName == "inout" && (input >> util::sequence("{"))) {
-                nativeShader += "out _InOut {\n";
+                shaderVSOutput += "out struct _InOut {\n";
+                shaderFSInput  += "in struct _InOut {\n";
                 
-                if (formVarsBlock(input, nativeShader, TYPES_COUNT) == 0) {
+                std::string varsBlock;
+                if (formVarsBlock(input, varsBlock, TYPES_COUNT) == 0) {
                     _platform->logError("[WASMRendering::createShader] shader '%s' has ill-formed 'inout' block\n", name);
                     completed = false;
                     break;
                 }
-                nativeShader += "}\npassing;\n\n";
+                
+                shaderVSOutput += varsBlock;
+                shaderVSOutput += "}\npassing;\n\n";
+                shaderFSInput += varsBlock;
+                shaderFSInput += "}\npassing;\n\n";
                 inoutBlockDone = true;
                 continue;
             }
@@ -270,9 +294,16 @@ namespace foundation {
                     std::string codeBlock;
                     
                     if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
-                        nativeShader += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
-                        nativeShader += codeBlock;
-                        nativeShader += "}\n\n";
+                        shaderFunctions += "\n" + funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
+                        shaderFunctions += codeBlock;
+                        shaderFunctions += "}\n\n";
+                        
+                        shaderUtils::replace(shaderFunctions, "float", "vec", SEPARATORS, "234");
+                        shaderUtils::replace(shaderFunctions, "int", "ivec", SEPARATORS, "234");
+                        shaderUtils::replace(shaderFunctions, "uint", "uvec", SEPARATORS, "234");
+                        shaderUtils::replace(shaderFunctions, "float1", "float", SEPARATORS, SEPARATORS);
+                        shaderUtils::replace(shaderFunctions, "int1", "int", SEPARATORS, SEPARATORS);
+                        shaderUtils::replace(shaderFunctions, "uint1", "uint", SEPARATORS, SEPARATORS);
                     }
                     else {
                         _platform->logError("[WASMRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
@@ -288,6 +319,14 @@ namespace foundation {
                 continue;
             }
             if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
+                std::string shaderVS = shaderDefines;
+                shaderVS +=
+                    "#define vertex_ID gl_VertexID\n"
+                    "#define instance_ID gl_InstanceID\n"
+                    "#define output_position gl_Position\n"
+                    "\n";
+                
+                shaderVS = shaderVS + shaderFixed + shaderFunctions + shaderVSOutput;
                 std::string codeBlock;
                 
                 if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
@@ -296,19 +335,23 @@ namespace foundation {
                     break;
                 }
 
-                shaderUtils::replacePattern(codeBlock, "const_", "constants.", "._");
-                shaderUtils::replacePattern(codeBlock, "frame_", "framedata.", "._");
-                shaderUtils::replacePattern(codeBlock, "output_", "passing.", "._", "output_position");
+                shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
+                shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
+                shaderUtils::replace(codeBlock, "uint", "uvec", SEPARATORS, "234");
+                shaderUtils::replace(codeBlock, "float1", "float", SEPARATORS, SEPARATORS);
+                shaderUtils::replace(codeBlock, "int1", "int", SEPARATORS, SEPARATORS);
+                shaderUtils::replace(codeBlock, "uint1", "uint", SEPARATORS, SEPARATORS);
 
-                nativeShaderVS = nativeShader;
-                nativeShaderVS += "void main() {\n";
-                nativeShaderVS += codeBlock;
-                nativeShaderVS += "}\n\n";
+                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "vertex_", "input.", SEPARATORS, {"vertex_ID"});
+                shaderUtils::replace(codeBlock, "instance_", "input.", SEPARATORS, {"instance_ID"});
+                shaderUtils::replace(codeBlock, "output_", "passing.", SEPARATORS, {"output_position"});
+
+                shaderVS += "void main() {\n";
+                shaderVS += codeBlock;
+                shaderVS += "}\n\n";
   
-//                shaderUtils::replacePattern(codeBlock, "vertex_", "input.", "._", vertexIDName);
-//                shaderUtils::replacePattern(codeBlock, "instance_", "input.", "._", instanceIDName);
-//                shaderUtils::replacePattern(codeBlock, "output_", "output.", "._");
-                
 //                for (std::size_t i = 0, cnt = vertex.size(); i < cnt; i++) {
 //                    const RenderShader::Input &current = *(vertex.begin() + i);
 //
@@ -326,10 +369,9 @@ namespace foundation {
 //                }
                 
                 
-                //nativeShader += codeBlock;
-                
-                nativeShaderVS = shaderUtils::makeLines(nativeShaderVS);
-                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", nativeShaderVS.data());
+                shaderVS = shaderUtils::makeLines(shaderVS);
+                nativeShaderVS = createNativeSrc(shaderVS);
+                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
                 
                 vssrcBlockDone = true;
                 continue;
@@ -340,7 +382,8 @@ namespace foundation {
                     completed = false;
                     break;
                 }
-
+                
+                std::string shaderFS = shaderDefines + shaderFixed + shaderFunctions + shaderFSInput;
                 std::string codeBlock;
 
                 if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
@@ -349,30 +392,43 @@ namespace foundation {
                     break;
                 }
                 
-                shaderUtils::replacePattern(codeBlock, "frame_", "framedata.", "._");
-                shaderUtils::replacePattern(codeBlock, "const_", "constants.", "._");
-                shaderUtils::replacePattern(codeBlock, "input_", "input.", "._");
+                shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
+                shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
+                shaderUtils::replace(codeBlock, "uint", "uvec", SEPARATORS, "234");
+                shaderUtils::replace(codeBlock, "float1", "float", SEPARATORS, SEPARATORS);
+                shaderUtils::replace(codeBlock, "int1", "int", SEPARATORS, SEPARATORS);
+                shaderUtils::replace(codeBlock, "uint1", "uint", SEPARATORS, SEPARATORS);
+
+                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
+                shaderUtils::replace(codeBlock, "input_", "passing.", SEPARATORS, {"input_position"});
                 
-                nativeShader += codeBlock;
+                shaderFS += "out vec4 output_color[4];\n\n";
+                shaderFS += "void main() {\n";
+                shaderFS += codeBlock;
+                shaderFS += "}\n\n";
+
+                shaderFS = shaderUtils::makeLines(shaderFS);
+                nativeShaderFS = createNativeSrc(shaderFS);
+
+                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
                 fssrcBlockDone = true;
                 continue;
             }
             
             _platform->logError("[MetalRendering::createShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
         }
-        
-        
-        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
-        
-//        if (completed && vssrcBlockDone && fssrcBlockDone) {
-//
-//        }
-//        else if(vssrcBlockDone == false) {
-//            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
-//        }
-//        else if(fssrcBlockDone == false) {
-//            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'fssrc' block\n", name);
-//        }
+                
+        if (completed && vssrcBlockDone && fssrcBlockDone) {
+            void *webglShader = webgl_makeProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
+            _platform->logMsg("-->>> %p", webglShader);
+        }
+        else if(vssrcBlockDone == false) {
+            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
+        }
+        else if(fssrcBlockDone == false) {
+            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'fssrc' block\n", name);
+        }
 
         return result;
     }

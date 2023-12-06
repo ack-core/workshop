@@ -314,15 +314,34 @@ namespace shaderUtils {
         
         return false;
     };
-    inline void replacePattern(std::string &target, const std::string &pattern, const std::string &replacement, const std::string &prevChExc, const std::string &exception = {}) {
+    inline void replace(std::string& target, const std::string& bit, const std::string& replacement, const std::string& prevAllowed, const std::initializer_list<std::string>& exceptions = {}) {
         std::size_t start_pos = 0;
-        while((start_pos = target.find(pattern, start_pos)) != std::string::npos) {
-            if (exception.length() == 0 || ::memcmp(target.data() + start_pos, exception.data(), exception.length()) != 0) {
-                if (prevChExc.find(target.data()[start_pos - 1]) == std::string::npos) {
-                    target.replace(start_pos, pattern.length(), replacement);
+        while ((start_pos = target.find(bit, start_pos)) != std::string::npos) {
+            bool skip = false;
+
+            for (const std::string &exception : exceptions) {
+                if (::memcmp(target.data() + start_pos, exception.data(), exception.length()) == 0) {
+                    skip = true;
+                }
+            }
+            if (skip == false) {
+                if (prevAllowed.find(target.data()[start_pos - 1]) != std::string::npos) {
+                    target.replace(start_pos, bit.length(), replacement);
                     start_pos += replacement.length();
                     continue;
                 }
+            }
+
+            start_pos++;
+        }
+    }
+    inline void replace(std::string& target, const std::string& bit, const std::string& replacement, const std::string& prevAllowed, const std::string& postAllowed) {
+        std::size_t start_pos = 0;
+        while ((start_pos = target.find(bit, start_pos)) != std::string::npos) {
+            if (prevAllowed.find(target.data()[start_pos - 1]) != std::string::npos && postAllowed.find(target.data()[start_pos + bit.length()]) != std::string::npos) {
+                target.replace(start_pos, bit.length(), replacement);
+                start_pos += replacement.length();
+                continue;
             }
             
             start_pos++;
