@@ -21,10 +21,12 @@ namespace {
     };
     
     static const std::uint32_t MAX_TEXTURES = 4;
+    static const std::uint32_t FRAME_CONST_BINDING_INDEX = 0;
+    static const std::uint32_t DRAW_CONST_BINDING_INDEX = 1;
+    static const std::uint32_t VERTEX_IN_BINDING_START = 2;
     
     std::uint32_t roundTo256(std::uint32_t value) {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
-        //std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(63)) + 64;
         return result;
     }
     
@@ -101,19 +103,55 @@ namespace {
             break;
         }
     }
+    
+    struct NativeFormat {
+        const char *nativeTypeName;
+        std::uint32_t size;
+        MTLVertexFormat nativeFormat;
+    }
+    g_formatConversionTable[] = { // index is RenderShaderInputFormat value
+        {"packed_half2",         4,  MTLVertexFormatHalf2},
+        {"packed_half4",         8,  MTLVertexFormatHalf4},
+        {"float",                4,  MTLVertexFormatFloat},
+        {"packed_float2",        8,  MTLVertexFormatFloat2},
+        {"packed_float3",        12, MTLVertexFormatFloat3},
+        {"float4",               16, MTLVertexFormatFloat4},
+        {"packed_short2",        4,  MTLVertexFormatShort2},
+        {"packed_short4",        8,  MTLVertexFormatShort4},
+        {"packed_ushort2",       4,  MTLVertexFormatUShort2},
+        {"packed_ushort4",       8,  MTLVertexFormatUShort4},
+        {"rg16snorm<float2>",    4,  MTLVertexFormatShort2Normalized},
+        {"rgba16snorm<float4>",  8,  MTLVertexFormatShort4Normalized},
+        {"rg16unorm<float2>",    4,  MTLVertexFormatUShort2Normalized},
+        {"rgba16unorm<float4>",  8,  MTLVertexFormatUShort4Normalized},
+        {"packed_uchar4",        4,  MTLVertexFormatUChar4},
+        {"rgba8unorm<float4>",   4,  MTLVertexFormatUChar4Normalized},
+        {"int",                  4,  MTLVertexFormatInt},
+        {"int2",                 8,  MTLVertexFormatInt2},
+        {"int3",                 12, MTLVertexFormatInt3},
+        {"int4",                 16, MTLVertexFormatInt4},
+        {"uint",                 4,  MTLVertexFormatUInt},
+        {"uint2",                8,  MTLVertexFormatUInt2},
+        {"uint3",                12, MTLVertexFormatUInt3},
+        {"uint4",                16, MTLVertexFormatUInt4}
+    };
+    
 }
 
 namespace foundation {
-    MetalShader::MetalShader(const std::string &name, id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength)
+    MetalShader::MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength)
         : _name(name)
-        , _library(library)
-        , _vdesc(vdesc)
+        , _layout(layout)
         , _constBufferLength(constBufferLength)
+        , _library(library)
     {}
     
     MetalShader::~MetalShader() {
         _library = nil;
-        _vdesc = nil;
+    }
+    
+    const InputLayout &MetalShader::getInputLayout() const {
+        return _layout;
     }
     
     id<MTLFunction> MetalShader::getVertexShader() const {
@@ -126,10 +164,6 @@ namespace foundation {
     
     std::uint32_t MetalShader::getConstBufferLength() const {
         return _constBufferLength;
-    }
-    
-    MTLVertexDescriptor *MetalShader::getVertexDesc() const {
-        return _vdesc;
     }
     
     const std::string &MetalShader::getName() const {
@@ -224,12 +258,16 @@ namespace foundation {
 }
 
 namespace foundation {
-    MetalData::MetalData(id<MTLBuffer> buffer, std::uint32_t count, std::uint32_t stride) : _buffer(buffer), _count(count), _stride(stride) {
+    MetalData::MetalData(id<MTLBuffer> buffer, std::uint32_t stride) : _buffer(buffer), _count(std::uint32_t(_buffer.length)), _stride(stride) {
     
     }
     
     MetalData::~MetalData() {
         _buffer = nil;
+    }
+    
+    std::uint32_t MetalData::getCapacity() const {
+        return std::uint32_t(_buffer.length) / _stride;
     }
     
     std::uint32_t MetalData::getCount() const {
@@ -309,7 +347,7 @@ namespace foundation {
         return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
-    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const RenderShaderInputDesc &vertex, const RenderShaderInputDesc &instance) {
+    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const InputLayout &layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(shadersrc, strlen(shadersrc));
         const std::string indent = "    ";
@@ -395,7 +433,6 @@ namespace foundation {
             return totalLength;
         };
         
-        MTLVertexDescriptor *vdesc = [MTLVertexDescriptor vertexDescriptor];
         std::string nativeShader =
             "#include <metal_stdlib>\n"
             "using namespace metal;\n"
@@ -511,81 +548,48 @@ namespace foundation {
                     inoutBlockDone = true;
                     nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n";
                 }
-                nativeShader += "struct _VSIn {\n";
-
-                struct NativeFormat {
-                    const char *nativeTypeName;
-                    std::uint32_t size;
-                    MTLVertexFormat nativeFormat;
-                }
-                formatTable[] = { // index is RenderShaderInputFormat value
-                    {"float2", 4,  MTLVertexFormatHalf2},
-                    {"float4", 8,  MTLVertexFormatHalf4},
-                    {"float1", 4,  MTLVertexFormatFloat},
-                    {"float2", 8,  MTLVertexFormatFloat2},
-                    {"float3", 12, MTLVertexFormatFloat3},
-                    {"float4", 16, MTLVertexFormatFloat4},
-                    {"int2",   4,  MTLVertexFormatShort2},
-                    {"int4",   8,  MTLVertexFormatShort4},
-                    {"float2", 4,  MTLVertexFormatShort2Normalized},
-                    {"float4", 8,  MTLVertexFormatShort4Normalized},
-                    {"uint4",  4,  MTLVertexFormatUChar4},
-                    {"float4", 4,  MTLVertexFormatUChar4Normalized},
-                    {"int1",   4,  MTLVertexFormatInt},
-                    {"int2",   8,  MTLVertexFormatInt2},
-                    {"int3",   12, MTLVertexFormatInt3},
-                    {"int4",   16, MTLVertexFormatInt4},
-                    {"uint1",  4,  MTLVertexFormatUInt},
-                    {"uint2",  8,  MTLVertexFormatUInt2},
-                    {"uint3",  12, MTLVertexFormatUInt3},
-                    {"uint4",  16, MTLVertexFormatUInt4}
-                };
 
                 std::size_t index = 0;
                 std::uint32_t offset = 0;
                 
-                auto formInput = [&](const RenderShaderInputDesc &desc, const std::string &prefix, std::uint32_t bufferIndex, std::string &output) {
+                auto formInput = [&](const std::vector<InputLayout::Attribute> &desc, std::uint32_t bufferIndex, std::string &output) {
                     offset = 0;
                                 
                     for (const auto &item : desc) {
-                        NativeFormat &fmt = formatTable[int(item.format)];
-                        vdesc.attributes[index].bufferIndex = bufferIndex;
-                        vdesc.attributes[index].offset = offset;
-                        vdesc.attributes[index].format = fmt.nativeFormat;
-                        
-                        output += indent + fmt.nativeTypeName + " " + item.name + " [[attribute(" + std::to_string(index) + ")]];\n";
+                        NativeFormat &fmt = g_formatConversionTable[int(item.format)];
+                        output += indent + fmt.nativeTypeName + " " + item.name + ";\n";
                         offset += fmt.size;
                         index++;
                     }
-                    vdesc.layouts[bufferIndex].stride = offset;
-                    vdesc.layouts[bufferIndex].stepRate = 1;
                 };
                 
-                formInput(vertex, "vertex_", 0, nativeShader);
-                formInput(instance, "instance_", 1, nativeShader);
-
-                vdesc.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
-                vdesc.layouts[1].stepFunction = MTLVertexStepFunctionPerInstance;
-
+                nativeShader += "struct _VSVertexIn {\n";
+                formInput(layout.vertexAttributes, 0, nativeShader);
+                nativeShader += "};\n";
+                nativeShader += "struct _VSInstanceIn {\n";
+                formInput(layout.instanceAttributes, 1, nativeShader);
+                nativeShader += "};\n";
+                
                 nativeShader +=
-                    "};\n"
                     "vertex _InOut main_vertex(\n"
-                    "    unsigned int vertex_ID [[vertex_id]],\n"
+                    "    unsigned int _v_ID [[vertex_id]],\n"
                     "    unsigned int instance_ID [[instance_id]],\n";
 
-                if (vdesc.layouts[0].stride || vdesc.layouts[1].stride) { // if there is something but vertex_id/instance_id
-                    nativeShader += "    _VSIn input [[stage_in]],\n";
-                }
-                if (constBlockLength) {
-                    nativeShader += "    constant _Constants &constants [[buffer(2)]],\n";
-                }
-                    
-                nativeShader += "    constant _FrameData &framedata [[buffer(3)]],\n    ";
+                nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
+                nativeShader += "    constant _Constants &constants [[buffer(1)]],\n";
+                nativeShader += "    device const _VSVertexIn *vertices [[buffer(2)]],\n";
+                nativeShader += "    device const _VSInstanceIn *instances [[buffer(3)]],\n";
+                
                 nativeShader +=
+                    "    "
                     "texture2d<float> _texture0 [[texture(0)]],\n    "
                     "texture2d<float> _texture1 [[texture(1)]],\n    "
                     "texture2d<float> _texture2 [[texture(2)]],\n    "
-                    "texture2d<float> _texture3 [[texture(3)]])\n{\n    _InOut output;\n";
+                    "texture2d<float> _texture3 [[texture(3)]])\n{\n";
+                
+                nativeShader += std::string("    const uint repeat_ID = _v_ID % ") + std::to_string(layout.vertexRepeat) + ";\n";
+                nativeShader += std::string("    const uint vertex_ID = _v_ID / ") + std::to_string(layout.vertexRepeat) + ";\n";
+                nativeShader += "    _InOut output;\n";
 
                 std::string codeBlock;
                 
@@ -595,13 +599,16 @@ namespace foundation {
                     break;
                 }
                 
-                shaderUtils::replace(codeBlock, "vertex_", "input.", SEPARATORS, {"vertex_ID"});
-                shaderUtils::replace(codeBlock, "instance_", "input.", SEPARATORS, {"instance_ID"});
+                shaderUtils::replace(codeBlock, "vertex_", "vertices[vertex_ID].", SEPARATORS, {"vertex_ID"});
+                shaderUtils::replace(codeBlock, "instance_", "instances[instance_ID].", SEPARATORS, {"instance_ID"});
                 shaderUtils::replace(codeBlock, "output_", "output.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 
                 nativeShader += codeBlock;
+                nativeShader += "    (void)fixed_p;\n";
+                nativeShader += "    (void)repeat_ID;\n";
+                nativeShader += "    (void)vertex_ID;\n";
                 nativeShader += "    return output;\n}\n";
                 vssrcBlockDone = true;
                 continue;
@@ -626,17 +633,15 @@ namespace foundation {
                     "texture2d<float> _texture2 [[texture(2)]],\n    "
                     "texture2d<float> _texture3 [[texture(3)]],\n"
                     "";
-                
-                if (constBlockLength) {
-                    nativeShader += "    constant _Constants &constants [[buffer(0)]],\n";
-                }
-                
-                nativeShader += "    constant _FrameData &framedata [[buffer(1)]])\n{\n    ";
+
+                nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
+                nativeShader += "    constant _Constants &constants [[buffer(1)]])\n{\n    ";
+
                 nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
                 nativeShader += "float4 output_color[4] = {};\n";
                 
                 std::string codeBlock;
-
+                
                 if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
                     _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fssrc' block\n", name);
                     completed = false;
@@ -673,7 +678,7 @@ namespace foundation {
                 id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
 
                 if (library) {
-                    result = std::make_shared<MetalShader>(name, library, vdesc, constBlockLength);
+                    result = std::make_shared<MetalShader>(name, layout, library, constBlockLength); //, vdesc
                 }
                 else {
                     const char *errorDesc = [[nsError localizedDescription] UTF8String];
@@ -756,7 +761,7 @@ namespace foundation {
     RenderTargetPtr MetalRendering::createRenderTarget(RenderTextureFormat format, unsigned count, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
         @autoreleasepool {
             MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
-            id<MTLTexture> targets[RenderTarget::MAXCOUNT] = {nullptr, nullptr, nullptr, nullptr};
+            id<MTLTexture> targets[RenderTarget::MAX_TEXTURE_COUNT] = {nullptr, nullptr, nullptr, nullptr};
             
             desc.pixelFormat = nativeTextureFormat[int(format)];
             desc.width = w;
@@ -781,11 +786,19 @@ namespace foundation {
         }
     }
     
-    RenderDataPtr MetalRendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
-        @autoreleasepool {
-            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * stride) options:MTLResourceStorageModeShared];
-            return std::make_shared<MetalData>(buffer, count, stride);
+    RenderDataPtr MetalRendering::createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t capacity) {
+        std::uint32_t stride = 0;
+        for (const InputLayout::Attribute &item : layout) {
+            stride += g_formatConversionTable[int(item.format)].size;
         }
+        @autoreleasepool {
+            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(capacity * stride) options:MTLResourceStorageModeShared];
+            return std::make_shared<MetalData>(buffer, stride);
+        }
+    }
+    
+    void MetalRendering::updateData(const RenderDataPtr &data, const void *src, std::uint32_t count) {
+        _platform->logError("[MetalRendering::updateData] Not implemented yet");
     }
     
     float MetalRendering::getBackBufferWidth() const {
@@ -844,7 +857,7 @@ namespace foundation {
             
             const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
             const MetalTarget *platformTarget = static_cast<const MetalTarget *>(cfg.target.get());
-
+            
             id<MTLRenderPipelineState> state = nil;
             
             if (platformShader) {
@@ -856,7 +869,6 @@ namespace foundation {
                     MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
                     
                     desc.vertexFunction = platformShader->getVertexShader();
-                    desc.vertexDescriptor = platformShader->getVertexDesc();
                     desc.fragmentFunction = platformShader->getFragmentShader();
                     desc.colorAttachments[0].pixelFormat = _view.colorPixelFormat;
                     desc.depthAttachmentPixelFormat = _view.depthStencilPixelFormat;
@@ -887,8 +899,8 @@ namespace foundation {
             _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:_currentPassDescriptor];
 
             if (state) {
-                double rtWidth = _platform->getScreenWidth();// _view.currentDrawable.texture.width; //
-                double rtHeight = _platform->getScreenHeight(); //_view.currentDrawable.texture.height; //
+                double rtWidth = _platform->getScreenWidth();
+                double rtHeight = _platform->getScreenHeight();
                 
                 if (cfg.target) {
                     rtWidth = double(cfg.target->getWidth());
@@ -897,9 +909,8 @@ namespace foundation {
                 
                 _frameConstants.rtBounds.x = rtWidth;
                 _frameConstants.rtBounds.y = rtHeight;
+                _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
                 
-                _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), 3, 1);
-
                 if (cfg.zBehaviorType != foundation::ZBehaviorType::DISABLED) {
                     [_currentRenderCommandEncoder setDepthStencilState:_zBehaviorStates[int(cfg.zBehaviorType)]];
                 }
@@ -908,6 +919,7 @@ namespace foundation {
 
                 [_currentRenderCommandEncoder setRenderPipelineState:state];
                 [_currentRenderCommandEncoder setViewport:viewPort];
+                
             }
         }
     }
@@ -918,7 +930,7 @@ namespace foundation {
             const std::uint32_t constBufferLength = platformShader->getConstBufferLength();
             
             if (platformShader && constBufferLength) {
-                _appendConstantBuffer(constants, constBufferLength, 2, 0);
+                _appendConstantBuffer(constants, constBufferLength, DRAW_CONST_BINDING_INDEX);
             }
         }
     }
@@ -939,50 +951,65 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) {
+    void MetalRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
         if (_currentRenderCommandEncoder && _currentShader) {
-            id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
-            id<MTLBuffer> buffers[2] = {nativeVertexData, nullptr};
-
+            id<MTLBuffer> buffers[2] = {nullptr, nullptr};
             NSUInteger offsets[2] = {0, 0};
-            NSRange vrange {0, 2};
+            NSRange vrange {VERTEX_IN_BINDING_START, 2};
             
             //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
             [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount];
+            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vertexCount];
         }
     }
     
-    void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) {
+    void MetalRendering::draw(const RenderDataPtr &vertexData, RenderTopology topology) {
+        if (_currentRenderCommandEncoder && _currentShader && vertexData) {
+            const MetalData *implData = static_cast<const MetalData *>(vertexData.get());
+            const std::uint32_t totalVertexCount = implData->getCount() * _currentShader->getInputLayout().vertexRepeat;
+            id<MTLBuffer> buffers[2] = {implData->get(), nullptr};
+
+            NSUInteger offsets[2] = {0, 0};
+            NSRange vrange {VERTEX_IN_BINDING_START, 2};
+            
+            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
+            [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:totalVertexCount];
+        }
+    }
+    
+    void MetalRendering::drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) {
         if (_currentRenderCommandEncoder && _currentShader) {
             if (vertexData && indexData) {
-                id<MTLBuffer> idata = static_cast<const MetalData *>(indexData.get())->get();
-                id<MTLBuffer> nativeVertexData = static_cast<const MetalData *>(vertexData.get())->get();
-                id<MTLBuffer> buffers[2] = {nativeVertexData, nullptr};
+                const MetalData *implVData = static_cast<const MetalData *>(vertexData.get());
+                const MetalData *implIData = static_cast<const MetalData *>(indexData.get());
 
+                id<MTLBuffer> buffers[2] = {implVData->get(), nullptr};
                 NSUInteger offsets[2] = {0, 0};
-                NSRange vrange {0, 2};
-                MTLPrimitiveType t = g_topologies[int(topology)];
+                NSRange vrange {VERTEX_IN_BINDING_START, 2};
+                MTLPrimitiveType topology = g_topologies[int(topology)];
                 
                 //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
                 [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-                [_currentRenderCommandEncoder drawIndexedPrimitives:t indexCount:indexCount indexType:MTLIndexTypeUInt32 indexBuffer:idata indexBufferOffset:0];
+                [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:implIData->getCount() indexType:MTLIndexTypeUInt32 indexBuffer:implIData->get() indexBufferOffset:0];
             }
         }
     }
 
-    void MetalRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) {
+    void MetalRendering::drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) {
         if (_currentRenderCommandEncoder && _currentShader) {
-            id<MTLBuffer> nativeVertexData = vertexData ? static_cast<const MetalData *>(vertexData.get())->get() : nullptr;
-            id<MTLBuffer> nativeInstanceData = instanceData ? static_cast<const MetalData *>(instanceData.get())->get() : nullptr;
-            id<MTLBuffer> buffers[2] = {nativeVertexData, nativeInstanceData};
-            
-            NSUInteger offsets[2] = {0, 0};
-            NSRange vrange {0, 2};
-            
-            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
-            [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
-            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:vcount instanceCount:icount];
+            if (vertexData && instanceData) {
+                const MetalData *implVData = static_cast<const MetalData *>(vertexData.get());
+                const MetalData *implIData = static_cast<const MetalData *>(instanceData.get());
+
+                id<MTLBuffer> buffers[2] = {implVData->get(), implIData->get()};
+                NSUInteger offsets[2] = {0, 0};
+                NSRange vrange {VERTEX_IN_BINDING_START, 2};
+                
+                //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
+                [_currentRenderCommandEncoder setVertexBuffers:buffers offsets:offsets withRange:vrange];
+                [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(topology)] vertexStart:0 vertexCount:implVData->getCount() instanceCount:implIData->getCount()];
+            }
         }
     }
     
@@ -1004,15 +1031,15 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex) {
+    void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
         std::uint32_t roundedSize = roundTo256(size);
         
         if (_constantsBufferOffset + roundedSize < CONSTANT_BUFFER_OFFSET_MAX) {
             std::uint8_t *constantsMemory = static_cast<std::uint8_t *>([_constantsBuffers[_constantsBuffersIndex] contents]);
             std::memcpy(constantsMemory + _constantsBufferOffset, buffer, size);
             
-            [_currentRenderCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:vIndex];
-            [_currentRenderCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:fIndex];
+            [_currentRenderCommandEncoder setVertexBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:index];
+            [_currentRenderCommandEncoder setFragmentBuffer:_constantsBuffers[_constantsBuffersIndex] offset:_constantsBufferOffset atIndex:index];
             
             _constantsBufferOffset+= roundedSize;
             return true;

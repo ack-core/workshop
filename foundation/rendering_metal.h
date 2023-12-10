@@ -7,27 +7,28 @@
 namespace foundation {
     class MetalShader : public RenderShader {
     public:
-        MetalShader(const std::string &name, id<MTLLibrary> library, MTLVertexDescriptor *vdesc, std::uint32_t constBufferLength);
+        MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength);
         ~MetalShader() override;
+        
+        const InputLayout &getInputLayout() const override;
         
         id<MTLFunction> getVertexShader() const;
         id<MTLFunction> getFragmentShader() const;
         
-        MTLVertexDescriptor *getVertexDesc() const;
         std::uint32_t getConstBufferLength() const;
         const std::string &getName() const;
         
     private:
-        std::string _name;
+        const std::string _name;
+        const InputLayout _layout;
+        const std::uint32_t _constBufferLength;
+        
         id<MTLLibrary> _library;
-        MTLVertexDescriptor *_vdesc;
-        std::uint32_t _constBufferLength;
     };
 
     class MetalTexBase : public RenderTexture {
     public:
         ~MetalTexBase() override {}
-        
         virtual id<MTLTexture> getNativeTexture() const = 0;
     };
 
@@ -88,7 +89,7 @@ namespace foundation {
         RenderTextureFormat _format;
         MTLPixelFormat _depthFormat;
         
-        std::shared_ptr<RenderTexture> _textures[RenderTarget::MAXCOUNT] = {nil, nil, nil, nil};
+        std::shared_ptr<RenderTexture> _textures[RenderTarget::MAX_TEXTURE_COUNT] = {nil, nil, nil, nil};
         unsigned _count;
         
         id<MTLTexture> _depth;
@@ -99,11 +100,13 @@ namespace foundation {
 
     class MetalData : public RenderData {
     public:
-        MetalData(id<MTLBuffer> buffer, std::uint32_t count, std::uint32_t stride);
+        MetalData(id<MTLBuffer> buffer, std::uint32_t stride);
         ~MetalData() override;
         
+        std::uint32_t getCapacity() const override;
         std::uint32_t getCount() const override;
         std::uint32_t getStride() const override;
+
         id<MTLBuffer> get() const;
         
     private:
@@ -122,10 +125,12 @@ namespace foundation {
         auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
         auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
         
-        RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx, const RenderShaderInputDesc &itc) override;
+        RenderShaderPtr createShader(const char *name, const char *src, const InputLayout &layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
-        RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
+        
+        RenderDataPtr createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) override;
+        void updateData(const RenderDataPtr &data, const void *src, std::uint32_t count) override;
         
         float getBackBufferWidth() const override;
         float getBackBufferHeight() const override;
@@ -134,14 +139,15 @@ namespace foundation {
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) override;
         
-        void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) override;
-        void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) override;
-        void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) override;
+        void draw(std::uint32_t vertexCount, RenderTopology topology) override;
+        void draw(const RenderDataPtr &vertexData, RenderTopology topology) override;
+        void drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) override;
+        void drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) override;
 
         void presentFrame() override;
         
     private:
-        void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t vIndex, std::uint32_t fIndex);
+        void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index);
         
         static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
         static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024 * 4;
@@ -166,7 +172,7 @@ namespace foundation {
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _renderPipelineStates;
         std::unordered_map<std::string, id<MTLComputePipelineState>> _computePipelineStates;
 
-        id<MTLDepthStencilState> _zBehaviorStates[int(foundation::ZBehaviorType::_count)];
+        id<MTLDepthStencilState> _zBehaviorStates[3];
         std::shared_ptr<RenderShader> _currentShader;
         
         id<MTLCommandBuffer> _currentCommandBuffer = nil;

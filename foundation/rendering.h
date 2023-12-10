@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace foundation {
     enum class RenderTopology {
@@ -14,70 +15,71 @@ namespace foundation {
         LINESTRIP,
         TRIANGLES,
         TRIANGLESTRIP,
-        _count
     };
     
     enum class ZBehaviorType {
         DISABLED = 0,
         TEST_ONLY,
         TEST_AND_WRITE,
-        _count
     };
     
     enum class BlendType {
-        DISABLED = 0,  // Blending is disabled
-        MIXING,        // sourceRGB * sourceA + destRGB * (1 - sourceA)
-        ADDITIVE,      // sourceRGB * sourceA + destRGB
-        AGREGATION,     // sourceRGBA + destRGBA
-        MINVALUE,      // min(sourceRGBA, destRGBA)
-        MAXVALUE,      // max(sourceRGBA, destRGBA)
-        _count
+        DISABLED = 0,           // Blending is disabled
+        MIXING,                 // sourceRGB * sourceA + destRGB * (1 - sourceA)
+        ADDITIVE,               // sourceRGB * sourceA + destRGB
+        AGREGATION,             // sourceRGBA + destRGBA
+        MINVALUE,               // min(sourceRGBA, destRGBA)
+        MAXVALUE,               // max(sourceRGBA, destRGBA)
+    };
+        
+    enum class RenderTextureFormat {
+        UNKNOWN = 0,            // For error handling
+        R8UN,                   // 1 byte grayscale normalized to [0..1]. In shader .r component is used
+        R16F,                   // float16 grayscale In shader .r component is used
+        R32F,                   // float grayscale In shader .r component is used
+        RG8UN,                  // rg 1 byte per channel normalized to [0..1]
+        RG16F,                  // 32-bit float per component
+        RG32F,                  // 32-bit float per component
+        RGBA8UN,                // rgba 1 byte per channel normalized to [0..1]
+        RGBA16F,                // rgba 1 byte per channel normalized to [0..1]
+        RGBA32F,                // 32-bit float per component
     };
     
-    enum class RenderShaderInputFormat {
+    enum class InputAttributeFormat {
         HALF2, HALF4,
         FLOAT1, FLOAT2, FLOAT3, FLOAT4,
         SHORT2, SHORT4,
+        USHORT2, USHORT4,
         SHORT2_NRM, SHORT4_NRM,
+        USHORT2_NRM, USHORT4_NRM,
         BYTE4, BYTE4_NRM,
         INT1, INT2, INT3, INT4,
         UINT1, UINT2, UINT3, UINT4,
-        _count
     };
     
-    enum class RenderTextureFormat {
-        UNKNOWN = 0, // For error handling
-        R8UN,        // 1 byte grayscale normalized to [0..1]. In shader .r component is used
-        R16F,        // float16 grayscale In shader .r component is used
-        R32F,        // float grayscale In shader .r component is used
-        RG8UN,       // rg 1 byte per channel normalized to [0..1]
-        RG16F,       // 32-bit float per component
-        RG32F,       // 32-bit float per component
-        RGBA8UN,     // rgba 1 byte per channel normalized to [0..1]
-        RGBA16F,     // rgba 1 byte per channel normalized to [0..1]
-        RGBA32F,     // 32-bit float per component
-        _count
+    struct InputLayout {
+        struct Attribute {
+            const char *name;
+            InputAttributeFormat format;
+        };
+
+        std::uint32_t vertexRepeat = 1;
+        std::vector<Attribute> vertexAttributes;
+        std::vector<Attribute> instanceAttributes;
     };
     
     class RenderShader {
     public:
-        // Field description for Vertex Shader input struct
-        //
-        struct Input {
-            const char *name;
-            RenderShaderInputFormat format;
-        };
-        
-    public:
         virtual ~RenderShader() = default;
+        virtual auto getInputLayout() const -> const InputLayout & = 0;
     };
     
     class RenderTexture {
     public:
-        virtual std::uint32_t getWidth() const = 0;
-        virtual std::uint32_t getHeight() const = 0;
-        virtual std::uint32_t getMipCount() const = 0;
-        virtual RenderTextureFormat getFormat() const = 0;
+        virtual auto getWidth() const -> std::uint32_t = 0;
+        virtual auto getHeight() const -> std::uint32_t = 0;
+        virtual auto getMipCount() const -> std::uint32_t = 0;
+        virtual auto getFormat() const -> RenderTextureFormat = 0;
         
     public:
         virtual ~RenderTexture() = default;
@@ -85,16 +87,14 @@ namespace foundation {
 
     class RenderTarget {
     public:
-        static const std::size_t MAXCOUNT = 4;
+        static const std::size_t MAX_TEXTURE_COUNT = 4;
         
-        virtual std::uint32_t getWidth() const = 0;
-        virtual std::uint32_t getHeight() const = 0;
-        
-        virtual RenderTextureFormat getFormat() const = 0;
         virtual bool hasDepthBuffer() const = 0;
-        
-        virtual std::uint32_t getTextureCount() const = 0;
-        virtual const std::shared_ptr<RenderTexture> &getTexture(unsigned index) const = 0;
+        virtual auto getWidth() const -> std::uint32_t = 0;
+        virtual auto getHeight() const -> std::uint32_t = 0;
+        virtual auto getFormat() const -> RenderTextureFormat = 0;
+        virtual auto getTextureCount() const -> std::uint32_t = 0;
+        virtual auto getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & = 0;
         
     public:
         virtual ~RenderTarget() = default;
@@ -102,14 +102,14 @@ namespace foundation {
 
     class RenderData {
     public:
-        virtual std::uint32_t getCount() const = 0;
-        virtual std::uint32_t getStride() const = 0;
+        virtual auto getCapacity() const -> std::uint32_t = 0;
+        virtual auto getCount() const -> std::uint32_t = 0;
+        virtual auto getStride() const -> std::uint32_t = 0;
         
     public:
         virtual ~RenderData() = default;
     };
     
-    using RenderShaderInputDesc = std::initializer_list<RenderShader::Input>;
     using RenderShaderPtr = std::shared_ptr<RenderShader>;
     using RenderTexturePtr = std::shared_ptr<RenderTexture>;
     using RenderTargetPtr = std::shared_ptr<RenderTarget>;
@@ -188,11 +188,10 @@ namespace foundation {
 
         // Create shader from source text
         // @name      - name that is used in error messages
-        // @vtx       - input layout for vertex shader. All such variables have 'vertex_' prefix.
-        // @itc       - input layout for vertex shader. All such variables have 'instance_' prefix.
+        // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix. Instance attributes have 'instance_' prefix.
         // @src       - generic shader source text. Example:
         //
-        // Assume that @vtx = {{"position", ShaderInput::Format::FLOAT3}, {"color", ShaderInput::Format::BYTE4_NRM}}
+        // Assume that @layout = {1, {"position", ShaderInput::Format::FLOAT3}, {"color", ShaderInput::Format::BYTE4_NRM}}
         // So vertex shader has vertex_position and vertex_color input values.
         // s--------------------------------------
         //     fixed {                                           - block of permanent constants. Can be omitted if unused.
@@ -205,12 +204,16 @@ namespace foundation {
         //         constNamesArray1[16] : float4                 - spaces in/before array braces are not permitted
         //     }
         //     inout {                                           - vertex output and fragment input. Can be omitted if unused.
-        //         varName4 : float4                             - these variables have 'input_' prefix in vssrc and 'output_' in fssrc
-        //     }                                                 - vertex shader also has float4 'output_position' variable
+        //         varName4 : float4                             - these variables have 'output_' prefix in vssrc and 'input_' in fssrc
+        //     }
+        //     fndef getcolor(float3 rgb) -> float4 {            - example of function defined in shader
+        //         return float4(rgb, 1.0);
+        //     }
         //     vssrc {
         //         output_varName4 = _lerp(vertex_color, const_constName1, fixed_constName1);
         //         output_position = _transform(float4(vertex_position, 1.0), frame_viewProjMatrix);
-        //     }
+        //
+        //     }                                                 - vertex shader has float4 'output_position' variable
         //     fssrc {                                           - fragment shader has float4 'output_color[4]' variable. Max four render targets
         //         output_color[0] = input_varName4;             - fragment shader has float2 'fragment_coord' variable with range 0.0 <= x, y <= 1.0
         //     }
@@ -229,33 +232,39 @@ namespace foundation {
         // Global functions:
         //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2nearest/_tex2linear/_tex2raw(index, v)
         //
-        virtual RenderShaderPtr createShader(const char *name, const char *src, const RenderShaderInputDesc &vtx = {}, const RenderShaderInputDesc &itc = {}) = 0;
+        virtual auto createShader(const char *name, const char *src, const InputLayout &layout) -> RenderShaderPtr = 0;
         
         // Create texture from binary data or empty
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr. Array can be empty if there is only one mip-level
         //
-        virtual RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) = 0;
+        virtual auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr = 0;
         
         // Create render target texture
         // @count       - color targets count
         // @w and @h    - width and height
         //
-        virtual RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) = 0;
+        virtual auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr = 0;
         
-        // Create geometry
+        // Create data buffer
         // @data        - pointer to data (array of structures)
+        // @layout      - vertex description. Should match the description in shader
         // @count       - count of structures in array
-        // @stride      - size of struture
         // @return      - handle
         //
-        virtual RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) = 0;
+        virtual auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t capacity) -> RenderDataPtr = 0;
+        
+        // Update data buffer
+        // @src         - pointer to data (array of structures)
+        // @count       - count of structures in array
+        //
+        virtual void updateData(const RenderDataPtr &data, const void *src, std::uint32_t count) = 0;
         
         // Return actual rendering area size
         //
-        virtual float getBackBufferWidth() const = 0;
-        virtual float getBackBufferHeight() const = 0;
-
+        virtual auto getBackBufferWidth() const -> float = 0;
+        virtual auto getBackBufferHeight() const -> float = 0;
+        
         // State is a rendering scope with shader
         // @shader      - shader object
         // @cfg         - render pass configuration
@@ -273,21 +282,24 @@ namespace foundation {
         //
         virtual void applyShaderConstants(const void *constants) = 0;
         
-        // Draw vertexes from RenderData
-        // @vertexData has layout set by current shader. Can be nullptr
+        // Draw vertexes
         //
-        virtual void drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) = 0;
+        virtual void draw(std::uint32_t vertexCount, RenderTopology topology) = 0;
+        
+        // Draw vertexes from RenderData
+        // @vertexData layout has to match current shader's layout. Cannot be nullptr
+        //
+        virtual void draw(const RenderDataPtr &vertexData, RenderTopology topology) = 0;
         
         // Draw vertexes from RenderData with indices
         // @vertexData  - vertex data that has layout set by current shader
         // @indexData   - indeces (uint32)
         //
-        virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) = 0;
+        virtual void drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) = 0;
         
         // Draw instanced vertexes from RenderData
-        // @vertexData and @instanceData has layout set by current shader. Both can be nullptr
         //
-        virtual void drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) = 0;
+        virtual void drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) = 0;
         
         // Frame finalization
         //

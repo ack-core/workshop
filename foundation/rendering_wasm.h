@@ -5,14 +5,14 @@
 namespace foundation {
     class WASMShader : public RenderShader {
     public:
-        WASMShader(const std::string &name, std::uint32_t constBufferLength);
+        WASMShader(const void *webglShader, std::uint32_t constBufferLength);
         ~WASMShader() override;
         
-        std::uint32_t getConstBufferLength() const;
-        const std::string &getName() const;
+        auto getConstBufferLength() const -> std::uint32_t;
+        auto getWebGLShader() const -> const void *;
         
     private:
-        std::string _name;
+        const void *_shader;
         std::uint32_t _constBufferLength;
     };
     

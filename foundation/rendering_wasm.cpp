@@ -8,6 +8,7 @@
 // From js
 extern "C" {
     void *webgl_makeProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen);
+    void webgl_applyState(const void *shader);
 }
 
 namespace {
@@ -26,20 +27,19 @@ namespace {
         return result;
     }
     
-    std::string generateRenderPipelineStateName(const foundation::WASMShader &shader, const foundation::RenderPassConfig &passConfig) {
-        std::string result = "r0_b0_" + shader.getName();
-        result[1] = passConfig.target ? '0' + int(passConfig.target->getFormat()) : 'X';
-        result[4] += int(passConfig.blendType);
-        return result;
-    }
+//    std::string generateRenderPipelineStateName(const foundation::WASMShader &shader, const foundation::RenderPassConfig &passConfig) {
+//        std::string result = "r0_b0_" + shader.getName();
+//        result[1] = passConfig.target ? '0' + int(passConfig.target->getFormat()) : 'X';
+//        result[4] += int(passConfig.blendType);
+//        return result;
+//    }
 }
 
 namespace foundation {
-    WASMShader::WASMShader(const std::string &name, std::uint32_t constBufferLength)
-        : _name(name)
+    WASMShader::WASMShader(const void *webglShader, std::uint32_t constBufferLength)
+        : _shader(webglShader)
         , _constBufferLength(constBufferLength)
     {}
-    
     WASMShader::~WASMShader() {
 
     }
@@ -47,9 +47,8 @@ namespace foundation {
     std::uint32_t WASMShader::getConstBufferLength() const {
         return _constBufferLength;
     }
-    
-    const std::string &WASMShader::getName() const {
-        return _name;
+    const void *WASMShader::getWebGLShader() const {
+        return _shader;
     }
 }
 
@@ -421,7 +420,7 @@ namespace foundation {
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             void *webglShader = webgl_makeProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
-            _platform->logMsg("-->>> %p", webglShader);
+            result = std::make_shared<WASMShader>(webglShader, constBlockLength);
         }
         else if(vssrcBlockDone == false) {
             _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
@@ -454,7 +453,8 @@ namespace foundation {
     }
     
     void WASMRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
-
+        const WASMShader *platformShader = static_cast<const WASMShader *>(shader.get());
+        webgl_applyState(platformShader->getWebGLShader());
     }
     
     void WASMRendering::applyShaderConstants(const void *constants) {

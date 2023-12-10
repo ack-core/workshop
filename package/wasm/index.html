@@ -92,13 +92,17 @@
                     glcontext.compileShader(vshader);
                     glcontext.compileShader(fshader);
 
-                    if (glcontext.getShaderParameter(vshader, glcontext.COMPILE_STATUS)) {
+                    if (glcontext.getShaderParameter(vshader, glcontext.COMPILE_STATUS)) {                        
                         if (glcontext.getShaderParameter(fshader, glcontext.COMPILE_STATUS)) {
                             glcontext.attachShader(program, vshader);
                             glcontext.attachShader(program, fshader);
                             glcontext.linkProgram(program);
+                            glcontext.uniformBlockBinding(program, glcontext.getUniformBlockIndex(program, "_FrameData"), 0);
+                            glcontext.uniformBlockBinding(program, glcontext.getUniformBlockIndex(program, "_Constants"), 1);
                             
                             if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
+                                glcontext.deleteShader(vshader);
+                                glcontext.deleteShader(fshader);
                                 glshaders[glIDCounter] = program;
                                 return glIDCounter++;
                             }
@@ -119,6 +123,9 @@
                     glcontext.deleteProgram(program);
 
                     return 0;
+                },
+                webgl_applyState: function(shaderID) {
+                    glcontext.useProgram(glshaders[shaderID]);
                 }
             }
         };

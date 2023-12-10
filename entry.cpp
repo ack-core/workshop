@@ -5,17 +5,40 @@
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 //
-//math::transform3f view = math::transform3f::identity();
-//math::transform3f proj = math::transform3f::identity();
-//math::vector4f camPosition = math::vector4f(0, 0, 0, 1);
-//math::vector4f camDirection = math::vector4f(1, 0, 0, 0);
+math::transform3f view = math::transform3f::identity();
+math::transform3f proj = math::transform3f::identity();
+math::vector4f camPosition = math::vector4f(0, 0, 0, 1);
+math::vector4f camDirection = math::vector4f(1, 0, 0, 0);
 //
+//const char *testShaderSrc = R"(
+//    const {
+//        p[2] : float4
+//    }
+//    fixed {
+//        test[2] : float4 = [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0]
+//    }
+//    inout {
+//        color : float4
+//    }
+//    fndef getcolor(float3 rgb) -> float4 {
+//        return float4(rgb, 1.0);
+//    }
+//    vssrc {
+//        float4 position = const_p[vertex_ID];
+//        output_position = _transform(position, _transform(frame_viewMatrix, frame_projMatrix));
+//        output_color = getcolor(float3(1, 1, 1));
+//    }
+//    fssrc {
+//        output_color[0] = input_color;
+//    }
+//)";
+
 const char *testShaderSrc = R"(
     const {
         p[2] : float4
     }
     fixed {
-        test[2] : float4 = [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0]
+        p[2] : float4 = [0, 0.0, 0, 0][0, 0.3, 0, 0]
     }
     inout {
         color : float4
@@ -24,15 +47,29 @@ const char *testShaderSrc = R"(
         return float4(rgb, 1.0);
     }
     vssrc {
-        float4 position = const_p[vertex_ID];
-        output_position = _transform(position, _transform(frame_viewMatrix, frame_projMatrix));
+        output_position = vertex_p + fixed_p[repeat_ID];
         output_color = getcolor(float3(1, 1, 1));
     }
     fssrc {
         output_color[0] = input_color;
     }
 )";
+
+const math::vector4f points[] = {
+    {0.0, 0, 0.1, 1},
+    {0.5, 0, 0.1, 1}
+};
+
+//const std::uint32_t points[] = {
+//    0xff110000,
+//    0xff11003f
+//};
+
+
 foundation::RenderShaderPtr testShader;
+foundation::RenderDataPtr testData;
+
+
 
 //struct AsyncContext {
 //    int result;
@@ -57,7 +94,13 @@ extern "C" void initialize() {
 //        platform->logMsg("No!");
 //    }
     
-    testShader = rendering->createShader("test", testShaderSrc, {}, {});
+    testShader = rendering->createShader("test", testShaderSrc, foundation::InputLayout {
+        .vertexRepeat = 2,
+        .vertexAttributes = {
+            {"p", foundation::InputAttributeFormat::FLOAT4}
+        }
+    });
+    testData = rendering->createData(points, testShader->getInputLayout().vertexAttributes, 2);
 
 //    platform->logMsg("[PLATFORM] initializing...");
 //    platform->loadFile("test1.txt", [p = platform](std::unique_ptr<std::uint8_t[]> &&data, std::size_t size) {
@@ -74,21 +117,17 @@ extern "C" void initialize() {
 //    }));
     
     platform->setLoop([](float dtSec) {
-//        math::vector4f p[] = {
-//            {0, 0, 0.1, 1},
-//            {1, 0, 0.1, 1}
-//        };
 //
-//        rendering->updateFrameConstants(view, proj, camPosition.xyz, camDirection.xyz);
-//        rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.2, 0.2, 0.1));
+        rendering->updateFrameConstants(view, proj, camPosition.xyz, camDirection.xyz);
+        rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
 //        rendering->applyShaderConstants(p);
-//        rendering->drawGeometry(nullptr, 2, foundation::RenderTopology::LINES);
+        rendering->draw(testData, foundation::RenderTopology::LINES);
 //        //platform->logMsg("-->> %d %d %f", (int)platform->getScreenWidth(), (int)platform->getScreenHeight(), dtSec);
 //
-        //rendering->presentFrame();
+        rendering->presentFrame();
     });
     
-    abort();
+    //abort();
 }
 
 extern "C" void deinitialize() {

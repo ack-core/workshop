@@ -37,6 +37,9 @@ onmessage = (msg) => {
                 },
                 webgl_makeProgram: function(vsrc, vlen, fsrc, flen) {
                     throw "can't access webgl from background";
+                },
+                webgl_applyState: function(shaderID) {
+                    throw "can't access webgl from background";
                 }
             }
         };
