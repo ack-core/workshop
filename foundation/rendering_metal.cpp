@@ -112,10 +112,10 @@ namespace {
     g_formatConversionTable[] = { // index is RenderShaderInputFormat value
         {"packed_half2",         4,  MTLVertexFormatHalf2},
         {"packed_half4",         8,  MTLVertexFormatHalf4},
-        {"float",                4,  MTLVertexFormatFloat},
+        {"packed_float",         4,  MTLVertexFormatFloat},
         {"packed_float2",        8,  MTLVertexFormatFloat2},
         {"packed_float3",        12, MTLVertexFormatFloat3},
-        {"float4",               16, MTLVertexFormatFloat4},
+        {"packed_float4",        16, MTLVertexFormatFloat4},
         {"packed_short2",        4,  MTLVertexFormatShort2},
         {"packed_short4",        8,  MTLVertexFormatShort4},
         {"packed_ushort2",       4,  MTLVertexFormatUShort2},
@@ -126,16 +126,15 @@ namespace {
         {"rgba16unorm<float4>",  8,  MTLVertexFormatUShort4Normalized},
         {"packed_uchar4",        4,  MTLVertexFormatUChar4},
         {"rgba8unorm<float4>",   4,  MTLVertexFormatUChar4Normalized},
-        {"int",                  4,  MTLVertexFormatInt},
-        {"int2",                 8,  MTLVertexFormatInt2},
-        {"int3",                 12, MTLVertexFormatInt3},
-        {"int4",                 16, MTLVertexFormatInt4},
-        {"uint",                 4,  MTLVertexFormatUInt},
-        {"uint2",                8,  MTLVertexFormatUInt2},
-        {"uint3",                12, MTLVertexFormatUInt3},
-        {"uint4",                16, MTLVertexFormatUInt4}
+        {"packed_int",           4,  MTLVertexFormatInt},
+        {"packed_int2",          8,  MTLVertexFormatInt2},
+        {"packed_int3",          12, MTLVertexFormatInt3},
+        {"packed_int4",          16, MTLVertexFormatInt4},
+        {"packed_uint",          4,  MTLVertexFormatUInt},
+        {"packed_uint2",         8,  MTLVertexFormatUInt2},
+        {"packed_uint3",         12, MTLVertexFormatUInt3},
+        {"packed_uint4",         16, MTLVertexFormatUInt4}
     };
-    
 }
 
 namespace foundation {
@@ -264,10 +263,6 @@ namespace foundation {
     
     MetalData::~MetalData() {
         _buffer = nil;
-    }
-    
-    std::uint32_t MetalData::getCapacity() const {
-        return std::uint32_t(_buffer.length) / _stride;
     }
     
     std::uint32_t MetalData::getCount() const {
@@ -576,10 +571,9 @@ namespace foundation {
                     "    unsigned int instance_ID [[instance_id]],\n";
 
                 nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
-                nativeShader += "    constant _Constants &constants [[buffer(1)]],\n";
+                nativeShader += constBlockDone ? "    constant _Constants &constants [[buffer(1)]],\n" : "";
                 nativeShader += "    device const _VSVertexIn *vertices [[buffer(2)]],\n";
                 nativeShader += "    device const _VSInstanceIn *instances [[buffer(3)]],\n";
-                
                 nativeShader +=
                     "    "
                     "texture2d<float> _texture0 [[texture(0)]],\n    "
@@ -634,9 +628,8 @@ namespace foundation {
                     "texture2d<float> _texture3 [[texture(3)]],\n"
                     "";
 
-                nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
-                nativeShader += "    constant _Constants &constants [[buffer(1)]])\n{\n    ";
-
+                nativeShader += "    constant _FrameData &framedata [[buffer(0)]]";
+                nativeShader += constBlockDone ? ",\n    constant _Constants &constants [[buffer(1)]])\n{\n    " : ")\n{\n    ";
                 nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
                 nativeShader += "float4 output_color[4] = {};\n";
                 
@@ -795,10 +788,6 @@ namespace foundation {
             id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(capacity * stride) options:MTLResourceStorageModeShared];
             return std::make_shared<MetalData>(buffer, stride);
         }
-    }
-    
-    void MetalRendering::updateData(const RenderDataPtr &data, const void *src, std::uint32_t count) {
-        _platform->logError("[MetalRendering::updateData] Not implemented yet");
     }
     
     float MetalRendering::getBackBufferWidth() const {

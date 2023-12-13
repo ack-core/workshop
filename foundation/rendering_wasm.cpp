@@ -7,8 +7,13 @@
 
 // From js
 extern "C" {
-    void *webgl_makeProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen);
+    void *webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen);
+    void *webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen);
     void webgl_applyState(const void *shader);
+    void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
+    void webgl_bindBuffer(const void *webglData);
+    void webgl_vertexAttribute(std::size_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset, std::uint32_t divisor);
+    void webgl_draw(std::uint32_t vertexCount, GLenum topology);
 }
 
 namespace {
@@ -21,29 +26,63 @@ namespace {
     };
     
     static const std::uint32_t MAX_TEXTURES = 4;
+    static const std::uint32_t FRAME_CONST_BINDING_INDEX = 0;
+    static const std::uint32_t DRAW_CONST_BINDING_INDEX = 1;
+    static const std::uint32_t VERTEX_IN_BINDING_START = 2;
     
     std::uint32_t roundTo256(std::uint32_t value) {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
         return result;
     }
     
-//    std::string generateRenderPipelineStateName(const foundation::WASMShader &shader, const foundation::RenderPassConfig &passConfig) {
-//        std::string result = "r0_b0_" + shader.getName();
-//        result[1] = passConfig.target ? '0' + int(passConfig.target->getFormat()) : 'X';
-//        result[4] += int(passConfig.blendType);
-//        return result;
-//    }
+    struct NativeFormat {
+        const char *nativeTypeName;
+        std::uint32_t size;
+        std::uint32_t components;
+        GLenum normalize;
+        GLenum type;
+    }
+    g_formatConversionTable[] = { // index is RenderShaderInputFormat value
+        {"vec2",  4,  2, GL_FALSE, GL_HALF_FLOAT},
+        {"vec4",  8,  4, GL_FALSE, GL_HALF_FLOAT},
+        {"float", 4,  1, GL_FALSE, GL_FLOAT},
+        {"vec2",  8,  2, GL_FALSE, GL_FLOAT},
+        {"vec3",  12, 3, GL_FALSE, GL_FLOAT},
+        {"vec4",  16, 4, GL_FALSE, GL_FLOAT},
+        {"ivec2", 4,  2, GL_FALSE, GL_SHORT},
+        {"ivec4", 8,  4, GL_FALSE, GL_SHORT},
+        {"uvec2", 4,  2, GL_FALSE, GL_UNSIGNED_SHORT},
+        {"uvec4", 8,  4, GL_FALSE, GL_UNSIGNED_SHORT},
+        {"vec2",  4,  2, GL_TRUE,  GL_SHORT},
+        {"vec4",  8,  4, GL_TRUE,  GL_SHORT},
+        {"vec2",  4,  2, GL_TRUE,  GL_UNSIGNED_SHORT},
+        {"vec4",  8,  4, GL_TRUE,  GL_UNSIGNED_SHORT},
+        {"uvec4", 4,  4, GL_FALSE, GL_UNSIGNED_BYTE},
+        {"vec4",  4,  4, GL_TRUE,  GL_UNSIGNED_BYTE},
+        {"int",   4,  1, GL_FALSE, GL_INT},
+        {"ivec2", 8,  2, GL_FALSE, GL_INT},
+        {"ivec3", 12, 3, GL_FALSE, GL_INT},
+        {"ivec4", 16, 4, GL_FALSE, GL_INT},
+        {"uint",  4,  1, GL_FALSE, GL_UNSIGNED_INT},
+        {"uvec2", 8,  2, GL_FALSE, GL_UNSIGNED_INT},
+        {"uvec3", 12, 3, GL_FALSE, GL_UNSIGNED_INT},
+        {"uvec4", 16, 4, GL_FALSE, GL_UNSIGNED_INT}
+    };
+
 }
 
 namespace foundation {
-    WASMShader::WASMShader(const void *webglShader, std::uint32_t constBufferLength)
+    WASMShader::WASMShader(const void *webglShader, const InputLayout &layout, std::uint32_t constBufferLength)
         : _shader(webglShader)
         , _constBufferLength(constBufferLength)
-    {}
-    WASMShader::~WASMShader() {
-
+        , _inputLayout(layout)
+    {
     }
-    
+    WASMShader::~WASMShader() {
+    }
+    const InputLayout &WASMShader::getInputLayout() const {
+        return _inputLayout;
+    }
     std::uint32_t WASMShader::getConstBufferLength() const {
         return _constBufferLength;
     }
@@ -53,21 +92,47 @@ namespace foundation {
 }
 
 namespace foundation {
+    WASMData::WASMData(const void *webglData, std::uint32_t count, std::uint32_t stride)
+        : _data(webglData)
+        , _count(count)
+        , _stride(stride)
+    {
+    }
+    WASMData::~WASMData() {
+
+    }
+    std::uint32_t WASMData::getCount() const {
+        return _count;
+    }
+    std::uint32_t WASMData::getStride() const {
+        return _stride;
+    }
+    const void *WASMData::getWebGLData() const {
+        return _data;
+    }
+}
+
+namespace foundation {
     WASMRendering::WASMRendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
         _platform->logMsg("[RENDER] Initialization : WebGL");
+        _frameConstants = new FrameConstants;
+        _drawConstantBufferLength = 1024;
+        _drawConstantBufferData = new std::uint8_t [_drawConstantBufferLength];
+        _platform->logMsg("[RENDER] Initialization : complete");
     }
     
     WASMRendering::~WASMRendering() {}
     
     void WASMRendering::updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) {
-        _frameConstants.viewMatrix = view;
-        _frameConstants.projMatrix = proj;
-        _frameConstants.cameraPosition.xyz = camPos;
-        _frameConstants.cameraDirection.xyz = camDir;
+        _frameConstants->viewMatrix = view;
+        _frameConstants->projMatrix = proj;
+        _frameConstants->cameraPosition.xyz = camPos;
+        _frameConstants->cameraDirection.xyz = camDir;
+        webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants, sizeof(FrameConstants));
     }
     
     math::vector2f WASMRendering::getScreenCoordinates(const math::vector3f &worldPosition) {
-        const math::transform3f vp = _frameConstants.viewMatrix * _frameConstants.projMatrix;
+        const math::transform3f vp = _frameConstants->viewMatrix * _frameConstants->projMatrix;
         math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
         
         tpos = tpos.transformed(vp);
@@ -86,7 +151,7 @@ namespace foundation {
     }
     
     math::vector3f WASMRendering::getWorldDirection(const math::vector2f &screenPosition) {
-        const math::transform3f inv = (_frameConstants.viewMatrix * _frameConstants.projMatrix).inverted();
+        const math::transform3f inv = (_frameConstants->viewMatrix * _frameConstants->projMatrix).inverted();
         
         float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
         float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
@@ -95,9 +160,9 @@ namespace foundation {
         return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
-    RenderShaderPtr WASMRendering::createShader(const char *name, const char *shadersrc, const RenderShaderInputDesc &vertex, const RenderShaderInputDesc &instance) {
+    RenderShaderPtr WASMRendering::createShader(const char *name, const char *src, const InputLayout &layout) {
         std::shared_ptr<RenderShader> result;
-        util::strstream input(shadersrc, strlen(shadersrc));
+        util::strstream input(src, strlen(src));
         const std::string indent = "    ";
 
         if (_shaderNames.find(name) == _shaderNames.end()) {
@@ -136,7 +201,7 @@ namespace foundation {
         nativeShaderVS, nativeShaderFS;
         
         auto createNativeSrc = [](const std::string &src) {
-            std::uint16_t *buffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * src.length()));
+            std::uint16_t *buffer = new std::uint16_t [src.length()];
             for (std::size_t i = 0; i < src.length(); i++) {
                 buffer[i] = src[i];
             }
@@ -333,7 +398,19 @@ namespace foundation {
                     completed = false;
                     break;
                 }
-
+                
+                for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
+                    const InputLayout::Attribute &attribute = layout.vertexAttributes[i];
+                    const std::string type = std::string(g_formatConversionTable[int(attribute.format)].nativeTypeName);
+                    shaderVS += "layout(location = " + std::to_string(i) +  ") in " + type + " vertex_" + std::string(attribute.name) + ";\n";
+                }
+                for (std::size_t i = 0; i < layout.instanceAttributes.size(); i++) {
+                    const InputLayout::Attribute &attribute = layout.instanceAttributes[i];
+                    const std::string type = std::string(g_formatConversionTable[int(attribute.format)].nativeTypeName);
+                    shaderVS += "layout(location = " + std::to_string(layout.vertexAttributes.size() + i) +  ") in " + type + " instance_" + std::string(attribute.name) + ";\n";
+                }
+                shaderVS += "\n";
+                
                 shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
                 shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
                 shaderUtils::replace(codeBlock, "uint", "uvec", SEPARATORS, "234");
@@ -343,31 +420,12 @@ namespace foundation {
 
                 shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "vertex_", "input.", SEPARATORS, {"vertex_ID"});
-                shaderUtils::replace(codeBlock, "instance_", "input.", SEPARATORS, {"instance_ID"});
                 shaderUtils::replace(codeBlock, "output_", "passing.", SEPARATORS, {"output_position"});
 
                 shaderVS += "void main() {\n";
                 shaderVS += codeBlock;
                 shaderVS += "}\n\n";
-  
-//                for (std::size_t i = 0, cnt = vertex.size(); i < cnt; i++) {
-//                    const RenderShader::Input &current = *(vertex.begin() + i);
-//
-//                    if (current.format != ShaderInput::Format::VERTEX_ID) {
-//                        nativeShaderVS += "in mediump " + shaderGetTypeName( current.format ) + " vertex_" + std::string(current.name) + ";\n";
-//                    }
-//                }
-                
-//                for (std::size_t i = 0, cnt = instance.size(); i < cnt; i++) {
-//                    const ShaderInput &current = *(instance.begin() + i);
-//
-//                    if (current.format != ShaderInput::Format::VERTEX_ID) {
-//                        vsInout += "in mediump " + shaderGetTypeName( current.format ) + " instance_" + std::string(current.name) + ";\n";
-//                    }
-//                }
-                
-                
+                  
                 shaderVS = shaderUtils::makeLines(shaderVS);
                 nativeShaderVS = createNativeSrc(shaderVS);
                 _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
@@ -419,8 +477,10 @@ namespace foundation {
         }
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
-            void *webglShader = webgl_makeProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
-            result = std::make_shared<WASMShader>(webglShader, constBlockLength);
+            void *webglShader = webgl_createProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
+            result = std::make_shared<WASMShader>(webglShader, layout, constBlockLength);
+            delete [] nativeShaderVS.src;
+            delete [] nativeShaderFS.src;
         }
         else if(vssrcBlockDone == false) {
             _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
@@ -440,8 +500,28 @@ namespace foundation {
         return nullptr;
     }
     
-    RenderDataPtr WASMRendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
-        return nullptr;
+    RenderDataPtr WASMRendering::createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) {
+        RenderDataPtr result = nullptr;
+        
+        if (layout.empty() == false) {
+            std::uint32_t stride = 0;
+            for (std::size_t i = 0; i < layout.size(); i++) {
+                stride += g_formatConversionTable[int(layout[i].format)].size;
+            }
+
+            std::uint8_t *memory = new std::uint8_t [layout.size() + stride * count];
+            for (std::size_t i = 0; i < layout.size(); i++) {
+                memory[i] = std::uint8_t(layout[i].format);
+            }
+            
+            memcpy(memory + layout.size(), data, stride * count);
+            const void *webglData = webgl_createData(memory, layout.size(), memory + layout.size(), count * stride);
+            delete [] memory;
+
+            result = std::make_shared<WASMData>(webglData, count, stride);
+        }
+        
+        return result;
     }
     
     float WASMRendering::getBackBufferWidth() const {
@@ -453,28 +533,56 @@ namespace foundation {
     }
     
     void WASMRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
-        const WASMShader *platformShader = static_cast<const WASMShader *>(shader.get());
-        webgl_applyState(platformShader->getWebGLShader());
+        _currentShader = std::static_pointer_cast<WASMShader>(shader);
+        webgl_applyState(_currentShader->getWebGLShader());
     }
     
     void WASMRendering::applyShaderConstants(const void *constants) {
-        
+        if (_currentShader) {
+            const std::uint32_t requiredLength = _currentShader->getConstBufferLength();
+            if (requiredLength > _drawConstantBufferLength) {
+                delete [] _drawConstantBufferData;
+                _drawConstantBufferLength = roundTo256(requiredLength);
+                _drawConstantBufferData = new std::uint8_t [_drawConstantBufferLength];
+            }
+            
+            memcpy(_drawConstantBufferData, constants, _currentShader->getConstBufferLength());
+            webgl_applyConstants(DRAW_CONST_BINDING_INDEX, _drawConstantBufferData, _currentShader->getConstBufferLength());
+        }
     }
     
     void WASMRendering::applyTextures(const RenderTexturePtr *textures, std::uint32_t count) {
         
     }
     
-    void WASMRendering::drawGeometry(const RenderDataPtr &vertexData, std::uint32_t vcount, RenderTopology topology) {
-        
+    void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
+        webgl_bindBuffer(nullptr);
+        webgl_draw(vertexCount, g_topologies[int(topology)]);
     }
     
-    void WASMRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, std::uint32_t indexCount, RenderTopology topology) {
-        
+    void WASMRendering::draw(const RenderDataPtr &vertexData, RenderTopology topology) {
+        std::shared_ptr<WASMData> platformData = std::static_pointer_cast<WASMData>(vertexData);
+        if (_currentShader && platformData) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            webgl_bindBuffer(platformData->getWebGLData());
+            
+            std::uint32_t offset = 0;
+            for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
+                const NativeFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
+                webgl_vertexAttribute(i, format.components, format.type, format.normalize, platformData->getStride(), offset, 0);
+                offset += format.size;
+            }
+            
+            webgl_draw(platformData->getCount(), g_topologies[int(topology)]);
+        }
     }
-
-    void WASMRendering::drawGeometry(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, std::uint32_t vcount, std::uint32_t icount, RenderTopology topology) {
-        
+    
+    void WASMRendering::drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) {
+    
+    }
+    
+    void WASMRendering::drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) {
+    
     }
     
     void WASMRendering::presentFrame() {

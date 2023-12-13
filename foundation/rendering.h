@@ -9,7 +9,7 @@
 #include <vector>
 
 namespace foundation {
-    enum class RenderTopology {
+    enum class RenderTopology : std::uint8_t {
         POINTS = 0,
         LINES,
         LINESTRIP,
@@ -17,13 +17,13 @@ namespace foundation {
         TRIANGLESTRIP,
     };
     
-    enum class ZBehaviorType {
+    enum class ZBehaviorType : std::uint8_t {
         DISABLED = 0,
         TEST_ONLY,
         TEST_AND_WRITE,
     };
     
-    enum class BlendType {
+    enum class BlendType : std::uint8_t {
         DISABLED = 0,           // Blending is disabled
         MIXING,                 // sourceRGB * sourceA + destRGB * (1 - sourceA)
         ADDITIVE,               // sourceRGB * sourceA + destRGB
@@ -32,7 +32,7 @@ namespace foundation {
         MAXVALUE,               // max(sourceRGBA, destRGBA)
     };
         
-    enum class RenderTextureFormat {
+    enum class RenderTextureFormat : std::uint8_t {
         UNKNOWN = 0,            // For error handling
         R8UN,                   // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         R16F,                   // float16 grayscale In shader .r component is used
@@ -45,7 +45,7 @@ namespace foundation {
         RGBA32F,                // 32-bit float per component
     };
     
-    enum class InputAttributeFormat {
+    enum class InputAttributeFormat : std::uint8_t {
         HALF2, HALF4,
         FLOAT1, FLOAT2, FLOAT3, FLOAT4,
         SHORT2, SHORT4,
@@ -102,7 +102,6 @@ namespace foundation {
 
     class RenderData {
     public:
-        virtual auto getCapacity() const -> std::uint32_t = 0;
         virtual auto getCount() const -> std::uint32_t = 0;
         virtual auto getStride() const -> std::uint32_t = 0;
         
@@ -253,12 +252,6 @@ namespace foundation {
         // @return      - handle
         //
         virtual auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t capacity) -> RenderDataPtr = 0;
-        
-        // Update data buffer
-        // @src         - pointer to data (array of structures)
-        // @count       - count of structures in array
-        //
-        virtual void updateData(const RenderDataPtr &data, const void *src, std::uint32_t count) = 0;
         
         // Return actual rendering area size
         //

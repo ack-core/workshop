@@ -103,7 +103,6 @@ namespace foundation {
         MetalData(id<MTLBuffer> buffer, std::uint32_t stride);
         ~MetalData() override;
         
-        std::uint32_t getCapacity() const override;
         std::uint32_t getCount() const override;
         std::uint32_t getStride() const override;
 
@@ -127,10 +126,8 @@ namespace foundation {
         
         RenderShaderPtr createShader(const char *name, const char *src, const InputLayout &layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
-        RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
-        
+        RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;        
         RenderDataPtr createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) override;
-        void updateData(const RenderDataPtr &data, const void *src, std::uint32_t count) override;
         
         float getBackBufferWidth() const override;
         float getBackBufferHeight() const override;

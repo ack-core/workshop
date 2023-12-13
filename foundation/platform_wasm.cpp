@@ -345,23 +345,25 @@ namespace foundation {
         va_list arglist;
         va_start(arglist, fmt);
         const std::size_t capacity = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * capacity));
+        std::uint16_t *logBuffer = new std::uint16_t [capacity];
         va_end(arglist);
         va_start(arglist, fmt);
         const std::size_t length = msgFormat(logBuffer, fmt, arglist);
         va_end(arglist);
         js_log(logBuffer, length);
+        delete [] logBuffer;
     }
     void WASMPlatform::logError(const char *fmt, ...) {
         va_list arglist;
         va_start(arglist, fmt);
         const std::size_t capacity = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * capacity));
+        std::uint16_t *logBuffer = new std::uint16_t [capacity];
         va_end(arglist);
         va_start(arglist, fmt);
         const std::size_t length = msgFormat(logBuffer, fmt, arglist);
         va_end(arglist);
         js_log(logBuffer, length);
+        delete [] logBuffer;
         abort();
     }
 }

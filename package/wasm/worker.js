@@ -21,7 +21,6 @@ onmessage = (msg) => {
                 js_log: function(str, len) {
                     const u16str = new Uint16Array(memory.buffer, str, len);
                     console.log(String.fromCharCode(...u16str));
-                    instance.exports.__wrap_free(str);
                 },
                 js_task: function(task) {
                     throw "can't start task in background";
@@ -35,10 +34,25 @@ onmessage = (msg) => {
                 js_canvas_height: function() {
                     throw "can't access canvas from background";
                 },
-                webgl_makeProgram: function(vsrc, vlen, fsrc, flen) {
+                webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
+                    throw "can't access webgl from background";
+                },
+                webgl_createData: function(ptr, len) {
                     throw "can't access webgl from background";
                 },
                 webgl_applyState: function(shaderID) {
+                    throw "can't access webgl from background";
+                },
+                webgl_applyConstants: function(index, ptr, len) {
+                    throw "can't access webgl from background";
+                },
+                webgl_bindBuffer: function(bufferID) {
+                    throw "can't access webgl from background";
+                },
+                webgl_vertexAttribute: function(index, size, type, nrm, stride, offset, divisor) {
+                    throw "can't access webgl from background";
+                },
+                webgl_draw: function(vertexCount, topology) {
                     throw "can't access webgl from background";
                 }
             }
