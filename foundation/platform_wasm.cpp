@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <cstdio>
 #include <pthread.h>
+#include <list>
 
 namespace {
     const std::size_t PAGESIZE = 65536;
@@ -33,9 +34,8 @@ extern "C" {
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
-
-    float js_canvas_width();
-    float js_canvas_height();
+    auto js_canvas_width() -> float;
+    auto js_canvas_height() -> float;
 }
 
 // Missing part of runtime
@@ -266,8 +266,16 @@ namespace {
 }
 
 namespace {
+    struct Handler {
+        foundation::EventHandlerToken token;
+        util::callback<bool(const foundation::PlatformPointerEventArgs &)> handler;
+    };
+    
     std::weak_ptr<foundation::PlatformInterface> g_instance;
+    std::list<Handler> g_pointerHandlers;
+
     util::callback<void(float)> g_updateAndDraw;
+    foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
 }
 
 namespace foundation {
@@ -322,7 +330,9 @@ namespace foundation {
     }
     
     EventHandlerToken WASMPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) {
-        return nullptr;
+        EventHandlerToken token = g_tokenCounter++;
+        g_pointerHandlers.emplace_back(Handler{token, std::move(handler)});
+        return token;
     }
     
     EventHandlerToken WASMPlatform::addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) {
@@ -330,7 +340,12 @@ namespace foundation {
     }
     
     void WASMPlatform::removeEventHandler(EventHandlerToken token) {
-
+        for (auto index = g_pointerHandlers.begin(); index != g_pointerHandlers.end(); ++index) {
+            if (index->token == token) {
+                g_pointerHandlers.erase(index);
+                return;
+            }
+        }
     }
     
     void WASMPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
@@ -369,13 +384,13 @@ namespace foundation {
 }
 
 extern "C" {
-    void frame(float dt) {
+    void updateFrame(float dt) {
         if (g_updateAndDraw) {
             g_updateAndDraw(dt);
         }
     }
     
-    void file(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
+    void fileLoaded(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         cbtype *cb = reinterpret_cast<cbtype *>(block + pathLen);
         cb->operator()(std::unique_ptr<std::uint8_t[]>(data), length);
@@ -383,13 +398,30 @@ extern "C" {
         ::free(block);
     }
     
-    void task_execute(foundation::AsyncTask *ptr) {
+    void taskExecute(foundation::AsyncTask *ptr) {
         ptr->executeInBackground();
     }
     
-    void task_complete(foundation::AsyncTask *ptr) {
+    void taskComplete(foundation::AsyncTask *ptr) {
         ptr->executeInMainThread();
         delete ptr;
+    }
+    
+    void pointerEvent(foundation::PlatformPointerEventArgs::EventType type, std::uint32_t id, float x, float y) {
+        if (auto p = g_instance.lock()) {
+            foundation::PlatformPointerEventArgs args = {
+                .type = type,
+                .pointerID = id,
+                .coordinateX = x,
+                .coordinateY = y
+            };
+            
+            for (auto &index : g_pointerHandlers) {
+                if (index.handler(args)) {
+                    break;
+                }
+            }
+        }
     }
 }
 

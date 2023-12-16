@@ -7,38 +7,30 @@ foundation::RenderingInterfacePtr rendering;
 //
 math::transform3f view = math::transform3f::identity();
 math::transform3f proj = math::transform3f::identity();
-math::vector4f camPosition = math::vector4f(0, 0, 0, 1);
-math::vector4f camDirection = math::vector4f(1, 0, 0, 0);
-//
-//const char *testShaderSrc = R"(
-//    const {
-//        p[2] : float4
-//    }
-//    fixed {
-//        test[2] : float4 = [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0]
-//    }
-//    inout {
-//        color : float4
-//    }
-//    fndef getcolor(float3 rgb) -> float4 {
-//        return float4(rgb, 1.0);
-//    }
-//    vssrc {
-//        float4 position = const_p[vertex_ID];
-//        output_position = _transform(position, _transform(frame_viewMatrix, frame_projMatrix));
-//        output_color = getcolor(float3(1, 1, 1));
-//    }
-//    fssrc {
-//        output_color[0] = input_color;
-//    }
-//)";
+math::vector3f camPosition = math::vector3f(10, 20, 30);
+math::vector3f camTarget = math::vector3f(0, 0, 0);
 
-/*
-    const {
-        p[2] : float4
+const char *axisShaderSrc = R"(
+    fixed {
+        points[6] : float4 =
+            [0.0, 0.0, 0.0, 1][1000.0, 0.0, 0.0, 1]
+            [0.0, 0.0, 0.0, 1][0.0, 1000.0, 0.0, 1]
+            [0.0, 0.0, 0.0, 1][0.0, 0.0, 1000.0, 1]
+        colors[3] : float4 =
+            [1.0, 0.0, 0.0, 1][0.0, 1.0, 0.0, 1][0.0, 0.0, 1.0, 1]
     }
+    inout {
+        color : float4
+    }
+    vssrc {
+        output_position = _transform(fixed_points[vertex_ID], _transform(frame_viewMatrix, frame_projMatrix));
+        output_color = fixed_colors[vertex_ID / 2];
+    }
+    fssrc {
+        output_color[0] = input_color;
+    }
+)";
 
-*/
 
 const char *testShaderSrc = R"(
     const {
@@ -71,69 +63,86 @@ const Vertex points[] = {
     {{0.5, 0, 0.1, 1}, 0xff00ff00}
 };
 
-//const std::uint32_t points[] = {
-//    0xff110000,
-//    0xff11003f
-//};
-
-
+foundation::RenderShaderPtr axisShader;
 foundation::RenderShaderPtr testShader;
 foundation::RenderDataPtr testData;
 
+std::size_t pointerId = foundation::INVALID_POINTER_ID;
+math::vector2f lockedCoordinates;
+math::vector3f center = { 0, 0, 0 };
+math::vector3f orbit = { 10, 20, 30 };
 
-
-//struct AsyncContext {
-//    int result;
-//};
+void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) {
+    math::vector3f right = math::vector3f(0, 1, 0).cross(position - sceneCenter).normalized();
+    math::vector3f nrmlook = (sceneCenter - position).normalized();
+    math::vector3f nrmright = right.normalized();
+    math::vector3f nrmup = nrmright.cross(nrmlook).normalized();
+    
+    float aspect = platform->getScreenWidth() / platform->getScreenHeight();
+    view = math::transform3f::lookAtRH(position, sceneCenter, nrmup);
+    proj = math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
+}
 
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
     
-    //char *t = nullptr;
-    //float f1 = std::strtof("567.34", &t);
-    //platform->logMsg("Yes! %f %s\n", 104326.45, "eee!");
+    platform->addPointerEventHandler(
+        [](const foundation::PlatformPointerEventArgs &args) -> bool {
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
+                pointerId = args.pointerID;
+                lockedCoordinates = { args.coordinateX, args.coordinateY };
+            }
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
+                if (pointerId != foundation::INVALID_POINTER_ID) {
+                    float dx = args.coordinateX - lockedCoordinates.x;
+                    float dy = args.coordinateY - lockedCoordinates.y;
+                    
+                    orbit.xz = orbit.xz.rotated(dx / 100.0f);
+                    
+                    math::vector3f right = math::vector3f(0, 1, 0).cross(orbit).normalized();
+                    math::vector3f rotatedOrbit = orbit.rotated(right, dy / 100.0f);
+                    
+                    if (fabs(math::vector3f(0, 1, 0).dot(rotatedOrbit.normalized())) < 0.96f) {
+                        orbit = rotatedOrbit;
+                    }
+                    
+                    setCameraLookAt(center + orbit, center);
+                    lockedCoordinates = { args.coordinateX, args.coordinateY };
+                }
+            }
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
+                pointerId = foundation::INVALID_POINTER_ID;
+            }
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
+                pointerId = foundation::INVALID_POINTER_ID;
+            }
+            
+            return true;
+        }
+    );
     
-    
-//    const char *text = "678     ";
-//    int value = 0;
-//
-//    if (std::from_chars(text, text+10, value).ec == std::errc()) {
-//        platform->logMsg("Yes! %d\n", value);
-//    }
-//    else {
-//        platform->logMsg("No!");
-//    }
-    
+    axisShader = rendering->createShader("axis", axisShaderSrc, {});
+    /*
     testShader = rendering->createShader("test", testShaderSrc, foundation::InputLayout {
-        .vertexRepeat = 2,
+        .vertexRepeat = 1,
         .vertexAttributes = {
             {"p", foundation::InputAttributeFormat::FLOAT4},
             {"c", foundation::InputAttributeFormat::BYTE4_NRM}
         }
     });
     testData = rendering->createData(points, testShader->getInputLayout().vertexAttributes, 2);
+    */
 
-//    platform->logMsg("[PLATFORM] initializing...");
-//    platform->loadFile("test1.txt", [p = platform](std::unique_ptr<std::uint8_t[]> &&data, std::size_t size) {
-//        if (data) {
-//            p->logMsg("-->>> %d %s", int(size), data.get());
-//        }
-//    });
-//    platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([p = platform, x = 10, y = 20](AsyncContext &ctx) {
-//        ctx.result = x + y;
-//        p->logMsg("-->>> working! %d %d\n", x, y);
-//    },
-//    [p = platform](AsyncContext &ctx) {
-//        p->logMsg("-->>> result! %d\n", ctx.result);
-//    }));
+    setCameraLookAt(camPosition, camTarget);
     
     platform->setLoop([](float dtSec) {
-        rendering->updateFrameConstants(view, proj, camPosition.xyz, camDirection.xyz);
-        rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
-        rendering->applyShaderConstants(points);
-        //rendering->draw(2, foundation::RenderTopology::LINES);
-        rendering->draw(testData, foundation::RenderTopology::LINES);
+        rendering->updateFrameConstants(view, proj, camPosition, (camTarget - camPosition));
+        //rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
+        rendering->applyState(axisShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
+        //rendering->applyShaderConstants(points);
+        rendering->draw(6, foundation::RenderTopology::LINES);
+        //rendering->draw(testData, foundation::RenderTopology::LINES);
 //        //platform->logMsg("-->> %d %d %f", (int)platform->getScreenWidth(), (int)platform->getScreenHeight(), dtSec);
 //
         rendering->presentFrame();

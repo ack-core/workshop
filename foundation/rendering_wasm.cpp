@@ -552,14 +552,17 @@ namespace foundation {
     void WASMRendering::applyShaderConstants(const void *constants) {
         if (_currentShader) {
             const std::uint32_t requiredLength = _currentShader->getConstBufferLength();
-            if (requiredLength > _drawConstantBufferLength) {
-                delete [] _drawConstantBufferData;
-                _drawConstantBufferLength = roundTo256(requiredLength);
-                _drawConstantBufferData = new std::uint8_t [_drawConstantBufferLength];
-            }
             
-            memcpy(_drawConstantBufferData, constants, _currentShader->getConstBufferLength());
-            webgl_applyConstants(DRAW_CONST_BINDING_INDEX, _drawConstantBufferData, _currentShader->getConstBufferLength());
+            if (requiredLength) {
+                if (requiredLength > _drawConstantBufferLength) {
+                    delete [] _drawConstantBufferData;
+                    _drawConstantBufferLength = roundTo256(requiredLength);
+                    _drawConstantBufferData = new std::uint8_t [_drawConstantBufferLength];
+                }
+                
+                memcpy(_drawConstantBufferData, constants, _currentShader->getConstBufferLength());
+                webgl_applyConstants(DRAW_CONST_BINDING_INDEX, _drawConstantBufferData, _currentShader->getConstBufferLength());
+            }
         }
     }
     
@@ -569,6 +572,7 @@ namespace foundation {
     
     void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
         webgl_bindBuffer(nullptr);
+        webgl_vertexAttribute(0, 4, GL_FLOAT, GL_FALSE, 0, 0, 0);
         webgl_draw(vertexCount, g_topologies[int(topology)]);
     }
     

@@ -600,7 +600,6 @@ namespace foundation {
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 
                 nativeShader += codeBlock;
-                nativeShader += "    (void)fixed_p;\n";
                 nativeShader += "    (void)repeat_ID;\n";
                 nativeShader += "    (void)vertex_ID;\n";
                 nativeShader += "    return output;\n}\n\n";

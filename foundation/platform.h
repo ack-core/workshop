@@ -20,7 +20,7 @@ namespace foundation {
     };
     
     struct PlatformKeyboardEventArgs {
-        enum class Key {
+        enum class Key : std::uint32_t {
             A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
             NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
             LEFT, RIGHT, UP, DOWN,
@@ -29,7 +29,7 @@ namespace foundation {
             F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
             _count
         };
-        enum class EventType {
+        enum class EventType : std::uint32_t {
             UNKNOWN,
             PRESS,
             RELEASE
@@ -40,8 +40,8 @@ namespace foundation {
     };
     
     struct PlatformPointerEventArgs {
-        enum class EventType {
-            UNKNOWN,
+        enum class EventType : std::uint32_t {
+            UNKNOWN = 0,
             START,
             MOVE,
             FINISH,
@@ -49,9 +49,9 @@ namespace foundation {
         };
         
         EventType type = EventType::UNKNOWN;
+        std::size_t pointerID = INVALID_POINTER_ID;
         mutable float coordinateX = 0.0f;
         mutable float coordinateY = 0.0f;
-        std::size_t pointerID = INVALID_POINTER_ID;
         
         struct {
             std::int32_t wheel : 8;
@@ -114,7 +114,7 @@ namespace foundation {
         
         // Loads file to memory
         // @filePath - file path. Example: "data/map1/test.png"
-        // @return   - size != 0 if file opened successfully. Items returned by formFileList should be successfully loaded.
+        // @return   - size != 0 if file opened successfully.
         // @completion called from the main thread
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;

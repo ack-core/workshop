@@ -570,8 +570,8 @@ namespace math {
     }
     template<int Ix, int Iy>
     inline vector2f swizzle2f<Ix, Iy>::rotated(scalar radians) const {
-        const float rsin = std::sin(radians);
-        const float rcos = std::cos(radians);
+        const float rsin = std::sinf(radians);
+        const float rcos = std::cosf(radians);
         const scalar (&flat)[4] = asFlat();
         const scalar rx = flat[Ix] * rcos - flat[Iy] * rsin;
         const scalar ry = flat[Ix] * rsin + flat[Iy] * rcos;
@@ -643,8 +643,8 @@ namespace math {
     }
     template<int Ix, int Iy, int Iz>
     inline vector3f swizzle3f<Ix, Iy, Iz>::rotated(const vector3f &axis, scalar radians) const {
-        const scalar rsin = std::sin(-radians * 0.5);
-        const scalar rcos = std::cos(-radians * 0.5);
+        const scalar rsin = std::sinf(-radians * 0.5);
+        const scalar rcos = std::cosf(-radians * 0.5);
         const vector4f q = vector4f(axis.x * rsin, axis.y * rsin, axis.z * rsin, rcos);
         const vector4f invq = vector4f(-q.x, -q.y, -q.z, q.w);
         const vector4f p = this->atv4start(0.0f);
@@ -736,8 +736,8 @@ namespace math {
         rv3 = r3.block;
     }
     inline transform3f::transform3f(const vector3f &axis, scalar radians) {
-        const scalar sina = std::sin(-radians * 0.5);
-        const scalar cosa = std::cos(-radians * 0.5);
+        const scalar sina = std::sinf(-radians * 0.5);
+        const scalar cosa = std::cosf(-radians * 0.5);
         
         const vector4f q = vector4f(axis.x * sina, axis.y * sina, axis.z * sina, cosa);
         const vector4f xq = vector4f(2.0 * q.x) * q;

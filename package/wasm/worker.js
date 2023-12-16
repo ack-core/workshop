@@ -14,6 +14,9 @@ onmessage = (msg) => {
         const imports = {
             env: {
                 memory: memory,
+                tanf: Math.tan,
+                sinf: Math.sin,
+                cosf: Math.cos,
                 abort: function() {
                     throw "aborted";
                 },
@@ -68,7 +71,7 @@ onmessage = (msg) => {
     }
     if (msg.data.type == EventType.BTASK) {
         const task = msg.data.task;
-        instance.exports.task_execute(task);
+        instance.exports.taskExecute(task);
         postMessage({type: EventType.FTASK, task});
     }
 };

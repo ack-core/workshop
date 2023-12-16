@@ -21,6 +21,10 @@
         const BUFFERS_REUSE_MAX = 256;
         const FRAME_CONST_BINDING_INDEX = 0;
         const DRAW_CONST_BINDING_INDEX = 1;
+        const POINTER_DOWN = 1;
+        const POINTER_MOVE = 2;
+        const POINTER_UP = 3;
+        const POINTER_CANCEL = 4;
 
         class EventType {
             static INIT  = 1
@@ -35,11 +39,12 @@
         var canvas = document.getElementById("render_target");
         var targetWidth = window.devicePixelRatio * canvas.scrollWidth;
         var targetHeight = window.devicePixelRatio * canvas.scrollHeight;
+        var activePointerIDs = {};
         var prevFrameTimeStamp = 0;
         var glShaderIDCounter = 0x10000000;
         var glBufferIDCounter = 0x20000000;
         var glshaders = {};
-        var glbuffers = {0: null};
+        var glbuffers = {};
         var glcontext = canvas.getContext("webgl2", { antialias: false });        
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
@@ -48,6 +53,9 @@
         const imports = {
             env: {
                 memory: memory,
+                tanf: Math.tan,
+                sinf: Math.sin,
+                cosf: Math.cos,
                 js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
                 js_log: function(str, len) {
                     const u16str = new Uint16Array(memory.buffer, str, len);
@@ -70,17 +78,17 @@
                         const data = instance.exports.__wrap_malloc(buffer.byteLength);
                         const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                         u8data.set(new Uint8Array(buffer));
-                        instance.exports.file(block, pathLen, data, buffer.byteLength);
+                        instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
                     }).catch(error => {
                         console.log(path + " loading failed with " + error);
-                        instance.exports.file(block, pathLen, 0, 0);
+                        instance.exports.fileLoaded(block, pathLen, 0, 0);
                     });
                 },
                 js_canvas_width: () => targetWidth,
                 js_canvas_height: () => targetHeight,
                 abort: function() {
                     throw "aborted";
-                },                
+                },
                 webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
                     const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
                     const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
@@ -207,12 +215,18 @@
                     shaderConstantBuffers[i] = glcontext.createBuffer();
                 }
                 
-                const vao = glcontext.createVertexArray();
-                glcontext.bindVertexArray(vao);
+                glbuffers[0] = glcontext.createBuffer();
+                glcontext.bindVertexArray(glcontext.createVertexArray());
                 glcontext.enableVertexAttribArray(0);
 
                 instance.exports.initialize();
 
+                function getCoord(event) {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = (event.clientX - rect.left) * window.devicePixelRatio;
+                    const y = (event.clientY - rect.top) * window.devicePixelRatio;
+                    return [x, y];
+                }
                 function onFrame(timestamp) {
                     const interval = 1000.0 / 30.0;
                     const dt = timestamp - prevFrameTimeStamp;
@@ -220,7 +234,7 @@
                     if (dt > interval) {
                         prevFrameTimeStamp = timestamp;
                         glcontext.viewport(0, 0, canvas.width, canvas.height);
-                        instance.exports.frame(dt);
+                        instance.exports.updateFrame(dt);
                     }
 
                     window.requestAnimationFrame(onFrame);
@@ -229,9 +243,36 @@
                     prevFrameTimeStamp = timestamp;
                     window.requestAnimationFrame(onFrame);
                 });
+                window.addEventListener("pointerdown", (event) => {
+                    [x, y] = getCoord(event);
+                    if (x >= 0 && y >= 0 && x <= targetWidth && y <= targetHeight) {
+                        activePointerIDs[event.pointerId] = true;
+                        instance.exports.pointerEvent(POINTER_DOWN, event.pointerId, x, y);
+                    }
+                });
+                window.addEventListener("pointermove", (event) => {
+                    if (activePointerIDs[event.pointerId]) {
+                        [x, y] = getCoord(event);
+                        instance.exports.pointerEvent(POINTER_MOVE, event.pointerId, x, y);
+                    }
+                });
+                window.addEventListener("pointerup", (event) => {
+                    if (activePointerIDs[event.pointerId]) {
+                        delete activePointerIDs[event.pointerId];
+                        [x, y] = getCoord(event);
+                        instance.exports.pointerEvent(POINTER_UP, event.pointerId, x, y);
+                    }
+                });
+                window.addEventListener("pointercancel", (event) => {
+                    if (activePointerIDs[event.pointerId]) {
+                        delete activePointerIDs[event.pointerId];
+                        [x, y] = getCoord(event);
+                        instance.exports.pointerEvent(POINTER_CANCEL, event.pointerId, x, y);
+                    }
+                });                
             }
             if (msg.data.type == EventType.FTASK) {
-                instance.exports.task_complete(msg.data.task);
+                instance.exports.taskComplete(msg.data.task);
             }
         };
     </script>

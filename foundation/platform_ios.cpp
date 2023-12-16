@@ -73,7 +73,7 @@ namespace {
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
-// Creepy IOS Stuff
+// IOS Stuff
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 @end
@@ -338,14 +338,6 @@ namespace foundation {
         }
         g_worker.notifier.notify_one();
     }
-    
-//    void IOSPlatform::formFileList(const char *dirPath, util::callback<void(const std::vector<PlatformFileEntry> &)> &&completion) {
-//        {
-//            std::lock_guard<std::mutex> guard(g_io.mutex);
-//            g_io.queue.emplace_back(std::make_unique<FileListTask>((_executableDirectoryPath + "/" + dirPath).data(), std::move(completion)));
-//        }
-//        g_io.notifier.notify_one();
-//    }
     
     void IOSPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
         {
