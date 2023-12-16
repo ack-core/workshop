@@ -7,7 +7,7 @@
 namespace foundation {
     class MetalShader : public RenderShader {
     public:
-        MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength);
+        MetalShader(const std::string &name, InputLayout &&layout, id<MTLLibrary> library, std::uint32_t constBufferLength);
         ~MetalShader() override;
         
         const InputLayout &getInputLayout() const override;
@@ -124,9 +124,9 @@ namespace foundation {
         auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
         auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
         
-        RenderShaderPtr createShader(const char *name, const char *src, const InputLayout &layout) override;
+        RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
-        RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;        
+        RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) override;
         
         float getBackBufferWidth() const override;

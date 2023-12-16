@@ -138,9 +138,9 @@ namespace {
 }
 
 namespace foundation {
-    MetalShader::MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength)
+    MetalShader::MetalShader(const std::string &name, InputLayout &&layout, id<MTLLibrary> library, std::uint32_t constBufferLength)
         : _name(name)
-        , _layout(layout)
+        , _layout(std::move(layout))
         , _constBufferLength(constBufferLength)
         , _library(library)
     {}
@@ -342,7 +342,7 @@ namespace foundation {
         return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
-    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const InputLayout &layout) {
+    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, InputLayout &&layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(shadersrc, strlen(shadersrc));
         const std::string indent = "    ";
@@ -395,7 +395,7 @@ namespace foundation {
                             else return false;
                         }
                         
-                        output += "};\n";
+                        output += "};\n\n";
                         continue;
                     }
                 }
@@ -465,7 +465,7 @@ namespace foundation {
             "    float4 cameraPosition;\n"
             "    float4 cameraDirection;\n"
             "    float4 rtBounds;\n"
-            "};\n";
+            "};\n\n";
         
         std::string blockName;
         std::uint32_t constBlockLength = 0;
@@ -496,7 +496,7 @@ namespace foundation {
                     completed = false;
                     break;
                 }
-                nativeShader += "};\n";
+                nativeShader += "};\n\n";
                 constBlockDone = true;
                 continue;
             }
@@ -508,7 +508,7 @@ namespace foundation {
                     completed = false;
                     break;
                 }
-                nativeShader += "};\n";
+                nativeShader += "};\n\n";
                 inoutBlockDone = true;
                 continue;
             }
@@ -521,7 +521,7 @@ namespace foundation {
                     std::string codeBlock;
                     
                     if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
-                        nativeShader += "\n" + funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
+                        nativeShader += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
                         nativeShader += codeBlock;
                         nativeShader += "}\n\n";
                     }
@@ -563,7 +563,7 @@ namespace foundation {
                 nativeShader += "};\n";
                 nativeShader += "struct _VSInstanceIn {\n";
                 formInput(layout.instanceAttributes, 1, nativeShader);
-                nativeShader += "};\n";
+                nativeShader += "};\n\n";
                 
                 nativeShader +=
                     "vertex _InOut main_vertex(\n"
@@ -603,7 +603,7 @@ namespace foundation {
                 nativeShader += "    (void)fixed_p;\n";
                 nativeShader += "    (void)repeat_ID;\n";
                 nativeShader += "    (void)vertex_ID;\n";
-                nativeShader += "    return output;\n}\n";
+                nativeShader += "    return output;\n}\n\n";
                 vssrcBlockDone = true;
                 continue;
             }
@@ -671,7 +671,8 @@ namespace foundation {
                 id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
 
                 if (library) {
-                    result = std::make_shared<MetalShader>(name, layout, library, constBlockLength); //, vdesc
+                    layout.vertexRepeat = std::max(layout.vertexRepeat, std::uint32_t(1));
+                    result = std::make_shared<MetalShader>(name, std::move(layout), library, constBlockLength);
                 }
                 else {
                     const char *errorDesc = [[nsError localizedDescription] UTF8String];

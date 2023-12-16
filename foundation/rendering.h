@@ -231,7 +231,7 @@ namespace foundation {
         // Global functions:
         //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2nearest/_tex2linear/_tex2raw(index, v)
         //
-        virtual auto createShader(const char *name, const char *src, const InputLayout &layout) -> RenderShaderPtr = 0;
+        virtual auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr = 0;
         
         // Create texture from binary data or empty
         // @w and @h    - width and height of the 0th mip layer

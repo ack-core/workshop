@@ -43,6 +43,7 @@
         var glcontext = canvas.getContext("webgl2", { antialias: false });        
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
+        var shaderVertexCountLocation = null;
         
         const imports = {
             env: {
@@ -142,7 +143,10 @@
                 webgl_applyState: function(shaderID) {
                     glcontext.clearColor(0.1, 0.1, 0.1, 1);
                     glcontext.clear(glcontext.COLOR_BUFFER_BIT);
-                    glcontext.useProgram(glshaders[shaderID]);
+
+                    const shader = glshaders[shaderID]
+                    glcontext.useProgram(shader);
+                    shaderVertexCountLocation = glcontext.getUniformLocation(shader, "_vertex_count");
                 },
                 webgl_applyConstants: function(index, ptr, len) {
                     const u8mem = new Uint8Array(memory.buffer, ptr, len);
@@ -160,7 +164,12 @@
                     glcontext.vertexAttribDivisor(index, divisor);
                 },
                 webgl_draw: function(vertexCount, topology) {
+                    glcontext.uniform1i(shaderVertexCountLocation, vertexCount);
                     glcontext.drawArrays(topology, 0, vertexCount);
+                },
+                webgl_drawInstanced: function(vertexCount, instanceCount, topology) {
+                    glcontext.uniform1i(shaderVertexCountLocation, vertexCount);
+                    glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
                 }
             }
         };
@@ -200,6 +209,7 @@
                 
                 const vao = glcontext.createVertexArray();
                 glcontext.bindVertexArray(vao);
+                glcontext.enableVertexAttribArray(0);
 
                 instance.exports.initialize();
 

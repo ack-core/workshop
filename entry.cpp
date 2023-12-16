@@ -33,12 +33,19 @@ math::vector4f camDirection = math::vector4f(1, 0, 0, 0);
 //    }
 //)";
 
+/*
+    const {
+        p[2] : float4
+    }
+
+*/
+
 const char *testShaderSrc = R"(
     const {
         p[2] : float4
     }
     fixed {
-        p[2] : float4 = [0, 0.0, 0, 0][0, 0.3, 0, 0]
+        p[2] : float4 = [0, 0.0, 0.01, 0][0, 0.3, 0.01, 0]
     }
     inout {
         color : float4
@@ -47,17 +54,21 @@ const char *testShaderSrc = R"(
         return float4(rgb, 1.0);
     }
     vssrc {
-        output_position = vertex_p + fixed_p[repeat_ID];
-        output_color = getcolor(float3(1, 1, 1));
+        output_position = vertex_p + fixed_p[repeat_ID]; //const_p[vertex_ID]; //
+        output_color = getcolor(float3(1, 1, 1)) * vertex_c;
     }
     fssrc {
         output_color[0] = input_color;
     }
 )";
 
-const math::vector4f points[] = {
-    {0.0, 0, 0.1, 1},
-    {0.5, 0, 0.1, 1}
+struct Vertex {
+    math::vector4f camPosition;
+    std::uint32_t color;
+};
+const Vertex points[] = {
+    {{0.0, 0, 0.1, 1}, 0xff0000ff},
+    {{0.5, 0, 0.1, 1}, 0xff00ff00}
 };
 
 //const std::uint32_t points[] = {
@@ -81,7 +92,7 @@ extern "C" void initialize() {
     
     //char *t = nullptr;
     //float f1 = std::strtof("567.34", &t);
-    platform->logMsg("Yes! %f %s\n", 104326.45, "eee!");
+    //platform->logMsg("Yes! %f %s\n", 104326.45, "eee!");
     
     
 //    const char *text = "678     ";
@@ -97,7 +108,8 @@ extern "C" void initialize() {
     testShader = rendering->createShader("test", testShaderSrc, foundation::InputLayout {
         .vertexRepeat = 2,
         .vertexAttributes = {
-            {"p", foundation::InputAttributeFormat::FLOAT4}
+            {"p", foundation::InputAttributeFormat::FLOAT4},
+            {"c", foundation::InputAttributeFormat::BYTE4_NRM}
         }
     });
     testData = rendering->createData(points, testShader->getInputLayout().vertexAttributes, 2);
@@ -117,10 +129,10 @@ extern "C" void initialize() {
 //    }));
     
     platform->setLoop([](float dtSec) {
-//
         rendering->updateFrameConstants(view, proj, camPosition.xyz, camDirection.xyz);
         rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
-//        rendering->applyShaderConstants(p);
+        rendering->applyShaderConstants(points);
+        //rendering->draw(2, foundation::RenderTopology::LINES);
         rendering->draw(testData, foundation::RenderTopology::LINES);
 //        //platform->logMsg("-->> %d %d %f", (int)platform->getScreenWidth(), (int)platform->getScreenHeight(), dtSec);
 //

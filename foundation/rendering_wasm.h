@@ -5,7 +5,7 @@
 namespace foundation {
     class WASMShader : public RenderShader {
     public:
-        WASMShader(const void *webglShader, const InputLayout &layout, std::uint32_t constBufferLength);
+        WASMShader(const void *webglShader, InputLayout &&layout, std::uint32_t constBufferLength);
         ~WASMShader() override;
         
         auto getInputLayout() const -> const InputLayout & override;
@@ -43,7 +43,7 @@ namespace foundation {
         auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
         auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
         
-        auto createShader(const char *name, const char *src, const InputLayout &layout) -> RenderShaderPtr override;
+        auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
         auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) -> RenderDataPtr override;

@@ -54,6 +54,9 @@ onmessage = (msg) => {
                 },
                 webgl_draw: function(vertexCount, topology) {
                     throw "can't access webgl from background";
+                },
+                webgl_drawInstanced: function(vertexCount, instanceCount, topology) {
+                    throw "can't access webgl from background";
                 }
             }
         };
