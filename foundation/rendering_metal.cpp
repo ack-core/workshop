@@ -287,6 +287,15 @@ namespace foundation {
             _commandQueue = [_device newCommandQueue];
             _constBufferSemaphore = dispatch_semaphore_create(CONSTANT_BUFFER_FRAMES_MAX);
             
+            MTLSamplerDescriptor *samplerDesc = [MTLSamplerDescriptor new];
+            samplerDesc.minFilter = MTLSamplerMinMagFilterNearest;
+            samplerDesc.magFilter = MTLSamplerMinMagFilterNearest;
+            _samplerStates[int(foundation::SamplerType::NEAREST)] = [_device newSamplerStateWithDescriptor:samplerDesc];
+            
+            samplerDesc.minFilter = MTLSamplerMinMagFilterLinear;
+            samplerDesc.magFilter = MTLSamplerMinMagFilterLinear;
+            _samplerStates[int(foundation::SamplerType::LINEAR)] = [_device newSamplerStateWithDescriptor:samplerDesc];
+            
             MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
             depthDesc.depthCompareFunction = MTLCompareFunctionGreater;
             depthDesc.depthWriteEnabled = NO;
@@ -452,12 +461,7 @@ namespace foundation {
             "#define _smooth(a, b, k) smoothstep((a), (b), (k))\n"
             "#define _min(a, b) min((a), (b))\n"
             "#define _max(a, b) max((a), (b))\n"
-            "#define _tex2nearest(i, a) _texture##i.sample(_nearestSampler, a)\n"
-            "#define _tex2linear(i, a) _texture##i.sample(_linearSampler, a)\n"
-            "#define _tex2raw(i, a) _texture##i.read(ushort2(a.x * (_texture##i.get_width() - 1), a.y * (_texture##i.get_height() - 1)), 0)\n"
-            "\n"
-            "const sampler _nearestSampler(mag_filter::nearest, min_filter::nearest);\n"
-            "const sampler _linearSampler(mag_filter::linear, min_filter::linear);\n"
+            "#define _tex2d(i, a) _texture##i.sample(_sampler, a)\n"
             "\n"
             "struct _FrameData {\n"
             "    float4x4 viewMatrix;\n"
@@ -621,6 +625,7 @@ namespace foundation {
                     "};\n"
                     "fragment _Output main_fragment(\n    "
                     "_InOut input [[stage_in]],\n    "
+                    "sampler _sampler [[sampler(0)]],\n    "
                     "texture2d<float> _texture0 [[texture(0)]],\n    "
                     "texture2d<float> _texture1 [[texture(1)]],\n    "
                     "texture2d<float> _texture2 [[texture(2)]],\n    "
@@ -647,8 +652,6 @@ namespace foundation {
                 nativeShader += codeBlock;
                 nativeShader += "    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";
                 nativeShader += "    (void)fragment_coord;\n";
-                nativeShader += "    (void)_nearestSampler;\n";
-                nativeShader += "    (void)_linearSampler;\n";
                 nativeShader += "}\n";
                 fssrcBlockDone = true;
                 continue;
@@ -691,7 +694,6 @@ namespace foundation {
         
     namespace {
         static MTLPixelFormat nativeTextureFormat[] = {
-            MTLPixelFormatInvalid,
             MTLPixelFormatR8Unorm,
             MTLPixelFormatR16Float,
             MTLPixelFormatR32Float,
@@ -818,16 +820,16 @@ namespace foundation {
             }
 
             MTLClearColor clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
-            MTLLoadAction loadAction = cfg.clearColorEnabled ? MTLLoadActionClear : MTLLoadActionLoad;
+            MTLLoadAction loadAction = cfg.doClearColor ? MTLLoadActionClear : MTLLoadActionLoad;
             
-            _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor]; //_view.currentRenderPassDescriptor;//
+            _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _currentPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
             _currentPassDescriptor.colorAttachments[0].loadAction = loadAction;
             _currentPassDescriptor.colorAttachments[0].clearColor = clearColor;
             _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
             _currentPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
-            _currentPassDescriptor.depthAttachment.loadAction = cfg.clearDepthEnabled ? MTLLoadActionClear : MTLLoadActionLoad;
+            _currentPassDescriptor.depthAttachment.loadAction = cfg.doClearDepth ? MTLLoadActionClear : MTLLoadActionLoad;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
             
             if (cfg.target) {
@@ -840,7 +842,7 @@ namespace foundation {
                 
                 if (cfg.target->hasDepthBuffer() == false) {
                     _currentPassDescriptor.depthAttachment.texture = nil;
-                    _currentPassDescriptor.depthAttachment.loadAction = cfg.clearDepthEnabled ? MTLLoadActionClear : MTLLoadActionLoad;
+                    _currentPassDescriptor.depthAttachment.loadAction = cfg.doClearDepth ? MTLLoadActionClear : MTLLoadActionLoad;
                 }
             }
             
@@ -924,17 +926,23 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::applyTextures(const RenderTexturePtr *textures, std::uint32_t count) {
+    void MetalRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) {
         if (_currentRenderCommandEncoder && _currentShader) {
-            if (count <= MAX_TEXTURES) {
-                NSRange range {0, count};
-                id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
+            if (textures.size() <= MAX_TEXTURES) {
+                const NSRange range {0, textures.size()};
+                __unsafe_unretained id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
+                __unsafe_unretained id<MTLSamplerState> smarray[MAX_TEXTURES] = {nil};
                 
-                for (std::uint32_t i = 0; i < count; i++) {
-                    texarray[i] = textures[i] ? static_cast<const MetalTexBase *>(textures[i].get())->getNativeTexture() : nil;
+                std::uint32_t index = 0;
+                for (auto &item : textures) {
+                    texarray[index] = item.first ? static_cast<const MetalTexBase *>(item.first->get())->getNativeTexture() : nil;
+                    smarray[index] = _samplerStates[int(item.second)];
+                    index++;
                 }
                 
+                [_currentRenderCommandEncoder setFragmentSamplerStates:smarray withRange:range];
                 [_currentRenderCommandEncoder setFragmentTextures:texarray withRange:range];
+                [_currentRenderCommandEncoder setVertexSamplerStates:smarray withRange:range];
                 [_currentRenderCommandEncoder setVertexTextures:texarray withRange:range];
             }
         }

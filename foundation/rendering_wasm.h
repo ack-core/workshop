@@ -29,10 +29,29 @@ namespace foundation {
         
     private:
         const void *_data;
-        std::uint32_t _count;
-        std::uint32_t _stride;
+        const std::uint32_t _stride;
+        const std::uint32_t _count;
     };
-    
+
+    class WASMTexture : public RenderTexture {
+    public:
+        WASMTexture(const void *webglTexture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        ~WASMTexture() override;
+        
+        auto getWidth() const -> std::uint32_t override;
+        auto getHeight() const -> std::uint32_t override;
+        auto getMipCount() const -> std::uint32_t override;
+        auto getFormat() const -> RenderTextureFormat override;
+        auto getWebGLTexture() const -> const void *;
+        
+    private:
+        const RenderTextureFormat _format;
+        const void *_texture;
+        const std::uint32_t _width;
+        const std::uint32_t _height;
+        const std::uint32_t _mipCount;
+    };
+
     class WASMRendering final : public RenderingInterface {
     public:
         WASMRendering(const std::shared_ptr<PlatformInterface> &platform);
@@ -53,7 +72,7 @@ namespace foundation {
         
         void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) override;
+        void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount, RenderTopology topology) override;
         void draw(const RenderDataPtr &vertexData, RenderTopology topology) override;

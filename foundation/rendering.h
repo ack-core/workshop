@@ -22,7 +22,12 @@ namespace foundation {
         TEST_ONLY,
         TEST_AND_WRITE,
     };
-    
+
+    enum class SamplerType : std::uint8_t {
+        NEAREST = 0,
+        LINEAR,
+    };
+
     enum class BlendType : std::uint8_t {
         DISABLED = 0,           // Blending is disabled
         MIXING,                 // sourceRGB * sourceA + destRGB * (1 - sourceA)
@@ -33,8 +38,7 @@ namespace foundation {
     };
         
     enum class RenderTextureFormat : std::uint8_t {
-        UNKNOWN = 0,            // For error handling
-        R8UN,                   // 1 byte grayscale normalized to [0..1]. In shader .r component is used
+        R8UN = 0,               // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         R16F,                   // float16 grayscale In shader .r component is used
         R32F,                   // float grayscale In shader .r component is used
         RG8UN,                  // rg 1 byte per channel normalized to [0..1]
@@ -114,13 +118,13 @@ namespace foundation {
     using RenderTargetPtr = std::shared_ptr<RenderTarget>;
     using RenderDataPtr = std::shared_ptr<RenderData>;
     
-    // Render targets decription that is passed to 'applyState'
+    // Render pass decription that is passed to 'applyState'
     //
     struct RenderPassConfig {
         RenderTargetPtr target = nullptr;
         
-        bool clearColorEnabled = false;
-        bool clearDepthEnabled = false;
+        bool doClearColor = false;
+        bool doClearDepth = false;
 
         float initialColor[4] = {0.0f};
         float initialDepth = 0.0f;
@@ -264,11 +268,11 @@ namespace foundation {
         //
         virtual void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg = RenderPassCommonConfigs::DEFAULT()) = 0;
         
-        // Apply textures
-        // @textures    - textures[i] can be nullptr (texture at i-th position will not be set)
+        // Apply textures and their sampling type
+        // @textures    - texture can be nullptr (texture at i-th position will not be set)
         // @count       - number of textures
         //
-        virtual void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) = 0;
+        virtual void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) = 0;
         
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null

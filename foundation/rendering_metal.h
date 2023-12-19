@@ -134,7 +134,7 @@ namespace foundation {
         
         void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const RenderTexturePtr *textures, std::uint32_t count) override;
+        void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount, RenderTopology topology) override;
         void draw(const RenderDataPtr &vertexData, RenderTopology topology) override;
@@ -168,7 +168,8 @@ namespace foundation {
         std::unordered_set<std::string> _shaderNames;
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _renderPipelineStates;
         std::unordered_map<std::string, id<MTLComputePipelineState>> _computePipelineStates;
-
+        
+        id<MTLSamplerState> _samplerStates[2];
         id<MTLDepthStencilState> _zBehaviorStates[3];
         std::shared_ptr<RenderShader> _currentShader;
         

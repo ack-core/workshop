@@ -5,12 +5,16 @@
 
 #include <GLES3/gl3.h>
 
+// TODO: big upload buffer to pass data to js
+
 // From js
 extern "C" {
-    void *webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen);
-    void *webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen);
-    void webgl_applyState(const void *shader);
+    auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> void *;
+    auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen) -> void *;
+    auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> void *;
+    void webgl_applyState(const void *webglShader);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
+    void webgl_applyTexture(std::uint32_t index, const void *webglTexture, int samplingType);
     void webgl_bindBuffer(const void *webglData);
     void webgl_vertexAttribute(std::size_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset, std::uint32_t divisor);
     void webgl_draw(std::uint32_t vertexCount, GLenum topology);
@@ -36,7 +40,7 @@ namespace {
         return result;
     }
     
-    struct NativeFormat {
+    struct NativeVertexFormat {
         const char *nativeTypeName;
         std::uint32_t size;
         std::uint32_t components;
@@ -68,6 +72,24 @@ namespace {
         {"uvec2", 8,  2, GL_FALSE, GL_UNSIGNED_INT},
         {"uvec3", 12, 3, GL_FALSE, GL_UNSIGNED_INT},
         {"uvec4", 16, 4, GL_FALSE, GL_UNSIGNED_INT}
+    };
+
+    struct NativeTextureFormat {
+        GLenum format;
+        GLenum internal;
+        GLenum type;
+        std::uint32_t size;
+    }
+    g_textureFormatTable[] = { // index is RenderTextureFormat value
+        {GL_RED,   GL_R8,      GL_UNSIGNED_BYTE, 1},
+        {GL_RED,   GL_R16F,    GL_HALF_FLOAT, 2},
+        {GL_RED,   GL_R32F,    GL_FLOAT, 4},
+        {GL_RG,    GL_RG8,     GL_UNSIGNED_BYTE, 2},
+        {GL_RG,    GL_RG16F,   GL_HALF_FLOAT, 4},
+        {GL_RG,    GL_RG32F,   GL_FLOAT, 8},
+        {GL_RGBA,  GL_RGBA8,   GL_UNSIGNED_BYTE, 4},
+        {GL_RGBA,  GL_RGBA16F, GL_HALF_FLOAT, 8},
+        {GL_RGBA,  GL_RGBA32F, GL_FLOAT, 16},
     };
 
 }
@@ -112,6 +134,36 @@ namespace foundation {
         return _data;
     }
 }
+
+namespace foundation {
+    WASMTexture::WASMTexture(const void *webglTexture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+        : _texture(webglTexture)
+        , _format(fmt)
+        , _width(w)
+        , _height(h)
+        , _mipCount(mipCount)
+    {
+    }
+    WASMTexture::~WASMTexture() {
+
+    }
+    std::uint32_t WASMTexture::getWidth() const {
+        return _width;
+    }
+    std::uint32_t WASMTexture::getHeight() const {
+        return _height;
+    }
+    std::uint32_t WASMTexture::getMipCount() const {
+        return _mipCount;
+    }
+    RenderTextureFormat WASMTexture::getFormat() const {
+        return _format;
+    }
+    const void *WASMTexture::getWebGLTexture() const {
+        return _texture;
+    }
+}
+
 
 namespace foundation {
     WASMRendering::WASMRendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
@@ -282,6 +334,7 @@ namespace foundation {
             "#define _smooth(a, b, k) smoothstep((a), (b), (k))\n"
             "#define _min(a, b) min((a), (b))\n"
             "#define _max(a, b) max((a), (b))\n"
+            "#define _tex2d(i, a) texture(_samplers[i], a)\n"
             "\n"
             "precision mediump float;\n"
             "\n"
@@ -471,6 +524,7 @@ namespace foundation {
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "input_", "passing.", SEPARATORS, {"input_position"});
                 
+                shaderFS += "uniform sampler2D _samplers[4];\n";
                 shaderFS += "out vec4 output_color[4];\n\n";
                 shaderFS += "void main() {\n";
                 shaderFS += codeBlock;
@@ -505,7 +559,29 @@ namespace foundation {
     }
     
     RenderTexturePtr WASMRendering::createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) {
-        return nullptr;
+        RenderTexturePtr result = nullptr;
+        
+        if (w && h && mipsData.size()) {
+            const NativeTextureFormat &fmt = g_textureFormatTable[int(format)];
+            std::uint8_t *memory = new std::uint8_t [2 * w * h * fmt.size];
+            std::uint32_t *mptrs = new std::uint32_t [mipsData.size()];
+            std::uint32_t offset = 0;
+
+            for (std::size_t i = 0; i < mipsData.size(); i++) {
+                std::uint32_t miplen = (w >> i) * (h >> i) * fmt.size;
+                memcpy(memory + offset, mipsData.begin()[i], miplen);
+                mptrs[i] = std::uint32_t(memory + offset);
+                offset += miplen;
+            }
+            
+            const void *webglTexture = webgl_createTexture(fmt.format, fmt.internal, fmt.type, fmt.size, w, h, mptrs, mipsData.size());
+            delete [] memory;
+            delete [] mptrs;
+            
+            result = std::make_shared<WASMTexture>(webglTexture, format, w, h, mipsData.size());
+        }
+        
+        return result;
     }
     
     RenderTargetPtr WASMRendering::createRenderTarget(RenderTextureFormat format, unsigned count, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
@@ -515,7 +591,7 @@ namespace foundation {
     RenderDataPtr WASMRendering::createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) {
         RenderDataPtr result = nullptr;
         
-        if (layout.empty() == false) {
+        if (count && layout.empty() == false) {
             std::uint32_t stride = 0;
             for (std::size_t i = 0; i < layout.size(); i++) {
                 stride += g_formatConversionTable[int(layout[i].format)].size;
@@ -566,8 +642,11 @@ namespace foundation {
         }
     }
     
-    void WASMRendering::applyTextures(const RenderTexturePtr *textures, std::uint32_t count) {
-        
+    void WASMRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) {
+        for (std::size_t i = 0; i < textures.size(); i++) {
+            const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first->get());
+            webgl_applyTexture(i, platformTexture->getWebGLTexture(), int(textures.begin()[i].second));
+        }
     }
     
     void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
@@ -585,7 +664,7 @@ namespace foundation {
             
             std::uint32_t offset = 0;
             for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
-                const NativeFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
+                const NativeVertexFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
                 webgl_vertexAttribute(i, format.components, format.type, format.normalize, platformData->getStride(), offset, repeat);
                 offset += format.size;
             }

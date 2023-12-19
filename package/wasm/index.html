@@ -33,7 +33,7 @@
             static FTASK = 4
         }
 
-        var instance = {};
+        var instance = null;
         var memory = new WebAssembly.Memory({ initial: 4, maximum: 1024, shared: true });
         var worker = new Worker("worker.js");
         var canvas = document.getElementById("render_target");
@@ -43,8 +43,11 @@
         var prevFrameTimeStamp = 0;
         var glShaderIDCounter = 0x10000000;
         var glBufferIDCounter = 0x20000000;
+        var glTextureIDCounter = 0x30000000;
         var glshaders = {};
         var glbuffers = {};
+        var gltextures = {};
+        var glsamplers = {};
         var glcontext = canvas.getContext("webgl2", { antialias: false });        
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
@@ -148,8 +151,22 @@
                     glbuffers[glBufferIDCounter] = vbo;
                     return glBufferIDCounter++;
                 },
+                webgl_createTexture(format, internal, type, size, w, h, mipAddresses, mipCount) {
+                    const mipPtrs = new Uint32Array(memory.buffer, mipAddresses, mipCount);
+                    const texture = glcontext.createTexture();
+                    glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
+                    glcontext.texStorage2D(glcontext.TEXTURE_2D, mipCount, internal, w, h);
+                    for (var i = 0; i < mipCount; i++) {
+                        const mw = w >> i;
+                        const mh = h >> i;
+                        const mipData = new Uint8Array(memory.buffer, mipPtrs[i], mw * mh * size);
+                        glcontext.texSubImage2D(glcontext.TEXTURE_2D, i, 0, 0, mw, mh, format, type, mipData);
+                    }
+                    gltextures[glTextureIDCounter] = texture;
+                    return glTextureIDCounter++;
+                },
                 webgl_applyState: function(shaderID) {
-                    glcontext.clearColor(0.1, 0.1, 0.1, 1);
+                    glcontext.clearColor(0.3, 0.3, 0.3, 1);
                     glcontext.clear(glcontext.COLOR_BUFFER_BIT);
 
                     const shader = glshaders[shaderID]
@@ -162,6 +179,12 @@
                     glcontext.bufferData(glcontext.UNIFORM_BUFFER, u8mem, glcontext.DYNAMIC_DRAW);
                     glcontext.bindBufferBase(glcontext.UNIFORM_BUFFER, index, shaderConstantBuffers[shaderConstantIndex]);
                     shaderConstantIndex = (shaderConstantIndex + 1) % BUFFERS_REUSE_MAX;
+                },
+                webgl_applyTexture: function(index, textureID, samplingType) {
+                    const texture = gltextures[textureID];
+                    glcontext.activeTexture(glcontext.TEXTURE0 + index);
+                    glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
+                    glcontext.bindSampler(index, glsamplers[samplingType]);
                 },
                 webgl_bindBuffer: function(bufferID) {
                     glcontext.bindBuffer(glcontext.ARRAY_BUFFER, glbuffers[bufferID]);
@@ -210,6 +233,18 @@
                 console.log("[PLATFORM] Background Thread started");
                 canvas.width = targetWidth;
                 canvas.height = targetHeight;
+
+                glsamplers[0] = glcontext.createSampler();
+                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MIN_FILTER, glcontext.NEAREST);
+                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MAG_FILTER, glcontext.NEAREST);
+                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_S, glcontext.CLAMP_TO_EDGE);
+                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_T, glcontext.CLAMP_TO_EDGE);
+
+                glsamplers[1] = glcontext.createSampler();
+                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MIN_FILTER, glcontext.LINEAR);
+                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MAG_FILTER, glcontext.LINEAR);
+                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_S, glcontext.CLAMP_TO_EDGE);
+                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_T, glcontext.CLAMP_TO_EDGE);
 
                 for (var i = 0; i < BUFFERS_REUSE_MAX; i++) {
                     shaderConstantBuffers[i] = glcontext.createBuffer();
