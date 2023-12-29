@@ -32,9 +32,6 @@ namespace foundation {
         DISABLED = 0,           // Blending is disabled
         MIXING,                 // sourceRGB * sourceA + destRGB * (1 - sourceA)
         ADDITIVE,               // sourceRGB * sourceA + destRGB
-        AGREGATION,             // sourceRGBA + destRGBA
-        MINVALUE,               // min(sourceRGBA, destRGBA)
-        MAXVALUE,               // max(sourceRGBA, destRGBA)
     };
         
     enum class RenderTextureFormat : std::uint8_t {
@@ -126,8 +123,8 @@ namespace foundation {
         bool doClearColor = false;
         bool doClearDepth = false;
 
-        float initialColor[4] = {0.0f};
-        float initialDepth = 0.0f;
+        float color[4] = {0.0f};
+        float depth = 0.0f;
         
         ZBehaviorType zBehaviorType = ZBehaviorType::TEST_AND_WRITE;
         BlendType blendType = BlendType::DISABLED;

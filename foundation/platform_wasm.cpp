@@ -360,6 +360,7 @@ namespace foundation {
         va_list arglist;
         va_start(arglist, fmt);
         const std::size_t capacity = msgLength(fmt, arglist);
+        //std::unique_ptr<std::uint16_t[]> logBuffer = std::make_unique<std::uint16_t[]>(capacity);
         std::uint16_t *logBuffer = new std::uint16_t [capacity];
         va_end(arglist);
         va_start(arglist, fmt);

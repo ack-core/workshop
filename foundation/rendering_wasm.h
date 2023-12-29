@@ -32,8 +32,14 @@ namespace foundation {
         const std::uint32_t _stride;
         const std::uint32_t _count;
     };
+    
+    class WASMTexBase : public RenderTexture {
+    public:
+        ~WASMTexBase() override {}
+        virtual const void *getWebGLTexture() const = 0;
+    };
 
-    class WASMTexture : public RenderTexture {
+    class WASMTexture : public WASMTexBase {
     public:
         WASMTexture(const void *webglTexture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
         ~WASMTexture() override;
@@ -42,7 +48,7 @@ namespace foundation {
         auto getHeight() const -> std::uint32_t override;
         auto getMipCount() const -> std::uint32_t override;
         auto getFormat() const -> RenderTextureFormat override;
-        auto getWebGLTexture() const -> const void *;
+        auto getWebGLTexture() const -> const void * override;
         
     private:
         const RenderTextureFormat _format;
@@ -51,7 +57,44 @@ namespace foundation {
         const std::uint32_t _height;
         const std::uint32_t _mipCount;
     };
+    
+    class WASMTarget : public RenderTarget {
+    public:
+        class RTTexture : public WASMTexBase {
+        public:
+            RTTexture(const WASMTarget &target) : _target(target) {}
+            ~RTTexture() override {}
+            
+            auto getWidth() const -> std::uint32_t override { return _target._width; }
+            auto getHeight() const -> std::uint32_t override { return _target._height; }
+            auto getMipCount() const -> std::uint32_t override { return 1; }
+            auto getFormat() const -> RenderTextureFormat override { return _target._format; }
+            auto getWebGLTexture() const -> const void * override;
+            
+        private:
+            const WASMTarget &_target;
+        };
 
+        WASMTarget(const void * const *targets, unsigned count, const void *depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h);
+        ~WASMTarget() override;
+        
+        auto getWidth() const -> std::uint32_t override;
+        auto getHeight() const -> std::uint32_t override;
+        auto getFormat() const -> RenderTextureFormat override;
+        auto getTextureCount() const -> std::uint32_t override;
+        auto getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & override;
+        bool hasDepthBuffer() const override;
+        
+    private:
+        const RenderTextureFormat _format;
+        const unsigned _count;
+        const void *_depth;
+        const std::uint32_t _width;
+        const std::uint32_t _height;
+
+        std::shared_ptr<RenderTexture> _textures[RenderTarget::MAX_TEXTURE_COUNT] = {nullptr};
+    };
+    
     class WASMRendering final : public RenderingInterface {
     public:
         WASMRendering(const std::shared_ptr<PlatformInterface> &platform);
@@ -82,6 +125,8 @@ namespace foundation {
         void presentFrame() override;
         
     private:
+        auto _getUploadBuffer(std::size_t requiredLength) -> std::uint8_t *;
+        
         struct FrameConstants {
             math::transform3f viewMatrix = math::transform3f::identity();
             math::transform3f projMatrix = math::transform3f::identity();
@@ -93,8 +138,8 @@ namespace foundation {
         
         const std::shared_ptr<PlatformInterface> _platform;
         
-        std::uint8_t *_drawConstantBufferData;
-        std::size_t _drawConstantBufferLength;
+        std::uint8_t *_uploadBufferData;
+        std::size_t _uploadBufferLength;
         
         std::unordered_set<std::string> _shaderNames;
         std::shared_ptr<WASMShader> _currentShader;

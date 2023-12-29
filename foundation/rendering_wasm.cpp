@@ -6,13 +6,16 @@
 #include <GLES3/gl3.h>
 
 // TODO: big upload buffer to pass data to js
+// TODO: +unique_ptr
+// TODO: resource dtors (webglData)
 
 // From js
 extern "C" {
     auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> void *;
     auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen) -> void *;
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> void *;
-    void webgl_applyState(const void *webglShader);
+    auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, const void **textures) -> void *;
+    void webgl_applyState(const void *webglShader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, const void *webglTexture, int samplingType);
     void webgl_bindBuffer(const void *webglData);
@@ -35,8 +38,8 @@ namespace {
     static const std::uint32_t DRAW_CONST_BINDING_INDEX = 1;
     static const std::uint32_t VERTEX_IN_BINDING_START = 2;
     
-    std::uint32_t roundTo256(std::uint32_t value) {
-        std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
+    std::uint32_t roundTo4096(std::uint32_t value) {
+        std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(4095)) + 4096;
         return result;
     }
     
@@ -164,13 +167,44 @@ namespace foundation {
     }
 }
 
+namespace foundation {
+    WASMTarget::WASMTarget(const void * const *targets, unsigned count, const void *depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h)
+        : _format(fmt)
+        , _count(count)
+        , _depth(depth)
+        , _width(w)
+        , _height(h)
+    {
+    }
+    WASMTarget::~WASMTarget() {
+        
+    }
+    std::uint32_t WASMTarget::getWidth() const {
+        return _width;
+    }
+    std::uint32_t WASMTarget::getHeight() const {
+        return _height;
+    }
+    RenderTextureFormat WASMTarget::getFormat() const {
+        return _format;
+    }
+    std::uint32_t WASMTarget::getTextureCount() const {
+        return _count;
+    }
+    const std::shared_ptr<RenderTexture> &WASMTarget::getTexture(unsigned index) const {
+        return _textures[index];
+    }
+    bool WASMTarget::hasDepthBuffer() const {
+        return _depth != nullptr;
+    }
+}
 
 namespace foundation {
     WASMRendering::WASMRendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
         _platform->logMsg("[RENDER] Initialization : WebGL");
         _frameConstants = new FrameConstants;
-        _drawConstantBufferLength = 1024;
-        _drawConstantBufferData = new std::uint8_t [_drawConstantBufferLength];
+        _uploadBufferLength = 1024;
+        _uploadBufferData = new std::uint8_t [_uploadBufferLength];
         _platform->logMsg("[RENDER] Initialization : complete");
     }
     
@@ -492,7 +526,7 @@ namespace foundation {
                   
                 shaderVS = shaderUtils::makeLines(shaderVS);
                 nativeShaderVS = createNativeSrc(shaderVS);
-                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
+                //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
                 
                 vssrcBlockDone = true;
                 continue;
@@ -533,7 +567,7 @@ namespace foundation {
                 shaderFS = shaderUtils::makeLines(shaderFS);
                 nativeShaderFS = createNativeSrc(shaderFS);
 
-                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
+                //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
                 fssrcBlockDone = true;
                 continue;
             }
@@ -563,10 +597,13 @@ namespace foundation {
         
         if (w && h && mipsData.size()) {
             const NativeTextureFormat &fmt = g_textureFormatTable[int(format)];
-            std::uint8_t *memory = new std::uint8_t [2 * w * h * fmt.size];
-            std::uint32_t *mptrs = new std::uint32_t [mipsData.size()];
+            
+            static_assert(sizeof(std::size_t) == sizeof(std::uint32_t), "that code assumes 32-bit webassembly environment");
+            std::uint8_t *buffer = _getUploadBuffer(2 * w * h * fmt.size + 4 * mipsData.size());
+            std::uint8_t *memory = buffer + 4 * mipsData.size();
+            std::uint32_t *mptrs = reinterpret_cast<std::uint32_t *>(buffer);
             std::uint32_t offset = 0;
-
+            
             for (std::size_t i = 0; i < mipsData.size(); i++) {
                 std::uint32_t miplen = (w >> i) * (h >> i) * fmt.size;
                 memcpy(memory + offset, mipsData.begin()[i], miplen);
@@ -575,9 +612,6 @@ namespace foundation {
             }
             
             const void *webglTexture = webgl_createTexture(fmt.format, fmt.internal, fmt.type, fmt.size, w, h, mptrs, mipsData.size());
-            delete [] memory;
-            delete [] mptrs;
-            
             result = std::make_shared<WASMTexture>(webglTexture, format, w, h, mipsData.size());
         }
         
@@ -597,15 +631,13 @@ namespace foundation {
                 stride += g_formatConversionTable[int(layout[i].format)].size;
             }
 
-            std::uint8_t *memory = new std::uint8_t [layout.size() + stride * count];
+            std::uint8_t *memory = _getUploadBuffer(layout.size() + stride * count);
             for (std::size_t i = 0; i < layout.size(); i++) {
                 memory[i] = std::uint8_t(layout[i].format);
             }
             
             memcpy(memory + layout.size(), data, stride * count);
             const void *webglData = webgl_createData(memory, layout.size(), memory + layout.size(), count * stride);
-            delete [] memory;
-
             result = std::make_shared<WASMData>(webglData, count, stride);
         }
         
@@ -621,8 +653,11 @@ namespace foundation {
     }
     
     void WASMRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
+        GLenum cmask = (cfg.doClearColor ? GL_COLOR_BUFFER_BIT : 0) | (cfg.doClearDepth ? GL_DEPTH_BUFFER_BIT : 0);
         _currentShader = std::static_pointer_cast<WASMShader>(shader);
-        webgl_applyState(_currentShader->getWebGLShader());
+        std::uint32_t ztype = std::uint32_t(cfg.zBehaviorType);
+        std::uint32_t btype = std::uint32_t(cfg.blendType);
+        webgl_applyState(_currentShader->getWebGLShader(), cmask, cfg.color[0], cfg.color[1], cfg.color[2], cfg.color[3], cfg.depth, ztype, btype);
     }
     
     void WASMRendering::applyShaderConstants(const void *constants) {
@@ -630,14 +665,9 @@ namespace foundation {
             const std::uint32_t requiredLength = _currentShader->getConstBufferLength();
             
             if (requiredLength) {
-                if (requiredLength > _drawConstantBufferLength) {
-                    delete [] _drawConstantBufferData;
-                    _drawConstantBufferLength = roundTo256(requiredLength);
-                    _drawConstantBufferData = new std::uint8_t [_drawConstantBufferLength];
-                }
-                
-                memcpy(_drawConstantBufferData, constants, _currentShader->getConstBufferLength());
-                webgl_applyConstants(DRAW_CONST_BINDING_INDEX, _drawConstantBufferData, _currentShader->getConstBufferLength());
+                std::uint8_t *buffer = _getUploadBuffer(requiredLength);
+                memcpy(buffer, constants, _currentShader->getConstBufferLength());
+                webgl_applyConstants(DRAW_CONST_BINDING_INDEX, buffer, _currentShader->getConstBufferLength());
             }
         }
     }
@@ -689,6 +719,17 @@ namespace foundation {
     void WASMRendering::presentFrame() {
         
     }
+    
+    std::uint8_t *WASMRendering::_getUploadBuffer(std::size_t requiredLength) {
+        if (requiredLength > _uploadBufferLength) {
+            delete [] _uploadBufferData;
+            _uploadBufferLength = roundTo4096(requiredLength);
+            _uploadBufferData = new std::uint8_t [_uploadBufferLength];
+        }
+        
+        return _uploadBufferData;
+    }
+    
 }
 
 namespace foundation {

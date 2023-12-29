@@ -44,15 +44,46 @@
         var glShaderIDCounter = 0x10000000;
         var glBufferIDCounter = 0x20000000;
         var glTextureIDCounter = 0x30000000;
+        var glFrameBufferIDCounter = 0x40000000;
         var glshaders = {};
         var glbuffers = {};
         var gltextures = {};
         var glsamplers = {};
+        var glframebuffers = {};
         var glcontext = canvas.getContext("webgl2", { antialias: false });        
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
         var shaderVertexCountLocation = null;
         
+        const ztypes = {
+            0: function() {
+                glcontext.disable(glcontext.DEPTH_TEST);
+            },
+            1: function() {
+                glcontext.enable(glcontext.DEPTH_TEST);
+                glcontext.depthMask(false);
+            },
+            2: function() {
+                glcontext.enable(glcontext.DEPTH_TEST);
+                glcontext.depthMask(true);
+            },            
+        };
+        const btypes = {
+            0: function() {
+                glcontext.disable(glcontext.BLEND);
+            },
+            1: function() {
+                glcontext.enable(glcontext.BLEND);
+                glcontext.blendEquation(glcontext.FUNC_ADD);
+                glcontext.blendFunc(glcontext.ONE, glcontext.ONE_MINUS_SRC_ALPHA);
+            },
+            2: function() {
+                glcontext.enable(glcontext.BLEND);
+                glcontext.blendEquation(glcontext.FUNC_ADD);
+                glcontext.blendFuncSeparate(glcontext.SRC_ALPHA, glcontext.ONE, glcontext.ONE, glcontext.ONE);
+            },
+        };
+
         const imports = {
             env: {
                 memory: memory,
@@ -95,10 +126,9 @@
                 webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
                     const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
                     const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
-                    
-                    var vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
-                    var fshader = glcontext.createShader(glcontext.FRAGMENT_SHADER);
-                    var program = glcontext.createProgram();
+                    const vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
+                    const fshader = glcontext.createShader(glcontext.FRAGMENT_SHADER);
+                    const program = glcontext.createProgram();
 
                     glcontext.shaderSource(vshader, vsstr);
                     glcontext.shaderSource(fshader, fsstr);
@@ -125,20 +155,22 @@
                             }
                             else {
                                 console.log("[WebGL link] " + glcontext.getProgramInfoLog(program));
+                                console.log(vsstr + "-----\n" + fsstr);
                             }
                         }
                         else {
                             console.log("[WebGL fs] " + glcontext.getShaderInfoLog(fshader));
+                            console.log(fsstr);
                         }
                     }
                     else {
                         console.log("[WebGL vs] " + glcontext.getShaderInfoLog(vshader));
+                        console.log(vsstr);
                     }
 
                     glcontext.deleteShader(vshader);
                     glcontext.deleteShader(fshader);
                     glcontext.deleteProgram(program);
-
                     return 0;
                 },
                 webgl_createData: function(layout, layoutLen, ptr, dataLen) {
@@ -156,18 +188,54 @@
                     const texture = glcontext.createTexture();
                     glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                     glcontext.texStorage2D(glcontext.TEXTURE_2D, mipCount, internal, w, h);
+
                     for (var i = 0; i < mipCount; i++) {
                         const mw = w >> i;
                         const mh = h >> i;
                         const mipData = new Uint8Array(memory.buffer, mipPtrs[i], mw * mh * size);
                         glcontext.texSubImage2D(glcontext.TEXTURE_2D, i, 0, 0, mw, mh, format, type, mipData);
                     }
+
                     gltextures[glTextureIDCounter] = texture;
                     return glTextureIDCounter++;
                 },
-                webgl_applyState: function(shaderID) {
-                    glcontext.clearColor(0.3, 0.3, 0.3, 1);
-                    glcontext.clear(glcontext.COLOR_BUFFER_BIT);
+                webgl_createTarget(format, internal, type, w, h, count, enableDepth, textures) {
+                    const texarray = new Uint32Array(memory.buffer, textures, count);
+                    const frameBuffer = glcontext.createFramebuffer();
+                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, frameBuffer);
+                    
+                    for (var i = 0; i < count; i++) {
+                        const texture = glcontext.createTexture();
+                        glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
+                        glcontext.texImage2D(glcontext.TEXTURE_2D, 0, internal, w, h, 0, format, type, null);
+                        glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0 + i, glcontext.TEXTURE_2D, texture, 0);
+                        gltextures[glTextureIDCounter] = texture;
+                        texarray[i] = glTextureIDCounter++;
+                    }
+                    if (enableDepth) {
+                        const depthBuffer = glcontext.createRenderbuffer();
+                        glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, depthBuffer);
+                        glcontext.renderbufferStorage(glcontext.RENDERBUFFER, glcontext.DEPTH_COMPONENT32F, w, h);
+                        glcontext.framebufferRenderbuffer(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.RENDERBUFFER, depthBuffer);
+                        glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, null);
+                    }
+                    if (glcontext.checkFramebufferStatus(glcontext.FRAMEBUFFER) != glcontext.FRAMEBUFFER_COMPLETE) {
+                        console.log("[WebGL] Framebuffer is not complete");
+                    }
+
+                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, null);
+                    glframebuffers[glFrameBufferIDCounter] = frameBuffer;
+                    return glFrameBufferIDCounter++;
+                },
+                webgl_applyState: function(shaderID, mask, r, g, b, a, d, ztype, btype) {
+                    if (mask) {
+                        glcontext.clearColor(r, g, b, a);
+                        glcontext.clearDepth(d);
+                        glcontext.clear(mask);
+                    }
+
+                    ztypes[ztype]();
+                    btypes[btype]();
 
                     const shader = glshaders[shaderID]
                     glcontext.useProgram(shader);
@@ -253,6 +321,7 @@
                 glbuffers[0] = glcontext.createBuffer();
                 glcontext.bindVertexArray(glcontext.createVertexArray());
                 glcontext.enableVertexAttribArray(0);
+                glcontext.depthFunc(glcontext.GREATER);
 
                 instance.exports.initialize();
 

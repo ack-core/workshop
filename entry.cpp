@@ -54,18 +54,49 @@ const char *testShaderSrc = R"(
     }
 )";
 
+const char *textureQuadShaderSrc = R"(
+    fixed {
+        p[4] : float4 =
+            [0.0, 0.0, 0.01, 1]
+            [0.0, 1.0, 0.01, 1]
+            [1.0, 0.0, 0.01, 1]
+            [1.0, 1.0, 0.01, 1]
+    }
+    inout {
+        coord : float2
+    }
+    vssrc {
+        float4 p = fixed_p[vertex_ID];
+        output_position = float4(p.xy * 0.6, p.zw);
+        output_coord = p.xy;
+    }
+    fssrc {
+        output_color[0] = _tex2d(0, input_coord);
+    }
+)";
+
+
 struct Vertex {
     math::vector4f camPosition;
     std::uint32_t color;
-};
-const Vertex points[] = {
+}
+points[] = {
     {{0.0, 0, 0.1, 1}, 0xff0000ff},
     {{0.5, 0, 0.1, 1}, 0xff00ff00}
 };
 
+std::uint32_t textureData[] = {
+    0xff00ffff, 0xff0000ff, 0xff0000ff, 0xff000000,
+    0xff0000ff, 0xff0000ff, 0xff000000, 0xff000000,
+    0xff0000ff, 0xff000000, 0xff0000ff, 0xff000000,
+    0xff000000, 0xff000000, 0xff000000, 0xff0000ff,
+};
+
 foundation::RenderShaderPtr axisShader;
 foundation::RenderShaderPtr testShader;
+foundation::RenderShaderPtr texQuadShader;
 foundation::RenderDataPtr testData;
+foundation::RenderTexturePtr texture;
 
 std::size_t pointerId = foundation::INVALID_POINTER_ID;
 math::vector2f lockedCoordinates;
@@ -122,6 +153,8 @@ extern "C" void initialize() {
         }
     );
     
+    texture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {textureData});
+    texQuadShader = rendering->createShader("texquad", textureQuadShaderSrc, {});
     axisShader = rendering->createShader("axis", axisShaderSrc, {});
     /*
     testShader = rendering->createShader("test", testShaderSrc, foundation::InputLayout {
@@ -140,8 +173,14 @@ extern "C" void initialize() {
         rendering->updateFrameConstants(view, proj, camPosition, (camTarget - camPosition));
         //rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
         rendering->applyState(axisShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
-        //rendering->applyShaderConstants(points);
         rendering->draw(6, foundation::RenderTopology::LINES);
+
+        rendering->applyState(texQuadShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        rendering->applyTextures({
+            {&texture, foundation::SamplerType::LINEAR}
+        });
+        //rendering->applyShaderConstants(points);
+        rendering->draw(4, foundation::RenderTopology::TRIANGLESTRIP);
         //rendering->draw(testData, foundation::RenderTopology::LINES);
 //        //platform->logMsg("-->> %d %d %f", (int)platform->getScreenWidth(), (int)platform->getScreenHeight(), dtSec);
 //

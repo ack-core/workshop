@@ -32,7 +32,7 @@ onmessage = (msg) => {
                 webgl_createProgram: (vsrc, vlen, fsrc, flen) => { throw "can't access webgl from background" },
                 webgl_createData: (ptr, len) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },
-                webgl_applyState: (shaderID) => { throw "can't access webgl from background" },
+                webgl_applyState: (shaderID, mask, r, g, b, a, d, ztype, btype) => { throw "can't access webgl from background" },
                 webgl_applyConstants: (index, ptr, len) => { throw "can't access webgl from background" },
                 webgl_applyTexture: (index, textureID, samplingType) => { throw "can't access webgl from background" },
                 webgl_bindBuffer: (bufferID) => { throw "can't access webgl from background" },

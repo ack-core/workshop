@@ -66,6 +66,7 @@ namespace {
                 target.destinationRGBBlendFactor = MTLBlendFactorOne;
                 break;
             }
+            /*
             case foundation::BlendType::AGREGATION:
             {
                 target.blendingEnabled = YES;
@@ -98,7 +99,7 @@ namespace {
                 target.destinationAlphaBlendFactor = MTLBlendFactorOne;
                 target.destinationRGBBlendFactor = MTLBlendFactorOne;
                 break;
-            }
+            }*/
             default:
             break;
         }
@@ -819,7 +820,7 @@ namespace foundation {
                 _constantsBufferOffset = 0;
             }
 
-            MTLClearColor clearColor = MTLClearColorMake(cfg.initialColor[0], cfg.initialColor[1], cfg.initialColor[2], cfg.initialColor[3]);
+            MTLClearColor clearColor = MTLClearColorMake(cfg.color[0], cfg.color[1], cfg.color[2], cfg.color[3]);
             MTLLoadAction loadAction = cfg.doClearColor ? MTLLoadActionClear : MTLLoadActionLoad;
             
             _currentPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -827,7 +828,7 @@ namespace foundation {
             _currentPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
             _currentPassDescriptor.colorAttachments[0].loadAction = loadAction;
             _currentPassDescriptor.colorAttachments[0].clearColor = clearColor;
-            _currentPassDescriptor.depthAttachment.clearDepth = cfg.initialDepth;
+            _currentPassDescriptor.depthAttachment.clearDepth = cfg.depth;
             _currentPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
             _currentPassDescriptor.depthAttachment.loadAction = cfg.doClearDepth ? MTLLoadActionClear : MTLLoadActionLoad;
             _currentPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
