@@ -27,30 +27,8 @@ const char *axisShaderSrc = R"(
         output_color = fixed_colors[vertex_ID / 2];
     }
     fssrc {
-        output_color[0] = input_color;
-    }
-)";
-
-
-const char *testShaderSrc = R"(
-    const {
-        p[2] : float4
-    }
-    fixed {
-        p[2] : float4 = [0, 0.0, 0.01, 0][0, 0.3, 0.01, 0]
-    }
-    inout {
-        color : float4
-    }
-    fndef getcolor(float3 rgb) -> float4 {
-        return float4(rgb, 1.0);
-    }
-    vssrc {
-        output_position = vertex_p + fixed_p[repeat_ID]; //const_p[vertex_ID]; //
-        output_color = getcolor(float3(1, 1, 1)) * vertex_c;
-    }
-    fssrc {
-        output_color[0] = input_color;
+        output_color[0] = float4(input_color.xyz * 0.5, 1.0);
+        output_color[1] = input_color;
     }
 )";
 
@@ -67,7 +45,7 @@ const char *textureQuadShaderSrc = R"(
     }
     vssrc {
         float4 p = fixed_p[vertex_ID];
-        output_position = float4(p.xy * 0.6, p.zw);
+        output_position = float4(p.xy * float2(0.6, -0.6), p.zw);
         output_coord = p.xy;
     }
     fssrc {
@@ -75,28 +53,18 @@ const char *textureQuadShaderSrc = R"(
     }
 )";
 
-
-struct Vertex {
-    math::vector4f camPosition;
-    std::uint32_t color;
-}
-points[] = {
-    {{0.0, 0, 0.1, 1}, 0xff0000ff},
-    {{0.5, 0, 0.1, 1}, 0xff00ff00}
-};
-
 std::uint32_t textureData[] = {
-    0xff00ffff, 0xff0000ff, 0xff0000ff, 0xff000000,
-    0xff0000ff, 0xff0000ff, 0xff000000, 0xff000000,
-    0xff0000ff, 0xff000000, 0xff0000ff, 0xff000000,
-    0xff000000, 0xff000000, 0xff000000, 0xff0000ff,
-};
+     0xff00ffff, 0xff0000ff, 0xff0000ff, 0xff000000,
+     0xff0000ff, 0xff0000ff, 0xff000000, 0xff000000,
+     0xff0000ff, 0xff000000, 0xff0000ff, 0xff000000,
+     0xff000000, 0xff000000, 0xff000000, 0xff0000ff,
+ };
 
 foundation::RenderShaderPtr axisShader;
-foundation::RenderShaderPtr testShader;
 foundation::RenderShaderPtr texQuadShader;
 foundation::RenderDataPtr testData;
 foundation::RenderTexturePtr texture;
+foundation::RenderTargetPtr target;
 
 std::size_t pointerId = foundation::INVALID_POINTER_ID;
 math::vector2f lockedCoordinates;
@@ -154,36 +122,24 @@ extern "C" void initialize() {
     );
     
     texture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, {textureData});
+    target = rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 2, 64, 64, true);
     texQuadShader = rendering->createShader("texquad", textureQuadShaderSrc, {});
     axisShader = rendering->createShader("axis", axisShaderSrc, {});
-    /*
-    testShader = rendering->createShader("test", testShaderSrc, foundation::InputLayout {
-        .vertexRepeat = 1,
-        .vertexAttributes = {
-            {"p", foundation::InputAttributeFormat::FLOAT4},
-            {"c", foundation::InputAttributeFormat::BYTE4_NRM}
-        }
-    });
-    testData = rendering->createData(points, testShader->getInputLayout().vertexAttributes, 2);
-    */
 
     setCameraLookAt(camPosition, camTarget);
     
     platform->setLoop([](float dtSec) {
         rendering->updateFrameConstants(view, proj, camPosition, (camTarget - camPosition));
-        //rendering->applyState(testShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
-        rendering->applyState(axisShader, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.2));
+        rendering->applyState(axisShader, foundation::RenderPassCommonConfigs::CLEAR(target, 0.4, 0.4, 0.4));
         rendering->draw(6, foundation::RenderTopology::LINES);
 
-        rendering->applyState(texQuadShader, foundation::RenderPassCommonConfigs::DEFAULT());
+        rendering->applyState(texQuadShader, foundation::RenderPassCommonConfigs::CLEAR(0.3, 0.2, 0.1));
         rendering->applyTextures({
-            {&texture, foundation::SamplerType::LINEAR}
+            //{&texture, foundation::SamplerType::LINEAR}
+            {&target->getTexture(1), foundation::SamplerType::LINEAR}
         });
-        //rendering->applyShaderConstants(points);
+
         rendering->draw(4, foundation::RenderTopology::TRIANGLESTRIP);
-        //rendering->draw(testData, foundation::RenderTopology::LINES);
-//        //platform->logMsg("-->> %d %d %f", (int)platform->getScreenWidth(), (int)platform->getScreenHeight(), dtSec);
-//
         rendering->presentFrame();
     });
     

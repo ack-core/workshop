@@ -8,6 +8,8 @@
 #include <memory>
 #include <vector>
 
+// TODO: 8 textures max
+
 namespace foundation {
     enum class RenderTopology : std::uint8_t {
         POINTS = 0,
@@ -42,7 +44,7 @@ namespace foundation {
         RG16F,                  // 32-bit float per component
         RG32F,                  // 32-bit float per component
         RGBA8UN,                // rgba 1 byte per channel normalized to [0..1]
-        RGBA16F,                // rgba 1 byte per channel normalized to [0..1]
+        RGBA16F,                // rgba 2 byte per channel normalized to [0..1]
         RGBA32F,                // 32-bit float per component
     };
     
@@ -141,11 +143,11 @@ namespace foundation {
                 ZBehaviorType::TEST_AND_WRITE, BlendType::DISABLED,
             };
         }
-        static const RenderPassConfig CLEAR(const RenderTargetPtr &rt, BlendType blendType, float r, float g, float b, float a = 1.0f, float d = 0.0f) {
+        static const RenderPassConfig CLEAR(const RenderTargetPtr &rt, float r, float g, float b, float a = 1.0f, float d = 0.0f) {
             return RenderPassConfig {
                 rt, true, rt->hasDepthBuffer(),
                 {r, g, b, a}, d,
-                rt->hasDepthBuffer() ? ZBehaviorType::TEST_AND_WRITE : ZBehaviorType::DISABLED, blendType,
+                rt->hasDepthBuffer() ? ZBehaviorType::TEST_AND_WRITE : ZBehaviorType::DISABLED, BlendType::DISABLED,
             };
         }
         static const RenderPassConfig OVERLAY(BlendType blendType) {

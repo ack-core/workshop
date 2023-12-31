@@ -2,33 +2,35 @@
 #include "rendering.h"
 #include <unordered_set>
 
+using WebGLId = std::uint32_t;
+
 namespace foundation {
     class WASMShader : public RenderShader {
     public:
-        WASMShader(const void *webglShader, InputLayout &&layout, std::uint32_t constBufferLength);
+        WASMShader(WebGLId shader, InputLayout &&layout, std::uint32_t constBufferLength);
         ~WASMShader() override;
         
         auto getInputLayout() const -> const InputLayout & override;
         auto getConstBufferLength() const -> std::uint32_t;
-        auto getWebGLShader() const -> const void *;
+        auto getWebGLShader() const -> WebGLId;
         
     private:
-        const void *_shader;
+        const WebGLId _shader;
         const std::uint32_t _constBufferLength;
         const InputLayout _inputLayout;
     };
     
     class WASMData : public RenderData {
     public:
-        WASMData(const void *webglData, std::uint32_t count, std::uint32_t stride);
+        WASMData(WebGLId data, std::uint32_t count, std::uint32_t stride);
         ~WASMData() override;
         
         auto getCount() const -> std::uint32_t override;
         auto getStride() const -> std::uint32_t override;
-        auto getWebGLData() const -> const void *;
+        auto getWebGLData() const -> WebGLId;
         
     private:
-        const void *_data;
+        const WebGLId _data;
         const std::uint32_t _stride;
         const std::uint32_t _count;
     };
@@ -36,23 +38,23 @@ namespace foundation {
     class WASMTexBase : public RenderTexture {
     public:
         ~WASMTexBase() override {}
-        virtual const void *getWebGLTexture() const = 0;
+        virtual WebGLId getWebGLTexture() const = 0;
     };
 
     class WASMTexture : public WASMTexBase {
     public:
-        WASMTexture(const void *webglTexture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        WASMTexture(WebGLId texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
         ~WASMTexture() override;
         
         auto getWidth() const -> std::uint32_t override;
         auto getHeight() const -> std::uint32_t override;
         auto getMipCount() const -> std::uint32_t override;
         auto getFormat() const -> RenderTextureFormat override;
-        auto getWebGLTexture() const -> const void * override;
+        auto getWebGLTexture() const -> WebGLId override;
         
     private:
         const RenderTextureFormat _format;
-        const void *_texture;
+        const WebGLId _texture;
         const std::uint32_t _width;
         const std::uint32_t _height;
         const std::uint32_t _mipCount;
@@ -62,20 +64,21 @@ namespace foundation {
     public:
         class RTTexture : public WASMTexBase {
         public:
-            RTTexture(const WASMTarget &target) : _target(target) {}
+            RTTexture(const WASMTarget &target, WebGLId texture) : _target(target), _texture(texture) {}
             ~RTTexture() override {}
             
             auto getWidth() const -> std::uint32_t override { return _target._width; }
             auto getHeight() const -> std::uint32_t override { return _target._height; }
             auto getMipCount() const -> std::uint32_t override { return 1; }
             auto getFormat() const -> RenderTextureFormat override { return _target._format; }
-            auto getWebGLTexture() const -> const void * override;
+            auto getWebGLTexture() const -> WebGLId override { return _texture; }
             
         private:
             const WASMTarget &_target;
+            const WebGLId _texture;
         };
 
-        WASMTarget(const void * const *targets, unsigned count, const void *depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h);
+        WASMTarget(WebGLId target, const WebGLId *textures, unsigned count, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, bool hasDepth);
         ~WASMTarget() override;
         
         auto getWidth() const -> std::uint32_t override;
@@ -83,14 +86,16 @@ namespace foundation {
         auto getFormat() const -> RenderTextureFormat override;
         auto getTextureCount() const -> std::uint32_t override;
         auto getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & override;
+        auto getWebGLTarget() const -> WebGLId;
         bool hasDepthBuffer() const override;
         
     private:
         const RenderTextureFormat _format;
         const unsigned _count;
-        const void *_depth;
+        const WebGLId _target;
         const std::uint32_t _width;
         const std::uint32_t _height;
+        const bool _hasDepth;
 
         std::shared_ptr<RenderTexture> _textures[RenderTarget::MAX_TEXTURE_COUNT] = {nullptr};
     };

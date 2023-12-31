@@ -215,7 +215,7 @@ namespace util {
                 const char *cur = target._current;
                 
                 while (stream.isError() == false && *cur != 0) {
-                    char ch = stream.peekChar();
+                    (void)stream.peekChar();
                     stream.peekChar() == *cur++ ? (void)stream.getChar() : stream.setError();
                 }
                 
@@ -233,7 +233,7 @@ namespace util {
                 stream.peekChar() == target._opening ? (void)stream.getChar() : stream.setError();
                 
                 while (stream.isError() == false) {
-                    char ch = stream.peekChar();
+                    (void)stream.peekChar();
                     if (stream.peekChar() == target._closing) {
                         if (--counter == 0) {
                             stream.getChar();

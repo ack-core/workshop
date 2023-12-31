@@ -16,6 +16,9 @@ namespace {
     std::size_t g_currentMemoryPages = __builtin_wasm_memory_size(0);
     std::size_t g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
     std::atomic<bool> g_memoryLock {false};
+    
+    std::uint32_t g_width;
+    std::uint32_t g_height;
 }
 
 // These function shouldn't be called
@@ -34,8 +37,6 @@ extern "C" {
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
-    auto js_canvas_width() -> float;
-    auto js_canvas_height() -> float;
 }
 
 // Missing part of runtime
@@ -305,10 +306,10 @@ namespace foundation {
     }
     
     float WASMPlatform::getScreenWidth() const {
-        return js_canvas_width();
+        return g_width;
     }
     float WASMPlatform::getScreenHeight() const {
-        return js_canvas_height();
+        return g_height;
     }
     
     void *WASMPlatform::attachNativeRenderingContext(void *context) {
@@ -390,7 +391,10 @@ extern "C" {
             g_updateAndDraw(dt);
         }
     }
-    
+    void resized(std::uint32_t w, std::uint32_t h) {
+        g_width = w;
+        g_height = h;
+    }
     void fileLoaded(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         cbtype *cb = reinterpret_cast<cbtype *>(block + pathLen);
@@ -398,16 +402,13 @@ extern "C" {
         cb->~cbtype();
         ::free(block);
     }
-    
     void taskExecute(foundation::AsyncTask *ptr) {
         ptr->executeInBackground();
     }
-    
     void taskComplete(foundation::AsyncTask *ptr) {
         ptr->executeInMainThread();
         delete ptr;
     }
-    
     void pointerEvent(foundation::PlatformPointerEventArgs::EventType type, std::uint32_t id, float x, float y) {
         if (auto p = g_instance.lock()) {
             foundation::PlatformPointerEventArgs args = {
@@ -416,7 +417,6 @@ extern "C" {
                 .coordinateX = x,
                 .coordinateY = y
             };
-            
             for (auto &index : g_pointerHandlers) {
                 if (index.handler(args)) {
                     break;

@@ -53,7 +53,7 @@
         var glcontext = canvas.getContext("webgl2", { antialias: false });        
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
-        var shaderVertexCountLocation = null;
+        var uniformVertexCountLocation = null;
         
         const ztypes = {
             0: function() {
@@ -118,8 +118,6 @@
                         instance.exports.fileLoaded(block, pathLen, 0, 0);
                     });
                 },
-                js_canvas_width: () => targetWidth,
-                js_canvas_height: () => targetHeight,
                 abort: function() {
                     throw "aborted";
                 },
@@ -147,6 +145,10 @@
                             if (cIndex != 0xFFFFFFFF) {
                                 glcontext.uniformBlockBinding(program, glcontext.getUniformBlockIndex(program, "_Constants"), DRAW_CONST_BINDING_INDEX);
                             }
+                    
+                            program.uniformVertexCountLocation = glcontext.getUniformLocation(program, "_vertex_count");
+                            program.uniformVerticalFlipLocation = glcontext.getUniformLocation(program, "_vertical_flip");
+
                             if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
                                 glcontext.deleteShader(vshader);
                                 glcontext.deleteShader(fshader);
@@ -202,8 +204,9 @@
                 webgl_createTarget(format, internal, type, w, h, count, enableDepth, textures) {
                     const texarray = new Uint32Array(memory.buffer, textures, count);
                     const frameBuffer = glcontext.createFramebuffer();
+                    const attachments = [];
                     glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, frameBuffer);
-                    
+
                     for (var i = 0; i < count; i++) {
                         const texture = glcontext.createTexture();
                         glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
@@ -211,6 +214,7 @@
                         glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0 + i, glcontext.TEXTURE_2D, texture, 0);
                         gltextures[glTextureIDCounter] = texture;
                         texarray[i] = glTextureIDCounter++;
+                        attachments[i] = glcontext.COLOR_ATTACHMENT0 + i;
                     }
                     if (enableDepth) {
                         const depthBuffer = glcontext.createRenderbuffer();
@@ -223,11 +227,17 @@
                         console.log("[WebGL] Framebuffer is not complete");
                     }
 
+                    glcontext.drawBuffers(attachments);                    
                     glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, null);
                     glframebuffers[glFrameBufferIDCounter] = frameBuffer;
                     return glFrameBufferIDCounter++;
                 },
-                webgl_applyState: function(shaderID, mask, r, g, b, a, d, ztype, btype) {
+                webgl_viewPort(w, h) {
+                    glcontext.viewport(0, 0, w, h);
+                },
+                webgl_applyState: function(frameBufferID, shaderID, mask, r, g, b, a, d, ztype, btype) {
+                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, glframebuffers[frameBufferID]);
+
                     if (mask) {
                         glcontext.clearColor(r, g, b, a);
                         glcontext.clearDepth(d);
@@ -239,7 +249,8 @@
 
                     const shader = glshaders[shaderID]
                     glcontext.useProgram(shader);
-                    shaderVertexCountLocation = glcontext.getUniformLocation(shader, "_vertex_count");
+                    uniformVertexCountLocation = shader.uniformVertexCountLocation;
+                    glcontext.uniform1f(shader.uniformVerticalFlipLocation, frameBufferID ? -1.0 : 1.0);
                 },
                 webgl_applyConstants: function(index, ptr, len) {
                     const u8mem = new Uint8Array(memory.buffer, ptr, len);
@@ -263,11 +274,11 @@
                     glcontext.vertexAttribDivisor(index, divisor);
                 },
                 webgl_draw: function(vertexCount, topology) {
-                    glcontext.uniform1i(shaderVertexCountLocation, vertexCount);
+                    glcontext.uniform1i(uniformVertexCountLocation, vertexCount);
                     glcontext.drawArrays(topology, 0, vertexCount);
                 },
                 webgl_drawInstanced: function(vertexCount, instanceCount, topology) {
-                    glcontext.uniform1i(shaderVertexCountLocation, vertexCount);
+                    glcontext.uniform1i(uniformVertexCountLocation, vertexCount);
                     glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
                 }
             }
@@ -289,6 +300,7 @@
                     targetHeight = window.devicePixelRatio * canvas.scrollHeight;
                     canvas.width = targetWidth;
                     canvas.height = targetHeight;
+                    instance.exports.resized(targetWidth, targetHeight);
                 });
             });
         }
@@ -299,8 +311,14 @@
         worker.onmessage = (msg) => {
             if (msg.data.type == EventType.READY) {
                 console.log("[PLATFORM] Background Thread started");
+
                 canvas.width = targetWidth;
                 canvas.height = targetHeight;
+                instance.exports.resized(targetWidth, targetHeight);
+                
+                if (glcontext.getExtension("EXT_color_buffer_float") == null) {
+                    throw "float textures aren't supported"
+                }
 
                 glsamplers[0] = glcontext.createSampler();
                 glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MIN_FILTER, glcontext.NEAREST);
@@ -318,11 +336,12 @@
                     shaderConstantBuffers[i] = glcontext.createBuffer();
                 }
                 
+                glframebuffers[0] = null;
                 glbuffers[0] = glcontext.createBuffer();
                 glcontext.bindVertexArray(glcontext.createVertexArray());
                 glcontext.enableVertexAttribArray(0);
                 glcontext.depthFunc(glcontext.GREATER);
-
+                        
                 instance.exports.initialize();
 
                 function getCoord(event) {

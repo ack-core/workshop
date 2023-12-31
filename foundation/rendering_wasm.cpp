@@ -11,14 +11,15 @@
 
 // From js
 extern "C" {
-    auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> void *;
-    auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen) -> void *;
-    auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> void *;
-    auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, const void **textures) -> void *;
-    void webgl_applyState(const void *webglShader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
+    auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> WebGLId;
+    auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen) -> WebGLId;
+    auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
+    auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
+    void webgl_viewPort(std::uint32_t w, std::uint32_t h);
+    void webgl_applyState(WebGLId target, WebGLId shader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
-    void webgl_applyTexture(std::uint32_t index, const void *webglTexture, int samplingType);
-    void webgl_bindBuffer(const void *webglData);
+    void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
+    void webgl_bindBuffer(WebGLId data);
     void webgl_vertexAttribute(std::size_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset, std::uint32_t divisor);
     void webgl_draw(std::uint32_t vertexCount, GLenum topology);
     void webgl_drawInstanced(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
@@ -94,12 +95,11 @@ namespace {
         {GL_RGBA,  GL_RGBA16F, GL_HALF_FLOAT, 8},
         {GL_RGBA,  GL_RGBA32F, GL_FLOAT, 16},
     };
-
 }
 
 namespace foundation {
-    WASMShader::WASMShader(const void *webglShader, InputLayout &&layout, std::uint32_t constBufferLength)
-        : _shader(webglShader)
+    WASMShader::WASMShader(WebGLId shader, InputLayout &&layout, std::uint32_t constBufferLength)
+        : _shader(shader)
         , _constBufferLength(constBufferLength)
         , _inputLayout(std::move(layout))
     {
@@ -112,14 +112,14 @@ namespace foundation {
     std::uint32_t WASMShader::getConstBufferLength() const {
         return _constBufferLength;
     }
-    const void *WASMShader::getWebGLShader() const {
+    WebGLId WASMShader::getWebGLShader() const {
         return _shader;
     }
 }
 
 namespace foundation {
-    WASMData::WASMData(const void *webglData, std::uint32_t count, std::uint32_t stride)
-        : _data(webglData)
+    WASMData::WASMData(WebGLId data, std::uint32_t count, std::uint32_t stride)
+        : _data(data)
         , _count(count)
         , _stride(stride)
     {
@@ -133,14 +133,14 @@ namespace foundation {
     std::uint32_t WASMData::getStride() const {
         return _stride;
     }
-    const void *WASMData::getWebGLData() const {
+    WebGLId WASMData::getWebGLData() const {
         return _data;
     }
 }
 
 namespace foundation {
-    WASMTexture::WASMTexture(const void *webglTexture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
-        : _texture(webglTexture)
+    WASMTexture::WASMTexture(WebGLId texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+        : _texture(texture)
         , _format(fmt)
         , _width(w)
         , _height(h)
@@ -162,19 +162,23 @@ namespace foundation {
     RenderTextureFormat WASMTexture::getFormat() const {
         return _format;
     }
-    const void *WASMTexture::getWebGLTexture() const {
+    WebGLId WASMTexture::getWebGLTexture() const {
         return _texture;
     }
 }
 
 namespace foundation {
-    WASMTarget::WASMTarget(const void * const *targets, unsigned count, const void *depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h)
-        : _format(fmt)
+    WASMTarget::WASMTarget(WebGLId target, const WebGLId *textures, unsigned count, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, bool hasDepth)
+        : _target(target)
+        , _format(fmt)
         , _count(count)
-        , _depth(depth)
         , _width(w)
         , _height(h)
+        , _hasDepth(hasDepth)
     {
+        for (unsigned i = 0; i < count; i++) {
+            _textures[i] = std::make_shared<RTTexture>(*this, textures[i]);
+        }
     }
     WASMTarget::~WASMTarget() {
         
@@ -194,8 +198,11 @@ namespace foundation {
     const std::shared_ptr<RenderTexture> &WASMTarget::getTexture(unsigned index) const {
         return _textures[index];
     }
+    WebGLId WASMTarget::getWebGLTarget() const {
+        return _target;
+    }
     bool WASMTarget::hasDepthBuffer() const {
-        return _depth != nullptr;
+        return _hasDepth;
     }
 }
 
@@ -501,7 +508,8 @@ namespace foundation {
                     shaderVS += "layout(location = " + std::to_string(layout.vertexAttributes.size() + i) +  ") in " + type + " instance_" + std::string(attribute.name) + ";\n";
                 }
                 shaderVS += "\n";
-                shaderVS += "uniform int _vertex_count;\n\n";
+                shaderVS += "uniform int _vertex_count;\n";
+                shaderVS += "uniform float _vertical_flip;\n\n";
                 
                 shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
                 shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
@@ -522,6 +530,7 @@ namespace foundation {
                 }
 
                 shaderVS += codeBlock;
+                shaderVS += "    gl_Position.y *= _vertical_flip;\n";
                 shaderVS += "}\n\n";
                   
                 shaderVS = shaderUtils::makeLines(shaderVS);
@@ -576,7 +585,7 @@ namespace foundation {
         }
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
-            void *webglShader = webgl_createProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
+            WebGLId webglShader = webgl_createProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
             layout.vertexRepeat = std::max(layout.vertexRepeat, std::uint32_t(1));
             result = std::make_shared<WASMShader>(webglShader, std::move(layout), constBlockLength);
             delete [] nativeShaderVS.src;
@@ -611,7 +620,7 @@ namespace foundation {
                 offset += miplen;
             }
             
-            const void *webglTexture = webgl_createTexture(fmt.format, fmt.internal, fmt.type, fmt.size, w, h, mptrs, mipsData.size());
+            WebGLId webglTexture = webgl_createTexture(fmt.format, fmt.internal, fmt.type, fmt.size, w, h, mptrs, mipsData.size());
             result = std::make_shared<WASMTexture>(webglTexture, format, w, h, mipsData.size());
         }
         
@@ -619,7 +628,16 @@ namespace foundation {
     }
     
     RenderTargetPtr WASMRendering::createRenderTarget(RenderTextureFormat format, unsigned count, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
-        return nullptr;
+        RenderTargetPtr result = nullptr;
+        
+        if (count && w && h) {
+            const NativeTextureFormat &fmt = g_textureFormatTable[int(format)];
+            WebGLId *textureIds = reinterpret_cast<WebGLId *>(_getUploadBuffer(sizeof(WebGLId) * count));
+            WebGLId webglTarget = webgl_createTarget(fmt.format, fmt.internal, fmt.type, w, h, count, withZBuffer, textureIds);
+            result = std::make_shared<WASMTarget>(webglTarget, textureIds, count, format, w, h, withZBuffer);
+        }
+        
+        return result;
     }
     
     RenderDataPtr WASMRendering::createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) {
@@ -637,7 +655,7 @@ namespace foundation {
             }
             
             memcpy(memory + layout.size(), data, stride * count);
-            const void *webglData = webgl_createData(memory, layout.size(), memory + layout.size(), count * stride);
+            WebGLId webglData = webgl_createData(memory, layout.size(), memory + layout.size(), count * stride);
             result = std::make_shared<WASMData>(webglData, count, stride);
         }
         
@@ -653,11 +671,28 @@ namespace foundation {
     }
     
     void WASMRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
-        GLenum cmask = (cfg.doClearColor ? GL_COLOR_BUFFER_BIT : 0) | (cfg.doClearDepth ? GL_DEPTH_BUFFER_BIT : 0);
-        _currentShader = std::static_pointer_cast<WASMShader>(shader);
-        std::uint32_t ztype = std::uint32_t(cfg.zBehaviorType);
-        std::uint32_t btype = std::uint32_t(cfg.blendType);
-        webgl_applyState(_currentShader->getWebGLShader(), cmask, cfg.color[0], cfg.color[1], cfg.color[2], cfg.color[3], cfg.depth, ztype, btype);
+        if (shader) {
+            GLenum cmask = (cfg.doClearColor ? GL_COLOR_BUFFER_BIT : 0) | (cfg.doClearDepth ? GL_DEPTH_BUFFER_BIT : 0);
+            const WASMTarget *platformTarget = static_cast<const WASMTarget *>(cfg.target.get());
+            WebGLId glTarget = 0;
+            
+            if (platformTarget) {
+                webgl_viewPort(platformTarget->getWidth(), platformTarget->getHeight());
+                glTarget = platformTarget->getWebGLTarget();
+            }
+            else {
+                webgl_viewPort(_platform->getScreenWidth(), _platform->getScreenHeight());
+            }
+            
+            _currentShader = std::static_pointer_cast<WASMShader>(shader);
+            std::uint32_t ztype = std::uint32_t(cfg.zBehaviorType);
+            std::uint32_t btype = std::uint32_t(cfg.blendType);
+            
+            webgl_applyState(glTarget, _currentShader->getWebGLShader(), cmask, cfg.color[0], cfg.color[1], cfg.color[2], cfg.color[3], cfg.depth, ztype, btype);
+        }
+        else {
+            _platform->logError("[MetalRendering::applyState] shader is null\n");
+        }
     }
     
     void WASMRendering::applyShaderConstants(const void *constants) {
@@ -680,7 +715,7 @@ namespace foundation {
     }
     
     void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
-        webgl_bindBuffer(nullptr);
+        webgl_bindBuffer(0);
         webgl_vertexAttribute(0, 4, GL_FLOAT, GL_FALSE, 0, 0, 0);
         webgl_draw(vertexCount, g_topologies[int(topology)]);
     }
