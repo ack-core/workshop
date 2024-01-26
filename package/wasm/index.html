@@ -1,23 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>ack-core demo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, viewport-fit=cover, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-title" content="ack-core-demo" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes">
     <link rel="icon" href="data:;base64,=">
     <style>
-    .fullscreen {
-        top: 5px;
-        margin-left: auto;
-        margin-right: auto;
-        border: 0;
-        width: 99%;
-        height: height * 1.777;
-        overflow: hidden;
-        display: block;
-    }
+        html, body {
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        .rt {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+
+        @media screen and (orientation:portrait) {
+            .rt {
+                visibility: hidden;
+            }
+        }
+        @media screen and (orientation:landscape) {
+            html, body {
+                position: fixed;
+            }
+            .output {
+                display: none;
+            }
+        }
+
     </style>
 </head>
 <body>
-    <canvas class="fullscreen" id="render_target" oncontextmenu="event.preventDefault()"></canvas>
+    <div class="output" id="output"></div>
+    <canvas class="rt" id="render_target"></canvas>
     <script type='text/javascript'>
+        const output = document.getElementById("output");
+        function print(...a) {
+            output.innerHTML += a.join(" ") + "<br>";
+            console.log(...a);
+        }
+
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("serviceworker.js").then(
+                (registration) => {
+                    print("Custom header service worker registered: ", registration.scope);
+                },
+                (error) => {
+                    throw "Custom header service worker failed to register: " + error;
+                }
+            );
+            navigator.serviceWorker.ready.then(
+                (registration) => {
+                    if (registration.active && !navigator.serviceWorker.controller) {
+                        window.location.reload();
+                    }
+                }
+            );
+        } 
+        else {
+            throw "Service workers are not supported";
+        }
+
+        if (!crossOriginIsolated) {
+            print("[PLATFORM] Page is not cross-origin isolated");
+        }
+
         const BUFFERS_REUSE_MAX = 256;
         const FRAME_CONST_BINDING_INDEX = 0;
         const DRAW_CONST_BINDING_INDEX = 1;
@@ -50,10 +108,11 @@
         var gltextures = {};
         var glsamplers = {};
         var glframebuffers = {};
-        var glcontext = canvas.getContext("webgl2", { antialias: false });        
+        var glcontext = canvas.getContext("webgl2", { antialias: false });
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
         var uniformVertexCountLocation = null;
+        var resizeTimeoutHandler = null;
         
         const ztypes = {
             0: function() {
@@ -93,7 +152,7 @@
                 js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
                 js_log: function(str, len) {
                     const u16str = new Uint16Array(memory.buffer, str, len);
-                    console.log(String.fromCharCode(...u16str));
+                    print(String.fromCharCode(...u16str));
                 },
                 js_task: function(task) {
                     worker.postMessage({type: EventType.BTASK, task});
@@ -108,13 +167,13 @@
                         }
                         throw response.status + " " + response.statusText;
                     }).then(buffer => {
-                        console.log(path + " loaded successfully");
+                        print(path + " loaded successfully");
                         const data = instance.exports.__wrap_malloc(buffer.byteLength);
                         const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                         u8data.set(new Uint8Array(buffer));
                         instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
                     }).catch(error => {
-                        console.log(path + " loading failed with " + error);
+                        print(path + " loading failed with " + error);
                         instance.exports.fileLoaded(block, pathLen, 0, 0);
                     });
                 },
@@ -156,18 +215,18 @@
                                 return glShaderIDCounter++;
                             }
                             else {
-                                console.log("[WebGL link] " + glcontext.getProgramInfoLog(program));
-                                console.log(vsstr + "-----\n" + fsstr);
+                                print("[WebGL link] " + glcontext.getProgramInfoLog(program));
+                                print(vsstr + "-----\n" + fsstr);
                             }
                         }
                         else {
-                            console.log("[WebGL fs] " + glcontext.getShaderInfoLog(fshader));
-                            console.log(fsstr);
+                            print("[WebGL fs] " + glcontext.getShaderInfoLog(fshader));
+                            print(fsstr);
                         }
                     }
                     else {
-                        console.log("[WebGL vs] " + glcontext.getShaderInfoLog(vshader));
-                        console.log(vsstr);
+                        print("[WebGL vs] " + glcontext.getShaderInfoLog(vshader));
+                        print(vsstr);
                     }
 
                     glcontext.deleteShader(vshader);
@@ -224,7 +283,8 @@
                         glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, null);
                     }
                     if (glcontext.checkFramebufferStatus(glcontext.FRAMEBUFFER) != glcontext.FRAMEBUFFER_COMPLETE) {
-                        console.log("[WebGL] Framebuffer is not complete");
+                        print("[WebGL] Framebuffer is not complete");
+                        return 0;
                     }
 
                     glcontext.drawBuffers(attachments);                    
@@ -284,7 +344,7 @@
             }
         };
 
-        if (glcontext != null) {
+        if (navigator.serviceWorker.controller != null && glcontext != null) {
             WebAssembly.instantiateStreaming(fetch('workshop.wasm'), imports).then(m => {
                 instance = m.instance;
 
@@ -293,31 +353,26 @@
                 }
 
                 const module = m.module;
-                worker.postMessage({type: EventType.INIT, module, memory});
-
-                window.addEventListener("resize", () => {
-                    targetWidth = window.devicePixelRatio * canvas.scrollWidth;
-                    targetHeight = window.devicePixelRatio * canvas.scrollHeight;
-                    canvas.width = targetWidth;
-                    canvas.height = targetHeight;
-                    instance.exports.resized(targetWidth, targetHeight);
-                });
+                worker.postMessage({type: EventType.INIT, module, memory}); //
             });
         }
         else {
-            console.log("Failed to create GL Context");
+            throw "[WebGL] Failed to initialize";
         }
 
         worker.onmessage = (msg) => {
             if (msg.data.type == EventType.READY) {
-                console.log("[PLATFORM] Background Thread started");
+                print("[PLATFORM] Background Thread started");
 
                 canvas.width = targetWidth;
                 canvas.height = targetHeight;
                 instance.exports.resized(targetWidth, targetHeight);
                 
+                if (glcontext.getParameter(glcontext.MAX_COLOR_ATTACHMENTS) < 4) {
+                    throw "[WebGL] Max fb attachment count is too low"
+                }
                 if (glcontext.getExtension("EXT_color_buffer_float") == null) {
-                    throw "float textures aren't supported"
+                    throw "[WebGL] Float textures aren't supported"
                 }
 
                 glsamplers[0] = glcontext.createSampler();
@@ -366,33 +421,63 @@
                     prevFrameTimeStamp = timestamp;
                     window.requestAnimationFrame(onFrame);
                 });
-                window.addEventListener("pointerdown", (event) => {
+                canvas.addEventListener("pointerdown", (event) => {
                     [x, y] = getCoord(event);
                     if (x >= 0 && y >= 0 && x <= targetWidth && y <= targetHeight) {
                         activePointerIDs[event.pointerId] = true;
                         instance.exports.pointerEvent(POINTER_DOWN, event.pointerId, x, y);
+                        event.preventDefault();
                     }
                 });
-                window.addEventListener("pointermove", (event) => {
+                canvas.addEventListener("pointermove", (event) => {
                     if (activePointerIDs[event.pointerId]) {
                         [x, y] = getCoord(event);
                         instance.exports.pointerEvent(POINTER_MOVE, event.pointerId, x, y);
+                        event.preventDefault();
                     }
                 });
-                window.addEventListener("pointerup", (event) => {
+                canvas.addEventListener("pointerup", (event) => {
                     if (activePointerIDs[event.pointerId]) {
                         delete activePointerIDs[event.pointerId];
                         [x, y] = getCoord(event);
                         instance.exports.pointerEvent(POINTER_UP, event.pointerId, x, y);
+                        event.preventDefault();
                     }
                 });
-                window.addEventListener("pointercancel", (event) => {
+                canvas.addEventListener("pointercancel", (event) => {
                     if (activePointerIDs[event.pointerId]) {
                         delete activePointerIDs[event.pointerId];
                         [x, y] = getCoord(event);
                         instance.exports.pointerEvent(POINTER_CANCEL, event.pointerId, x, y);
+                        event.preventDefault();
                     }
-                });                
+                });
+                
+                window.addEventListener("resize", (event) => {
+                    clearTimeout(resizeTimeoutHandler);
+                    resizeTimeoutHandler = setTimeout(() => {
+                        const w = window.devicePixelRatio * canvas.scrollWidth;
+                        const h = window.devicePixelRatio * canvas.scrollHeight;
+                        
+                        if (w > h) {
+                            if (w != targetWidth || h != targetHeight) {
+                                targetWidth = canvas.width = w;
+                                targetHeight = canvas.height = h;
+                                instance.exports.resized(targetWidth, targetHeight);
+                                print("[PLATFORM] Resized to " + targetWidth + " " + targetHeight);
+                            }
+                        }
+                    }, 300);
+                });
+
+                window.addEventListener("contextmenu", (event) => {
+                    event.preventDefault();
+                    return false;
+                });
+                window.addEventListener("touchend", (event) => {
+                    event.preventDefault();
+                    return false;
+                });
             }
             if (msg.data.type == EventType.FTASK) {
                 instance.exports.taskComplete(msg.data.task);
