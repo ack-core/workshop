@@ -100,7 +100,7 @@ namespace foundation {
 
     class MetalData : public RenderData {
     public:
-        MetalData(id<MTLBuffer> buffer, std::uint32_t stride);
+        MetalData(id<MTLBuffer> buffer, std::uint32_t count, std::uint32_t stride);
         ~MetalData() override;
         
         std::uint32_t getCount() const override;

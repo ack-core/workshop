@@ -20,9 +20,13 @@ extern "C" {
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
     void webgl_bindBuffer(WebGLId data);
-    void webgl_vertexAttribute(std::size_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset, std::uint32_t divisor);
-    void webgl_draw(std::uint32_t vertexCount, GLenum topology);
+    //void webgl_inputAttribute(std::size_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset, std::uint32_t divisor);
+    void webgl_enableAttributes(std::uint32_t count);
+    void webgl_inputAttributePtr(std::uint32_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset);
+    void webgl_inputAttributeDiv(std::uint32_t index, std::uint32_t divisor);
+    void webgl_drawSingle(std::uint32_t vertexCount, GLenum topology);
     void webgl_drawInstanced(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_drawInstanceIndex(std::uint32_t repeatCount, std::uint32_t vertexCount, std::uint32_t instanceIndex, GLenum topology);
 }
 
 namespace {
@@ -222,7 +226,6 @@ namespace foundation {
         _frameConstants->projMatrix = proj;
         _frameConstants->cameraPosition.xyz = camPos;
         _frameConstants->cameraDirection.xyz = camDir;
-        webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants, sizeof(FrameConstants));
     }
     
     math::vector2f WASMRendering::getScreenCoordinates(const math::vector3f &worldPosition) {
@@ -480,13 +483,6 @@ namespace foundation {
             if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
                 std::string shaderVS = shaderDefines;
                 
-                if (layout.vertexRepeat > 1) {
-                    shaderVS += "#define repeat_ID gl_VertexID\n";
-                }
-                else {
-                    shaderVS += "#define repeat_ID 0\n#define vertex_ID gl_VertexID\n#define instance_ID gl_InstanceID\n";
-                }
-                
                 shaderVS += "#define output_position gl_Position\n\n";
                 shaderVS = shaderVS + shaderFixed + shaderFunctions + shaderVSOutput;
                 std::string codeBlock;
@@ -507,9 +503,22 @@ namespace foundation {
                     const std::string type = std::string(g_formatConversionTable[int(attribute.format)].nativeTypeName);
                     shaderVS += "layout(location = " + std::to_string(layout.vertexAttributes.size() + i) +  ") in " + type + " instance_" + std::string(attribute.name) + ";\n";
                 }
+                
                 shaderVS += "\n";
-                shaderVS += "uniform int _vertex_count;\n";
-                shaderVS += "uniform float _vertical_flip;\n\n";
+                shaderVS += "uniform float _vertical_flip;\n";
+                
+                if (layout.vertexRepeat > 1) {
+                    if (layout.instanceAttributes.size()) {
+                        shaderVS += "uniform int _instance_index;\n";
+                        shaderVS += "\n#define repeat_ID gl_VertexID\n#define vertex_ID gl_InstanceID\n#define instance_ID _instance_index\n";
+                    }
+                    else {
+                        shaderVS += "\n#define repeat_ID gl_VertexID\n#define vertex_ID gl_InstanceID\n#define instance_ID 0\n";
+                    }
+                }
+                else {
+                    shaderVS += "\n#define repeat_ID 0\n#define vertex_ID gl_VertexID\n#define instance_ID gl_InstanceID\n";
+                }
                 
                 shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
                 shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
@@ -517,22 +526,16 @@ namespace foundation {
                 shaderUtils::replace(codeBlock, "float1", "float", SEPARATORS, SEPARATORS);
                 shaderUtils::replace(codeBlock, "int1", "int", SEPARATORS, SEPARATORS);
                 shaderUtils::replace(codeBlock, "uint1", "uint", SEPARATORS, SEPARATORS);
-
+                
                 shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "output_", "passing.", SEPARATORS, {"output_position"});
-
-                shaderVS += "void main() {\n";
-
-                if (layout.vertexRepeat > 1) {
-                    shaderVS += "    int vertex_ID = gl_InstanceID % _vertex_count;\n";
-                    shaderVS += "    int instance_ID = gl_InstanceID / _vertex_count;\n";
-                }
-
+                
+                shaderVS += "\nvoid main() {\n";
                 shaderVS += codeBlock;
                 shaderVS += "    gl_Position.y *= _vertical_flip;\n";
                 shaderVS += "}\n\n";
-                  
+                
                 shaderVS = shaderUtils::makeLines(shaderVS);
                 nativeShaderVS = createNativeSrc(shaderVS);
                 //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
@@ -549,7 +552,7 @@ namespace foundation {
                 
                 std::string shaderFS = shaderDefines + shaderFixed + shaderFunctions + shaderFSInput;
                 std::string codeBlock;
-
+                
                 if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
                     _platform->logError("[WASMRendering::createShader] shader '%s' has uncompleted 'fssrc' block\n", name);
                     completed = false;
@@ -585,8 +588,8 @@ namespace foundation {
         }
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
-            WebGLId webglShader = webgl_createProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
             layout.vertexRepeat = std::max(layout.vertexRepeat, std::uint32_t(1));
+            WebGLId webglShader = webgl_createProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
             result = std::make_shared<WASMShader>(webglShader, std::move(layout), constBlockLength);
             delete [] nativeShaderVS.src;
             delete [] nativeShaderFS.src;
@@ -672,7 +675,9 @@ namespace foundation {
     
     void WASMRendering::applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) {
         if (shader) {
-            GLenum cmask = (cfg.doClearColor ? GL_COLOR_BUFFER_BIT : 0) | (cfg.doClearDepth ? GL_DEPTH_BUFFER_BIT : 0);
+            webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants, sizeof(FrameConstants));
+            
+            const GLenum cmask = (cfg.doClearColor ? GL_COLOR_BUFFER_BIT : 0) | (cfg.doClearDepth ? GL_DEPTH_BUFFER_BIT : 0);
             const WASMTarget *platformTarget = static_cast<const WASMTarget *>(cfg.target.get());
             WebGLId glTarget = 0;
             
@@ -685,8 +690,8 @@ namespace foundation {
             }
             
             _currentShader = std::static_pointer_cast<WASMShader>(shader);
-            std::uint32_t ztype = std::uint32_t(cfg.zBehaviorType);
-            std::uint32_t btype = std::uint32_t(cfg.blendType);
+            const std::uint32_t ztype = std::uint32_t(cfg.zBehaviorType);
+            const std::uint32_t btype = std::uint32_t(cfg.blendType);
             
             webgl_applyState(glTarget, _currentShader->getWebGLShader(), cmask, cfg.color[0], cfg.color[1], cfg.color[2], cfg.color[3], cfg.depth, ztype, btype);
         }
@@ -715,22 +720,27 @@ namespace foundation {
     }
     
     void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
+        webgl_enableAttributes(0);
         webgl_bindBuffer(0);
-        webgl_vertexAttribute(0, 4, GL_FLOAT, GL_FALSE, 0, 0, 0);
-        webgl_draw(vertexCount, g_topologies[int(topology)]);
+        //webgl_inputAttribute(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        webgl_drawSingle(vertexCount, g_topologies[int(topology)]);
     }
     
     void WASMRendering::draw(const RenderDataPtr &vertexData, RenderTopology topology) {
-        std::shared_ptr<WASMData> platformData = std::static_pointer_cast<WASMData>(vertexData);
+        const std::shared_ptr<WASMData> platformData = std::static_pointer_cast<WASMData>(vertexData);
+        
         if (_currentShader && platformData) {
             const InputLayout &layout = _currentShader->getInputLayout();
             const std::uint32_t repeat = std::uint32_t(layout.vertexRepeat > 1);
+            std::uint32_t offset = 0;
+            
+            webgl_enableAttributes(layout.vertexAttributes.size());
             webgl_bindBuffer(platformData->getWebGLData());
             
-            std::uint32_t offset = 0;
             for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
                 const NativeVertexFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
-                webgl_vertexAttribute(i, format.components, format.type, format.normalize, platformData->getStride(), offset, repeat);
+                webgl_inputAttributePtr(i, format.components, format.type, format.normalize, platformData->getStride(), offset);
+                webgl_inputAttributeDiv(i, repeat);
                 offset += format.size;
             }
             
@@ -738,7 +748,7 @@ namespace foundation {
                 webgl_drawInstanced(layout.vertexRepeat, platformData->getCount(), g_topologies[int(topology)]);
             }
             else {
-                webgl_draw(platformData->getCount(), g_topologies[int(topology)]);
+                webgl_drawSingle(platformData->getCount(), g_topologies[int(topology)]);
             }
         }
     }
@@ -748,7 +758,54 @@ namespace foundation {
     }
     
     void WASMRendering::drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) {
-    
+        const std::shared_ptr<WASMData> platformVData = std::static_pointer_cast<WASMData>(vertexData);
+        const std::shared_ptr<WASMData> platformIData = std::static_pointer_cast<WASMData>(instanceData);
+        
+        if (_currentShader && platformVData && platformIData) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            const std::uint32_t vertexCount = platformVData->getCount();
+            std::uint32_t offset = 0;
+            
+            webgl_enableAttributes(layout.vertexAttributes.size() + layout.instanceAttributes.size());
+            webgl_bindBuffer(platformVData->getWebGLData());
+            
+            for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
+                const NativeVertexFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
+                webgl_inputAttributePtr(i, format.components, format.type, format.normalize, platformVData->getStride(), offset);
+                webgl_inputAttributeDiv(i, layout.vertexRepeat > 1 ? 1 : 0);
+                offset += format.size;
+            }
+            
+            webgl_bindBuffer(platformIData->getWebGLData());
+            
+            if (layout.vertexRepeat > 1) {
+                for (std::size_t i = 0; i < layout.instanceAttributes.size(); i++) {
+                    webgl_inputAttributeDiv(layout.vertexAttributes.size() + i, vertexCount);
+                }
+                
+                for (std::uint32_t i = 0; i < platformIData->getCount(); i++) { //
+                    offset = i * platformIData->getStride();
+                    for (std::size_t c = 0; c < layout.instanceAttributes.size(); c++) {
+                        const NativeVertexFormat &format = g_formatConversionTable[int(layout.instanceAttributes[c].format)];
+                        webgl_inputAttributePtr(layout.vertexAttributes.size() + c, format.components, format.type, format.normalize, platformIData->getStride(), offset);
+                        offset += format.size;
+                    }
+                    
+                    webgl_drawInstanceIndex(layout.vertexRepeat, platformVData->getCount(), i, g_topologies[int(topology)]);
+                }
+            }
+            else {
+                offset = 0;
+                for (std::size_t i = 0; i < layout.instanceAttributes.size(); i++) {
+                    const NativeVertexFormat &format = g_formatConversionTable[int(layout.instanceAttributes[i].format)];
+                    webgl_inputAttributePtr(layout.vertexAttributes.size() + i, format.components, format.type, format.normalize, platformIData->getStride(), offset);
+                    webgl_inputAttributeDiv(layout.vertexAttributes.size() + i, 1);
+                    offset += format.size;
+                }
+                
+                webgl_drawInstanced(platformVData->getCount(), platformIData->getCount(), g_topologies[int(topology)]);
+            }
+        }
     }
     
     void WASMRendering::presentFrame() {

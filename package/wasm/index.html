@@ -109,9 +109,10 @@
         var glsamplers = {};
         var glframebuffers = {};
         var glcontext = canvas.getContext("webgl2", { antialias: false });
+        var glEnabledAttribCount = 0;
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
-        var uniformVertexCountLocation = null;
+        var uniformInstanceIndexLocation = null;
         var resizeTimeoutHandler = null;
         
         const ztypes = {
@@ -205,7 +206,7 @@
                                 glcontext.uniformBlockBinding(program, glcontext.getUniformBlockIndex(program, "_Constants"), DRAW_CONST_BINDING_INDEX);
                             }
                     
-                            program.uniformVertexCountLocation = glcontext.getUniformLocation(program, "_vertex_count");
+                            program.uniformInstanceIndexLocation = glcontext.getUniformLocation(program, "_instance_index");
                             program.uniformVerticalFlipLocation = glcontext.getUniformLocation(program, "_vertical_flip");
 
                             if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
@@ -250,7 +251,7 @@
                     glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                     glcontext.texStorage2D(glcontext.TEXTURE_2D, mipCount, internal, w, h);
 
-                    for (var i = 0; i < mipCount; i++) {
+                    for (let i = 0; i < mipCount; i++) {
                         const mw = w >> i;
                         const mh = h >> i;
                         const mipData = new Uint8Array(memory.buffer, mipPtrs[i], mw * mh * size);
@@ -307,10 +308,11 @@
                     ztypes[ztype]();
                     btypes[btype]();
 
-                    const shader = glshaders[shaderID]
-                    glcontext.useProgram(shader);
-                    uniformVertexCountLocation = shader.uniformVertexCountLocation;
-                    glcontext.uniform1f(shader.uniformVerticalFlipLocation, frameBufferID ? -1.0 : 1.0);
+                    const program = glshaders[shaderID];
+
+                    glcontext.useProgram(program);
+                    glcontext.uniform1f(program.uniformVerticalFlipLocation, frameBufferID ? -1.0 : 1.0);
+                    uniformInstanceIndexLocation = program.uniformInstanceIndexLocation;
                 },
                 webgl_applyConstants: function(index, ptr, len) {
                     const u8mem = new Uint8Array(memory.buffer, ptr, len);
@@ -328,18 +330,30 @@
                 webgl_bindBuffer: function(bufferID) {
                     glcontext.bindBuffer(glcontext.ARRAY_BUFFER, glbuffers[bufferID]);
                 },
-                webgl_vertexAttribute: function(index, size, type, nrm, stride, offset, divisor) {
-                    glcontext.enableVertexAttribArray(index);
+                webgl_enableAttributes: function(count) {
+                    for (let i = 1; i < count; i++) {
+                        glcontext.enableVertexAttribArray(i);
+                    }
+                    for (let i = Math.max(1, count); i < glEnabledAttribCount; i++) {
+                        glcontext.disableVertexAttribArray(i);
+                    }
+                    glEnabledAttribCount = count;
+                },
+                webgl_inputAttributePtr: function(index, size, type, nrm, stride, offset) {
                     glcontext.vertexAttribPointer(index, size, type, nrm, stride, offset);
+                },
+                webgl_inputAttributeDiv: function(index, divisor) {
                     glcontext.vertexAttribDivisor(index, divisor);
                 },
-                webgl_draw: function(vertexCount, topology) {
-                    glcontext.uniform1i(uniformVertexCountLocation, vertexCount);
+                webgl_drawSingle: function(vertexCount, topology) {
                     glcontext.drawArrays(topology, 0, vertexCount);
                 },
                 webgl_drawInstanced: function(vertexCount, instanceCount, topology) {
-                    glcontext.uniform1i(uniformVertexCountLocation, vertexCount);
                     glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
+                },
+                webgl_drawInstanceIndex: function(repeatCount, vertexCount, instanceIndex, topology) {
+                    glcontext.uniform1i(uniformInstanceIndexLocation, instanceIndex);
+                    glcontext.drawArraysInstanced(topology, 0, repeatCount, vertexCount);
                 }
             }
         };
@@ -387,7 +401,7 @@
                 glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_S, glcontext.CLAMP_TO_EDGE);
                 glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_T, glcontext.CLAMP_TO_EDGE);
 
-                for (var i = 0; i < BUFFERS_REUSE_MAX; i++) {
+                for (let i = 0; i < BUFFERS_REUSE_MAX; i++) {
                     shaderConstantBuffers[i] = glcontext.createBuffer();
                 }
                 
@@ -413,6 +427,7 @@
                         prevFrameTimeStamp = timestamp;
                         glcontext.viewport(0, 0, canvas.width, canvas.height);
                         instance.exports.updateFrame(dt);
+                        //throw "test!"
                     }
 
                     window.requestAnimationFrame(onFrame);
@@ -458,7 +473,7 @@
                     resizeTimeoutHandler = setTimeout(() => {
                         const w = window.devicePixelRatio * canvas.scrollWidth;
                         const h = window.devicePixelRatio * canvas.scrollHeight;
-                        
+
                         if (w > h) {
                             if (w != targetWidth || h != targetHeight) {
                                 targetWidth = canvas.width = w;

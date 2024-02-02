@@ -193,7 +193,7 @@ namespace foundation {
         // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix. Instance attributes have 'instance_' prefix.
         // @src       - generic shader source text. Example:
         //
-        // Assume that @layout = {1, {"position", ShaderInput::Format::FLOAT3}, {"color", ShaderInput::Format::BYTE4_NRM}}
+        // Assume that @layout = {1, {"position", foundation::InputAttributeFormat::FLOAT3}, {"color", foundation::InputAttributeFormat::BYTE4_NRM}}
         // So vertex shader has vertex_position and vertex_color input values.
         // s--------------------------------------
         //     fixed {                                           - block of permanent constants. Can be omitted if unused.
@@ -254,7 +254,7 @@ namespace foundation {
         // @count       - count of structures in array
         // @return      - handle
         //
-        virtual auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t capacity) -> RenderDataPtr = 0;
+        virtual auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) -> RenderDataPtr = 0;
         
         // Return actual rendering area size
         //
