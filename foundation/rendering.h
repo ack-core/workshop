@@ -46,6 +46,7 @@ namespace foundation {
         RGBA8UN,                // rgba 1 byte per channel normalized to [0..1]
         RGBA16F,                // rgba 2 byte per channel normalized to [0..1]
         RGBA32F,                // 32-bit float per component
+        UNKNOWN = 0xff
     };
     
     enum class InputAttributeFormat : std::uint8_t {
@@ -271,7 +272,7 @@ namespace foundation {
         // @textures    - texture can be nullptr (texture at i-th position will not be set)
         // @count       - number of textures
         //
-        virtual void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) = 0;
+        virtual void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) = 0;
         
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null

@@ -28,7 +28,7 @@ def main():
     handler.extensions_map['.js'] = 'text/javascript'
     handler.extensions_map['.wasm'] = 'application/wasm'
 
-    httpd = http.server.ThreadingHTTPServer(("", 8000), handler)
+    httpd = http.server.ThreadingHTTPServer(("", 9001), handler)
     httpd.allow_reuse_address = True
     httpd.socket = ssl.wrap_socket(httpd.socket, certfile='./server.pem', server_side=True)
     httpd.serve_forever()

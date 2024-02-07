@@ -24,8 +24,7 @@ namespace resource {
     public:
         static std::shared_ptr<TextureProvider> instance(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
-            const char *resourceList
+            const foundation::RenderingInterfacePtr &rendering
         );
         
     public:
@@ -40,19 +39,13 @@ namespace resource {
         // @return  - raw data and size or nullptr
         //
         virtual void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const TextureInfo &)> &&completion) = 0;
-
+        
         // Asynchronously Load texture from file if it isn't loaded yet
         // @texPath - path to file without extension
         // @return  - texture object or nullptr
         //
         virtual void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) = 0;
-
-        // Synchronously load texture from file if it isn't loaded yet
-        // @texPath - path to file without extension
-        // @return  - texture object or nullptr
-        //
-        //virtual auto getOrLoadTexture(const char *texPath) -> const foundation::RenderTexturePtr = 0;
-
+        
         // Provider tracks resources life time and tries to free them
         //
         virtual void update(float dtSec) = 0;

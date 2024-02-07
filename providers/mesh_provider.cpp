@@ -1,5 +1,6 @@
 
 #include "mesh_provider.h"
+#include "resource_list.h"
 
 #include <list>
 #include <unordered_map>
@@ -8,7 +9,7 @@
 namespace resource {
     class MeshProviderImpl : public std::enable_shared_from_this<MeshProviderImpl>, public MeshProvider {
     public:
-        MeshProviderImpl(const foundation::PlatformInterfacePtr &platform, const char *resourceList);
+        MeshProviderImpl(const foundation::PlatformInterfacePtr &platform);
         ~MeshProviderImpl() override;
         
         const MeshInfo *getMeshInfo(const char *voxPath) override;
@@ -30,24 +31,24 @@ namespace resource {
         bool _asyncInProgress;
     };
     
-    MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *resourceList) : _platform(platform), _asyncInProgress(false) {
-        std::istringstream source = std::istringstream(resourceList);
-        std::string line, path;
-        MeshInfo info;
-        
-        while (std::getline(source, line)) {
-            printf("-->> %s", line.data());
-            std::istringstream input = std::istringstream(line);
-            
-            if (line.length()) {
-                if (input >> path >> info.sizeX >> info.sizeY >> info.sizeZ) {
-                    _meshInfos.emplace(path, info);
-                }
-                else {
-                    _platform->logError("[MeshProviderImpl::MeshProviderImpl] Bad mesh info in '%s'\n", line.data());
-                }
-            }
-        }
+    MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform), _asyncInProgress(false) {
+//        std::istringstream source = std::istringstream(resourceList);
+//        std::string line, path;
+//        MeshInfo info;
+//
+//        while (std::getline(source, line)) {
+//            printf("-->> %s", line.data());
+//            std::istringstream input = std::istringstream(line);
+//
+//            if (line.length()) {
+//                if (input >> path >> info.sizeX >> info.sizeY >> info.sizeZ) {
+//                    _meshInfos.emplace(path, info);
+//                }
+//                else {
+//                    _platform->logError("[MeshProviderImpl::MeshProviderImpl] Bad mesh info in '%s'\n", line.data());
+//                }
+//            }
+//        }
     }
     
     MeshProviderImpl::~MeshProviderImpl() {
@@ -421,7 +422,7 @@ namespace resource {
 }
 
 namespace resource {
-    std::shared_ptr<MeshProvider> MeshProvider::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const char *resourceList) {
-        return std::make_shared<MeshProviderImpl>(platform, resourceList);
+    std::shared_ptr<MeshProvider> MeshProvider::instance(const std::shared_ptr<foundation::PlatformInterface> &platform) {
+        return std::make_shared<MeshProviderImpl>(platform);
     }
 }

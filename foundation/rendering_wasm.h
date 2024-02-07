@@ -120,7 +120,7 @@ namespace foundation {
         
         void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) override;
+        void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount, RenderTopology topology) override;
         void draw(const RenderDataPtr &vertexData, RenderTopology topology) override;

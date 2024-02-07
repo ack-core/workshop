@@ -442,11 +442,11 @@ extern "C" void initialize();
 extern "C" void deinitialize();
 
 int main(int argc, const char * argv[]) {
+    initialize();
+
     g_io.thread = std::thread(&backgroundThreadLoop, std::ref(g_io));
     g_worker.thread = std::thread(&backgroundThreadLoop, std::ref(g_worker));
-    
-    initialize();
-    
+
     @autoreleasepool {
         char *argv[] = {0};
         UIApplicationMain(0, argv, nil, NSStringFromClass([AppDelegate class]));

@@ -1,29 +1,27 @@
 
 #include "texture_provider.h"
+#include "resource_list.h"
 #include "thirdparty/upng/upng.h"
 
 #include <unordered_map>
-#include <sstream>
 #include <list>
 
 namespace resource {
     class TextureProviderImpl : public std::enable_shared_from_this<TextureProviderImpl>, public TextureProvider {
     public:
-        TextureProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, const char *resourceList);
+        TextureProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
         ~TextureProviderImpl() override;
         
         const TextureInfo *getTextureInfo(const char *texPath) override;
 
         void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const TextureInfo &)> &&completion) override;
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
-        //auto getOrLoadTexture(const char *texPath) -> const foundation::RenderTexturePtr override;
 
         void update(float dtSec) override;
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         const std::shared_ptr<foundation::RenderingInterface> _rendering;
-        const foundation::RenderTexturePtr _empty;
         
         struct TextureData : public TextureInfo {
             std::unique_ptr<std::uint8_t[]> data;
@@ -44,38 +42,33 @@ namespace resource {
     
     TextureProviderImpl::TextureProviderImpl(
         const std::shared_ptr<foundation::PlatformInterface> &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        const char *resourceList
+        const foundation::RenderingInterfacePtr &rendering
     )
     : _platform(platform)
     , _rendering(rendering)
     {
-        std::istringstream source = std::istringstream(resourceList);
         std::string line, path, type;
         
-        while (std::getline(source, line)) {
-            printf("-->> %s", line.data());
-            std::istringstream input = std::istringstream(line);
+        for (const char *line : TexturesList) {
+            util::strstream input (line, strlen(line));
             TextureData data = {};
             
-            if (line.length()) {
-                if (input >> path >> type >> data.width >> data.height) {
-                    if (type == "rgba") {
-                        data.type = TextureInfo::Type::RGBA8;
-                    }
-                    else if (type == "grayscale") {
-                        data.type = TextureInfo::Type::GRAYSCALE8;
-                    }
-                    else {
-                        _platform->logError("[TextureProviderImpl::TextureProviderImpl] Unknown texture type '%s'\n", type.data());
-                        break;
-                    }
-                    
-                    _textures.emplace(path, std::move(data));
+            if (input >> path >> type >> data.width >> data.height) {
+                if (type == "rgba") {
+                    data.type = TextureInfo::Type::RGBA8;
+                }
+                else if (type == "grayscale") {
+                    data.type = TextureInfo::Type::GRAYSCALE8;
                 }
                 else {
-                    _platform->logError("[TextureProviderImpl::TextureProviderImpl] Bad texture info '%s'\n", line.data());
+                    _platform->logError("[TextureProviderImpl::TextureProviderImpl] Unknown texture type '%s'\n", type.data());
+                    break;
                 }
+                
+                _textures.emplace(path, std::move(data));
+            }
+            else {
+                _platform->logError("[TextureProviderImpl::TextureProviderImpl] Bad texture info '%s'\n", line);
             }
         }
     }
@@ -226,7 +219,6 @@ namespace resource {
                                     self->_platform->logError("[TextureProviderImpl::getOrLoadTexture (ptr)] Async operation has failed for file '%s'", path.data());
                                     completion(nullptr);
                                 }
-                                
                             }
                         }));
                     }
@@ -238,38 +230,6 @@ namespace resource {
             });
         }
     }
-
-//    const foundation::RenderTexturePtr TextureProviderImpl::getOrLoadTexture(const char *texPath) {
-//        std::unique_ptr<std::uint8_t[]> data;
-//        std::size_t size;
-//
-//        if (_platform->loadFile((std::string(texPath) + ".png").data(), data, size)) {
-//            upng_t *upng = upng_new_from_bytes(data.get(), (unsigned long)(size));
-//
-//            if (upng != nullptr && *reinterpret_cast<const unsigned *>(data.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-//                if (upng_get_format(upng) == UPNG_RGBA8) {
-//                    TextureData &texture = _textures.emplace(texPath, TextureData{upng_get_width(upng), upng_get_height(upng), TextureInfo::Type::RGBA8}).first->second;
-//                    texture.ptr = _rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, upng_get_width(upng), upng_get_height(upng), { upng_get_buffer(upng) });
-//                    return texture.ptr;
-//                }
-//                else if (upng_get_format(upng) == UPNG_LUMINANCE8) {
-//                    TextureData &texture = _textures.emplace(texPath, TextureData{upng_get_width(upng), upng_get_height(upng), TextureInfo::Type::GRAYSCALE8}).first->second;
-//                    texture.ptr = _rendering->createTexture(foundation::RenderTextureFormat::R8UN, upng_get_width(upng), upng_get_height(upng), { upng_get_buffer(upng) });
-//                    return texture.ptr;
-//                }
-//                else {
-//                    _platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' must have a valid format (rgba8, lum8)", texPath);
-//                }
-//
-//                upng_free(upng);
-//            }
-//            else {
-//                _platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' is not a valid png file", texPath);
-//            }
-//        }
-//
-//        return nullptr;
-//    }
     
     void TextureProviderImpl::update(float dtSec) {
         while (_asyncInProgress == false && _callsQueue.size()) {
@@ -290,9 +250,8 @@ namespace resource {
 namespace resource {
     std::shared_ptr<TextureProvider> TextureProvider::instance(
         const std::shared_ptr<foundation::PlatformInterface> &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        const char *resourceList
+        const foundation::RenderingInterfacePtr &rendering
     ) {
-        return std::make_shared<TextureProviderImpl>(platform, rendering, resourceList);
+        return std::make_shared<TextureProviderImpl>(platform, rendering);
     }
 }

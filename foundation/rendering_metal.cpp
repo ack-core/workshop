@@ -672,7 +672,7 @@ namespace foundation {
         }
         
         nativeShader = shaderUtils::makeLines(nativeShader);
-        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
+        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -937,7 +937,7 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) {
+    void MetalRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) {
         if (_currentRenderCommandEncoder && _currentShader) {
             if (textures.size() <= MAX_TEXTURES) {
                 const NSRange range {0, textures.size()};
@@ -946,7 +946,7 @@ namespace foundation {
                 
                 std::uint32_t index = 0;
                 for (auto &item : textures) {
-                    texarray[index] = item.first ? static_cast<const MetalTexBase *>(item.first->get())->getNativeTexture() : nil;
+                    texarray[index] = item.first ? static_cast<const MetalTexBase *>(item.first.get())->getNativeTexture() : nil;
                     smarray[index] = _samplerStates[int(item.second)];
                     index++;
                 }

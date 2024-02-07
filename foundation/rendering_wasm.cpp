@@ -712,17 +712,17 @@ namespace foundation {
         }
     }
     
-    void WASMRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr *, SamplerType>> &textures) {
+    void WASMRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) {
         for (std::size_t i = 0; i < textures.size(); i++) {
-            const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first->get());
-            webgl_applyTexture(i, platformTexture->getWebGLTexture(), int(textures.begin()[i].second));
+            const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first.get());
+            webgl_applyTexture(i, platformTexture ? platformTexture->getWebGLTexture() : 0, int(textures.begin()[i].second));
         }
     }
     
     void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
         webgl_enableAttributes(0);
         webgl_bindBuffer(0);
-        //webgl_inputAttribute(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        webgl_inputAttributePtr(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
         webgl_drawSingle(vertexCount, g_topologies[int(topology)]);
     }
     

@@ -173,9 +173,12 @@
                         const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                         u8data.set(new Uint8Array(buffer));
                         instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
-                    }).catch(error => {
+                    })
+                    .catch(error => {
                         print(path + " loading failed with " + error);
-                        instance.exports.fileLoaded(block, pathLen, 0, 0);
+                        if (typeof error === "string") {
+                            instance.exports.fileLoaded(block, pathLen, 0, 0);
+                        }
                     });
                 },
                 abort: function() {
@@ -425,9 +428,8 @@
                     
                     if (dt > interval) {
                         prevFrameTimeStamp = timestamp;
-                        glcontext.viewport(0, 0, canvas.width, canvas.height);
+                        glcontext.viewport(0, 0, targetWidth, targetHeight);
                         instance.exports.updateFrame(dt);
-                        //throw "test!"
                     }
 
                     window.requestAnimationFrame(onFrame);

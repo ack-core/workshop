@@ -7,7 +7,6 @@
 
 #include <stdarg.h>
 #include <cstdio>
-#include <pthread.h>
 #include <list>
 
 namespace {
@@ -21,13 +20,19 @@ namespace {
     std::uint32_t g_height;
 }
 
+void fatal() {
+    *(volatile int *)0xffffffff = 0;
+}
+
 // These function shouldn't be called
 extern "C" {
     void *realloc(void *ptr, size_t size) {
-        abort();
+        fatal();
+        return nullptr;
     }
     void *aligned_alloc(size_t alignment, size_t size) {
-        abort();
+        fatal();
+        return nullptr;
     }
 }
 
@@ -61,7 +66,7 @@ extern "C" {
             std::size_t oldMemoryPages = __builtin_wasm_memory_grow(0, incMemoryPages);
             
             if (oldMemoryPages == std::size_t(-1)) {
-                abort();
+                fatal();
             }
             
             g_currentMemoryPages += incMemoryPages;
@@ -294,15 +299,18 @@ namespace foundation {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
         const std::size_t len = fullPath.length() + 1;
-        std::uint16_t *block = reinterpret_cast<std::uint16_t *>(malloc(sizeof(std::uint16_t) * len + sizeof(cbtype)));
+        
+        std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * len));
+        std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
         
         for (std::size_t i = 0; i < len; i++) {
-            block[i] = fullPath[i];
+            path[i] = fullPath[i];
         }
         
-        cbtype *cb = reinterpret_cast<cbtype *>(block + len);
+        cbtype *cb = reinterpret_cast<cbtype *>(block);
         new (cb) cbtype(std::move(completion));
-        js_fetch(block, len);
+        
+        js_fetch(path, len);
     }
     
     float WASMPlatform::getScreenWidth() const {
@@ -381,7 +389,7 @@ namespace foundation {
         va_end(arglist);
         js_log(logBuffer, length);
         delete [] logBuffer;
-        abort();
+        fatal();
     }
 }
 
@@ -397,15 +405,16 @@ extern "C" {
     }
     void fileLoaded(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
-        cbtype *cb = reinterpret_cast<cbtype *>(block + pathLen);
+        cbtype *cb = reinterpret_cast<cbtype *>(reinterpret_cast<std::uint8_t *>(block) - sizeof(cbtype));
         cb->operator()(std::unique_ptr<std::uint8_t[]>(data), length);
         cb->~cbtype();
-        ::free(block);
+        ::free(cb);
     }
     void taskExecute(foundation::AsyncTask *ptr) {
-        ptr->executeInBackground();
+        // TODO: TLSF allocator with manual thread safety
     }
     void taskComplete(foundation::AsyncTask *ptr) {
+        ptr->executeInBackground();
         ptr->executeInMainThread();
         delete ptr;
     }
