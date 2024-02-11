@@ -672,7 +672,7 @@ namespace foundation {
         }
         
         nativeShader = shaderUtils::makeLines(nativeShader);
-        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
+        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {

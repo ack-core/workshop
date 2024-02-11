@@ -38,7 +38,7 @@ namespace resource {
         // @texPath - path to file without extension
         // @return  - raw data and size or nullptr
         //
-        virtual void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const TextureInfo &)> &&completion) = 0;
+        virtual void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const resource::TextureInfo &)> &&completion) = 0;
         
         // Asynchronously Load texture from file if it isn't loaded yet
         // @texPath - path to file without extension

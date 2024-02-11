@@ -13,7 +13,7 @@ namespace resource {
         ~MeshProviderImpl() override;
         
         const MeshInfo *getMeshInfo(const char *voxPath) override;
-        void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) override;
         void update(float dtSec) override;
         
     private:
@@ -32,23 +32,19 @@ namespace resource {
     };
     
     MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform), _asyncInProgress(false) {
-//        std::istringstream source = std::istringstream(resourceList);
-//        std::string line, path;
-//        MeshInfo info;
-//
-//        while (std::getline(source, line)) {
-//            printf("-->> %s", line.data());
-//            std::istringstream input = std::istringstream(line);
-//
-//            if (line.length()) {
-//                if (input >> path >> info.sizeX >> info.sizeY >> info.sizeZ) {
-//                    _meshInfos.emplace(path, info);
-//                }
-//                else {
-//                    _platform->logError("[MeshProviderImpl::MeshProviderImpl] Bad mesh info in '%s'\n", line.data());
-//                }
-//            }
-//        }
+        std::string line, path;
+        MeshInfo info;
+
+        for (const char *line : MeshesList) {
+            util::strstream input (line, strlen(line));
+            
+            if (input >> path >> info.sizeX >> info.sizeY >> info.sizeZ) {
+                _meshInfos.emplace(path, info);
+            }
+            else {
+                _platform->logError("[MeshProviderImpl::MeshProviderImpl] Bad mesh info in '%s'\n", line);
+            }
+        }
     }
     
     MeshProviderImpl::~MeshProviderImpl() {
@@ -60,7 +56,7 @@ namespace resource {
         return index != _meshInfos.end() ? &index->second : nullptr;
     }
 
-    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) {
+    void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueue.emplace_back(QueueEntry {
                 .optimization = optimization,

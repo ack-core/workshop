@@ -20,9 +20,9 @@ extern "C" {
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
     void webgl_bindBuffer(WebGLId data);
-    //void webgl_inputAttribute(std::size_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset, std::uint32_t divisor);
     void webgl_enableAttributes(std::uint32_t count);
-    void webgl_inputAttributePtr(std::uint32_t index, std::uint32_t components, GLenum type, GLenum nrm, std::uint32_t stride, std::uint32_t offset);
+    void webgl_inputFAttributePtr(std::uint32_t index, std::uint32_t components, GLenum type, std::uint32_t nrm, std::uint32_t stride, std::uint32_t offset);
+    void webgl_inputIAttributePtr(std::uint32_t index, std::uint32_t components, GLenum type, std::uint32_t, std::uint32_t stride, std::uint32_t offset);
     void webgl_inputAttributeDiv(std::uint32_t index, std::uint32_t divisor);
     void webgl_drawSingle(std::uint32_t vertexCount, GLenum topology);
     void webgl_drawInstanced(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
@@ -54,32 +54,33 @@ namespace {
         std::uint32_t components;
         GLenum normalize;
         GLenum type;
+        void (*funcAttributePtr)(std::uint32_t, std::uint32_t, GLenum, std::uint32_t, std::uint32_t, std::uint32_t);
     }
     g_formatConversionTable[] = { // index is RenderShaderInputFormat value
-        {"vec2",  4,  2, GL_FALSE, GL_HALF_FLOAT},
-        {"vec4",  8,  4, GL_FALSE, GL_HALF_FLOAT},
-        {"float", 4,  1, GL_FALSE, GL_FLOAT},
-        {"vec2",  8,  2, GL_FALSE, GL_FLOAT},
-        {"vec3",  12, 3, GL_FALSE, GL_FLOAT},
-        {"vec4",  16, 4, GL_FALSE, GL_FLOAT},
-        {"ivec2", 4,  2, GL_FALSE, GL_SHORT},
-        {"ivec4", 8,  4, GL_FALSE, GL_SHORT},
-        {"uvec2", 4,  2, GL_FALSE, GL_UNSIGNED_SHORT},
-        {"uvec4", 8,  4, GL_FALSE, GL_UNSIGNED_SHORT},
-        {"vec2",  4,  2, GL_TRUE,  GL_SHORT},
-        {"vec4",  8,  4, GL_TRUE,  GL_SHORT},
-        {"vec2",  4,  2, GL_TRUE,  GL_UNSIGNED_SHORT},
-        {"vec4",  8,  4, GL_TRUE,  GL_UNSIGNED_SHORT},
-        {"uvec4", 4,  4, GL_FALSE, GL_UNSIGNED_BYTE},
-        {"vec4",  4,  4, GL_TRUE,  GL_UNSIGNED_BYTE},
-        {"int",   4,  1, GL_FALSE, GL_INT},
-        {"ivec2", 8,  2, GL_FALSE, GL_INT},
-        {"ivec3", 12, 3, GL_FALSE, GL_INT},
-        {"ivec4", 16, 4, GL_FALSE, GL_INT},
-        {"uint",  4,  1, GL_FALSE, GL_UNSIGNED_INT},
-        {"uvec2", 8,  2, GL_FALSE, GL_UNSIGNED_INT},
-        {"uvec3", 12, 3, GL_FALSE, GL_UNSIGNED_INT},
-        {"uvec4", 16, 4, GL_FALSE, GL_UNSIGNED_INT}
+        {"vec2",  4,  2, GL_FALSE, GL_HALF_FLOAT, &webgl_inputFAttributePtr}, // HALF2
+        {"vec4",  8,  4, GL_FALSE, GL_HALF_FLOAT, &webgl_inputFAttributePtr}, // HALF4
+        {"float", 4,  1, GL_FALSE, GL_FLOAT, &webgl_inputFAttributePtr}, // FLOAT1
+        {"vec2",  8,  2, GL_FALSE, GL_FLOAT, &webgl_inputFAttributePtr}, // FLOAT2
+        {"vec3",  12, 3, GL_FALSE, GL_FLOAT, &webgl_inputFAttributePtr}, // FLOAT3
+        {"vec4",  16, 4, GL_FALSE, GL_FLOAT, &webgl_inputFAttributePtr}, // FLOAT4
+        {"ivec2", 4,  2, GL_FALSE, GL_SHORT, &webgl_inputIAttributePtr}, // SHORT2
+        {"ivec4", 8,  4, GL_FALSE, GL_SHORT, &webgl_inputIAttributePtr}, // SHORT4
+        {"uvec2", 4,  2, GL_FALSE, GL_UNSIGNED_SHORT, &webgl_inputIAttributePtr}, // USHORT2
+        {"uvec4", 8,  4, GL_FALSE, GL_UNSIGNED_SHORT, &webgl_inputIAttributePtr}, // USHORT4
+        {"vec2",  4,  2, GL_TRUE,  GL_SHORT, &webgl_inputFAttributePtr}, // SHORT2_NRM
+        {"vec4",  8,  4, GL_TRUE,  GL_SHORT, &webgl_inputFAttributePtr}, // SHORT4_NRM
+        {"vec2",  4,  2, GL_TRUE,  GL_UNSIGNED_SHORT, &webgl_inputFAttributePtr}, // USHORT2_NRM
+        {"vec4",  8,  4, GL_TRUE,  GL_UNSIGNED_SHORT, &webgl_inputFAttributePtr}, // USHORT4_NRM
+        {"uvec4", 4,  4, GL_FALSE, GL_UNSIGNED_BYTE, &webgl_inputIAttributePtr}, // BYTE4
+        {"vec4",  4,  4, GL_TRUE,  GL_UNSIGNED_BYTE, &webgl_inputFAttributePtr}, // BYTE4_NRM
+        {"int",   4,  1, GL_FALSE, GL_INT, &webgl_inputIAttributePtr}, // INT1
+        {"ivec2", 8,  2, GL_FALSE, GL_INT, &webgl_inputIAttributePtr}, // INT2
+        {"ivec3", 12, 3, GL_FALSE, GL_INT, &webgl_inputIAttributePtr}, // INT3
+        {"ivec4", 16, 4, GL_FALSE, GL_INT, &webgl_inputIAttributePtr}, // INT4
+        {"uint",  4,  1, GL_FALSE, GL_UNSIGNED_INT, &webgl_inputIAttributePtr}, // UINT1
+        {"uvec2", 8,  2, GL_FALSE, GL_UNSIGNED_INT, &webgl_inputIAttributePtr}, // UINT2
+        {"uvec3", 12, 3, GL_FALSE, GL_UNSIGNED_INT, &webgl_inputIAttributePtr}, // UINT3
+        {"uvec4", 16, 4, GL_FALSE, GL_UNSIGNED_INT, &webgl_inputIAttributePtr} // UINT4
     };
 
     struct NativeTextureFormat {
@@ -722,7 +723,7 @@ namespace foundation {
     void WASMRendering::draw(std::uint32_t vertexCount, RenderTopology topology) {
         webgl_enableAttributes(0);
         webgl_bindBuffer(0);
-        webgl_inputAttributePtr(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        webgl_inputFAttributePtr(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
         webgl_drawSingle(vertexCount, g_topologies[int(topology)]);
     }
     
@@ -739,7 +740,7 @@ namespace foundation {
             
             for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
                 const NativeVertexFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
-                webgl_inputAttributePtr(i, format.components, format.type, format.normalize, platformData->getStride(), offset);
+                format.funcAttributePtr(i, format.components, format.type, format.normalize, platformData->getStride(), offset);
                 webgl_inputAttributeDiv(i, repeat);
                 offset += format.size;
             }
@@ -771,7 +772,7 @@ namespace foundation {
             
             for (std::size_t i = 0; i < layout.vertexAttributes.size(); i++) {
                 const NativeVertexFormat &format = g_formatConversionTable[int(layout.vertexAttributes[i].format)];
-                webgl_inputAttributePtr(i, format.components, format.type, format.normalize, platformVData->getStride(), offset);
+                format.funcAttributePtr(i, format.components, format.type, format.normalize, platformVData->getStride(), offset);
                 webgl_inputAttributeDiv(i, layout.vertexRepeat > 1 ? 1 : 0);
                 offset += format.size;
             }
@@ -787,7 +788,7 @@ namespace foundation {
                     offset = i * platformIData->getStride();
                     for (std::size_t c = 0; c < layout.instanceAttributes.size(); c++) {
                         const NativeVertexFormat &format = g_formatConversionTable[int(layout.instanceAttributes[c].format)];
-                        webgl_inputAttributePtr(layout.vertexAttributes.size() + c, format.components, format.type, format.normalize, platformIData->getStride(), offset);
+                        format.funcAttributePtr(layout.vertexAttributes.size() + c, format.components, format.type, format.normalize, platformIData->getStride(), offset);
                         offset += format.size;
                     }
                     
@@ -798,7 +799,7 @@ namespace foundation {
                 offset = 0;
                 for (std::size_t i = 0; i < layout.instanceAttributes.size(); i++) {
                     const NativeVertexFormat &format = g_formatConversionTable[int(layout.instanceAttributes[i].format)];
-                    webgl_inputAttributePtr(layout.vertexAttributes.size() + i, format.components, format.type, format.normalize, platformIData->getStride(), offset);
+                    format.funcAttributePtr(layout.vertexAttributes.size() + i, format.components, format.type, format.normalize, platformIData->getStride(), offset);
                     webgl_inputAttributeDiv(layout.vertexAttributes.size() + i, 1);
                     offset += format.size;
                 }

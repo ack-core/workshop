@@ -342,9 +342,12 @@
                     }
                     glEnabledAttribCount = count;
                 },
-                webgl_inputAttributePtr: function(index, size, type, nrm, stride, offset) {
+                webgl_inputFAttributePtr: function(index, size, type, nrm, stride, offset) {
                     glcontext.vertexAttribPointer(index, size, type, nrm, stride, offset);
                 },
+                webgl_inputIAttributePtr: function(index, size, type, nrm, stride, offset) {
+                    glcontext.vertexAttribIPointer(index, size, type, stride, offset);
+                },                
                 webgl_inputAttributeDiv: function(index, divisor) {
                     glcontext.vertexAttribDivisor(index, divisor);
                 },

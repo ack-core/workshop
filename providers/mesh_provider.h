@@ -52,7 +52,7 @@ namespace resource {
         // @scaledVoxels  - optimization using scaled voxels
         // @return  - pointer to Mesh or nullptr
         //
-        virtual void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<VoxelMesh> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) = 0;
         
         // Provider tracks resources life time and tries to free them
         //

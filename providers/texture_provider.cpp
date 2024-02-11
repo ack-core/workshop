@@ -14,7 +14,7 @@ namespace resource {
         
         const TextureInfo *getTextureInfo(const char *texPath) override;
 
-        void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const TextureInfo &)> &&completion) override;
+        void getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const resource::TextureInfo &)> &&completion) override;
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
 
         void update(float dtSec) override;
@@ -129,7 +129,7 @@ namespace resource {
         }
     }
     
-    void TextureProviderImpl::getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const TextureInfo &)> &&completion) {
+    void TextureProviderImpl::getOrLoadTexture(const char *texPath, util::callback<void(const std::unique_ptr<std::uint8_t[]> &, const resource::TextureInfo &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueue.emplace_back(QueueEntry {
                 .texPath = texPath,
