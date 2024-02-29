@@ -29,6 +29,7 @@ namespace foundation {
         void removeEventHandler(EventHandlerToken token) override;
 
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
+        void setResizeHandler(util::callback<void()> &&handler) override;
         void exit() override;
         
         void logMsg(const char *fmt, ...) override;

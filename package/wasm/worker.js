@@ -30,21 +30,16 @@ onmessage = (msg) => {
                 js_canvas_width: () => { throw "can't access canvas from background" },
                 js_canvas_height: () => { throw "can't access canvas from background" },
                 webgl_createProgram: (vsrc, vlen, fsrc, flen) => { throw "can't access webgl from background" },
-                webgl_createData: (ptr, len) => { throw "can't access webgl from background" },
+                webgl_createData: (layout, layoutLen, ptr, dataLen, stride) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },
                 webgl_createTarget: (format, internal, type, w, h, count, enableDepth, textures) => { throw "can't access webgl from background" },
                 webgl_viewPort: (w, h) => { throw "can't access webgl from background" },
-                webgl_applyState: (shaderID, mask, r, g, b, a, d, ztype, btype) => { throw "can't access webgl from background" },
+                webgl_applyState: (frameBufferID, shaderID, mask, r, g, b, a, d, ztype, btype) => { throw "can't access webgl from background" },
                 webgl_applyConstants: (index, ptr, len) => { throw "can't access webgl from background" },
                 webgl_applyTexture: (index, textureID, samplingType) => { throw "can't access webgl from background" },
                 webgl_bindBuffer: (bufferID) => { throw "can't access webgl from background" },
-                webgl_enableAttributes: (count) => { throw "can't access webgl from background" },
-                webgl_inputFAttributePtr: (index, size, type, nrm, stride, offset) => { throw "can't access webgl from background" },
-                webgl_inputIAttributePtr: (index, size, type, nrm, stride, offset) => { throw "can't access webgl from background" },
-                webgl_inputAttributeDiv: (index, divisor) => { throw "can't access webgl from background" },                
-                webgl_drawSingle: (vertexCount, topology) => { throw "can't access webgl from background" },
-                webgl_drawInstanced: (vertexCount, instanceCount, topology) => { throw "can't access webgl from background" },
-                webgl_drawInstanceIndex: (shaderID, repeatCount, vertexCount, instanceIndex, topology) => { throw "can't access webgl from background" }
+                webgl_setInstanceCount: (count) => { throw "can't access webgl from background" },
+                webgl_draw: (vertexCount, instanceCount, topology) => { throw "can't access webgl from background" }
             }
         };
 

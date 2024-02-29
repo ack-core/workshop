@@ -67,9 +67,8 @@ namespace foundation {
             InputAttributeFormat format;
         };
 
-        std::uint32_t vertexRepeat = 1;
-        std::vector<Attribute> vertexAttributes;
-        std::vector<Attribute> instanceAttributes;
+        std::uint32_t repeat = 1;
+        std::vector<Attribute> attributes;
     };
     
     class RenderShader {
@@ -137,6 +136,15 @@ namespace foundation {
         static const RenderPassConfig DEFAULT() {
             return {};
         }
+        static const RenderPassConfig DEFAULT(const RenderTargetPtr &rt) {
+            return { .target = rt };
+        }
+        static const RenderPassConfig DEPTHCLEAR(const RenderTargetPtr &rt, float d = 0.0f) {
+            return RenderPassConfig {
+                rt, false, true,
+                {0, 0, 0, 0}, d
+            };
+        }
         static const RenderPassConfig CLEAR(float r, float g, float b, float a = 1.0f, float d = 0.0f) {
             return RenderPassConfig {
                 nullptr, true, true,
@@ -191,10 +199,10 @@ namespace foundation {
 
         // Create shader from source text
         // @name      - name that is used in error messages
-        // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix. Instance attributes have 'instance_' prefix.
+        // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix
         // @src       - generic shader source text. Example:
         //
-        // Assume that @layout = {1, {"position", foundation::InputAttributeFormat::FLOAT3}, {"color", foundation::InputAttributeFormat::BYTE4_NRM}}
+        // Assume that @layout = {1, {"position", foundation::InputAttributeFormat::FLOAT3}}
         // So vertex shader has vertex_position and vertex_color input values.
         // s--------------------------------------
         //     fixed {                                           - block of permanent constants. Can be omitted if unused.
@@ -255,7 +263,7 @@ namespace foundation {
         // @count       - count of structures in array
         // @return      - handle
         //
-        virtual auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) -> RenderDataPtr = 0;
+        virtual auto createData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr = 0;
         
         // Return actual rendering area size
         //
@@ -266,7 +274,7 @@ namespace foundation {
         // @shader      - shader object
         // @cfg         - render pass configuration
         //
-        virtual void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg = RenderPassCommonConfigs::DEFAULT()) = 0;
+        virtual void applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg = RenderPassCommonConfigs::DEFAULT()) = 0;
         
         // Apply textures and their sampling type
         // @textures    - texture can be nullptr (texture at i-th position will not be set)
@@ -278,25 +286,11 @@ namespace foundation {
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
         //
         virtual void applyShaderConstants(const void *constants) = 0;
-        
-        // Draw vertexes
-        //
-        virtual void draw(std::uint32_t vertexCount, RenderTopology topology) = 0;
-        
+
         // Draw vertexes from RenderData
-        // @vertexData layout has to match current shader's layout. Cannot be nullptr
+        // @inputData layout has to match current shader's layout
         //
-        virtual void draw(const RenderDataPtr &vertexData, RenderTopology topology) = 0;
-        
-        // Draw vertexes from RenderData with indices
-        // @vertexData  - vertex data that has layout set by current shader
-        // @indexData   - indeces (uint32)
-        //
-        virtual void drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) = 0;
-        
-        // Draw instanced vertexes from RenderData
-        //
-        virtual void drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) = 0;
+        virtual void draw(const RenderDataPtr &inputData = nullptr, std::uint32_t instanceCount = 1) = 0;
         
         // Frame finalization
         //

@@ -127,27 +127,23 @@ namespace foundation {
         RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
-        RenderDataPtr createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) override;
+        RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t count) override;
         
         float getBackBufferWidth() const override;
         float getBackBufferHeight() const override;
         
-        void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
+        void applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
-        void draw(std::uint32_t vertexCount, RenderTopology topology) override;
-        void draw(const RenderDataPtr &vertexData, RenderTopology topology) override;
-        void drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) override;
-        void drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) override;
-
+        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) override;
         void presentFrame() override;
         
     private:
         void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index);
         
         static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
-        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024 * 4;
+        static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024;
         
         struct FrameConstants {
             math::transform3f viewMatrix = math::transform3f::identity();
@@ -181,5 +177,7 @@ namespace foundation {
         id<MTLBuffer> _constantsBuffers[CONSTANT_BUFFER_FRAMES_MAX];
         std::uint32_t _constantsBuffersIndex = 0;
         std::uint32_t _constantsBufferOffset = 0;
+        
+        RenderTopology _topology;
     };
 }

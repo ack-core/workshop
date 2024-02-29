@@ -657,7 +657,7 @@ namespace math {
     }
     template<int Ix, int Iy, int Iz>
     inline vector3f swizzle3f<Ix, Iy, Iz>::transformed(const transform3f &trfm, bool likePosition) const {
-        const scalar flat[4] = {(*this)[Ix], (*this)[Iy], (*this)[Iz], likePosition ? 1.0 : 0.0};
+        const scalar flat[4] = {(*this)[Ix], (*this)[Iy], (*this)[Iz], likePosition ? scalar(1.0) : scalar(0.0)};
         return {
             flat[0] * trfm.row0[0] + flat[1] * trfm.row1[0] + flat[2] * trfm.row2[0] + flat[3] * trfm.row3[0],
             flat[0] * trfm.row0[1] + flat[1] * trfm.row1[1] + flat[2] * trfm.row2[1] + flat[3] * trfm.row3[1],

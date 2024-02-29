@@ -281,6 +281,7 @@ namespace {
     std::list<Handler> g_pointerHandlers;
 
     util::callback<void(float)> g_updateAndDraw;
+    util::callback<void()> g_resizeHandler;
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
 }
 
@@ -361,6 +362,10 @@ namespace foundation {
         g_updateAndDraw = std::move(updateAndDraw);
     }
     
+    void WASMPlatform::setResizeHandler(util::callback<void()> &&handler) {
+        g_resizeHandler = std::move(handler);
+    }
+    
     void WASMPlatform::exit() {
 
     }
@@ -402,6 +407,10 @@ extern "C" {
     void resized(std::uint32_t w, std::uint32_t h) {
         g_width = w;
         g_height = h;
+        
+        if (g_resizeHandler) {
+            g_resizeHandler();
+        }
     }
     void fileLoaded(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;

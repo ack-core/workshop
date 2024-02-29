@@ -113,20 +113,16 @@ namespace foundation {
         auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
-        auto createData(const void *data, const std::vector<InputLayout::Attribute> &layout, std::uint32_t count) -> RenderDataPtr override;
+        auto createData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr override;
         
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
         
-        void applyState(const RenderShaderPtr &shader, const RenderPassConfig &cfg) override;
+        void applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
-        void draw(std::uint32_t vertexCount, RenderTopology topology) override;
-        void draw(const RenderDataPtr &vertexData, RenderTopology topology) override;
-        void drawIndexed(const RenderDataPtr &vertexData, const RenderDataPtr &indexData, RenderTopology topology) override;
-        void drawInstanced(const RenderDataPtr &vertexData, const RenderDataPtr &instanceData, RenderTopology topology) override;
-        
+        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) override;
         void presentFrame() override;
         
     private:
@@ -148,5 +144,7 @@ namespace foundation {
         
         std::unordered_set<std::string> _shaderNames;
         std::shared_ptr<WASMShader> _currentShader;
+        
+        RenderTopology _topology;
     };
 }

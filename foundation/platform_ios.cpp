@@ -395,8 +395,12 @@ namespace foundation {
         g_updateAndDraw = std::move(updateAndDraw);
     }
     
-    void IOSPlatform::exit() {
+    void IOSPlatform::setResizeHandler(util::callback<void()> &&handler) {
+        
+    }
     
+    void IOSPlatform::exit() {
+        
     }
     
     void IOSPlatform::logMsg(const char *fmt, ...) {

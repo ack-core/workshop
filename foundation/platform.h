@@ -114,7 +114,7 @@ namespace foundation {
         
         // Loads file to memory
         // @filePath - file path. Example: "data/map1/test.png"
-        // @return   - size != 0 if file opened successfully.
+        // @return   - data != nullptr and size != 0 if file opened successfully.
         // @completion called from the main thread
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
@@ -168,6 +168,10 @@ namespace foundation {
         // Argument of @updateAndDraw is delta time in seconds
         //
         virtual void setLoop(util::callback<void(float)> &&updateAndDraw) = 0;
+        
+        // Set handler for window resize
+        //
+        virtual void setResizeHandler(util::callback<void()> &&handler) = 0;
         
         // Breaks platform update cycle
         //

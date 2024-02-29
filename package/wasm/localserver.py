@@ -9,9 +9,9 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')
         self.send_header('Connection', 'close')
-        #self.send_header('Access-Control-Allow-Origin', '*')
-        #self.send_header('Cross-Origin-Embedder-Policy', 'credentialless')
-        #self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cross-Origin-Embedder-Policy', 'credentialless')
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         SimpleHTTPRequestHandler.end_headers(self)
 
     def do_POST(self):
