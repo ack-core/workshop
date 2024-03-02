@@ -37,9 +37,8 @@ onmessage = (msg) => {
                 webgl_applyState: (frameBufferID, shaderID, mask, r, g, b, a, d, ztype, btype) => { throw "can't access webgl from background" },
                 webgl_applyConstants: (index, ptr, len) => { throw "can't access webgl from background" },
                 webgl_applyTexture: (index, textureID, samplingType) => { throw "can't access webgl from background" },
-                webgl_bindBuffer: (bufferID) => { throw "can't access webgl from background" },
-                webgl_setInstanceCount: (count) => { throw "can't access webgl from background" },
-                webgl_draw: (vertexCount, instanceCount, topology) => { throw "can't access webgl from background" }
+                webgl_drawDefault: (buffer, vertexCount, instanceCount, topology) => { throw "can't access webgl from background" },
+                webgl_drawWithRepeat: (buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) => { throw "can't access webgl from background" }
             }
         };
 

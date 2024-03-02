@@ -18,9 +18,19 @@ extern "C" {
     void webgl_applyState(WebGLId target, WebGLId shader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
-    void webgl_bindBuffer(WebGLId data);
-    void webgl_setInstanceCount(std::uint32_t instanceCount);
-    void webgl_draw(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    //void webgl_draw(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_drawDefault(WebGLId data, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_drawWithRepeat(WebGLId data, std::uint32_t attrCount, std::uint32_t instanceCount, std::uint32_t vertexCount, std::uint32_t totalInstCount, GLenum topology);
+    
+//                webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {
+//                    glcontext.bindVertexArray(glbuffers[buffer].layout);
+//                    glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
+//                },
+//                webgl_drawWithRepeat: function(buffer, attrCount, vertexCount, instanceCount, topology) {
+//
+//    void webgl_bindBuffer(WebGLId data);
+//    void webgl_setInstanceCount(std::uint32_t instanceCount);
+//    void webgl_draw(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
 }
 
 namespace {
@@ -723,21 +733,18 @@ namespace foundation {
             
             WebGLId id = 0;
             std::uint32_t vcount = 1;
-            std::uint32_t icount = instanceCount;
             
             if (platformData) {
                 id = platformData->getWebGLData();
                 vcount = platformData->getCount();
             }
-            webgl_bindBuffer(id);
-
-            if (layout.repeat > 1) {
-                webgl_setInstanceCount(instanceCount);
-                icount = vcount * instanceCount;
-                vcount = layout.repeat;
-            }
             
-            webgl_draw(vcount, icount, g_topologies[int(_topology)]);
+            if (layout.repeat > 1) {
+                webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, vcount * instanceCount, g_topologies[int(_topology)]);
+            }
+            else {
+                webgl_drawDefault(id, vcount, instanceCount, g_topologies[int(_topology)]);
+            }
         }
     }
         

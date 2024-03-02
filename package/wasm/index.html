@@ -118,22 +118,22 @@
         var resizeTimeoutHandler = null;
         
         const vertexAttribFunctions = [
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 2, glcontext.HALF_FLOAT, false, stride, offset); return 4; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 4, glcontext.HALF_FLOAT, false, stride, offset); return 8; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 1, glcontext.FLOAT, false, stride, offset); return 4; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 2, glcontext.FLOAT, false, stride, offset); return 8; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 3, glcontext.FLOAT, false, stride, offset); return 12; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 4, glcontext.FLOAT, false, stride, offset); return 16; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.HALF_FLOAT, false, stride, offset); return 4; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  4, glcontext.HALF_FLOAT, false, stride, offset); return 8; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  1, glcontext.FLOAT, false, stride, offset); return 4; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.FLOAT, false, stride, offset); return 8; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  3, glcontext.FLOAT, false, stride, offset); return 12; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  4, glcontext.FLOAT, false, stride, offset); return 16; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 2, glcontext.SHORT, stride, offset); return 4; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 4, glcontext.SHORT, stride, offset); return 8; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 2, glcontext.UNSIGNED_SHORT, stride, offset); return 4; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 4, glcontext.UNSIGNED_SHORT, stride, offset); return 8; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 2, glcontext.SHORT, true, stride, offset); return 4; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 4, glcontext.SHORT, true, stride, offset); return 8; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 2, glcontext.UNSIGNED_SHORT, true, stride, offset); return 4; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 4, glcontext.UNSIGNED_SHORT, true, stride, offset); return 8; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.SHORT, true, stride, offset); return 4; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  4, glcontext.SHORT, true, stride, offset); return 8; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.UNSIGNED_SHORT, true, stride, offset); return 4; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  4, glcontext.UNSIGNED_SHORT, true, stride, offset); return 8; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 4, glcontext.UNSIGNED_BYTE, stride, offset); return 4; },
-            (index, stride, offset) => { glcontext.vertexAttribPointer(index, 4, glcontext.UNSIGNED_BYTE, true, stride, offset); return 4; },
+            (index, stride, offset) => { glcontext.vertexAttribPointer(index,  4, glcontext.UNSIGNED_BYTE, true, stride, offset); return 4; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 1, glcontext.INT, stride, offset); return 4; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 2, glcontext.INT, stride, offset); return 8; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 3, glcontext.INT, stride, offset); return 12; },
@@ -371,21 +371,21 @@
                     glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                     glcontext.bindSampler(index, glsamplers[samplingType]);
                 },
-                webgl_bindBuffer: function(buffer) {
+                webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {
                     glcontext.bindVertexArray(glbuffers[buffer].layout);
-
-                },
-                webgl_setInstanceCount: function(count) {
-                    glcontext.uniform1i(uniformInstanceCountLocation, count);
-                    glcontext.vertexAttribDivisor(0, count);
-
-                },
-                webgl_draw: function(vertexCount, instanceCount, topology) {
                     glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
+                },
+                webgl_drawWithRepeat: function(buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) {
+                    glcontext.bindVertexArray(glbuffers[buffer].layout);
+                    glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);
+                    for (let i = 0; i < attrCount; i++) {
+                        glcontext.vertexAttribDivisor(i, instanceCount);
+                    }
+                    glcontext.drawArraysInstanced(topology, 0, vertexCount, totalInstCount);
                 }
             }
         };
-
+        
         //navigator.serviceWorker.controller != null && 
         if (glcontext != null) {
             WebAssembly.instantiateStreaming(fetch('workshop.wasm'), imports).then(m => {
