@@ -286,7 +286,11 @@ namespace foundation {
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
         //
         virtual void applyShaderConstants(const void *constants) = 0;
-
+        
+        // Draw vertexes
+        //
+        virtual void draw(std::uint32_t vertexCount) = 0;
+        
         // Draw vertexes from RenderData
         // @inputData layout has to match current shader's layout
         //

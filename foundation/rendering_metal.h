@@ -136,6 +136,7 @@ namespace foundation {
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
+        void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) override;
         void presentFrame() override;
         

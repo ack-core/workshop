@@ -960,6 +960,13 @@ namespace foundation {
         }
     }
     
+    void MetalRendering::draw(std::uint32_t vertexCount) {
+        if (_currentRenderCommandEncoder && _currentShader) {
+            [_currentRenderCommandEncoder setVertexBuffer:nil offset:0 atIndex:VERTEX_IN_BINDING_START];
+            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(_topology)] vertexStart:0 vertexCount:vertexCount];
+        }
+    }
+    
     void MetalRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
         if (_currentRenderCommandEncoder && _currentShader) {
             const InputLayout &layout = _currentShader->getInputLayout();

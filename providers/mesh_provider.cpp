@@ -1,10 +1,8 @@
 
 #include "mesh_provider.h"
-#include "resource_list.h"
+#include "meshes_list.h"
 
 #include <list>
-#include <unordered_map>
-#include <sstream>
 
 namespace resource {
     class MeshProviderImpl : public std::enable_shared_from_this<MeshProviderImpl>, public MeshProvider {
@@ -18,7 +16,6 @@ namespace resource {
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
-        std::unordered_map<std::string, MeshInfo> _meshInfos;
         std::unordered_map<std::string, std::unique_ptr<VoxelMesh>> _meshes;
         
         struct QueueEntry {
@@ -31,29 +28,14 @@ namespace resource {
         bool _asyncInProgress;
     };
     
-    MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform), _asyncInProgress(false) {
-        std::string line, path;
-        MeshInfo info;
-
-        for (const char *line : MeshesList) {
-            util::strstream input (line, strlen(line));
-            
-            if (input >> path >> info.sizeX >> info.sizeY >> info.sizeZ) {
-                _meshInfos.emplace(path, info);
-            }
-            else {
-                _platform->logError("[MeshProviderImpl::MeshProviderImpl] Bad mesh info in '%s'\n", line);
-            }
-        }
-    }
-    
+    MeshProviderImpl::MeshProviderImpl(const std::shared_ptr<foundation::PlatformInterface> &platform) : _platform(platform), _asyncInProgress(false) {}
     MeshProviderImpl::~MeshProviderImpl() {
     
     }
     
     const MeshInfo *MeshProviderImpl::getMeshInfo(const char *voxPath) {
-        auto index = _meshInfos.find(voxPath);
-        return index != _meshInfos.end() ? &index->second : nullptr;
+        auto index = MESHES_LIST.find(voxPath);
+        return index != MESHES_LIST.end() ? &index->second : nullptr;
     }
 
     void MeshProviderImpl::getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) {

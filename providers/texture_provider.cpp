@@ -1,9 +1,8 @@
 
 #include "texture_provider.h"
-#include "resource_list.h"
+#include "textures_list.h"
 #include "thirdparty/upng/upng.h"
 
-#include <unordered_map>
 #include <list>
 
 namespace resource {
@@ -47,30 +46,6 @@ namespace resource {
     : _platform(platform)
     , _rendering(rendering)
     {
-        std::string line, path, type;
-        
-        for (const char *line : TexturesList) {
-            util::strstream input (line, strlen(line));
-            TextureData data = {};
-            
-            if (input >> path >> type >> data.width >> data.height) {
-                if (type == "rgba") {
-                    data.type = TextureInfo::Type::RGBA8;
-                }
-                else if (type == "grayscale") {
-                    data.type = TextureInfo::Type::GRAYSCALE8;
-                }
-                else {
-                    _platform->logError("[TextureProviderImpl::TextureProviderImpl] Unknown texture type '%s'\n", type.data());
-                    break;
-                }
-                
-                _textures.emplace(path, std::move(data));
-            }
-            else {
-                _platform->logError("[TextureProviderImpl::TextureProviderImpl] Bad texture info '%s'\n", line);
-            }
-        }
     }
     
     TextureProviderImpl::~TextureProviderImpl() {
@@ -78,8 +53,8 @@ namespace resource {
     }
     
     const TextureInfo *TextureProviderImpl::getTextureInfo(const char *texPath) {
-        auto index = _textures.find(texPath);
-        return index != _textures.end() ? &index->second : nullptr;
+        auto index = TEXTURES_LIST.find(texPath);
+        return index != TEXTURES_LIST.end() ? &index->second : nullptr;
     }
     
     namespace {
