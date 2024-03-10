@@ -58,7 +58,7 @@ namespace foundation {
         class RTTexture : public MetalTexBase {
         public:
             RTTexture(MetalTarget &target, id<MTLTexture> texture) : _target(target), _texture(texture) {}
-            ~RTTexture() override {}
+            ~RTTexture() override { _texture = nil; }
             
             std::uint32_t getWidth() const override { return _target._width; }
             std::uint32_t getHeight() const override { return _target._height; }
@@ -121,9 +121,6 @@ namespace foundation {
         
         void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) override;
         
-        auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
-        auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
-        
         RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
@@ -137,7 +134,7 @@ namespace foundation {
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount) override;
-        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) override;
+        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
         void presentFrame() override;
         
     private:

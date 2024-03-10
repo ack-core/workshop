@@ -189,14 +189,6 @@ namespace foundation {
         //
         virtual void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
         
-        // Get screen coords from world position
-        //
-        virtual auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f = 0;
-
-        // Get ray direction from screen coords (start point is camera position)
-        //
-        virtual auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f = 0;
-
         // Create shader from source text
         // @name      - name that is used in error messages
         // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix
@@ -241,7 +233,7 @@ namespace foundation {
         // Textures. There 4 texture slots. Example of getting color from the last slot: float4 color = _tex2linear(3, float2(0, 0));
         //
         // Global functions:
-        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2nearest/_tex2linear/_tex2raw(index, v)
+        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2d(index, v)
         //
         virtual auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr = 0;
         

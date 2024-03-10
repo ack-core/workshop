@@ -4,9 +4,6 @@
 #include "foundation/rendering.h"
 #include "foundation/math.h"
 
-#include "datahub/datahub.h"
-#include "providers/texture_provider.h"
-
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -16,10 +13,7 @@ namespace voxel {
     public:
         static std::shared_ptr<SceneInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
-            const resource::TextureProviderPtr &textureProvider,
-            const foundation::RenderTexturePtr &palette,
-            const dh::DataHubPtr &dh
+            const foundation::RenderingInterfacePtr &rendering
         );
         
     public:
@@ -77,12 +71,14 @@ namespace voxel {
     public:
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
+        
         virtual auto addLineSet(bool depthTested, std::uint32_t startCount) -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
         virtual auto addStaticModel(const std::vector<VTXSVOX> &voxels) -> StaticModelPtr = 0;
         virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
         virtual auto addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) -> DynamicModelPtr = 0;
         virtual auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr = 0;
+        
         virtual auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f = 0;
         virtual auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f = 0;
 

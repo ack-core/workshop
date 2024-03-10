@@ -37,7 +37,7 @@ add_subdirectory("${m_source_root}/thirdparty/stb_mini_ttf")
 
 add_subdirectory("${m_source_root}/foundation")
 add_subdirectory("${m_source_root}/providers")
-#add_subdirectory("${m_source_root}/voxel")
+add_subdirectory("${m_source_root}/voxel")
 #add_subdirectory("${m_source_root}/ui")
 #add_subdirectory("${m_source_root}/datahub")
 #add_subdirectory("${m_source_root}/game")
@@ -54,7 +54,7 @@ target_link_libraries(workshop PUBLIC stb_mini_ttf)
 
 target_link_libraries(workshop PUBLIC foundation)
 target_link_libraries(workshop PUBLIC providers)
-#target_link_libraries(workshop PUBLIC voxel)
+target_link_libraries(workshop PUBLIC voxel)
 #target_link_libraries(workshop PUBLIC ui)
 #target_link_libraries(workshop PUBLIC datahub)
 #target_link_libraries(workshop PUBLIC game)
@@ -72,21 +72,19 @@ get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_
 #file(MAKE_DIRECTORY "${m_binary_root}")
 
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.ttf")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.yard")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.bin")
+file(COPY "${m_resources_root}/ui" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
+file(COPY "${m_resources_root}/actors" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
+file(COPY "${m_resources_root}/things" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
 message(STATUS "Generating resource lists...")
 execute_process(
-	COMMAND python ${m_tools_root}/resource_list.py -r ${m_resources_root} -e .png -d ${m_binary_root}/data/textures.list
+	COMMAND python ${m_tools_root}/resource_list.py -r ${m_resources_root} -d ${PROJECT_SOURCE_DIR}/providers
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
-
+message(STATUS "Generating palette...")
 execute_process(
-	COMMAND python ${m_tools_root}/resource_list.py -r ${m_resources_root} -e .vox -d ${m_binary_root}/data/meshes.list
+	COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/voxel/palette.h
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 

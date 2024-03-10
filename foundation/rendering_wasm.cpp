@@ -6,7 +6,6 @@
 #include <GLES3/gl3.h>
 
 // TODO: +unique_ptr
-// TODO: resource dtors (webglData)
 
 // From js
 extern "C" {
@@ -18,19 +17,12 @@ extern "C" {
     void webgl_applyState(WebGLId target, WebGLId shader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
-    //void webgl_draw(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
     void webgl_drawDefault(WebGLId data, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
     void webgl_drawWithRepeat(WebGLId data, std::uint32_t attrCount, std::uint32_t instanceCount, std::uint32_t vertexCount, std::uint32_t totalInstCount, GLenum topology);
-    
-//                webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {
-//                    glcontext.bindVertexArray(glbuffers[buffer].layout);
-//                    glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
-//                },
-//                webgl_drawWithRepeat: function(buffer, attrCount, vertexCount, instanceCount, topology) {
-//
-//    void webgl_bindBuffer(WebGLId data);
-//    void webgl_setInstanceCount(std::uint32_t instanceCount);
-//    void webgl_draw(std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_deleteProgram(WebGLId id);
+    void webgl_deleteData(WebGLId id);
+    void webgl_deleteTexture(WebGLId id);
+    void webgl_deleteTarget(WebGLId id);
 }
 
 namespace {
@@ -111,6 +103,7 @@ namespace foundation {
     {
     }
     WASMShader::~WASMShader() {
+        webgl_deleteProgram(_shader);
     }
     const InputLayout &WASMShader::getInputLayout() const {
         return _inputLayout;
@@ -131,7 +124,7 @@ namespace foundation {
     {
     }
     WASMData::~WASMData() {
-
+        webgl_deleteData(_data);
     }
     std::uint32_t WASMData::getCount() const {
         return _count;
@@ -154,7 +147,7 @@ namespace foundation {
     {
     }
     WASMTexture::~WASMTexture() {
-
+        webgl_deleteTexture(_texture);
     }
     std::uint32_t WASMTexture::getWidth() const {
         return _width;
@@ -186,8 +179,11 @@ namespace foundation {
             _textures[i] = std::make_shared<RTTexture>(*this, textures[i]);
         }
     }
+    WASMTarget::RTTexture::~RTTexture() {
+        webgl_deleteTexture(_texture);
+    }
     WASMTarget::~WASMTarget() {
-        
+        webgl_deleteTarget(_target);
     }
     std::uint32_t WASMTarget::getWidth() const {
         return _width;
@@ -229,36 +225,7 @@ namespace foundation {
         _frameConstants->cameraPosition.xyz = camPos;
         _frameConstants->cameraDirection.xyz = camDir;
     }
-    
-    math::vector2f WASMRendering::getScreenCoordinates(const math::vector3f &worldPosition) {
-        const math::transform3f vp = _frameConstants->viewMatrix * _frameConstants->projMatrix;
-        math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
         
-        tpos = tpos.transformed(vp);
-        tpos.x /= tpos.w;
-        tpos.y /= tpos.w;
-        tpos.z /= tpos.w;
-        
-        math::vector2f result = math::vector2f(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
-        
-        if (tpos.z > 0.0f) {
-            result.x = (tpos.x + 1.0f) * 0.5f * _platform->getScreenWidth();
-            result.y = (1.0f - tpos.y) * 0.5f * _platform->getScreenHeight();
-        }
-        
-        return result;
-    }
-    
-    math::vector3f WASMRendering::getWorldDirection(const math::vector2f &screenPosition) {
-        const math::transform3f inv = (_frameConstants->viewMatrix * _frameConstants->projMatrix).inverted();
-        
-        float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
-        float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
-        
-        const math::vector4f worldPos = math::vector4f(relScreenPosX, relScreenPosY, 0.0f, 1.0f).transformed(inv);
-        return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
-    }
-    
     RenderShaderPtr WASMRendering::createShader(const char *name, const char *src, InputLayout &&layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(src, strlen(src));
@@ -726,11 +693,24 @@ namespace foundation {
         }
     }
     
-    void WASMRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
-        const std::shared_ptr<WASMData> platformData = std::static_pointer_cast<WASMData>(inputData);
+    void WASMRendering::draw(std::uint32_t vertexCount) {
         if (_currentShader) {
             const InputLayout &layout = _currentShader->getInputLayout();
             
+            if (layout.repeat > 1) {
+                webgl_drawDefault(0, layout.repeat, vertexCount, g_topologies[int(_topology)]);
+            }
+            else {
+                webgl_drawDefault(0, vertexCount, 1, g_topologies[int(_topology)]);
+            }
+        }
+    }
+    
+    void WASMRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
+        const std::shared_ptr<WASMData> platformData = std::static_pointer_cast<WASMData>(inputData);
+        
+        if (_currentShader) {
+            const InputLayout &layout = _currentShader->getInputLayout();
             WebGLId id = 0;
             std::uint32_t vcount = 1;
             
@@ -738,7 +718,6 @@ namespace foundation {
                 id = platformData->getWebGLData();
                 vcount = platformData->getCount();
             }
-            
             if (layout.repeat > 1) {
                 webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, vcount * instanceCount, g_topologies[int(_topology)]);
             }

@@ -224,7 +224,7 @@
                     glcontext.compileShader(vshader);
                     glcontext.compileShader(fshader);
 
-                    if (glcontext.getShaderParameter(vshader, glcontext.COMPILE_STATUS)) {                        
+                    if (glcontext.getShaderParameter(vshader, glcontext.COMPILE_STATUS)) {
                         if (glcontext.getShaderParameter(fshader, glcontext.COMPILE_STATUS)) {
                             glcontext.attachShader(program, vshader);
                             glcontext.attachShader(program, fshader);
@@ -309,9 +309,11 @@
                     const texarray = new Uint32Array(memory.buffer, textures, count);
                     const frameBuffer = glcontext.createFramebuffer();
                     const attachments = [];
-                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, frameBuffer);
 
-                    for (var i = 0; i < count; i++) {
+                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, frameBuffer);
+                    var result = {fb: frameBuffer, depth: null};
+
+                    for (let i = 0; i < count; i++) {
                         const texture = glcontext.createTexture();
                         glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                         glcontext.texImage2D(glcontext.TEXTURE_2D, 0, internal, w, h, 0, format, type, null);
@@ -321,10 +323,10 @@
                         attachments[i] = glcontext.COLOR_ATTACHMENT0 + i;
                     }
                     if (enableDepth) {
-                        const depthBuffer = glcontext.createRenderbuffer();
-                        glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, depthBuffer);
+                        result.depth = glcontext.createRenderbuffer();
+                        glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, result.depth);
                         glcontext.renderbufferStorage(glcontext.RENDERBUFFER, glcontext.DEPTH_COMPONENT32F, w, h);
-                        glcontext.framebufferRenderbuffer(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.RENDERBUFFER, depthBuffer);
+                        glcontext.framebufferRenderbuffer(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.RENDERBUFFER, result.depth);
                         glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, null);
                     }
                     if (glcontext.checkFramebufferStatus(glcontext.FRAMEBUFFER) != glcontext.FRAMEBUFFER_COMPLETE) {
@@ -332,16 +334,38 @@
                         return 0;
                     }
 
-                    glcontext.drawBuffers(attachments);                    
+                    glcontext.drawBuffers(attachments);
                     glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, null);
-                    glframebuffers[glFrameBufferIDCounter] = frameBuffer;
+                    glframebuffers[glFrameBufferIDCounter] = result;
                     return glFrameBufferIDCounter++;
+                },
+                webgl_deleteProgram(id) {
+                    const program = glshaders[id]
+                    glcontext.deleteProgram(program);
+                    glshaders[id] = null;
+                },
+                webgl_deleteData(id) {
+                    const data = glbuffers[id]
+                    glcontext.deleteBuffer(data.vbo);
+                    glcontext.deleteVertexArray(data.vao);
+                    glbuffers[id] = null;
+                },
+                webgl_deleteTexture(id) {
+                    const texture = gltextures[id]
+                    glcontext.deleteTexture(texture);
+                    gltextures[id] = null;
+                },
+                webgl_deleteTarget(id) {
+                    const target = glframebuffers[id]
+                    glcontext.deleteRenderbuffer(target.depth);
+                    glcontext.deleteFramebuffer(target.fb);
+                    glframebuffers[id] = null;
                 },
                 webgl_viewPort(w, h) {
                     glcontext.viewport(0, 0, w, h);
                 },
                 webgl_applyState: function(frameBufferID, shaderID, mask, r, g, b, a, d, ztype, btype) {
-                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, glframebuffers[frameBufferID]);
+                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, glframebuffers[frameBufferID].fb);
 
                     if (mask) {
                         glcontext.clearColor(r, g, b, a);
@@ -385,7 +409,7 @@
                 }
             }
         };
-        
+
         //navigator.serviceWorker.controller != null && 
         if (glcontext != null) {
             WebAssembly.instantiateStreaming(fetch('workshop.wasm'), imports).then(m => {
@@ -437,19 +461,19 @@
                 glbuffers[0] = {
                     buffer: glcontext.createBuffer(),
                     layout: glcontext.createVertexArray()
-                };                    
+                };
                 glcontext.bindVertexArray(glbuffers[0].layout);
                 glcontext.bindBuffer(glcontext.ARRAY_BUFFER, glbuffers[0].buffer);
                 glcontext.enableVertexAttribArray(0);
                 glcontext.vertexAttribPointer(0, 1, glcontext.FLOAT, false, 0, 0);
                 glcontext.bindVertexArray(null);
 
-                glframebuffers[0] = null;
+                glframebuffers[0] = {fb: null, depth: null};
                 glcontext.depthFunc(glcontext.GREATER);
                 glcontext.clearColor(0, 0, 0, 0);
                 glcontext.clearDepth(0);
                 glcontext.clear(glcontext.DEPTH_BUFFER_BIT | glcontext.COLOR_BUFFER_BIT);
-                        
+                
                 instance.exports.initialize();
 
                 function getCoord(event) {

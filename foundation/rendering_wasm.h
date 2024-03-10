@@ -65,7 +65,7 @@ namespace foundation {
         class RTTexture : public WASMTexBase {
         public:
             RTTexture(const WASMTarget &target, WebGLId texture) : _target(target), _texture(texture) {}
-            ~RTTexture() override {}
+            ~RTTexture() override;
             
             auto getWidth() const -> std::uint32_t override { return _target._width; }
             auto getHeight() const -> std::uint32_t override { return _target._height; }
@@ -107,9 +107,6 @@ namespace foundation {
         
         void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) override;
         
-        auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
-        auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
-        
         auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
@@ -122,7 +119,8 @@ namespace foundation {
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
-        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) override;
+        void draw(std::uint32_t vertexCount) override;
+        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
         void presentFrame() override;
         
     private:

@@ -325,35 +325,6 @@ namespace foundation {
         _frameConstants.cameraDirection.xyz = camDir;
     }
     
-    math::vector2f MetalRendering::getScreenCoordinates(const math::vector3f &worldPosition) {
-        const math::transform3f vp = _frameConstants.viewMatrix * _frameConstants.projMatrix;
-        math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
-        
-        tpos = tpos.transformed(vp);
-        tpos.x /= tpos.w;
-        tpos.y /= tpos.w;
-        tpos.z /= tpos.w;
-        
-        math::vector2f result = math::vector2f(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
-        
-        if (tpos.z > 0.0f) {
-            result.x = (tpos.x + 1.0f) * 0.5f * _platform->getScreenWidth();
-            result.y = (1.0f - tpos.y) * 0.5f * _platform->getScreenHeight();
-        }
-        
-        return result;
-    }
-    
-    math::vector3f MetalRendering::getWorldDirection(const math::vector2f &screenPosition) {
-        const math::transform3f inv = (_frameConstants.viewMatrix * _frameConstants.projMatrix).inverted();
-        
-        float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
-        float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
-        
-        const math::vector4f worldPos = math::vector4f(relScreenPosX, relScreenPosY, 0.0f, 1.0f).transformed(inv);
-        return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
-    }
-    
     RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, InputLayout &&layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(shadersrc, strlen(shadersrc));
@@ -962,8 +933,15 @@ namespace foundation {
     
     void MetalRendering::draw(std::uint32_t vertexCount) {
         if (_currentRenderCommandEncoder && _currentShader) {
+            const InputLayout &layout = _currentShader->getInputLayout();
             [_currentRenderCommandEncoder setVertexBuffer:nil offset:0 atIndex:VERTEX_IN_BINDING_START];
-            [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(_topology)] vertexStart:0 vertexCount:vertexCount];
+            
+            if (layout.repeat > 1) {
+                [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(_topology)] vertexStart:0 vertexCount:layout.repeat instanceCount:vertexCount];
+            }
+            else {
+                [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(_topology)] vertexStart:0 vertexCount:vertexCount];
+            }
         }
     }
     

@@ -5,5 +5,6 @@
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
         {"actors/knight_00", { 7, 8, 7 }},
+        {"things/room", { 30, 10, 20 }},
     };
 }
