@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Tool to make engine resources list
+Tool to make engine resources list (*.vox, *.png)
 """
 
 import typing
@@ -18,15 +18,18 @@ PNG_COLOR_TYPE_RGBA = 6
 VOX_READ_MAIN = 20
 VOX_READ_CHUNK_HEADER = 4
 
+PLC_READ_HEADER = 16
+
 def list_png(root: str, file: str, out: typing.BinaryIO) -> None:
-    with open(os.path.join(root, file), mode="rb") as f:
+    fullpath = os.path.join(root, file)
+    with open(fullpath, mode="rb") as f:
         header = f.read(PNG_READ_LENGTH)
         try:
             sign, _, _, w, h, depth, color_type = struct.unpack(">8siiiiBB", header)
             if sign == PNG_SIGN and depth == PNG_REQUIRED_DEPTH:
                 color_types = {
-                    PNG_COLOR_TYPE_GRAYSCALE: "TextureInfo::Type::GRAYSCALE8",
-                    PNG_COLOR_TYPE_RGBA: "TextureInfo::Type::RGBA8"
+                    PNG_COLOR_TYPE_GRAYSCALE: "foundation::RenderTextureFormat::R8UN",
+                    PNG_COLOR_TYPE_RGBA: "foundation::RenderTextureFormat::RGBA8UN"
                 }
 
                 if color_type in color_types:
@@ -34,15 +37,27 @@ def list_png(root: str, file: str, out: typing.BinaryIO) -> None:
                     msg = "        {{ \"{}\", {{ {}, {}, {} }}}},\r\n".format(file, w, h, color_types[color_type])
                     out.write(msg.encode("utf-8"))
 
-        except (Exception,):
+        except (Exception,) as e:
+            print("---- Error: '{}' caused '{}'".format(fullpath, e))
             pass
 
 def list_vox(root: str, file: str, out: typing.BinaryIO) -> None:
-    with open(os.path.join(root, file), mode="rb") as f:
-        _ = f.read(VOX_READ_MAIN)
-        if f.read(VOX_READ_CHUNK_HEADER) == b'PACK':
-            data = f.read(12)
-            frame_count = struct.unpack("<i", data[8:12])[0]
+    fullpath = os.path.join(root, file)
+    file = file.replace(".vox", "")
+
+    with open(fullpath, mode="rb") as f:
+        header = f.read(VOX_READ_MAIN)
+        version = struct.unpack("<i", header[4:8])[0]
+        frame_count = 1
+
+        if version == 0x96:
+            current_offset = f.tell()
+            if f.read(VOX_READ_CHUNK_HEADER) == b'PACK':
+                data = f.read(12)
+                frame_count = struct.unpack("<i", data[8:12])[0]
+            else:
+                f.seek(current_offset)
+
             mx, my, mz = (0, 0, 0)
 
             for i in range(0, frame_count):
@@ -58,15 +73,36 @@ def list_vox(root: str, file: str, out: typing.BinaryIO) -> None:
                         data = f.read(12)
                         voxel_count = struct.unpack("<i", data[8:])[0]
                         f.read(voxel_count * 4)
-
                     else:
+                        print("---- Error: '{}' has no 'XYZI' block".format(fullpath))
                         return
                 else:
+                    print("---- Error: '{}' has no 'SIZE' block".format(fullpath))
                     return
 
-            file = file.replace(".vox", "")
             msg = "        {{\"{}\", {{ {}, {}, {} }}}},\r\n".format(file, mx, my, mz)
             out.write(msg.encode("utf-8"))
+
+        elif version == 0x7f:
+            data = f.read(12)
+            sx, sy, sz = struct.unpack("<iii", data)
+            msg = "        {{\"{}\", {{ {}, {}, {} }}}},\r\n".format(file, sx, sy, sz)
+            out.write(msg.encode("utf-8"))
+
+        else:
+            print("---- Error: '{}' has unknown format".format(fullpath))
+
+def list_plc(root: str, file: str, out: typing.BinaryIO) -> None:
+    fullpath = os.path.join(root, file)
+    file = file.replace(".plc", "")
+
+    with open(fullpath, mode="rb") as f:
+        f.read(PLC_READ_HEADER)
+        data = f.read(12)
+        sx, sy, sz = struct.unpack("<iii", data)
+        msg = "        {{\"{}\", {{ {}, {}, {} }}}},\r\n".format(file, sx, sy, sz)
+        out.write(msg.encode("utf-8"))
+        pass
 
 def main(root: str, dst: str) -> None:
     type_items: dict[str, tuple[callable, str, str, str]] = {
@@ -81,6 +117,12 @@ def main(root: str, dst: str) -> None:
             "    const std::unordered_map<const char *, TextureInfo> TEXTURES_LIST = {\r\n",
             "#include \"texture_provider.h\"\r\n\r\n",
             "textures_list.h"
+        ),
+        ".plc": (
+            list_plc,
+            "    const std::unordered_map<const char *, PlaceInfo> PLACES_LIST = {\r\n",
+            "#include \"place_provider.h\"\r\n\r\n",
+            "places_list.h"
         )
     }
 

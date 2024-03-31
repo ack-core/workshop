@@ -1,21 +1,8 @@
 
 #pragma once
-#include "foundation/util.h"
-#include "foundation/math.h"
 #include "foundation/platform.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-
 namespace resource {
-    enum class MeshOptimization {
-        DISABLED,    // Raw array of voxels
-        VISIBLE,     // Remove invisible voxels
-        OPTIMIZED,   // Merge voxels to scaled box considering color and neighbor-mask
-        MINIMIZED,   // Merge voxels to scaled box considering only color
-    };
-    
     struct MeshInfo {
         int sizeX;
         int sizeY;
@@ -25,7 +12,7 @@ namespace resource {
     struct VoxelMesh {
         struct Voxel {
             std::int16_t positionX, positionY, positionZ;
-            std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ;
+            std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
         };
         struct Frame {
             std::unique_ptr<Voxel[]> voxels;
@@ -47,12 +34,11 @@ namespace resource {
         //
         virtual const MeshInfo *getMeshInfo(const char *voxPath) = 0;
         
-        // Load voxels from file if they aren't loaded yet
+        // Asynchronously load voxels from file if they aren't loaded yet
         // @voxPath - path to file without extension
-        // @scaledVoxels  - optimization using scaled voxels
         // @return  - pointer to Mesh or nullptr
         //
-        virtual void getOrLoadVoxelMesh(const char *voxPath, MeshOptimization optimization, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) = 0;
         
         // Provider tracks resources life time and tries to free them
         //

@@ -77,14 +77,24 @@ file(COPY "${m_resources_root}/actors" DESTINATION "${m_binary_root}/data" FILES
 file(COPY "${m_resources_root}/things" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
-message(STATUS "Generating resource lists...")
-execute_process(
-	COMMAND python ${m_tools_root}/resource_list.py -r ${m_resources_root} -d ${PROJECT_SOURCE_DIR}/providers
-	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
 message(STATUS "Generating palette...")
 execute_process(
 	COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/voxel/palette.h
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+message(STATUS "Generating places...")
+execute_process(
+	COMMAND python ${m_tools_root}/gen_places.py -s ${m_resources_root}/places -d ${m_binary_root}/data/places -p ${m_resources_root}/palette.png
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+message(STATUS "Generating optimized meshes...")
+execute_process(
+	COMMAND python ${m_tools_root}/gen_static_meshes.py -s ${m_resources_root}/things -d ${m_binary_root}/data/things
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+message(STATUS "Generating resource lists...")
+execute_process(
+	COMMAND python ${m_tools_root}/resource_list.py -r ${m_binary_root}/data -d ${PROJECT_SOURCE_DIR}/providers
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
