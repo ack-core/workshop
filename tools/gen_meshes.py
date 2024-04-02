@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Tool to generate optimized static meshes from *.vox 
+Tool to generate optimized meshes from *.vox 
 Format:
 4 bytes  - 'VOX '
 1 uint32 - 127 (0x7f)
@@ -20,15 +20,60 @@ import struct
 VOX_READ_MAIN = 20
 VOX_READ_CHUNK_HEADER = 4
 
-def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int) -> (int, bytes):
+class Voxel:
+    def __init__(self):
+        self.exist = False
+        self.color = 0
+        self.mask = 0
+
+def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) -> (int, bytes):
     output = bytearray()
-    for e in data:
-        voxel = struct.pack("<hhhBBBBBB", e[0], e[1], e[2], e[3], 0x7e, 0, 0, 0, 0)
-        output += voxel
+    matrix = [[[Voxel() for i in range(0, sz + 2)] for i in range(0, sy + 2)] for i in range(0, sx + 2)]
+    for v in data:
+        e = matrix[v[0] + 1][v[1] + 1][v[2] + 1]
+        e.exist = True
+        e.color = v[3]
+        e.mask = 0b111111
+
+    if opt >= 1:
+        for x in range(1, sx + 1):
+            for y in range(1, sy + 1):
+                for z in range(1, sz + 1):
+                    e = matrix[x][y][z]
+                    if e.exist:
+                        if matrix[x][y][z - 1].exist:
+                            e.mask &= 0b111110
+                        if matrix[x - 1][y][z].exist:
+                            e.mask &= 0b111101
+                        if matrix[x][y - 1][z].exist:
+                            e.mask &= 0b111011
+                        if matrix[x][y][z + 1].exist:
+                            e.mask &= 0b110111
+                        if matrix[x + 1][y][z].exist:
+                            e.mask &= 0b101111
+                        if matrix[x][y + 1][z].exist:
+                            e.mask &= 0b011111
+
+        for x in range(1, sx + 1):
+            for y in range(1, sy + 1):
+                for z in range(1, sz + 1):
+                    e = matrix[x][y][z]
+                    e.exist = e.mask != 0
+
+    if opt >= 2:
+        pass
+
+    for x in range(1, sx + 1):
+        for y in range(1, sy + 1):
+            for z in range(1, sz + 1):
+                e = matrix[x][y][z]
+                if e.exist:
+                    voxel = struct.pack("<hhhBBBBBB", x - 1, y - 1, z - 1, e.color, e.mask, 0, 0, 0, 0)
+                    output += voxel
 
     return len(data), output
 
-def convert_vox(src: str, dst: str):
+def convert_vox(src: str, dst: str, opt: int):
     print("---- ", src)
     with open(src, mode="rb") as src_file:
         with open(dst, mode="wb") as dst_file:
@@ -76,11 +121,11 @@ def convert_vox(src: str, dst: str):
             for i in range(0, frame_count):
                 voxels = [tuple(frame_data[i][c * 4:c * 4 + 4]) for c in range(0, frame_size[i])]
                 voxels = [(e[1], e[2], e[0], (31 - e[3] // 8) * 8 + e[3] % 8) for e in voxels]
-                count, data = optimize(voxels, frame_bounds[i][0], frame_bounds[i][1], frame_bounds[i][2])
+                count, data = optimize(voxels, frame_bounds[i][0], frame_bounds[i][1], frame_bounds[i][2], opt)
                 dst_file.write(struct.pack("<i", count))
                 dst_file.write(data)
 
-def main(src: str, dst: str):
+def main(src: str, dst: str, opt: int):
     src = os.path.abspath(src)
     dst = os.path.abspath(dst)
 
@@ -90,11 +135,12 @@ def main(src: str, dst: str):
                 relpath_to = os.path.join(os.path.relpath(path, src), file)
                 fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
                 fullpath_from = os.path.join(path, file)
-                convert_vox(fullpath_from, fullpath_to)
+                convert_vox(fullpath_from, fullpath_to, opt)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Tool to generate optimized static meshes")
+    parser = argparse.ArgumentParser(description="Tool to generate optimized meshes")
     parser.add_argument("-s", "--src", type=str, required=True, help="Directory containing *.vox")
     parser.add_argument("-d", "--dst", type=str, required=True, help="Directory to output")
+    parser.add_argument("-o", "--opt", type=int, required=True, help="Optimization level 0-2")
     args = parser.parse_args()
     main(**vars(args))

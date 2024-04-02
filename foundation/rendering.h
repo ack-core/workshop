@@ -251,6 +251,14 @@ namespace foundation {
         
         // Create data buffer
         // @data        - pointer to data (array of structures)
+        // @count       - count of structures in array
+        // @stride      - size of structure in bytes
+        // @return      - handle
+        //
+        virtual auto createData(const void *data, std::uint32_t count, std::uint32_t stride) -> RenderDataPtr = 0;
+        
+        // Create data buffer
+        // @data        - pointer to data (array of structures)
         // @layout      - vertex description. Should match the description in shader
         // @count       - count of structures in array
         // @return      - handle
@@ -287,6 +295,12 @@ namespace foundation {
         // @inputData layout has to match current shader's layout
         //
         virtual void draw(const RenderDataPtr &inputData = nullptr, std::uint32_t instanceCount = 1) = 0;
+        
+        // Draw indexed vertexes
+        // @inputData layout has to match current shader's layout
+        // @indexes must be std::uint32_t indexes
+        //
+        virtual void draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) = 0;
         
         // Frame finalization
         //

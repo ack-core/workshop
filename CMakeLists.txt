@@ -89,7 +89,11 @@ execute_process(
 )
 message(STATUS "Generating optimized meshes...")
 execute_process(
-	COMMAND python ${m_tools_root}/gen_static_meshes.py -s ${m_resources_root}/things -d ${m_binary_root}/data/things
+	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/things -d ${m_binary_root}/data/things -o 1
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+execute_process(
+	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/actors -d ${m_binary_root}/data/actors -o 1
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 message(STATUS "Generating resource lists...")

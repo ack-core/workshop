@@ -124,6 +124,7 @@ namespace foundation {
         RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
+        RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
         RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t count) override;
         
         float getBackBufferWidth() const override;
@@ -135,6 +136,7 @@ namespace foundation {
         
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
+        void draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) override;
         void presentFrame() override;
         
     private:

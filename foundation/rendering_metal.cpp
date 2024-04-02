@@ -763,6 +763,13 @@ namespace foundation {
         }
     }
     
+    RenderDataPtr MetalRendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
+        @autoreleasepool {
+            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * stride) options:MTLResourceStorageModeShared];
+            return std::make_shared<MetalData>(buffer, count, stride);
+        }
+    }
+    
     RenderDataPtr MetalRendering::createData(const void *data, const InputLayout &layout, std::uint32_t count) {
         std::uint32_t stride = 0;
         for (const InputLayout::Attribute &item : layout.attributes) {
@@ -968,6 +975,18 @@ namespace foundation {
             else {
                 [_currentRenderCommandEncoder drawPrimitives:g_topologies[int(_topology)] vertexStart:0 vertexCount:vertexCount instanceCount:instanceCount];
             }
+        }
+    }
+    
+    void MetalRendering::draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) {
+        if (_currentRenderCommandEncoder && _currentShader) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            const MetalData *implData = static_cast<const MetalData *>(inputData.get());
+            const MetalData *idx = static_cast<const MetalData *>(indexes.get());
+            
+            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
+            [_currentRenderCommandEncoder setVertexBuffer:implData->get() offset:0 atIndex:VERTEX_IN_BINDING_START];
+            [_currentRenderCommandEncoder drawIndexedPrimitives:g_topologies[int(_topology)] indexCount:indexes->getCount() indexType:MTLIndexTypeUInt32 indexBuffer:idx->get() indexBufferOffset:0];
         }
     }
         

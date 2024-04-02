@@ -34,27 +34,27 @@ namespace voxel {
     public:
         struct LineSet {
             virtual void setPosition(const math::vector3f &position) = 0;
-            virtual auto addLine(const math::vector3f &start, const math::vector3f &end, const math::color &rgba) -> std::uint32_t = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
-            virtual void removeAllLines() = 0;
             virtual ~LineSet() = default;
         };
         struct BoundingBox {
-            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual void setBBoxData(const math::bound3f &bbox) = 0;
+            virtual void setColor(const math::color &rgba) = 0;
             virtual ~BoundingBox() = default;
         };
-        struct StaticModel {
+        struct StaticMesh {
             virtual void setPosition(const math::vector3f &position) = 0;
-            virtual ~StaticModel() = default;
-        };
-        struct TexturedModel {
-            virtual void setPosition(const math::vector3f &position) = 0;
-            virtual ~TexturedModel() = default;
-        };
-        struct DynamicModel {
             virtual void setFrame(std::uint32_t index) = 0;
+            virtual ~StaticMesh() = default;
+        };
+        struct DynamicMesh {
             virtual void setTransform(const math::transform3f &trfm) = 0;
-            virtual ~DynamicModel() = default;
+            virtual void setFrame(std::uint32_t index) = 0;
+            virtual ~DynamicMesh() = default;
+        };
+        struct TexturedMesh {
+            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual ~TexturedMesh() = default;
         };
         struct LightSource {
             virtual void setPosition(const math::vector3f &position) = 0;
@@ -63,20 +63,20 @@ namespace voxel {
         
         using LineSetPtr = std::shared_ptr<LineSet>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
-        using StaticModelPtr = std::shared_ptr<StaticModel>;
-        using TexturedModelPtr = std::shared_ptr<TexturedModel>;
-        using DynamicModelPtr = std::shared_ptr<DynamicModel>;
+        using StaticMeshPtr = std::shared_ptr<StaticMesh>;
+        using DynamicMeshPtr = std::shared_ptr<DynamicMesh>;
+        using TexturedMeshPtr = std::shared_ptr<TexturedMesh>;
         using LightSourcePtr = std::shared_ptr<LightSource>;
         
     public:
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
-        virtual auto addLineSet(bool depthTested, std::uint32_t startCount) -> LineSetPtr = 0;
-        virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addStaticModel(const std::vector<VTXSVOX> &voxels) -> StaticModelPtr = 0;
-        virtual auto addTexturedModel(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedModelPtr = 0;
-        virtual auto addDynamicModel(const std::vector<VTXDVOX> *frames, std::size_t frameCount, const math::transform3f &transform) -> DynamicModelPtr = 0;
+        virtual auto addLineSet(bool depthTested, std::uint32_t count) -> LineSetPtr = 0;
+        virtual auto addBoundingBox(bool depthTested, const math::bound3f &bbox) -> BoundingBoxPtr = 0;
+        virtual auto addStaticMesh(const std::vector<VTXSVOX> *frames, std::size_t frameCount) -> StaticMeshPtr = 0;
+        virtual auto addDynamicMesh(const std::vector<VTXDVOX> *frames, std::size_t frameCount) -> DynamicMeshPtr = 0;
+        virtual auto addTexturedMesh(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedMeshPtr = 0;
         virtual auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f = 0;
