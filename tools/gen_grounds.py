@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Tool to generate optimized places from *.png
+Tool to generate optimized grounds from *.png
 """
 
 import os
@@ -28,7 +28,7 @@ def generate_place(src: str, dst: str, palette: Palette):
         idx_data = [palette.get_index(src_data[i * 4:i * 4 + 4]) for i in range(0, src_w * src_h)]
 
         with open(dst, mode="wb") as f:
-            f.write(b'PLACE\0\0\0\0\0\0\0\0\0\0\0')
+            f.write(b'GROUND\0\0\0\0\0\0\0\0\0\0')
 
             # size
             f.write(struct.pack("<iii", src_w, 1, src_h))
@@ -72,7 +72,7 @@ def main(src: str, dst: str, palette: str):
                     if file.endswith(".png"):
                         relpath_to = os.path.join(os.path.relpath(path, src), file)
                         fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
-                        fullpath_to = fullpath_to.replace(".png", ".plc")
+                        fullpath_to = fullpath_to.replace(".png", ".grd")
                         fullpath_from = os.path.join(path, file)
                         generate_place(fullpath_from, fullpath_to, palette_object)
 
@@ -83,8 +83,8 @@ def main(src: str, dst: str, palette: str):
         print("---- Error: '{}'".format(e))
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Tool to generate optimized places from *.png")
-    parser.add_argument("-s", "--src", type=str, required=True, help="Directory containing place sources")
+    parser = argparse.ArgumentParser(description="Tool to generate optimized grounds from *.png")
+    parser.add_argument("-s", "--src", type=str, required=True, help="Directory containing ground sources")
     parser.add_argument("-d", "--dst", type=str, required=True, help="Directory to output")
     parser.add_argument("-p", "--palette", type=str, required=True, help="Path to the palette")
     args = parser.parse_args()

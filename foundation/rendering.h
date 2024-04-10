@@ -19,7 +19,7 @@ namespace foundation {
         TRIANGLESTRIP,
     };
     
-    enum class ZBehaviorType : std::uint8_t {
+    enum class DepthBehavior : std::uint8_t {
         DISABLED = 0,
         TEST_ONLY,
         TEST_AND_WRITE,
@@ -92,17 +92,17 @@ namespace foundation {
     public:
         static const std::size_t MAX_TEXTURE_COUNT = 4;
         
-        virtual bool hasDepthBuffer() const = 0;
         virtual auto getWidth() const -> std::uint32_t = 0;
         virtual auto getHeight() const -> std::uint32_t = 0;
         virtual auto getFormat() const -> RenderTextureFormat = 0;
         virtual auto getTextureCount() const -> std::uint32_t = 0;
         virtual auto getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & = 0;
+        virtual auto getDepth() const -> const std::shared_ptr<RenderTexture> & = 0;
         
     public:
         virtual ~RenderTarget() = default;
     };
-
+    
     class RenderData {
     public:
         virtual auto getCount() const -> std::uint32_t = 0;
@@ -116,64 +116,6 @@ namespace foundation {
     using RenderTexturePtr = std::shared_ptr<RenderTexture>;
     using RenderTargetPtr = std::shared_ptr<RenderTarget>;
     using RenderDataPtr = std::shared_ptr<RenderData>;
-    
-    // Render pass decription that is passed to 'applyState'
-    //
-    struct RenderPassConfig {
-        RenderTargetPtr target = nullptr;
-        
-        bool doClearColor = false;
-        bool doClearDepth = false;
-
-        float color[4] = {0.0f};
-        float depth = 0.0f;
-        
-        ZBehaviorType zBehaviorType = ZBehaviorType::TEST_AND_WRITE;
-        BlendType blendType = BlendType::DISABLED;
-    };
-    
-    struct RenderPassCommonConfigs {
-        static const RenderPassConfig DEFAULT() {
-            return {};
-        }
-        static const RenderPassConfig DEFAULT(const RenderTargetPtr &rt) {
-            return { .target = rt };
-        }
-        static const RenderPassConfig DEPTHCLEAR(const RenderTargetPtr &rt, float d = 0.0f) {
-            return RenderPassConfig {
-                rt, false, true,
-                {0, 0, 0, 0}, d
-            };
-        }
-        static const RenderPassConfig CLEAR(float r, float g, float b, float a = 1.0f, float d = 0.0f) {
-            return RenderPassConfig {
-                nullptr, true, true,
-                {r, g, b, a}, d,
-                ZBehaviorType::TEST_AND_WRITE, BlendType::DISABLED,
-            };
-        }
-        static const RenderPassConfig CLEAR(const RenderTargetPtr &rt, float r, float g, float b, float a = 1.0f, float d = 0.0f) {
-            return RenderPassConfig {
-                rt, true, rt->hasDepthBuffer(),
-                {r, g, b, a}, d,
-                rt->hasDepthBuffer() ? ZBehaviorType::TEST_AND_WRITE : ZBehaviorType::DISABLED, BlendType::DISABLED,
-            };
-        }
-        static const RenderPassConfig OVERLAY(BlendType blendType) {
-            return RenderPassConfig {
-                nullptr, false, false,
-                {0, 0, 0, 0}, 0.0f,
-                ZBehaviorType::DISABLED, blendType,
-            };
-        }
-        static const RenderPassConfig OVERLAY(BlendType blendType, ZBehaviorType zBehaviorType) {
-            return RenderPassConfig {
-                nullptr, false, false,
-                {0, 0, 0, 0}, 0.0f,
-                zBehaviorType, blendType,
-            };
-        }
-    };
     
     // Interface provides 3D-visualization methods
     //
@@ -214,7 +156,7 @@ namespace foundation {
         //     }
         //     vssrc {
         //         output_varName4 = _lerp(vertex_color, const_constName1, fixed_constName1);
-        //         output_position = _transform(float4(vertex_position, 1.0), frame_viewProjMatrix);
+        //         output_position = _transform(float4(vertex_position, 1.0), frame_stdVPMatrix);
         //
         //     }                                                 - vertex shader has float4 'output_position' variable
         //     fssrc {                                           - fragment shader has float4 'output_color[4]' variable. Max four render targets
@@ -225,7 +167,8 @@ namespace foundation {
         //     matrix4, matrix3, float1, float2, float3, float4, int1, int2, int3, int4, uint1, uint2, uint3, uint4
         //
         // Per frame global constants:
-        //     frame_viewProjMatrix     : matrix4 - view * projection matrix
+        //     frame_stdVPMatrix        : matrix4 - view * projection matrix
+        //     frame_invVPMatrix        : matrix4 - view * projection matrix
         //     frame_cameraPosition     : float4  - camera position (w = 1)
         //     frame_cameraDirection    : float4  - normalized camera direction (w = 0)
         //     frame_rtBounds           : float4  - render target size in pixels (.rg)
@@ -241,13 +184,13 @@ namespace foundation {
         // @w and @h    - width and height of the 0th mip layer
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr. Array can be empty if there is only one mip-level
         //
-        virtual auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr = 0;
+        virtual auto createTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr = 0;
         
         // Create render target texture
         // @count       - color targets count
         // @w and @h    - width and height
         //
-        virtual auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr = 0;
+        virtual auto createRenderTarget(foundation::RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr = 0;
         
         // Create data buffer
         // @data        - pointer to data (array of structures)
@@ -263,24 +206,31 @@ namespace foundation {
         // @count       - count of structures in array
         // @return      - handle
         //
-        virtual auto createData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr = 0;
+        virtual auto createData(const void *data, const foundation::InputLayout &layout, std::uint32_t count) -> RenderDataPtr = 0;
         
         // Return actual rendering area size
         //
         virtual auto getBackBufferWidth() const -> float = 0;
         virtual auto getBackBufferHeight() const -> float = 0;
         
-        // State is a rendering scope with shader
-        // @shader      - shader object
-        // @cfg         - render pass configuration
+        // Set target configuration
+        // @target      - render target where to perform rendering. Can be nullptr
+        // @depth       - depth buffer. Can be nullptr
+        // @clear       - clear color
         //
-        virtual void applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg = RenderPassCommonConfigs::DEFAULT()) = 0;
+        virtual void forTarget(const RenderTargetPtr &target, const math::color &clear, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) = 0;
+        
+        // Apply shader
+        // @shader      - shader object
+        // @topology    - geometry type
+        //
+        virtual void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, foundation::BlendType blendType, foundation::DepthBehavior depthBehavior) = 0;
         
         // Apply textures and their sampling type
         // @textures    - texture can be nullptr (texture at i-th position will not be set)
         // @count       - number of textures
         //
-        virtual void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) = 0;
+        virtual void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
         
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null

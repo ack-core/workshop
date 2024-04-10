@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Tool to make engine resources list (*.vox, *.png)
+Tool to make engine resources list (*.vox, *.plc)
 """
 
 import typing
@@ -18,7 +18,7 @@ PNG_COLOR_TYPE_RGBA = 6
 VOX_READ_MAIN = 20
 VOX_READ_CHUNK_HEADER = 4
 
-PLC_READ_HEADER = 16
+GRD_READ_HEADER = 16
 
 def list_png(root: str, file: str, out: typing.BinaryIO) -> None:
     fullpath = os.path.join(root, file)
@@ -92,12 +92,12 @@ def list_vox(root: str, file: str, out: typing.BinaryIO) -> None:
         else:
             print("---- Error: '{}' has unknown format".format(fullpath))
 
-def list_plc(root: str, file: str, out: typing.BinaryIO) -> None:
+def list_grd(root: str, file: str, out: typing.BinaryIO) -> None:
     fullpath = os.path.join(root, file)
-    file = file.replace(".plc", "")
+    file = file.replace(".grd", "")
 
     with open(fullpath, mode="rb") as f:
-        f.read(PLC_READ_HEADER)
+        f.read(GRD_READ_HEADER)
         data = f.read(12)
         sx, sy, sz = struct.unpack("<iii", data)
         msg = "        {{\"{}\", {{ {}, {}, {} }}}},\r\n".format(file, sx, sy, sz)
@@ -118,11 +118,11 @@ def main(root: str, dst: str) -> None:
             "#include \"texture_provider.h\"\r\n\r\n",
             "textures_list.h"
         ),
-        ".plc": (
-            list_plc,
-            "    const std::unordered_map<const char *, PlaceInfo> PLACES_LIST = {\r\n",
-            "#include \"place_provider.h\"\r\n\r\n",
-            "places_list.h"
+        ".grd": (
+            list_grd,
+            "    const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {\r\n",
+            "#include \"ground_provider.h\"\r\n\r\n",
+            "grounds_list.h"
         )
     }
 

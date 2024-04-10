@@ -238,6 +238,9 @@ namespace voxel {
         foundation::RenderShaderPtr _dynamicMeshShader;
         foundation::RenderShaderPtr _axisShader;
         
+        foundation::RenderTargetPtr _gbuffer;
+        foundation::RenderShaderPtr _gbufferToScreenShader;
+        
         std::vector<std::shared_ptr<LineSetImpl>> _lineSets;
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<StaticMeshImpl>> _staticMeshes;
@@ -262,7 +265,7 @@ namespace {
         }
         vssrc {
             float4 position = const_linePositions[vertex_ID] + const_globalPosition;
-            output_position = _transform(position, _transform(frame_viewMatrix, frame_projMatrix));
+            output_position = _transform(position, frame_stdVPMatrix);
             output_color = const_lineColors[vertex_ID >> 1];
         }
         fssrc {
@@ -286,7 +289,7 @@ namespace {
         }
         vssrc {
             float4 position = _lerp(const_bbmin, const_bbmax, float4(fixed_lines[repeat_ID], 0.0));
-            output_position = _transform(position, _transform(frame_viewMatrix, frame_projMatrix));
+            output_position = _transform(position, frame_stdVPMatrix);
         }
         fssrc {
             output_color[0] = const_color;
@@ -298,12 +301,14 @@ namespace {
                 [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
                 [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
                 [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+            normal[6] : float3 =
+                [0.5, 0.5, 0.0][0.0, 0.5, 0.5][0.5, 0.0, 0.5][0.5, 0.5, 1.0][1.0, 0.5, 0.5][0.5, 1.0, 0.5]
         }
         const {
             globalPosition : float4
         }
         inout {
-            paletteCoordinates : float2
+            normalc : float4
         }
         vssrc {
             float3 cubeCenter = float3(vertex_position_color_mask.xyz) + const_globalPosition.xyz;
@@ -316,11 +321,11 @@ namespace {
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[repeat_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(vertex_scale_reserved.xyz), 0.0);
             
-            output_paletteCoordinates = float2(float(colorIndex) / 255.0, 0.0); //
-            output_position = _transform(absVertexPos, _transform(frame_viewMatrix, frame_projMatrix));
+            output_normalc = float4(fixed_normal[faceIndex], float(colorIndex) / 255.0); //
+            output_position = _transform(absVertexPos, frame_stdVPMatrix);
         }
         fssrc {
-            output_color[0] = _tex2d(0, input_paletteCoordinates);
+            output_color[0] = input_normalc;
         }
     )";
     const char *g_dynamicMeshShaderSrc = R"(
@@ -329,12 +334,14 @@ namespace {
                 [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
                 [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
                 [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+            normal[6] : float4 =
+                [0.0, 0.0, -1.0, 0.0][-1.0, 0.0, 0.0, 0.0][0.0, -1.0, 0.0, 0.0][0.0, 0.0, 1.0, 0.0][1.0, 0.0, 0.0, 0.0][0.0, 1.0, 0.0, 0.0]
         }
         const {
             modelTransform : matrix4
         }
         inout {
-            paletteCoordinates : float2
+            normalc : float4
         }
         vssrc {
             float3 cubeCenter = float3(vertex_position.xyz);
@@ -348,11 +355,11 @@ namespace {
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[repeat_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
-            output_paletteCoordinates = float2(float(colorIndex) / 255.0, 0.0); //
-            output_position = _transform(absVertexPos, _transform(const_modelTransform, _transform(frame_viewMatrix, frame_projMatrix)));
+            output_normalc = float4(_transform(fixed_normal[faceIndex], const_modelTransform).xyz * 0.5 + 0.5, float(colorIndex) / 255.0); //
+            output_position = _transform(absVertexPos, _transform(const_modelTransform, frame_stdVPMatrix));
         }
         fssrc {
-            output_color[0] = _tex2d(0, input_paletteCoordinates);
+            output_color[0] = input_normalc;
         }
     )";
     const char *g_texturedMeshShaderSrc = R"(
@@ -364,13 +371,33 @@ namespace {
             nrm : float3
         }
         vssrc {
-            output_position = _transform(float4(vertex_position_u.xyz + const_globalPosition.xyz, 1.0), _transform(frame_viewMatrix, frame_projMatrix));
+            output_position = _transform(float4(vertex_position_u.xyz + const_globalPosition.xyz, 1.0), frame_stdVPMatrix);
             output_uv = float2(vertex_position_u.w, vertex_normal_v.w);
             output_nrm = vertex_normal_v.xyz;
         }
         fssrc {
             float paletteIndex = _tex2d(0, input_uv).r;
-            output_color[0] = _tex2d(1, float2(paletteIndex, 0.0));
+            output_color[0] = float4(input_nrm * 0.5 + 0.5, paletteIndex);
+        }
+    )";
+    const char *g_gbufferToScreenShaderSrc = R"(
+        fixed {
+            quad[4] : float4 = [-1, 1, 0.1, 1][1, 1, 0.1, 1][-1, -1, 0.1, 1][1, -1, 0.1, 1]
+            uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
+        }
+        inout {
+            uv : float2
+        }
+        vssrc {
+            output_position = fixed_quad[repeat_ID];
+            output_uv = fixed_uv[repeat_ID];
+        }
+        fssrc {
+            float4 gbuffer = _tex2d(1, input_uv);
+            float3 normal = gbuffer.rgb;
+            float  colorIndex = gbuffer.w;
+            float  gdepth = _tex2d(2, input_uv).r;
+            output_color[0] = _tex2d(0, colorIndex);
         }
     )";
 }
@@ -408,7 +435,16 @@ namespace voxel {
                 {"normal_v", foundation::InputAttributeFormat::FLOAT4},
             }
         });
+        _gbufferToScreenShader = rendering->createShader("scene_gbuffer_to_screen", g_gbufferToScreenShaderSrc, foundation::InputLayout {
+            .repeat = 4
+        });
+
+
+        _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
+        _platform->setResizeHandler([]() {
         
+        });
+
         setCameraLookAt({45, 45, 45}, {0, 0, 0});
     }
     
@@ -528,64 +564,72 @@ namespace voxel {
         _cleanupUnused(_dynamicMeshes);
         _rendering->updateFrameConstants(_camera.viewMatrix, _camera.projMatrix, _camera.position, _camera.forward);
         
-        _rendering->applyState(_staticMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::RenderPassCommonConfigs::CLEAR(0.1, 0.1, 0.1));
-        _rendering->applyTextures({
-            {_palette, foundation::SamplerType::NEAREST}
+        _rendering->forTarget(_gbuffer, {0.2, 0.2, 0.2, 1.0}, [&](foundation::RenderingInterface &rendering) {
+            rendering.applyShader(_staticMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &staticMesh : _staticMeshes) {
+                rendering.applyShaderConstants(&staticMesh->position);
+                rendering.draw(staticMesh->frames[0]);
+            }
+            
+            rendering.applyShader(_dynamicMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &dynamicMesh : _dynamicMeshes) {
+                rendering.applyShaderConstants(&dynamicMesh->transform);
+                rendering.draw(dynamicMesh->frames[0]);
+            }
+            
+            rendering.applyShader(_texturedMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &texturedMesh : _texturedMeshes) {
+                _rendering->applyTextures({
+                    {texturedMesh->texture, foundation::SamplerType::NEAREST}
+                });
+                rendering.applyShaderConstants(&texturedMesh->position);
+                rendering.draw(texturedMesh->vertices, texturedMesh->indices);
+            }
         });
-        for (const auto &staticMesh : _staticMeshes) {
-            _rendering->applyShaderConstants(&staticMesh->position);
-            _rendering->draw(staticMesh->frames[0]);
-        }
-        _rendering->applyState(_dynamicMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::RenderPassCommonConfigs::DEFAULT());
-        _rendering->applyTextures({
-            {_palette, foundation::SamplerType::NEAREST}
-        });
-        for (const auto &dynamicMesh : _dynamicMeshes) {
-            _rendering->applyShaderConstants(&dynamicMesh->transform);
-            _rendering->draw(dynamicMesh->frames[0]);
-        }
-        _rendering->applyState(_texturedMeshShader, foundation::RenderTopology::TRIANGLES, foundation::RenderPassCommonConfigs::DEFAULT());
-        for (const auto &texturedMesh : _texturedMeshes) {
-            _rendering->applyTextures({
-                {texturedMesh->texture, foundation::SamplerType::NEAREST},
-                {_palette, foundation::SamplerType::NEAREST}
+        _rendering->forTarget(nullptr, {0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
+            rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+            rendering.applyTextures({
+                {_palette, foundation::SamplerType::NEAREST},
+                {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
+                {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
             });
-            _rendering->applyShaderConstants(&texturedMesh->position);
-            _rendering->draw(texturedMesh->vertices, texturedMesh->indices);
-        }
+            rendering.draw(4);
+        });
         
-        _rendering->applyState(_lineSetShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::DEFAULT());
-        for (const auto &set : _lineSets) {
-            if (set->depthTested) {
-                for (std::size_t i = 0; i < set->blocks.size(); i++) {
-                    _rendering->applyShaderConstants(&set->blocks[i]);
-                    _rendering->draw(set->blocks[i].lineCount * 2);
-                }
-            }
-        }
-        _rendering->applyState(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::DEFAULT());
-        for (const auto &bbox : _boundingBoxes) {
-            if (bbox->depthTested) {
-                _rendering->applyShaderConstants(&bbox->bboxData);
-                _rendering->draw();
-            }
-        }
-        _rendering->applyState(_lineSetShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
-        for (const auto &set : _lineSets) {
-            if (set->depthTested == false) {
-                for (std::size_t i = 0; i < set->blocks.size(); i++) {
-                    _rendering->applyShaderConstants(&set->blocks[i]);
-                    _rendering->draw(set->blocks[i].lineCount * 2);
-                }
-            }
-        }
-        _rendering->applyState(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
-        for (const auto &bbox : _boundingBoxes) {
-            if (bbox->depthTested == false) {
-                _rendering->applyShaderConstants(&bbox->bboxData);
-                _rendering->draw();
-            }
-        }
+//
+////        _rendering->applyState(_lineSetShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::DEFAULT());
+////        for (const auto &set : _lineSets) {
+////            if (set->depthTested) {
+////                for (std::size_t i = 0; i < set->blocks.size(); i++) {
+////                    _rendering->applyShaderConstants(&set->blocks[i]);
+////                    _rendering->draw(set->blocks[i].lineCount * 2);
+////                }
+////            }
+////        }
+////        _rendering->applyState(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::DEFAULT());
+////        for (const auto &bbox : _boundingBoxes) {
+////            if (bbox->depthTested) {
+////                _rendering->applyShaderConstants(&bbox->bboxData);
+////                _rendering->draw();
+////            }
+////        }
+////
+////        _rendering->applyState(_lineSetShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
+////        for (const auto &set : _lineSets) {
+////            if (set->depthTested == false) {
+////                for (std::size_t i = 0; i < set->blocks.size(); i++) {
+////                    _rendering->applyShaderConstants(&set->blocks[i]);
+////                    _rendering->draw(set->blocks[i].lineCount * 2);
+////                }
+////            }
+////        }
+////        _rendering->applyState(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
+////        for (const auto &bbox : _boundingBoxes) {
+////            if (bbox->depthTested == false) {
+////                _rendering->applyShaderConstants(&bbox->bboxData);
+////                _rendering->draw();
+////            }
+////        }
     }
 }
 

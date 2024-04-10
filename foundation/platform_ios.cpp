@@ -175,7 +175,7 @@ namespace {
     g_mtkView.autoResizeDrawable = NO;
 	g_mtkView.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
     g_mtkView.depthStencilAttachmentTextureUsage = MTLTextureUsageRenderTarget;
-	g_mtkView.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+	g_mtkView.colorPixelFormat = MTLPixelFormatRGBA8Unorm;
     g_mtkView.clearDepth = 0.0f;
     g_mtkView.sampleCount = 1;
 	g_mtkView.delegate = _delegate;

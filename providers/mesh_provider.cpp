@@ -76,13 +76,13 @@ namespace resource {
                                         data += sizeof(std::uint32_t);
                                         
                                         for (std::uint32_t f = 0; f < ctx.mesh->frameCount; f++) {
-                                            ctx.mesh->frames[f].voxelCount = *(std::uint32_t *)data;
-                                            ctx.mesh->frames[f].voxels = std::make_unique<VoxelMesh::Voxel[]>(ctx.mesh->frames[f].voxelCount);
+                                            VoxelMesh::Frame &frame = ctx.mesh->frames[f];
+                                            frame.voxelCount = *(std::uint32_t *)data;
+                                            frame.voxels = std::make_unique<VoxelMesh::Voxel[]>(frame.voxelCount);
                                             data += sizeof(std::uint32_t);
                                             
-                                            for (std::uint32_t i = 0; i < ctx.mesh->frames[f].voxelCount; i++) {
-                                                VoxelMesh::Voxel &targetVoxel = ctx.mesh->frames[f].voxels[i];
-                                                targetVoxel = *(VoxelMesh::Voxel *)data;
+                                            for (std::uint32_t i = 0; i < frame.voxelCount; i++) {
+                                                frame.voxels[i] = *(VoxelMesh::Voxel *)data;
                                                 data += sizeof(VoxelMesh::Voxel);
                                             }
                                         }

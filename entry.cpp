@@ -12,33 +12,33 @@ Two Contexts:
 #include "foundation/rendering.h"
 #include "providers/texture_provider.h"
 #include "providers/mesh_provider.h"
-#include "providers/place_provider.h"
+#include "providers/ground_provider.h"
 #include "voxel/scene.h"
 
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 resource::TextureProviderPtr textureProvider;
 resource::MeshProviderPtr meshProvider;
-resource::PlaceProviderPtr placeProvider;
+resource::GroundProviderPtr groundProvider;
 voxel::SceneInterfacePtr scene;
 
 voxel::SceneInterface::BoundingBoxPtr bbox1;
 voxel::SceneInterface::LineSetPtr axis;
 voxel::SceneInterface::StaticMeshPtr thing;
-voxel::SceneInterface::TexturedMeshPtr place;
+voxel::SceneInterface::TexturedMeshPtr ground;
 voxel::SceneInterface::DynamicMeshPtr actor;
 
 
 std::size_t pointerId = foundation::INVALID_POINTER_ID;
 math::vector2f lockedCoordinates;
-math::vector3f orbit = { 85, 85, 85 };
+math::vector3f orbit = { 45, 45, 45 };
 
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
     textureProvider = resource::TextureProvider::instance(platform, rendering);
     meshProvider = resource::MeshProvider::instance(platform);
-    placeProvider = resource::PlaceProvider::instance(platform, rendering);
+    groundProvider = resource::GroundProvider::instance(platform, rendering);
     scene = voxel::SceneInterface::instance(platform, rendering);
     
     platform->addPointerEventHandler(
@@ -75,10 +75,10 @@ extern "C" void initialize() {
         }
     );
     
-    meshProvider->getOrLoadVoxelMesh("things/books", [](const std::unique_ptr<resource::VoxelMesh> &mesh) {
+    meshProvider->getOrLoadVoxelMesh("statics/ruins", [](const std::unique_ptr<resource::VoxelMesh> &mesh) {
         std::vector<voxel::SceneInterface::VTXSVOX> voxels;
         voxels.reserve(mesh->frames[0].voxelCount);
-        
+
         for (std::uint16_t i = 0; i < mesh->frames[0].voxelCount; i++) {
             const resource::VoxelMesh::Voxel &src = mesh->frames[0].voxels[i];
             voxel::SceneInterface::VTXSVOX &voxel = voxels.emplace_back();
@@ -92,14 +92,13 @@ extern "C" void initialize() {
             voxel.scaleZ = src.scaleZ;
             voxel.reserved = 0;
         }
-        
+
         thing = scene->addStaticMesh(&voxels, 1);
-        thing->setPosition({40, 0, 20});
     });
-    meshProvider->getOrLoadVoxelMesh("actors/knight", [](const std::unique_ptr<resource::VoxelMesh> &mesh) {
+    meshProvider->getOrLoadVoxelMesh("objects/stool", [](const std::unique_ptr<resource::VoxelMesh> &mesh) {
         std::vector<voxel::SceneInterface::VTXDVOX> voxels;
         voxels.reserve(mesh->frames[0].voxelCount);
-        
+
         for (std::uint16_t i = 0; i < mesh->frames[0].voxelCount; i++) {
             const resource::VoxelMesh::Voxel &src = mesh->frames[0].voxels[i];
             voxel::SceneInterface::VTXDVOX &voxel = voxels.emplace_back();
@@ -109,17 +108,17 @@ extern "C" void initialize() {
             voxel.colorIndex = src.colorIndex;
             voxel.mask = src.mask;
         }
-        
+
         actor = scene->addDynamicMesh(&voxels, 1);
         actor->setTransform(math::transform3f({0, 1, 0}, M_PI / 4).translated({20, 0, 40}));
     });
-    placeProvider->getOrLoadPlace("places/floor", [](const std::unique_ptr<resource::PlaceData> &data) {
+    groundProvider->getOrLoadGround("grounds/white", [](const std::unique_ptr<resource::GroundData> &data) {
         if (data) {
             std::vector<voxel::SceneInterface::VTXNRMUV> vertexes;
             vertexes.reserve(data->vertexes.size());
             
             for (std::size_t i = 0; i < data->vertexes.size(); i++) {
-                const resource::PlaceData::Vertex &src = data->vertexes[i];
+                const resource::GroundData::Vertex &src = data->vertexes[i];
                 voxel::SceneInterface::VTXNRMUV &vertex = vertexes.emplace_back();
                 vertex.x = src.x;
                 vertex.y = src.y;
@@ -131,11 +130,11 @@ extern "C" void initialize() {
                 vertex.v = src.v;
             }
             
-            place = scene->addTexturedMesh(vertexes, data->indexes, data->texture);
+            ground = scene->addTexturedMesh(vertexes, data->indexes, data->texture);
         }
     });
     
-    math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 2.0f + 0.5f, 9.0f + 0.5f, 8.0f + 0.5f};
+    math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
     bbox1 = scene->addBoundingBox(false, bb1);
     
     axis = scene->addLineSet(true, 3);

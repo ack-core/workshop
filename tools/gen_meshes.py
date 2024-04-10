@@ -63,6 +63,7 @@ def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) 
     if opt >= 2:
         pass
 
+    count = 0
     for x in range(1, sx + 1):
         for y in range(1, sy + 1):
             for z in range(1, sz + 1):
@@ -70,8 +71,9 @@ def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) 
                 if e.exist:
                     voxel = struct.pack("<hhhBBBBBB", x - 1, y - 1, z - 1, e.color, e.mask, 0, 0, 0, 0)
                     output += voxel
+                    count = count + 1
 
-    return len(data), output
+    return count, output
 
 def convert_vox(src: str, dst: str, opt: int):
     print("---- ", src)
@@ -120,7 +122,7 @@ def convert_vox(src: str, dst: str, opt: int):
 
             for i in range(0, frame_count):
                 voxels = [tuple(frame_data[i][c * 4:c * 4 + 4]) for c in range(0, frame_size[i])]
-                voxels = [(e[1], e[2], e[0], (31 - e[3] // 8) * 8 + e[3] % 8) for e in voxels]
+                voxels = [(e[1], e[2], e[0], 7 - (256 - e[3]) % 8 + ((256 - e[3]) // 8) * 8) for e in voxels]
                 count, data = optimize(voxels, frame_bounds[i][0], frame_bounds[i][1], frame_bounds[i][2], opt)
                 dst_file.write(struct.pack("<i", count))
                 dst_file.write(data)

@@ -73,8 +73,8 @@ get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_
 
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.ttf")
 file(COPY "${m_resources_root}/ui" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
-file(COPY "${m_resources_root}/actors" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
-file(COPY "${m_resources_root}/things" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
+file(COPY "${m_resources_root}/objects" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
+file(COPY "${m_resources_root}/statics" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
 message(STATUS "Generating palette...")
@@ -82,18 +82,18 @@ execute_process(
 	COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/voxel/palette.h
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
-message(STATUS "Generating places...")
+message(STATUS "Generating grounds...")
 execute_process(
-	COMMAND python ${m_tools_root}/gen_places.py -s ${m_resources_root}/places -d ${m_binary_root}/data/places -p ${m_resources_root}/palette.png
+	COMMAND python ${m_tools_root}/gen_grounds.py -s ${m_resources_root}/grounds -d ${m_binary_root}/data/grounds -p ${m_resources_root}/palette.png
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 message(STATUS "Generating optimized meshes...")
 execute_process(
-	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/things -d ${m_binary_root}/data/things -o 1
+	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/statics -d ${m_binary_root}/data/statics -o 1
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 execute_process(
-	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/actors -d ${m_binary_root}/data/actors -o 1
+	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/objects -d ${m_binary_root}/data/objects -o 1
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 message(STATUS "Generating resource lists...")
