@@ -64,21 +64,22 @@ namespace foundation {
     public:
         class RTTexture : public WASMTexBase {
         public:
-            RTTexture(const WASMTarget &target, WebGLId texture) : _target(target), _texture(texture) {}
+            RTTexture(const WASMTarget &target, RenderTextureFormat format, WebGLId texture) : _target(target), _format(format), _texture(texture) {}
             ~RTTexture() override;
             
             auto getWidth() const -> std::uint32_t override { return _target._width; }
             auto getHeight() const -> std::uint32_t override { return _target._height; }
             auto getMipCount() const -> std::uint32_t override { return 1; }
-            auto getFormat() const -> RenderTextureFormat override { return _target._format; }
+            auto getFormat() const -> RenderTextureFormat override { return _format; }
             auto getWebGLTexture() const -> WebGLId override { return _texture; }
             
         private:
             const WASMTarget &_target;
+            const RenderTextureFormat _format;
             const WebGLId _texture;
         };
 
-        WASMTarget(WebGLId target, const WebGLId *textures, unsigned count, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, bool hasDepth);
+        WASMTarget(WebGLId target, const WebGLId *textures, std::uint32_t count, WebGLId depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h);
         ~WASMTarget() override;
         
         auto getWidth() const -> std::uint32_t override;
@@ -86,18 +87,17 @@ namespace foundation {
         auto getFormat() const -> RenderTextureFormat override;
         auto getTextureCount() const -> std::uint32_t override;
         auto getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & override;
+        auto getDepth() const -> const std::shared_ptr<RenderTexture> & override;
         auto getWebGLTarget() const -> WebGLId;
-        bool hasDepthBuffer() const override;
         
     private:
-        const RenderTextureFormat _format;
-        const unsigned _count;
         const WebGLId _target;
+        const std::uint32_t _count;
         const std::uint32_t _width;
         const std::uint32_t _height;
-        const bool _hasDepth;
 
         std::shared_ptr<RenderTexture> _textures[RenderTarget::MAX_TEXTURE_COUNT] = {nullptr};
+        std::shared_ptr<RenderTexture> _depth = nullptr;
     };
     
     class WASMRendering final : public RenderingInterface {
@@ -110,17 +110,20 @@ namespace foundation {
         auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
-        auto createData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr override;
+        auto createIndexData(const std::uint32_t *data, std::uint32_t count) -> RenderDataPtr override;
+        auto createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr override;
         
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
         
-        void applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg) override;
+        void forTarget(const RenderTargetPtr &target, const math::color &clear, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) override;
+        void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
+        void draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) override;
         void presentFrame() override;
         
     private:

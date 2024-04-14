@@ -10,11 +10,15 @@
 // From js
 extern "C" {
     auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> WebGLId;
-    auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride) -> WebGLId;
+    //auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride) -> WebGLId;
+    auto webgl_createIndexData(const std::uint32_t *data, std::uint32_t count) -> WebGLId;
+    auto webgl_createVertexData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride) -> WebGLId;
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
     auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
     void webgl_viewPort(std::uint32_t w, std::uint32_t h);
-    void webgl_applyState(WebGLId target, WebGLId shader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
+    //void webgl_applyState(WebGLId target, WebGLId shader, GLenum cmask, float r, float g, float b, float a, float d, std::uint32_t ztype, std::uint32_t btype);
+    void webgl_applyTarget(WebGLId target, GLenum cmask, float r, float g, float b, float a, float d);
+    void webgl_applyShader(WebGLId shader, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
     void webgl_drawDefault(WebGLId data, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
@@ -167,17 +171,16 @@ namespace foundation {
 }
 
 namespace foundation {
-    WASMTarget::WASMTarget(WebGLId target, const WebGLId *textures, unsigned count, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, bool hasDepth)
+    WASMTarget::WASMTarget(WebGLId target, const WebGLId *textures, std::uint32_t count, WebGLId depth, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h)
         : _target(target)
-        , _format(fmt)
         , _count(count)
         , _width(w)
         , _height(h)
-        , _hasDepth(hasDepth)
     {
         for (unsigned i = 0; i < count; i++) {
-            _textures[i] = std::make_shared<RTTexture>(*this, textures[i]);
+            _textures[i] = std::make_shared<RTTexture>(*this, fmt, textures[i]);
         }
+        _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
     }
     WASMTarget::RTTexture::~RTTexture() {
         webgl_deleteTexture(_texture);
@@ -192,7 +195,7 @@ namespace foundation {
         return _height;
     }
     RenderTextureFormat WASMTarget::getFormat() const {
-        return _format;
+        return _textures[0]->getFormat();
     }
     std::uint32_t WASMTarget::getTextureCount() const {
         return _count;
@@ -200,11 +203,11 @@ namespace foundation {
     const std::shared_ptr<RenderTexture> &WASMTarget::getTexture(unsigned index) const {
         return _textures[index];
     }
+    const std::shared_ptr<RenderTexture> &WASMTarget::getDepth() const {
+        return _depth;
+    }
     WebGLId WASMTarget::getWebGLTarget() const {
         return _target;
-    }
-    bool WASMTarget::hasDepthBuffer() const {
-        return _hasDepth;
     }
 }
 
@@ -353,8 +356,8 @@ namespace foundation {
             "precision mediump float;\n"
             "\n"
             "layout(std140) uniform _FrameData {\n"
-            "    mediump mat4 viewMatrix;\n"
-            "    mediump mat4 projMatrix;\n"
+            "    mediump mat4 stdVPMatrix;\n"
+            "    mediump mat4 invVPMatrix;\n"
             "    mediump vec4 cameraPosition;\n"
             "    mediump vec4 cameraDirection;\n"
             "    mediump vec4 rtBounds;\n"
@@ -596,15 +599,20 @@ namespace foundation {
         
         if (count && w && h) {
             const NativeTextureFormat &fmt = g_textureFormatTable[int(format)];
-            WebGLId *textureIds = reinterpret_cast<WebGLId *>(_getUploadBuffer(sizeof(WebGLId) * count));
+            WebGLId *textureIds = reinterpret_cast<WebGLId *>(_getUploadBuffer(sizeof(WebGLId) * (count + 1)));
             WebGLId webglTarget = webgl_createTarget(fmt.format, fmt.internal, fmt.type, w, h, count, withZBuffer, textureIds);
-            result = std::make_shared<WASMTarget>(webglTarget, textureIds, count, format, w, h, withZBuffer);
+            result = std::make_shared<WASMTarget>(webglTarget, &textureIds[1], count, textureIds[0], format, w, h);
         }
         
         return result;
     }
     
-    RenderDataPtr WASMRendering::createData(const void *data, const InputLayout &layout, std::uint32_t count) {
+    RenderDataPtr WASMRendering::createIndexData(const std::uint32_t *data, std::uint32_t count) {
+        WebGLId webglData = webgl_createIndexData(data, count);
+        return std::make_shared<WASMData>(webglData, count, sizeof(std::uint32_t));
+    }
+    
+    RenderDataPtr WASMRendering::createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) {
         RenderDataPtr result = nullptr;
         
         if (count && layout.attributes.empty() == false) {
@@ -612,14 +620,14 @@ namespace foundation {
             for (std::size_t i = 0; i < layout.attributes.size(); i++) {
                 stride += g_formatConversionTable[int(layout.attributes[i].format)].size;
             }
-
+            
             std::uint8_t *memory = _getUploadBuffer(layout.attributes.size() + stride * count);
             for (std::size_t i = 0; i < layout.attributes.size(); i++) {
                 memory[i] = std::uint8_t(layout.attributes[i].format);
             }
             
             memcpy(memory + layout.attributes.size(), data, stride * count);
-            WebGLId webglData = webgl_createData(memory, layout.attributes.size(), memory + layout.attributes.size(), count * stride, stride);
+            WebGLId webglData = webgl_createVertexData(memory, layout.attributes.size(), memory + layout.attributes.size(), count * stride, stride);
             result = std::make_shared<WASMData>(webglData, count, stride);
         }
         
@@ -634,6 +642,15 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
+    void WASMRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
+    
+    }
+    
+    void WASMRendering::applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
+    
+    }
+    
+    /*
     void WASMRendering::applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg) {
         if (shader) {
             float rtWidth = _platform->getScreenWidth();
@@ -673,6 +690,7 @@ namespace foundation {
             _platform->logError("[MetalRendering::applyState] shader is null\n");
         }
     }
+    */
     
     void WASMRendering::applyShaderConstants(const void *constants) {
         if (_currentShader) {
@@ -726,7 +744,11 @@ namespace foundation {
             }
         }
     }
+    
+    void WASMRendering::draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) {
         
+    }
+    
     void WASMRendering::presentFrame() {
         
     }

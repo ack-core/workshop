@@ -179,9 +179,9 @@ namespace foundation {
     
     MetalTarget::~MetalTarget() {
         for (unsigned i = 0; i < _count; i++) {
-            _textures[i] = nil;
+            _textures[i] = nullptr;
         }
-        _depth = nil;
+        _depth = nullptr;
     }
     
     std::uint32_t MetalTarget::getWidth() const {
@@ -722,14 +722,14 @@ namespace foundation {
         }
     }
     
-    RenderDataPtr MetalRendering::createData(const void *data, std::uint32_t count, std::uint32_t stride) {
+    RenderDataPtr MetalRendering::createIndexData(const std::uint32_t *data, std::uint32_t count) {
         @autoreleasepool {
-            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * stride) options:MTLResourceStorageModeShared];
-            return std::make_shared<MetalData>(buffer, count, stride);
+            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * sizeof(std::uint32_t)) options:MTLResourceStorageModeShared];
+            return std::make_shared<MetalData>(buffer, count, sizeof(std::uint32_t));
         }
     }
     
-    RenderDataPtr MetalRendering::createData(const void *data, const InputLayout &layout, std::uint32_t count) {
+    RenderDataPtr MetalRendering::createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) {
         std::uint32_t stride = 0;
         for (const InputLayout::Attribute &item : layout.attributes) {
             stride += g_formatConversionTable[int(item.format)].size;

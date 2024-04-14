@@ -85,8 +85,8 @@ namespace foundation {
         const std::shared_ptr<RenderTexture> &getDepth() const override;
         
     private:
-        std::shared_ptr<RenderTexture> _textures[RenderTarget::MAX_TEXTURE_COUNT] = {nil, nil, nil, nil};
-        std::shared_ptr<RenderTexture> _depth = nil;
+        std::shared_ptr<RenderTexture> _textures[RenderTarget::MAX_TEXTURE_COUNT] = {nullptr};
+        std::shared_ptr<RenderTexture> _depth = nullptr;
         std::uint32_t _count;
         std::uint32_t _width;
         std::uint32_t _height;
@@ -118,8 +118,8 @@ namespace foundation {
         RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
-        RenderDataPtr createData(const void *data, std::uint32_t count, std::uint32_t stride) override;
-        RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t count) override;
+        RenderDataPtr createIndexData(const std::uint32_t *data, std::uint32_t count) override;
+        RenderDataPtr createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) override;
         
         float getBackBufferWidth() const override;
         float getBackBufferHeight() const override;

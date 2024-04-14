@@ -192,21 +192,20 @@ namespace foundation {
         //
         virtual auto createRenderTarget(foundation::RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr = 0;
         
-        // Create data buffer
-        // @data        - pointer to data (array of structures)
+        // Create index data buffer
+        // @data        - pointer to data
         // @count       - count of structures in array
-        // @stride      - size of structure in bytes
         // @return      - handle
         //
-        virtual auto createData(const void *data, std::uint32_t count, std::uint32_t stride) -> RenderDataPtr = 0;
+        virtual auto createIndexData(const std::uint32_t *data, std::uint32_t count) -> RenderDataPtr = 0;
         
-        // Create data buffer
+        // Create vertex data buffer
         // @data        - pointer to data (array of structures)
         // @layout      - vertex description. Should match the description in shader
         // @count       - count of structures in array
         // @return      - handle
         //
-        virtual auto createData(const void *data, const foundation::InputLayout &layout, std::uint32_t count) -> RenderDataPtr = 0;
+        virtual auto createVertexData(const void *data, const foundation::InputLayout &layout, std::uint32_t count) -> RenderDataPtr = 0;
         
         // Return actual rendering area size
         //

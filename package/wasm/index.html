@@ -111,6 +111,7 @@
         var glsamplers = {};
         var glframebuffers = {};
         var glcontext = canvas.getContext("webgl2", { antialias: false });
+        var glVerticalFlip = 1.0;
         var glEnabledAttribCount = 0;
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
@@ -266,7 +267,21 @@
                     glcontext.deleteProgram(program);
                     return 0;
                 },
-                webgl_createData: function(layout, layoutLen, ptr, dataLen, stride) {
+                webgl_createIndexData: function(ptr, count) {
+                    const u8mem = new Uint8Array(memory.buffer, ptr, 4 * count);
+                    const ibo = glcontext.createBuffer();
+                    
+                    glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, ibo);
+                    glcontext.bufferData(glcontext.ELEMENT_ARRAY_BUFFER, u8mem, glcontext.STATIC_DRAW);
+
+                    glbuffers[glBufferIDCounter] = {
+                        buffer: ibo,
+                        layout: null
+                    };
+
+                    return glBufferIDCounter++;
+                },
+                webgl_createVertexData: function(layout, layoutLen, ptr, dataLen, stride) {
                     const u8mem = new Uint8Array(memory.buffer, ptr, dataLen);
                     const lmem = new Uint8Array(memory.buffer, layout, layoutLen);
                     const vao = glcontext.createVertexArray();
@@ -364,23 +379,25 @@
                 webgl_viewPort(w, h) {
                     glcontext.viewport(0, 0, w, h);
                 },
-                webgl_applyState: function(frameBufferID, shaderID, mask, r, g, b, a, d, ztype, btype) {
+                webgl_applyTarget: function(frameBufferID, mask, r, g, b, a, d) {
                     glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, glframebuffers[frameBufferID].fb);
+                    glVerticalFlip = frameBufferID ? -1.0 : 1.0;
 
                     if (mask) {
                         glcontext.clearColor(r, g, b, a);
                         glcontext.clearDepth(d);
                         glcontext.clear(mask);
                     }
-
-                    ztypes[ztype]();
-                    btypes[btype]();
-
+                },
+                webgl_applyShader: function(shaderID, ztype, btype) {
                     const program = glshaders[shaderID];
 
                     glcontext.useProgram(program);
-                    glcontext.uniform1f(program.uniformVerticalFlipLocation, frameBufferID ? -1.0 : 1.0);
+                    glcontext.uniform1f(program.uniformVerticalFlipLocation, glVerticalFlip);
                     uniformInstanceCountLocation = program.uniformInstanceCountLocation;
+
+                    ztypes[ztype]();
+                    btypes[btype]();
                 },
                 webgl_applyConstants: function(index, ptr, len) {
                     const u8mem = new Uint8Array(memory.buffer, ptr, len);
