@@ -721,11 +721,21 @@ namespace math {
         scalar yS = scalar(1.0f) / std::tan(fovY * scalar(0.5));
         scalar xS = yS / aspect;
         
+#if PLATFORM_IOS
+        scalar dN = scalar(0.0f);
+        scalar dF = scalar(1.0f);
+#elif PLATFORM_WASM
+        scalar dN = scalar(-1.0f);
+        scalar dF = scalar(1.0f);
+#else
+        static_assert("");
+#endif
+
         return {
             vector4f(xS, 0, 0, 0),
             vector4f(0, yS, 0, 0),
-            vector4f(0, 0, zNear / (zFar - zNear), -scalar(1.0)),
-            vector4f(0, 0, (zFar * zNear) / (zFar - zNear), 0),
+            vector4f(0, 0, (dF * zNear - dN * zFar) / (zFar - zNear), -scalar(1.0)),
+            vector4f(0, 0, (dF - dN) * (zFar * zNear) / (zFar - zNear), 0),
         };
     }
     

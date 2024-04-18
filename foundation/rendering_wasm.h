@@ -109,7 +109,7 @@ namespace foundation {
         
         auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
-        auto createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
+        auto createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
         auto createIndexData(const std::uint32_t *data, std::uint32_t count) -> RenderDataPtr override;
         auto createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr override;
         
@@ -130,8 +130,8 @@ namespace foundation {
         auto _getUploadBuffer(std::size_t requiredLength) -> std::uint8_t *;
         
         struct FrameConstants {
-            math::transform3f viewMatrix = math::transform3f::identity();
-            math::transform3f projMatrix = math::transform3f::identity();
+            math::transform3f stdVPMatrix = math::transform3f::identity();
+            math::transform3f invVPMatrix = math::transform3f::identity();
             math::vector4f cameraPosition = math::vector4f(0, 0, 0, 1);
             math::vector4f cameraDirection = math::vector4f(1, 0, 0, 0);
             math::vector4f rtBounds = {0, 0, 0, 0};

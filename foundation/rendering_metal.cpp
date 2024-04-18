@@ -754,6 +754,7 @@ namespace foundation {
         }
         if (_view) {
             MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+            MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
             
             if (target) {
                 for (std::uint32_t i = 0; i < target->getTextureCount(); i++) {
@@ -767,14 +768,23 @@ namespace foundation {
                 renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
                 renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
                 renderPassDescriptor.depthAttachment.clearDepth = 0.0;
+
+                viewPort.width = _frameConstants.rtBounds.x = float(target->getWidth());
+                viewPort.height = _frameConstants.rtBounds.y = float(target->getHeight());
             }
             else {
                 _initializeDefaultRenderPassDescriptor(renderPassDescriptor, clear);
+
+                viewPort.width = _frameConstants.rtBounds.x = _platform->getScreenWidth();
+                viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
             }
             
             _finishRenderCommandEncoder();
             _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
             _currentTarget = target;
+                        
+            _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
+            [_currentRenderCommandEncoder setViewport:viewPort];
             
             pass(*this);
             
@@ -789,6 +799,12 @@ namespace foundation {
             MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             _initializeDefaultRenderPassDescriptor(renderPassDescriptor, {0, 0, 0, 0});
             _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+            
+            MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+            viewPort.width = _frameConstants.rtBounds.x = _platform->getScreenWidth();
+            viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
+            _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
+            [_currentRenderCommandEncoder setViewport:viewPort];
         }
         
         const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
@@ -832,22 +848,8 @@ namespace foundation {
             }
             
             if (state) {
-                MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-                
-                if (platformTarget) {
-                    viewPort.width = _frameConstants.rtBounds.x = float(platformTarget->getWidth());
-                    viewPort.height = _frameConstants.rtBounds.y = float(platformTarget->getHeight());
-                }
-                else {
-                    viewPort.width = _frameConstants.rtBounds.x = _platform->getScreenWidth();
-                    viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
-                }
-                
-                _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
-                
                 [_currentRenderCommandEncoder setRenderPipelineState:state];
                 [_currentRenderCommandEncoder setDepthStencilState:_depthStates[int(depthBehavior)]];
-                [_currentRenderCommandEncoder setViewport:viewPort];
                 
                 _currentTopology = topology;
                 _currentShader = shader;

@@ -26,7 +26,6 @@ namespace voxel {
         };
         
         std::vector<LinesBlock> blocks;
-        bool depthTested;
         
     public:
         void setPosition(const math::vector3f &position) override {
@@ -46,7 +45,7 @@ namespace voxel {
         }
         
     public:
-        LineSetImpl(bool depthTested, std::uint32_t count) : depthTested(depthTested) {
+        LineSetImpl(std::uint32_t count) {
             std::uint32_t left = count % LINES_IN_BLOCK_MAX;
             for (std::uint32_t i = 0; i < count / LINES_IN_BLOCK_MAX; i++) {
                 blocks.emplace_back().lineCount = LINES_IN_BLOCK_MAX;
@@ -68,7 +67,6 @@ namespace voxel {
             math::vector4f max;
         }
         bboxData;
-        bool depthTested;
         
     public:
         void setBBoxData(const math::bound3f &bbox) override {
@@ -80,7 +78,7 @@ namespace voxel {
         }
         
     public:
-        BoundingBoxImpl(bool depthTested, const math::bound3f &bbox) : bboxData{math::color(1.0f, 1.0f, 1.0f, 1.0f)}, depthTested(depthTested) {
+        BoundingBoxImpl(const math::bound3f &bbox) : bboxData{math::color(1.0f, 1.0f, 1.0f, 1.0f)} {
             setBBoxData(bbox);
         }
         ~BoundingBoxImpl() override {}
@@ -192,8 +190,8 @@ namespace voxel {
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
-        auto addLineSet(bool depthTested, std::uint32_t startCount) -> LineSetPtr override;
-        auto addBoundingBox(bool depthTested, const math::bound3f &bbox) -> BoundingBoxPtr override;
+        auto addLineSet(std::uint32_t count) -> LineSetPtr override;
+        auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
         auto addStaticMesh(const std::vector<VTXSVOX> *frames, std::size_t frameCount) -> StaticMeshPtr override;
         auto addDynamicMesh(const std::vector<VTXDVOX> *frames, std::size_t frameCount) -> DynamicMeshPtr override;
         auto addTexturedMesh(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedMeshPtr override;
@@ -314,9 +312,9 @@ namespace {
             float3 cubeCenter = float3(vertex_position_color_mask.xyz) + const_globalPosition.xyz;
             float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
             
-            int faceIndex = repeat_ID / 4 + int((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
-            int colorIndex = vertex_position_color_mask.w & 0xff;
-            int mask = (vertex_position_color_mask.w >> (8 + faceIndex)) & 0x1;
+            uint faceIndex = uint(repeat_ID / 4) + uint((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
+            uint colorIndex = uint(vertex_position_color_mask.w & 0xff);
+            uint mask = uint((vertex_position_color_mask.w >> (uint(8) + faceIndex)) & 1);
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[repeat_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(vertex_scale_reserved.xyz), 0.0);
@@ -348,9 +346,9 @@ namespace {
             float3 worldCubePos = _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
             float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - worldCubePos, 0.0)).xyz);
             
-            int faceIndex = repeat_ID / 4 + int((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
-            int colorIndex = vertex_color_mask.r;
-            int mask = (vertex_color_mask.g >> faceIndex) & 0x1;
+            uint faceIndex = uint(repeat_ID / 4) + uint((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
+            uint colorIndex = vertex_color_mask.r;
+            uint mask = (vertex_color_mask.g >> faceIndex) & uint(1);
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[repeat_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
@@ -395,9 +393,10 @@ namespace {
         fssrc {
             float4 gbuffer = _tex2d(1, input_uv);
             float3 normal = gbuffer.rgb;
-            float  colorIndex = gbuffer.w;
             float  gdepth = _tex2d(2, input_uv).r;
-            output_color[0] = _tex2d(0, colorIndex);
+            
+            float4 albedo = _tex2d(0, float2(gbuffer.w, 0)); //
+            output_color[0] = float4(normal, 1.0); //albedo; // float4(gdepth * 100.0, 0, 0, 1); // //_tex2d(0, float2(colorIndex, 0));
         }
     )";
 }
@@ -472,12 +471,12 @@ namespace voxel {
     
     }
     
-    SceneInterface::LineSetPtr SceneInterfaceImpl::addLineSet(bool depthTested, std::uint32_t startCount) {
-        return _lineSets.emplace_back(std::make_shared<LineSetImpl>(depthTested, startCount));
+    SceneInterface::LineSetPtr SceneInterfaceImpl::addLineSet(std::uint32_t count) {
+        return _lineSets.emplace_back(std::make_shared<LineSetImpl>(count));
     }
     
-    SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(bool depthTested, const math::bound3f &bbox) {
-        return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(depthTested, bbox));
+    SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::bound3f &bbox) {
+        return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox));
     }
     
     SceneInterface::StaticMeshPtr SceneInterfaceImpl::addStaticMesh(const std::vector<VTXSVOX> *frames, std::size_t frameCount) {
@@ -485,7 +484,7 @@ namespace voxel {
         std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
         
         for (std::size_t i = 0; i < frameCount; i++) {
-            voxFrames[i] = _rendering->createData(frames[i].data(), _staticMeshShader->getInputLayout(),  std::uint32_t(frames[i].size()));
+            voxFrames[i] = _rendering->createVertexData(frames[i].data(), _staticMeshShader->getInputLayout(),  std::uint32_t(frames[i].size()));
         }
         if (frameCount) {
             mesh = std::make_shared<StaticMeshImpl>(voxFrames.get(), frameCount);
@@ -498,11 +497,10 @@ namespace voxel {
     SceneInterface::DynamicMeshPtr SceneInterfaceImpl::addDynamicMesh(const std::vector<VTXDVOX> *frames, std::size_t frameCount) {
         std::shared_ptr<DynamicMeshImpl> mesh = nullptr;
         std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
-
+        
         for (std::size_t i = 0; i < frameCount; i++) {
-            voxFrames[i] = _rendering->createData(frames[i].data(), std::uint32_t(frames[i].size()), sizeof(VTXDVOX));
+            voxFrames[i] = _rendering->createVertexData(frames[i].data(), _dynamicMeshShader->getInputLayout(), std::uint32_t(frames[i].size()));
         }
-
         if (frameCount) {
             mesh = std::make_shared<DynamicMeshImpl>(voxFrames.get(), frameCount);
             _dynamicMeshes.emplace_back(mesh);
@@ -513,9 +511,9 @@ namespace voxel {
     
     SceneInterface::TexturedMeshPtr SceneInterfaceImpl::addTexturedMesh(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) {
         std::shared_ptr<TexturedMeshImpl> mesh = nullptr;
-        foundation::RenderDataPtr vertexData = _rendering->createData(vtx.data(), _texturedMeshShader->getInputLayout(), std::uint32_t(vtx.size()));
-        foundation::RenderDataPtr indexData = _rendering->createData(idx.data(), std::uint32_t(idx.size()), sizeof(std::uint32_t));
-
+        foundation::RenderDataPtr vertexData = _rendering->createVertexData(vtx.data(), _texturedMeshShader->getInputLayout(), std::uint32_t(vtx.size()));
+        foundation::RenderDataPtr indexData = _rendering->createIndexData(idx.data(), std::uint32_t(idx.size()));
+        
         if (vertexData && indexData && tx) {
             mesh = std::make_shared<TexturedMeshImpl>(std::move(vertexData), std::move(indexData), tx);
             _texturedMeshes.emplace_back(mesh);
@@ -557,6 +555,15 @@ namespace voxel {
         return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
+    // Next:
+    // v remove z-buffered lines/bboxes + integrate with deffered rendering
+    // + implement textured mesh for webgl
+    // + SSAO
+    // --+ reconstruct world position from depth
+    // --+ construct depth from world position and compare with depth
+    // --+ AO shader
+    // + Skybox + texture types
+    //
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _cleanupUnused(_boundingBoxes);
         _cleanupUnused(_staticMeshes);
@@ -594,42 +601,24 @@ namespace voxel {
                 {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
             });
             rendering.draw(4);
+            
+            rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+            for (const auto &set : _lineSets) {
+                for (std::size_t i = 0; i < set->blocks.size(); i++) {
+                    rendering.applyShaderConstants(&set->blocks[i]);
+                    rendering.draw(set->blocks[i].lineCount * 2);
+                }
+            }
+            rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+            for (const auto &bbox : _boundingBoxes) {
+                rendering.applyShaderConstants(&bbox->bboxData);
+                rendering.draw();
+            }
         });
-        
-//
-////        _rendering->applyState(_lineSetShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::DEFAULT());
-////        for (const auto &set : _lineSets) {
-////            if (set->depthTested) {
-////                for (std::size_t i = 0; i < set->blocks.size(); i++) {
-////                    _rendering->applyShaderConstants(&set->blocks[i]);
-////                    _rendering->draw(set->blocks[i].lineCount * 2);
-////                }
-////            }
-////        }
-////        _rendering->applyState(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::DEFAULT());
-////        for (const auto &bbox : _boundingBoxes) {
-////            if (bbox->depthTested) {
-////                _rendering->applyShaderConstants(&bbox->bboxData);
-////                _rendering->draw();
-////            }
-////        }
-////
-////        _rendering->applyState(_lineSetShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
-////        for (const auto &set : _lineSets) {
-////            if (set->depthTested == false) {
-////                for (std::size_t i = 0; i < set->blocks.size(); i++) {
-////                    _rendering->applyShaderConstants(&set->blocks[i]);
-////                    _rendering->draw(set->blocks[i].lineCount * 2);
-////                }
-////            }
-////        }
-////        _rendering->applyState(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::RenderPassCommonConfigs::OVERLAY(foundation::BlendType::MIXING));
-////        for (const auto &bbox : _boundingBoxes) {
-////            if (bbox->depthTested == false) {
-////                _rendering->applyShaderConstants(&bbox->bboxData);
-////                _rendering->draw();
-////            }
-////        }
     }
 }
+
+// + Ground color influence effect
+// + Cubemap shadows
+//
 

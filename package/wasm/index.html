@@ -51,7 +51,7 @@
             console.log(...a);
         }
 
-        /*
+        
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("serviceworker.js").then(
                 (registration) => {
@@ -72,7 +72,7 @@
         else {
             throw "Service workers are not supported";
         }
-        */
+        
 
         if (!crossOriginIsolated) {
             print("[PLATFORM] Page is not cross-origin isolated");
@@ -144,7 +144,7 @@
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 3, glcontext.UNSIGNED_INT, stride, offset); return 12; },
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 4, glcontext.UNSIGNED_INT, stride, offset); return 16; },
         ];
-        const ztypes = {
+        const dtypes = {
             0: function() {
                 glcontext.disable(glcontext.DEPTH_TEST);
             },
@@ -237,7 +237,8 @@
                             if (cIndex != 0xFFFFFFFF) {
                                 glcontext.uniformBlockBinding(program, glcontext.getUniformBlockIndex(program, "_Constants"), DRAW_CONST_BINDING_INDEX);
                             }
-                    
+                            
+                            program.uniformSamplersLocation = glcontext.getUniformLocation(program, "_samplers");                            
                             program.uniformInstanceCountLocation = glcontext.getUniformLocation(program, "_instance_count");
                             program.uniformVerticalFlipLocation = glcontext.getUniformLocation(program, "_vertical_flip");
 
@@ -321,28 +322,30 @@
                     return glTextureIDCounter++;
                 },
                 webgl_createTarget(format, internal, type, w, h, count, enableDepth, textures) {
-                    const texarray = new Uint32Array(memory.buffer, textures, count);
+                    const texarray = new Uint32Array(memory.buffer, textures, count + 1);
                     const frameBuffer = glcontext.createFramebuffer();
                     const attachments = [];
 
+                    texarray[0] = 0;
                     glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, frameBuffer);
-                    var result = {fb: frameBuffer, depth: null};
+                    var result = {fb: frameBuffer};
 
+                    if (enableDepth) {
+                        const texture = glcontext.createTexture();
+                        glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
+                        glcontext.texImage2D(glcontext.TEXTURE_2D, 0, glcontext.DEPTH_COMPONENT32F, w, h, 0, glcontext.DEPTH_COMPONENT, glcontext.FLOAT, null);
+                        glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.TEXTURE_2D, texture, 0);
+                        gltextures[glTextureIDCounter] = texture;
+                        texarray[0] = glTextureIDCounter++;
+                    }
                     for (let i = 0; i < count; i++) {
                         const texture = glcontext.createTexture();
                         glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                         glcontext.texImage2D(glcontext.TEXTURE_2D, 0, internal, w, h, 0, format, type, null);
                         glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0 + i, glcontext.TEXTURE_2D, texture, 0);
                         gltextures[glTextureIDCounter] = texture;
-                        texarray[i] = glTextureIDCounter++;
+                        texarray[i + 1] = glTextureIDCounter++;
                         attachments[i] = glcontext.COLOR_ATTACHMENT0 + i;
-                    }
-                    if (enableDepth) {
-                        result.depth = glcontext.createRenderbuffer();
-                        glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, result.depth);
-                        glcontext.renderbufferStorage(glcontext.RENDERBUFFER, glcontext.DEPTH_COMPONENT32F, w, h);
-                        glcontext.framebufferRenderbuffer(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.RENDERBUFFER, result.depth);
-                        glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, null);
                     }
                     if (glcontext.checkFramebufferStatus(glcontext.FRAMEBUFFER) != glcontext.FRAMEBUFFER_COMPLETE) {
                         print("[WebGL] Framebuffer is not complete");
@@ -372,31 +375,32 @@
                 },
                 webgl_deleteTarget(id) {
                     const target = glframebuffers[id]
-                    glcontext.deleteRenderbuffer(target.depth);
                     glcontext.deleteFramebuffer(target.fb);
                     glframebuffers[id] = null;
                 },
                 webgl_viewPort(w, h) {
                     glcontext.viewport(0, 0, w, h);
+                    glcontext.depthRange(0, 1);
                 },
                 webgl_applyTarget: function(frameBufferID, mask, r, g, b, a, d) {
                     glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, glframebuffers[frameBufferID].fb);
                     glVerticalFlip = frameBufferID ? -1.0 : 1.0;
 
                     if (mask) {
-                        glcontext.clearColor(r, g, b, a);
+                        glcontext.clearColor(r, g, b, 1.0);
                         glcontext.clearDepth(d);
                         glcontext.clear(mask);
                     }
                 },
-                webgl_applyShader: function(shaderID, ztype, btype) {
+                webgl_applyShader: function(shaderID, dtype, btype) {
                     const program = glshaders[shaderID];
 
                     glcontext.useProgram(program);
                     glcontext.uniform1f(program.uniformVerticalFlipLocation, glVerticalFlip);
+                    glcontext.uniform1iv(program.uniformSamplersLocation, [0, 1, 2, 3])
                     uniformInstanceCountLocation = program.uniformInstanceCountLocation;
 
-                    ztypes[ztype]();
+                    dtypes[dtype]();
                     btypes[btype]();
                 },
                 webgl_applyConstants: function(index, ptr, len) {
@@ -509,6 +513,7 @@
                         instance.exports.updateFrame(dt);
                     }
 
+                    //throw "test";
                     window.requestAnimationFrame(onFrame);
                 }
                 window.requestAnimationFrame(timestamp => {

@@ -135,12 +135,13 @@ extern "C" void initialize() {
     });
     
     math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
-    bbox1 = scene->addBoundingBox(false, bb1);
+    bbox1 = scene->addBoundingBox(bb1);
+    bbox1->setColor({0.5f, 0.5f, 0.5f, 0.5f});
     
-    axis = scene->addLineSet(true, 3);
-    axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 1});
-    axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 1});
-    axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 1});
+    axis = scene->addLineSet(3);
+    axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.5});
+    axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
+    axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.5});
     
     platform->setLoop([](float dtSec) {
         scene->setCameraLookAt(orbit + math::vector3f{32, 0, 32}, {32, 0, 32});
