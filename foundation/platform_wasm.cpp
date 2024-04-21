@@ -1,5 +1,6 @@
 
-// TODO:
+// TODO: unique_ptr
+// TODO: tlsf allocator
 // 
 
 #ifdef PLATFORM_WASM
@@ -135,6 +136,7 @@ extern "C" {
 }
 
 // Message formatting
+// TODO: move to common util
 namespace {
     std::size_t align64(std::size_t len) {
         return (len + 63) & ~std::size_t(63);

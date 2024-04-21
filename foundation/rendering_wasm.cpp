@@ -5,13 +5,10 @@
 
 #include <GLES3/gl3.h>
 
-// TODO: +unique_ptr
-
 // From js
 extern "C" {
     auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> WebGLId;
-    auto webgl_createIndexData(const std::uint32_t *data, std::uint32_t count) -> WebGLId;
-    auto webgl_createVertexData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride) -> WebGLId;
+    auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride, const std::uint32_t *idx, std::uint32_t icount) -> WebGLId;
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
     auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
     void webgl_viewPort(std::uint32_t w, std::uint32_t h);
@@ -20,6 +17,7 @@ extern "C" {
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
     void webgl_drawDefault(WebGLId data, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_drawIndexed(WebGLId data, std::uint32_t indexCount, std::uint32_t instanceCount, GLenum topology);
     void webgl_drawWithRepeat(WebGLId data, std::uint32_t attrCount, std::uint32_t instanceCount, std::uint32_t vertexCount, std::uint32_t totalInstCount, GLenum topology);
     void webgl_deleteProgram(WebGLId id);
     void webgl_deleteData(WebGLId id);
@@ -119,17 +117,21 @@ namespace foundation {
 }
 
 namespace foundation {
-    WASMData::WASMData(WebGLId data, std::uint32_t count, std::uint32_t stride)
+    WASMData::WASMData(WebGLId data, std::uint32_t vcount, std::uint32_t icount, std::uint32_t stride)
         : _data(data)
-        , _count(count)
+        , _vcount(vcount)
+        , _icount(icount)
         , _stride(stride)
     {
     }
     WASMData::~WASMData() {
         webgl_deleteData(_data);
     }
-    std::uint32_t WASMData::getCount() const {
-        return _count;
+    std::uint32_t WASMData::getVertexCount() const {
+        return _vcount;
+    }
+    std::uint32_t WASMData::getIndexCount() const {
+        return _icount;
     }
     std::uint32_t WASMData::getStride() const {
         return _stride;
@@ -212,9 +214,9 @@ namespace foundation {
 namespace foundation {
     WASMRendering::WASMRendering(const std::shared_ptr<PlatformInterface> &platform) : _platform(platform) {
         _platform->logMsg("[RENDER] Initialization : WebGL");
-        _frameConstants = new FrameConstants;
+        _frameConstants = std::make_unique<FrameConstants>();
         _uploadBufferLength = 1024;
-        _uploadBufferData = new std::uint8_t [_uploadBufferLength];
+        _uploadBufferData = std::make_unique<std::uint8_t[]>(_uploadBufferLength);
         _platform->logMsg("[RENDER] Initialization : complete");
     }
     
@@ -262,17 +264,17 @@ namespace foundation {
         };
         
         struct ShaderSrc {
-            const std::uint16_t *src;
+            std::unique_ptr<std::uint16_t[]> src;
             std::size_t length;
         }
         nativeShaderVS, nativeShaderFS;
         
-        auto createNativeSrc = [](const std::string &src) {
-            std::uint16_t *buffer = new std::uint16_t [src.length()];
+        auto createNativeSrc = [](ShaderSrc &output, const std::string &src) {
+            output.length = src.length();
+            output.src = std::make_unique<std::uint16_t[]>(src.length());
             for (std::size_t i = 0; i < src.length(); i++) {
-                buffer[i] = src[i];
+                output.src[i] = src[i];
             }
-            return ShaderSrc {buffer, src.length()};
         };
         auto formFixedBlock = [&indent](util::strstream &stream, std::string &output) {
             std::string varname, arg;
@@ -499,7 +501,7 @@ namespace foundation {
                 shaderVS += "}\n\n";
                 
                 shaderVS = shaderUtils::makeLines(shaderVS);
-                nativeShaderVS = createNativeSrc(shaderVS);
+                createNativeSrc(nativeShaderVS, shaderVS);
                 //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
                 
                 vssrcBlockDone = true;
@@ -527,7 +529,7 @@ namespace foundation {
                 shaderUtils::replace(codeBlock, "float1", "float", SEPARATORS, SEPARATORS);
                 shaderUtils::replace(codeBlock, "int1", "int", SEPARATORS, SEPARATORS);
                 shaderUtils::replace(codeBlock, "uint1", "uint", SEPARATORS, SEPARATORS);
-
+                
                 shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 shaderUtils::replace(codeBlock, "input_", "passing.", SEPARATORS, {"input_position"});
@@ -537,9 +539,9 @@ namespace foundation {
                 shaderFS += "void main() {\n";
                 shaderFS += codeBlock;
                 shaderFS += "}\n\n";
-
+                
                 shaderFS = shaderUtils::makeLines(shaderFS);
-                nativeShaderFS = createNativeSrc(shaderFS);
+                createNativeSrc(nativeShaderFS, shaderFS);
 
                 //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
                 fssrcBlockDone = true;
@@ -551,10 +553,8 @@ namespace foundation {
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             layout.repeat = std::max(layout.repeat, std::uint32_t(1));
-            WebGLId webglShader = webgl_createProgram(nativeShaderVS.src, nativeShaderVS.length, nativeShaderFS.src, nativeShaderFS.length);
+            WebGLId webglShader = webgl_createProgram(nativeShaderVS.src.get(), nativeShaderVS.length, nativeShaderFS.src.get(), nativeShaderFS.length);
             result = std::make_shared<WASMShader>(webglShader, std::move(layout), constBlockLength);
-            delete [] nativeShaderVS.src;
-            delete [] nativeShaderFS.src;
         }
         else if(vssrcBlockDone == false) {
             _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
@@ -605,28 +605,27 @@ namespace foundation {
         return result;
     }
     
-    RenderDataPtr WASMRendering::createIndexData(const std::uint32_t *data, std::uint32_t count) {
-        WebGLId webglData = webgl_createIndexData(data, count);
-        return std::make_shared<WASMData>(webglData, count, sizeof(std::uint32_t));
-    }
-    
-    RenderDataPtr WASMRendering::createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) {
+    RenderDataPtr WASMRendering::createData(const void *data, const foundation::InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
         RenderDataPtr result = nullptr;
         
-        if (count && layout.attributes.empty() == false) {
+        if (indexes && layout.repeat > 1) {
+            _platform->logError("[MetalRendering::createData] Vertex repeat is incompatible with indexed data");
+            return nullptr;
+        }
+        if (vcnt && layout.attributes.empty() == false) {
             std::uint32_t stride = 0;
             for (std::size_t i = 0; i < layout.attributes.size(); i++) {
                 stride += g_formatConversionTable[int(layout.attributes[i].format)].size;
             }
             
-            std::uint8_t *memory = _getUploadBuffer(layout.attributes.size() + stride * count);
+            std::uint8_t *memory = _getUploadBuffer(layout.attributes.size() + stride * vcnt);
             for (std::size_t i = 0; i < layout.attributes.size(); i++) {
                 memory[i] = std::uint8_t(layout.attributes[i].format);
             }
             
-            memcpy(memory + layout.attributes.size(), data, stride * count);
-            WebGLId webglData = webgl_createVertexData(memory, layout.attributes.size(), memory + layout.attributes.size(), count * stride, stride);
-            result = std::make_shared<WASMData>(webglData, count, stride);
+            memcpy(memory + layout.attributes.size(), data, stride * vcnt);
+            WebGLId webglData = webgl_createData(memory, layout.attributes.size(), memory + layout.attributes.size(), vcnt * stride, stride, indexes, icnt);
+            result = std::make_shared<WASMData>(webglData, vcnt, icnt, stride);
         }
         
         return result;
@@ -656,15 +655,21 @@ namespace foundation {
             _frameConstants->rtBounds.y = _platform->getScreenHeight();
         }
         
-        webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
-        webgl_applyTarget(glTarget, cmask, clear.r, clear.g, clear.b, clear.a, 0.0f);
-        webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants, sizeof(FrameConstants));
+        if (_lastGLTarget != glTarget) {
+            _lastGLTarget = glTarget;
+            
+            webgl_applyTarget(glTarget, cmask, clear.r, clear.g, clear.b, clear.a, 0.0f);
+            webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
+            webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
+        }
         
         pass(*this);
         
         if (platformTarget) {
-            webgl_applyTarget(0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+            webgl_applyTarget(0, cmask, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
             webgl_viewPort(_platform->getScreenWidth(), _platform->getScreenHeight());
+            webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
+            _lastGLTarget = 0;
         }
     }
     
@@ -673,54 +678,20 @@ namespace foundation {
             _topology = topology;
             _currentShader = std::static_pointer_cast<WASMShader>(shader);
             
-            const std::uint32_t dtype = std::uint32_t(depthBehavior);
-            const std::uint32_t btype = std::uint32_t(blendType);
+            std::uint32_t dtype = 0, btype = 0;
+            
+            if (_lastBlendType != blendType) {
+                _lastBlendType = blendType;
+                btype = std::uint32_t(blendType);
+            }
+            if (_lastDepthBehavior != depthBehavior) {
+                _lastDepthBehavior = depthBehavior;
+                dtype = std::uint32_t(depthBehavior);
+            }
             
             webgl_applyShader(_currentShader->getWebGLShader(), dtype, btype);
         }
     }
-    
-    /*
-    void WASMRendering::applyState(const RenderShaderPtr &shader, RenderTopology topology, const RenderPassConfig &cfg) {
-        if (shader) {
-            float rtWidth = _platform->getScreenWidth();
-            float rtHeight = _platform->getScreenHeight();
-            
-            if (cfg.target) {
-                rtWidth = float(cfg.target->getWidth());
-                rtHeight = float(cfg.target->getHeight());
-            }
-            
-            _frameConstants->rtBounds.x = rtWidth;
-            _frameConstants->rtBounds.y = rtHeight;
-            
-            webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants, sizeof(FrameConstants));
-            
-            const GLenum cmask = (cfg.doClearColor ? GL_COLOR_BUFFER_BIT : 0) | (cfg.doClearDepth ? GL_DEPTH_BUFFER_BIT : 0);
-            const WASMTarget *platformTarget = static_cast<const WASMTarget *>(cfg.target.get());
-            WebGLId glTarget = 0;
-            
-            if (platformTarget) {
-                webgl_viewPort(platformTarget->getWidth(), platformTarget->getHeight());
-                glTarget = platformTarget->getWebGLTarget();
-            }
-            else {
-                webgl_viewPort(_platform->getScreenWidth(), _platform->getScreenHeight());
-            }
-            
-            _topology = topology;
-            _currentShader = std::static_pointer_cast<WASMShader>(shader);
-            
-            const std::uint32_t ztype = std::uint32_t(cfg.zBehaviorType);
-            const std::uint32_t btype = std::uint32_t(cfg.blendType);
-            
-            webgl_applyState(glTarget, _currentShader->getWebGLShader(), cmask, cfg.color[0], cfg.color[1], cfg.color[2], cfg.color[3], cfg.depth, ztype, btype);
-        }
-        else {
-            _platform->logError("[MetalRendering::applyState] shader is null\n");
-        }
-    }
-    */
     
     void WASMRendering::applyShaderConstants(const void *constants) {
         if (_currentShader) {
@@ -755,7 +726,7 @@ namespace foundation {
     }
     
     void WASMRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
-        const std::shared_ptr<WASMData> platformData = std::static_pointer_cast<WASMData>(inputData);
+        const WASMData *platformData = static_cast<const WASMData *>(inputData.get());
         
         if (_currentShader) {
             const InputLayout &layout = _currentShader->getInputLayout();
@@ -764,33 +735,39 @@ namespace foundation {
             
             if (platformData) {
                 id = platformData->getWebGLData();
-                vcount = platformData->getCount();
+                vcount = platformData->getVertexCount();
             }
             if (layout.repeat > 1) {
                 webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, vcount * instanceCount, g_topologies[int(_topology)]);
             }
             else {
-                webgl_drawDefault(id, vcount, instanceCount, g_topologies[int(_topology)]);
+                if (platformData->getIndexCount()) {
+                    webgl_drawIndexed(id, platformData->getIndexCount(), instanceCount, g_topologies[int(_topology)]);
+                }
+                else {
+                    webgl_drawDefault(id, vcount, instanceCount, g_topologies[int(_topology)]);
+                }
             }
         }
     }
     
-    void WASMRendering::draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) {
-        
-    }
-    
     void WASMRendering::presentFrame() {
+        _lastGLTarget = -1;
+        _lastBlendType = BlendType(-1);
+        _lastDepthBehavior = DepthBehavior(-1);
         
+        for (std::size_t i = 0; i < MAX_TEXTURES; i++) {
+            webgl_applyTexture(i, 0, 0);
+        }
     }
     
     std::uint8_t *WASMRendering::_getUploadBuffer(std::size_t requiredLength) {
         if (requiredLength > _uploadBufferLength) {
-            delete [] _uploadBufferData;
             _uploadBufferLength = roundTo4096(requiredLength);
-            _uploadBufferData = new std::uint8_t [_uploadBufferLength];
+            _uploadBufferData = std::make_unique<std::uint8_t[]>(_uploadBufferLength);
         }
         
-        return _uploadBufferData;
+        return _uploadBufferData.get();
     }
     
 }

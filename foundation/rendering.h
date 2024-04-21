@@ -20,22 +20,22 @@ namespace foundation {
     };
     
     enum class DepthBehavior : std::uint8_t {
-        DISABLED = 0,
+        DISABLED = 1,
         TEST_ONLY,
         TEST_AND_WRITE,
     };
-
+    
+    enum class BlendType : std::uint8_t {
+        DISABLED = 1,           // Blending is disabled
+        MIXING,                 // sourceRGB * sourceA + destRGB * (1 - sourceA)
+        ADDITIVE,               // sourceRGB * sourceA + destRGB
+    };
+    
     enum class SamplerType : std::uint8_t {
         NEAREST = 0,
         LINEAR,
     };
-
-    enum class BlendType : std::uint8_t {
-        DISABLED = 0,           // Blending is disabled
-        MIXING,                 // sourceRGB * sourceA + destRGB * (1 - sourceA)
-        ADDITIVE,               // sourceRGB * sourceA + destRGB
-    };
-        
+    
     enum class RenderTextureFormat : std::uint8_t {
         R8UN = 0,               // 1 byte grayscale normalized to [0..1]. In shader .r component is used
         R16F,                   // float16 grayscale In shader .r component is used
@@ -105,7 +105,8 @@ namespace foundation {
     
     class RenderData {
     public:
-        virtual auto getCount() const -> std::uint32_t = 0;
+        virtual auto getVertexCount() const -> std::uint32_t = 0;
+        virtual auto getIndexCount() const -> std::uint32_t = 0;
         virtual auto getStride() const -> std::uint32_t = 0;
         
     public:
@@ -192,20 +193,14 @@ namespace foundation {
         //
         virtual auto createRenderTarget(foundation::RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr = 0;
         
-        // Create index data buffer
-        // @data        - pointer to data
-        // @count       - count of structures in array
-        // @return      - handle
-        //
-        virtual auto createIndexData(const std::uint32_t *data, std::uint32_t count) -> RenderDataPtr = 0;
-        
         // Create vertex data buffer
         // @data        - pointer to data (array of structures)
         // @layout      - vertex description. Should match the description in shader
-        // @count       - count of structures in array
+        // @vcnt        - count of structures in array
+        // @indexes     - pointer to indexes
         // @return      - handle
         //
-        virtual auto createVertexData(const void *data, const foundation::InputLayout &layout, std::uint32_t count) -> RenderDataPtr = 0;
+        virtual auto createData(const void *data, const foundation::InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) -> RenderDataPtr = 0;
         
         // Return actual rendering area size
         //
@@ -244,12 +239,6 @@ namespace foundation {
         // @inputData layout has to match current shader's layout
         //
         virtual void draw(const RenderDataPtr &inputData = nullptr, std::uint32_t instanceCount = 1) = 0;
-        
-        // Draw indexed vertexes
-        // @inputData layout has to match current shader's layout
-        // @indexes must be std::uint32_t indexes
-        //
-        virtual void draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) = 0;
         
         // Frame finalization
         //

@@ -147,8 +147,7 @@ namespace voxel {
     
     class TexturedMeshImpl : public SceneInterface::TexturedMesh {
     public:
-        foundation::RenderDataPtr vertices;
-        foundation::RenderDataPtr indices;
+        foundation::RenderDataPtr data;
         foundation::RenderTexturePtr texture;
         math::vector4f position = {0, 0, 0, 1};
         
@@ -158,9 +157,8 @@ namespace voxel {
         }
         
     public:
-        TexturedMeshImpl(foundation::RenderDataPtr &&v, foundation::RenderDataPtr &&i, const foundation::RenderTexturePtr &t) {
-            vertices = std::move(v);
-            indices = std::move(i);
+        TexturedMeshImpl(foundation::RenderDataPtr &&indexedData, const foundation::RenderTexturePtr &t) {
+            data = std::move(indexedData);
             texture = t;
         }
         ~TexturedMeshImpl() override {}
@@ -374,7 +372,7 @@ namespace {
             output_nrm = vertex_normal_v.xyz;
         }
         fssrc {
-            float paletteIndex = _tex2d(0, input_uv).r;
+            float paletteIndex = _tex2d(0, input_uv).r; //
             output_color[0] = float4(input_nrm * 0.5 + 0.5, paletteIndex);
         }
     )";
@@ -395,8 +393,8 @@ namespace {
             float3 normal = gbuffer.rgb;
             float  gdepth = _tex2d(2, input_uv).r;
             
-            float4 albedo = _tex2d(0, float2(gbuffer.w, 0)); //
-            output_color[0] = float4(normal, 1.0); //albedo; // float4(gdepth * 100.0, 0, 0, 1); // //_tex2d(0, float2(colorIndex, 0));
+            float4 color = _tex2d(0, float2(gbuffer.w, 0)); //
+            output_color[0] = color; //float4(gdepth * 100.0, 0, 0, 1); // //_tex2d(0, float2(colorIndex, 0));
         }
     )";
 }
@@ -440,8 +438,8 @@ namespace voxel {
 
 
         _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
-        _platform->setResizeHandler([]() {
-        
+        _platform->setResizeHandler([&]() {
+            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         });
 
         setCameraLookAt({45, 45, 45}, {0, 0, 0});
@@ -484,7 +482,7 @@ namespace voxel {
         std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
         
         for (std::size_t i = 0; i < frameCount; i++) {
-            voxFrames[i] = _rendering->createVertexData(frames[i].data(), _staticMeshShader->getInputLayout(),  std::uint32_t(frames[i].size()));
+            voxFrames[i] = _rendering->createData(frames[i].data(), _staticMeshShader->getInputLayout(),  std::uint32_t(frames[i].size()));
         }
         if (frameCount) {
             mesh = std::make_shared<StaticMeshImpl>(voxFrames.get(), frameCount);
@@ -499,7 +497,7 @@ namespace voxel {
         std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
         
         for (std::size_t i = 0; i < frameCount; i++) {
-            voxFrames[i] = _rendering->createVertexData(frames[i].data(), _dynamicMeshShader->getInputLayout(), std::uint32_t(frames[i].size()));
+            voxFrames[i] = _rendering->createData(frames[i].data(), _dynamicMeshShader->getInputLayout(), std::uint32_t(frames[i].size()));
         }
         if (frameCount) {
             mesh = std::make_shared<DynamicMeshImpl>(voxFrames.get(), frameCount);
@@ -511,11 +509,10 @@ namespace voxel {
     
     SceneInterface::TexturedMeshPtr SceneInterfaceImpl::addTexturedMesh(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) {
         std::shared_ptr<TexturedMeshImpl> mesh = nullptr;
-        foundation::RenderDataPtr vertexData = _rendering->createVertexData(vtx.data(), _texturedMeshShader->getInputLayout(), std::uint32_t(vtx.size()));
-        foundation::RenderDataPtr indexData = _rendering->createIndexData(idx.data(), std::uint32_t(idx.size()));
+        foundation::RenderDataPtr data = _rendering->createData(vtx.data(), _texturedMeshShader->getInputLayout(), std::uint32_t(vtx.size()), idx.data(), std::uint32_t(idx.size()));
         
-        if (vertexData && indexData && tx) {
-            mesh = std::make_shared<TexturedMeshImpl>(std::move(vertexData), std::move(indexData), tx);
+        if (data && tx) {
+            mesh = std::make_shared<TexturedMeshImpl>(std::move(data), tx);
             _texturedMeshes.emplace_back(mesh);
         }
         
@@ -563,6 +560,10 @@ namespace voxel {
     // --+ construct depth from world position and compare with depth
     // --+ AO shader
     // + Skybox + texture types
+    // + Particles
+    //
+    // TODO:
+    // + forTarget - depthTexture from other target
     //
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _cleanupUnused(_boundingBoxes);
@@ -586,11 +587,11 @@ namespace voxel {
             
             rendering.applyShader(_texturedMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &texturedMesh : _texturedMeshes) {
+                rendering.applyShaderConstants(&texturedMesh->position);
                 _rendering->applyTextures({
                     {texturedMesh->texture, foundation::SamplerType::NEAREST}
                 });
-                rendering.applyShaderConstants(&texturedMesh->position);
-                rendering.draw(texturedMesh->vertices, texturedMesh->indices);
+                rendering.draw(texturedMesh->data);
             }
         });
         _rendering->forTarget(nullptr, {0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
@@ -600,8 +601,8 @@ namespace voxel {
                 {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
                 {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
             });
-            rendering.draw(4);
-            
+            rendering.draw();
+
             rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
             for (const auto &set : _lineSets) {
                 for (std::size_t i = 0; i < set->blocks.size(); i++) {

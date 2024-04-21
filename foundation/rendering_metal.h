@@ -94,17 +94,21 @@ namespace foundation {
     
     class MetalData : public RenderData {
     public:
-        MetalData(id<MTLBuffer> buffer, std::uint32_t count, std::uint32_t stride);
+        MetalData(id<MTLBuffer> vdata, id<MTLBuffer> indexes, std::uint32_t vcnt, std::uint32_t icnt, std::uint32_t stride);
         ~MetalData() override;
         
-        std::uint32_t getCount() const override;
+        std::uint32_t getVertexCount() const override;
+        std::uint32_t getIndexCount() const override;
         std::uint32_t getStride() const override;
 
-        id<MTLBuffer> get() const;
+        id<MTLBuffer> getVertexes() const;
+        id<MTLBuffer> getIndexes() const;
         
     private:
-        id<MTLBuffer> _buffer;
-        std::uint32_t _count;
+        id<MTLBuffer> _vertices;
+        id<MTLBuffer> _indexes;
+        std::uint32_t _vcount;
+        std::uint32_t _icount;
         std::uint32_t _stride;
     };
     
@@ -117,9 +121,8 @@ namespace foundation {
         
         RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
-        RenderTargetPtr createRenderTarget(RenderTextureFormat format, unsigned textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
-        RenderDataPtr createIndexData(const std::uint32_t *data, std::uint32_t count) override;
-        RenderDataPtr createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) override;
+        RenderTargetPtr createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
+        RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
         
         float getBackBufferWidth() const override;
         float getBackBufferHeight() const override;
@@ -131,7 +134,6 @@ namespace foundation {
         
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
-        void draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) override;
         void presentFrame() override;
         
     private:
@@ -162,7 +164,7 @@ namespace foundation {
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _renderPipelineStates;
         
         id<MTLSamplerState> _samplerStates[2];
-        id<MTLDepthStencilState> _depthStates[3];
+        id<MTLDepthStencilState> _depthStates[4];
         
         RenderShaderPtr _currentShader;
         RenderTargetPtr _currentTarget;

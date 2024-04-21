@@ -22,17 +22,19 @@ namespace foundation {
     
     class WASMData : public RenderData {
     public:
-        WASMData(WebGLId data, std::uint32_t count, std::uint32_t stride);
+        WASMData(WebGLId data, std::uint32_t vcount, std::uint32_t icount, std::uint32_t stride);
         ~WASMData() override;
         
-        auto getCount() const -> std::uint32_t override;
+        auto getVertexCount() const -> std::uint32_t override;
+        auto getIndexCount() const -> std::uint32_t override;
         auto getStride() const -> std::uint32_t override;
         auto getWebGLData() const -> WebGLId;
         
     private:
         const WebGLId _data;
         const std::uint32_t _stride;
-        const std::uint32_t _count;
+        const std::uint32_t _vcount;
+        const std::uint32_t _icount;
     };
     
     class WASMTexBase : public RenderTexture {
@@ -110,8 +112,7 @@ namespace foundation {
         auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
-        auto createIndexData(const std::uint32_t *data, std::uint32_t count) -> RenderDataPtr override;
-        auto createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) -> RenderDataPtr override;
+        auto createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr override;
         
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
@@ -123,7 +124,6 @@ namespace foundation {
         
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
-        void draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) override;
         void presentFrame() override;
         
     private:
@@ -135,17 +135,21 @@ namespace foundation {
             math::vector4f cameraPosition = math::vector4f(0, 0, 0, 1);
             math::vector4f cameraDirection = math::vector4f(1, 0, 0, 0);
             math::vector4f rtBounds = {0, 0, 0, 0};
-        }
-        *_frameConstants;
+        };
         
         const std::shared_ptr<PlatformInterface> _platform;
         
-        std::uint8_t *_uploadBufferData;
+        std::unique_ptr<FrameConstants> _frameConstants;
+        std::unique_ptr<std::uint8_t[]> _uploadBufferData;
         std::size_t _uploadBufferLength;
         
         std::unordered_set<std::string> _shaderNames;
         std::shared_ptr<WASMShader> _currentShader;
         
+        BlendType _lastBlendType = BlendType(-1);
+        DepthBehavior _lastDepthBehavior = DepthBehavior(-1);
+        
+        WebGLId _lastGLTarget = -1;
         RenderTopology _topology;
     };
 }

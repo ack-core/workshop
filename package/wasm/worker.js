@@ -30,8 +30,8 @@ onmessage = (msg) => {
                 js_canvas_width: () => { throw "can't access canvas from background" },
                 js_canvas_height: () => { throw "can't access canvas from background" },
                 webgl_createProgram: (vsrc, vlen, fsrc, flen) => { throw "can't access webgl from background" },
-                webgl_createIndexData: (ptr, count) => { throw "can't access webgl from background" },
-                webgl_createVertexData: (layout, layoutLen, ptr, dataLen, stride) => { throw "can't access webgl from background" },
+                //webgl_createIndexData: (ptr, count) => { throw "can't access webgl from background" },
+                webgl_createData: (layout, layoutLen, ptr, dataLen, stride, idx, icount) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },
                 webgl_createTarget: (format, internal, type, w, h, count, enableDepth, textures) => { throw "can't access webgl from background" },
                 webgl_deleteProgram: (id) => { throw "can't access webgl from background" },
@@ -44,6 +44,7 @@ onmessage = (msg) => {
                 webgl_applyConstants: (index, ptr, len) => { throw "can't access webgl from background" },
                 webgl_applyTexture: (index, textureID, samplingType) => { throw "can't access webgl from background" },
                 webgl_drawDefault: (buffer, vertexCount, instanceCount, topology) => { throw "can't access webgl from background" },
+                webgl_drawIndexed: (buffer, indexes, indexCount, topology) => { throw "can't access webgl from background" },
                 webgl_drawWithRepeat: (buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) => { throw "can't access webgl from background" }
             }
         };

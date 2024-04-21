@@ -30,6 +30,9 @@ namespace voxel {
             float x, y, z, u;
             float nx, ny, nz, v;
         };
+        struct VTXPTC {
+        
+        };
         
     public:
         struct LineSet {

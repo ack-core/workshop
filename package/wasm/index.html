@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>ack-core demo</title>
     <meta charset="utf-8">
@@ -20,9 +20,9 @@
             height: 100%;
             display: block;
             touch-action: none;
-            user-select: none;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
+            user-select: none;
         }
 
         @media screen and (orientation:portrait) {
@@ -145,28 +145,30 @@
             (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 4, glcontext.UNSIGNED_INT, stride, offset); return 16; },
         ];
         const dtypes = {
-            0: function() {
+            0: function() {},
+            1: function() {
                 glcontext.disable(glcontext.DEPTH_TEST);
             },
-            1: function() {
+            2: function() {
                 glcontext.enable(glcontext.DEPTH_TEST);
                 glcontext.depthMask(false);
             },
-            2: function() {
+            3: function() {
                 glcontext.enable(glcontext.DEPTH_TEST);
                 glcontext.depthMask(true);
             },            
         };
         const btypes = {
-            0: function() {
+            0: function() {},
+            1: function() {
                 glcontext.disable(glcontext.BLEND);
             },
-            1: function() {
+            2: function() {
                 glcontext.enable(glcontext.BLEND);
                 glcontext.blendEquation(glcontext.FUNC_ADD);
                 glcontext.blendFunc(glcontext.ONE, glcontext.ONE_MINUS_SRC_ALPHA);
             },
-            2: function() {
+            3: function() {
                 glcontext.enable(glcontext.BLEND);
                 glcontext.blendEquation(glcontext.FUNC_ADD);
                 glcontext.blendFuncSeparate(glcontext.SRC_ALPHA, glcontext.ONE, glcontext.ONE, glcontext.ONE);
@@ -268,26 +270,13 @@
                     glcontext.deleteProgram(program);
                     return 0;
                 },
-                webgl_createIndexData: function(ptr, count) {
-                    const u8mem = new Uint8Array(memory.buffer, ptr, 4 * count);
-                    const ibo = glcontext.createBuffer();
-                    
-                    glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, ibo);
-                    glcontext.bufferData(glcontext.ELEMENT_ARRAY_BUFFER, u8mem, glcontext.STATIC_DRAW);
-
-                    glbuffers[glBufferIDCounter] = {
-                        buffer: ibo,
-                        layout: null
-                    };
-
-                    return glBufferIDCounter++;
-                },
-                webgl_createVertexData: function(layout, layoutLen, ptr, dataLen, stride) {
+                webgl_createData: function(layout, layoutLen, ptr, dataLen, stride, idx, icount) {
                     const u8mem = new Uint8Array(memory.buffer, ptr, dataLen);
                     const lmem = new Uint8Array(memory.buffer, layout, layoutLen);
                     const vao = glcontext.createVertexArray();
                     const vbo = glcontext.createBuffer();
-                    
+                    var ibo = null;
+
                     glcontext.bindVertexArray(vao);
                     glcontext.bindBuffer(glcontext.ARRAY_BUFFER, vbo);
                     glcontext.bufferData(glcontext.ARRAY_BUFFER, u8mem, glcontext.STATIC_DRAW);
@@ -297,8 +286,18 @@
                         offset += vertexAttribFunctions[lmem[i]](i, stride, offset);
                     }
 
+                    if (idx) {
+                        const imem = new Uint32Array(memory.buffer, idx, icount);
+                        ibo = glcontext.createBuffer();
+                        glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, ibo);
+                        glcontext.bufferData(glcontext.ELEMENT_ARRAY_BUFFER, imem, glcontext.STATIC_DRAW);
+                    }
+                    
                     glcontext.bindVertexArray(null);
+                    glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, null);
+                    glcontext.bindBuffer(glcontext.ARRAY_BUFFER, null);
                     glbuffers[glBufferIDCounter] = {
+                        indexes: ibo,
                         buffer: vbo,
                         layout: vao
                     };
@@ -308,6 +307,7 @@
                 webgl_createTexture(format, internal, type, size, w, h, mipAddresses, mipCount) {
                     const mipPtrs = new Uint32Array(memory.buffer, mipAddresses, mipCount);
                     const texture = glcontext.createTexture();
+                    glcontext.activeTexture(glcontext.TEXTURE0);
                     glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                     glcontext.texStorage2D(glcontext.TEXTURE_2D, mipCount, internal, w, h);
 
@@ -318,23 +318,24 @@
                         glcontext.texSubImage2D(glcontext.TEXTURE_2D, i, 0, 0, mw, mh, format, type, mipData);
                     }
 
+                    glcontext.bindTexture(glcontext.TEXTURE_2D, null);
                     gltextures[glTextureIDCounter] = texture;
                     return glTextureIDCounter++;
                 },
                 webgl_createTarget(format, internal, type, w, h, count, enableDepth, textures) {
                     const texarray = new Uint32Array(memory.buffer, textures, count + 1);
                     const frameBuffer = glcontext.createFramebuffer();
-                    const attachments = [];
 
                     texarray[0] = 0;
-                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, frameBuffer);
-                    var result = {fb: frameBuffer};
+                    glcontext.bindFramebuffer(glcontext.DRAW_FRAMEBUFFER, frameBuffer);
+                    glcontext.activeTexture(glcontext.TEXTURE0);
+                    var result = {fb: frameBuffer, attachments: []};
 
                     if (enableDepth) {
                         const texture = glcontext.createTexture();
                         glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                         glcontext.texImage2D(glcontext.TEXTURE_2D, 0, glcontext.DEPTH_COMPONENT32F, w, h, 0, glcontext.DEPTH_COMPONENT, glcontext.FLOAT, null);
-                        glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.TEXTURE_2D, texture, 0);
+                        glcontext.framebufferTexture2D(glcontext.DRAW_FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.TEXTURE_2D, texture, 0);
                         gltextures[glTextureIDCounter] = texture;
                         texarray[0] = glTextureIDCounter++;
                     }
@@ -342,18 +343,18 @@
                         const texture = glcontext.createTexture();
                         glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
                         glcontext.texImage2D(glcontext.TEXTURE_2D, 0, internal, w, h, 0, format, type, null);
-                        glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0 + i, glcontext.TEXTURE_2D, texture, 0);
+                        glcontext.framebufferTexture2D(glcontext.DRAW_FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0 + i, glcontext.TEXTURE_2D, texture, 0);
                         gltextures[glTextureIDCounter] = texture;
                         texarray[i + 1] = glTextureIDCounter++;
-                        attachments[i] = glcontext.COLOR_ATTACHMENT0 + i;
+                        result.attachments[i] = glcontext.COLOR_ATTACHMENT0 + i;
                     }
-                    if (glcontext.checkFramebufferStatus(glcontext.FRAMEBUFFER) != glcontext.FRAMEBUFFER_COMPLETE) {
+                    if (glcontext.checkFramebufferStatus(glcontext.DRAW_FRAMEBUFFER) != glcontext.FRAMEBUFFER_COMPLETE) {
                         print("[WebGL] Framebuffer is not complete");
                         return 0;
                     }
 
-                    glcontext.drawBuffers(attachments);
-                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, null);
+                    glcontext.bindTexture(glcontext.TEXTURE_2D, null);
+                    glcontext.bindFramebuffer(glcontext.DRAW_FRAMEBUFFER, null);
                     glframebuffers[glFrameBufferIDCounter] = result;
                     return glFrameBufferIDCounter++;
                 },
@@ -365,6 +366,7 @@
                 webgl_deleteData(id) {
                     const data = glbuffers[id]
                     glcontext.deleteBuffer(data.vbo);
+                    glcontext.deleteBuffer(data.ibo);
                     glcontext.deleteVertexArray(data.vao);
                     glbuffers[id] = null;
                 },
@@ -380,10 +382,11 @@
                 },
                 webgl_viewPort(w, h) {
                     glcontext.viewport(0, 0, w, h);
-                    glcontext.depthRange(0, 1);
                 },
                 webgl_applyTarget: function(frameBufferID, mask, r, g, b, a, d) {
-                    glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, glframebuffers[frameBufferID].fb);
+                    const target = glframebuffers[frameBufferID];
+                    glcontext.bindFramebuffer(glcontext.DRAW_FRAMEBUFFER, target.fb);
+                    glcontext.drawBuffers(target.attachments);
                     glVerticalFlip = frameBufferID ? -1.0 : 1.0;
 
                     if (mask) {
@@ -397,10 +400,12 @@
 
                     glcontext.useProgram(program);
                     glcontext.uniform1f(program.uniformVerticalFlipLocation, glVerticalFlip);
-                    glcontext.uniform1iv(program.uniformSamplersLocation, [0, 1, 2, 3])
+                    if (program.uniformSamplersLocation) {
+                        glcontext.uniform1iv(program.uniformSamplersLocation, [0, 1, 2, 3])
+                    }
                     uniformInstanceCountLocation = program.uniformInstanceCountLocation;
 
-                    dtypes[dtype]();
+                    dtypes[dtype]();                        
                     btypes[btype]();
                 },
                 webgl_applyConstants: function(index, ptr, len) {
@@ -420,9 +425,15 @@
                     glcontext.bindVertexArray(glbuffers[buffer].layout);
                     glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
                 },
+                webgl_drawIndexed: function(buffer, indexCount, instanceCount, topology) {
+                    glcontext.bindVertexArray(glbuffers[buffer].layout);
+                    glcontext.drawElementsInstanced(topology, indexCount, glcontext.UNSIGNED_INT, 0, instanceCount);
+                },
                 webgl_drawWithRepeat: function(buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) {
                     glcontext.bindVertexArray(glbuffers[buffer].layout);
-                    glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);
+                    if (uniformInstanceCountLocation) {
+                        glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);                        
+                    }
                     for (let i = 0; i < attrCount; i++) {
                         glcontext.vertexAttribDivisor(i, instanceCount);
                     }
@@ -488,8 +499,9 @@
                 glcontext.enableVertexAttribArray(0);
                 glcontext.vertexAttribPointer(0, 1, glcontext.FLOAT, false, 0, 0);
                 glcontext.bindVertexArray(null);
-
-                glframebuffers[0] = {fb: null, depth: null};
+                glcontext.bindBuffer(glcontext.ARRAY_BUFFER, null);
+                
+                glframebuffers[0] = {fb: null, attachments: [glcontext.BACK]};
                 glcontext.depthFunc(glcontext.GREATER);
                 glcontext.clearColor(0, 0, 0, 0);
                 glcontext.clearDepth(0);

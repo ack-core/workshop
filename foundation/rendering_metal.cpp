@@ -41,6 +41,7 @@ namespace {
     }
     
     void (*initializeBlendOptions[])(MTLRenderPipelineColorAttachmentDescriptor *target) = {
+        [](MTLRenderPipelineColorAttachmentDescriptor *target){},
         [](MTLRenderPipelineColorAttachmentDescriptor *target){
             target.blendingEnabled = false;
         },
@@ -210,24 +211,36 @@ namespace foundation {
 }
 
 namespace foundation {
-    MetalData::MetalData(id<MTLBuffer> buffer, std::uint32_t count, std::uint32_t stride) : _buffer(buffer), _count(count), _stride(stride) {
-    
+    MetalData::MetalData(id<MTLBuffer> vdata, id<MTLBuffer> indexes, std::uint32_t vcnt, std::uint32_t icnt, std::uint32_t stride)
+        : _vertices(vdata)
+        , _indexes(indexes)
+        , _vcount(vcnt)
+        , _icount(icnt)
+        , _stride(stride)
+    {
     }
     
     MetalData::~MetalData() {
-        _buffer = nil;
+        _vertices = nil;
+        _indexes = nil;
     }
     
-    std::uint32_t MetalData::getCount() const {
-        return _count;
+    std::uint32_t MetalData::getVertexCount() const {
+        return _vcount;
+    }
+    std::uint32_t MetalData::getIndexCount() const {
+        return _icount;
     }
     
     std::uint32_t MetalData::getStride() const {
         return _stride;
     }
     
-    id<MTLBuffer> MetalData::get() const {
-        return _buffer;
+    id<MTLBuffer> MetalData::getVertexes() const {
+        return _vertices;
+    }
+    id<MTLBuffer> MetalData::getIndexes() const {
+        return _indexes;
     }
 }
 
@@ -690,7 +703,7 @@ namespace foundation {
         }
     }
     
-    RenderTargetPtr MetalRendering::createRenderTarget(RenderTextureFormat format, unsigned count, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
+    RenderTargetPtr MetalRendering::createRenderTarget(RenderTextureFormat format, std::uint32_t count, std::uint32_t w, std::uint32_t h, bool withZBuffer) {
         @autoreleasepool {
             MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
             id<MTLTexture> targets[RenderTarget::MAX_TEXTURE_COUNT] = {nullptr, nullptr, nullptr, nullptr};
@@ -722,21 +735,24 @@ namespace foundation {
         }
     }
     
-    RenderDataPtr MetalRendering::createIndexData(const std::uint32_t *data, std::uint32_t count) {
-        @autoreleasepool {
-            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * sizeof(std::uint32_t)) options:MTLResourceStorageModeShared];
-            return std::make_shared<MetalData>(buffer, count, sizeof(std::uint32_t));
-        }
-    }
-    
-    RenderDataPtr MetalRendering::createVertexData(const void *data, const InputLayout &layout, std::uint32_t count) {
+    RenderDataPtr MetalRendering::createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
         std::uint32_t stride = 0;
         for (const InputLayout::Attribute &item : layout.attributes) {
             stride += g_formatConversionTable[int(item.format)].size;
         }
+        if (indexes && layout.repeat > 1) {
+            _platform->logError("[MetalRendering::createData] Vertex repeat is incompatible with indexed data");
+            return nullptr;
+        }
         @autoreleasepool {
-            id<MTLBuffer> buffer = [_device newBufferWithBytes:data length:(count * stride) options:MTLResourceStorageModeShared];
-            return std::make_shared<MetalData>(buffer, count, stride);
+            id<MTLBuffer> vbuffer = [_device newBufferWithBytes:data length:(vcnt * stride) options:MTLResourceStorageModeShared];
+            id<MTLBuffer> ibuffer = nil;
+            
+            if (indexes) {
+                ibuffer = [_device newBufferWithBytes:indexes length:(icnt * sizeof(std::uint32_t)) options:MTLResourceStorageModeShared];
+            }
+            
+            return std::make_shared<MetalData>(vbuffer, ibuffer, vcnt, icnt, stride);
         }
     }
     
@@ -912,39 +928,48 @@ namespace foundation {
             const MetalData *implData = static_cast<const MetalData *>(inputData.get());
             const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
             
-            std::uint32_t vertexCount = 1;
-            id<MTLBuffer> buffer = nil;
+            std::uint32_t vcnt = 1;
+            std::uint32_t icnt = 0;
+            id<MTLBuffer> vbuffer = nil;
+            id<MTLBuffer> ibuffer = nil;
             
             if (implData) {
-                vertexCount = implData->getCount();
-                buffer = implData->get();
+                vcnt = implData->getVertexCount();
+                icnt = implData->getIndexCount();
+                vbuffer = implData->getVertexes();
+                ibuffer = implData->getIndexes();
             }
 
             //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
-            [_currentRenderCommandEncoder setVertexBuffer:buffer offset:0 atIndex:VERTEX_IN_BINDING_START];
+            [_currentRenderCommandEncoder setVertexBuffer:vbuffer offset:0 atIndex:VERTEX_IN_BINDING_START];
 
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vertexCount length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
-                [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vertexCount * instanceCount];
+                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
+                [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt * instanceCount];
             }
             else {
-                [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vertexCount instanceCount:instanceCount];
+                if (ibuffer) {
+                    [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:icnt indexType:MTLIndexTypeUInt32 indexBuffer:ibuffer indexBufferOffset:0 instanceCount:instanceCount];
+                }
+                else {
+                    [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vcnt instanceCount:instanceCount];
+                }
             }
         }
     }
     
-    void MetalRendering::draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) {
-        if (_currentRenderCommandEncoder && _currentShader) {
-            const InputLayout &layout = _currentShader->getInputLayout();
-            const MetalData *implData = static_cast<const MetalData *>(inputData.get());
-            const MetalData *idx = static_cast<const MetalData *>(indexes.get());
-            const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
-            
-            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
-            [_currentRenderCommandEncoder setVertexBuffer:implData->get() offset:0 atIndex:VERTEX_IN_BINDING_START];
-            [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:indexes->getCount() indexType:MTLIndexTypeUInt32 indexBuffer:idx->get() indexBufferOffset:0];
-        }
-    }
+//    void MetalRendering::draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) {
+//        if (_currentRenderCommandEncoder && _currentShader) {
+//            const InputLayout &layout = _currentShader->getInputLayout();
+//            const MetalData *implData = static_cast<const MetalData *>(inputData.get());
+//            const MetalData *idx = static_cast<const MetalData *>(indexes.get());
+//            const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
+//
+//            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
+//            [_currentRenderCommandEncoder setVertexBuffer:implData->get() offset:0 atIndex:VERTEX_IN_BINDING_START];
+//            [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:indexes->getCount() indexType:MTLIndexTypeUInt32 indexBuffer:idx->get() indexBufferOffset:0];
+//        }
+//    }
         
     void MetalRendering::presentFrame() {
         _finishRenderCommandEncoder();
