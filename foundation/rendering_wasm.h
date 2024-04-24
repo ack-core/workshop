@@ -107,7 +107,7 @@ namespace foundation {
         WASMRendering(const std::shared_ptr<PlatformInterface> &platform);
         ~WASMRendering() override;
         
-        void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) override;
+        void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) override;
         
         auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
@@ -130,6 +130,7 @@ namespace foundation {
         auto _getUploadBuffer(std::size_t requiredLength) -> std::uint8_t *;
         
         struct FrameConstants {
+            math::transform3f plmVPMatrix = math::transform3f::identity();
             math::transform3f stdVPMatrix = math::transform3f::identity();
             math::transform3f invVPMatrix = math::transform3f::identity();
             math::vector4f cameraPosition = math::vector4f(0, 0, 0, 1);

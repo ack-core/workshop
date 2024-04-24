@@ -286,9 +286,12 @@ namespace foundation {
     
     MetalRendering::~MetalRendering() {}
     
-    void MetalRendering::updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) {
-        _frameConstants.stdVPMatrix = view * proj;
-        _frameConstants.invVPMatrix = _frameConstants.stdVPMatrix.inverted();
+    static bool dbg = false;
+    
+    void MetalRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
+        _frameConstants.plmVPMatrix = vp;
+        _frameConstants.stdVPMatrix = svp;
+        _frameConstants.invVPMatrix = ivp;
         _frameConstants.cameraPosition.xyz = camPos;
         _frameConstants.cameraDirection.xyz = camDir;
     }
@@ -407,6 +410,7 @@ namespace foundation {
             "#define _discard() discard_fragment()\n"
             "\n"
             "struct _FrameData {\n"
+            "    float4x4 plmVPMatrix;\n"
             "    float4x4 stdVPMatrix;\n"
             "    float4x4 invVPMatrix;\n"
             "    float4 cameraPosition;\n"
@@ -414,6 +418,8 @@ namespace foundation {
             "    float4 rtBounds;\n"
             "};\n\n";
         
+        std::string functions;
+        std::string functionDefines;
         std::string blockName;
         std::uint32_t constBlockLength = 0;
         
@@ -423,6 +429,7 @@ namespace foundation {
         bool inoutBlockDone = false;
         bool vssrcBlockDone = false;
         bool fssrcBlockDone = false;
+        int  fndefBlockCount = 0;
         
         while (input >> blockName) {
             if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
@@ -463,14 +470,17 @@ namespace foundation {
                 std::string funcName;
                 std::string funcSignature;
                 std::string funcReturnType;
-
+                
                 if (input >> util::word(funcName) >> util::braced(funcSignature, '(', ')') >> util::sequence("->") >> funcReturnType >> util::sequence("{")) {
                     std::string codeBlock;
                     
-                    if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
-                        nativeShader += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
-                        nativeShader += codeBlock;
-                        nativeShader += "}\n\n";
+                    if (shaderUtils::formCodeBlock("        ", input, codeBlock)) {
+                        functions += "    " + funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
+                        functions += codeBlock;
+                        functions += "    }\n\n";
+                        
+                        functionDefines += "#define " + funcName + " _fn." + funcName + "\n";
+                        fndefBlockCount++;
                     }
                     else {
                         _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
@@ -486,11 +496,15 @@ namespace foundation {
                 continue;
             }
             if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
+                if (constBlockDone == false) {
+                    constBlockDone = true;
+                    nativeShader += "struct _Constants {\n};\n\n";
+                }
                 if (inoutBlockDone == false) {
                     inoutBlockDone = true;
-                    nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n";
+                    nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n\n";
                 }
-                
+
                 std::size_t index = 0;
                 std::uint32_t offset = 0;
                 std::string variables;
@@ -507,7 +521,15 @@ namespace foundation {
                     }
                 };
                 
-                nativeShader += "struct _VSVertexIn {\n";
+                shaderUtils::replace(functions, "const_", "constants.", SEPARATORS);
+                shaderUtils::replace(functions, "frame_", "framedata.", SEPARATORS);
+                
+                nativeShader += "struct _FN {\n    constant _FrameData &framedata;\n    constant _Constants &constants;\n";
+                nativeShader += "    _FN(constant _FrameData &f, constant _Constants &c) : framedata(f), constants(c) {}\n\n";
+                nativeShader += functions;
+                nativeShader += "};\n";
+                nativeShader += functionDefines;
+                nativeShader += "\nstruct _VSVertexIn {\n";
                 formInput(layout.attributes, 0, "vertex_", "vertices[vertex_ID].", nativeShader);
                 nativeShader += "};\n\nvertex _InOut main_vertex(\n";
                 
@@ -518,9 +540,9 @@ namespace foundation {
                     nativeShader += "    unsigned int vertex_ID [[vertex_id]],\n    unsigned int instance_ID [[instance_id]],\n";
                 }
                 
-                nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
-                nativeShader += constBlockDone ? "    constant _Constants &constants [[buffer(1)]],\n" : "";
                 nativeShader +=
+                    "    constant _FrameData &framedata [[buffer(0)]],\n"
+                    "    constant _Constants &constants [[buffer(1)]],\n"
                     "    device const _VSVertexIn *vertices [[buffer(2)]],\n"
                     "    constant uint &_vertexCount [[buffer(";
                     
@@ -540,7 +562,7 @@ namespace foundation {
                 }
                 
                 nativeShader += variables;
-                nativeShader += "    _InOut output;\n\n";
+                nativeShader += "    _FN _fn = _FN(framedata, constants);\n    _InOut output;\n\n";
 
                 std::string codeBlock;
                 
@@ -555,7 +577,7 @@ namespace foundation {
                 shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
                 
                 nativeShader += codeBlock;
-                nativeShader += "\n    (void)repeat_ID; (void)vertex_ID; (void)instance_ID;\n";
+                nativeShader += "\n    (void)repeat_ID; (void)vertex_ID; (void)instance_ID;(void)_fn;\n";
                 nativeShader += "    return output;\n}\n\n";
                 vssrcBlockDone = true;
                 continue;
@@ -566,13 +588,14 @@ namespace foundation {
                     completed = false;
                     break;
                 }
+                
                 nativeShader +=
                     "struct _Output {\n"
                     "    float4 c0[[color(0)]];\n"
                     "    float4 c1[[color(1)]];\n"
                     "    float4 c2[[color(2)]];\n"
                     "    float4 c3[[color(3)]];\n"
-                    "};\n"
+                    "};\n\n"
                     "fragment _Output main_fragment(\n    "
                     "_InOut input [[stage_in]],\n    "
                     "sampler _sampler [[sampler(0)]],\n    "
@@ -582,10 +605,10 @@ namespace foundation {
                     "texture2d<float> _texture3 [[texture(3)]],\n"
                     "";
 
-                nativeShader += "    constant _FrameData &framedata [[buffer(0)]]";
-                nativeShader += constBlockDone ? ",\n    constant _Constants &constants [[buffer(1)]])\n{\n    " : ")\n{\n    ";
-                nativeShader += "float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n    ";
-                nativeShader += "float4 output_color[4] = {};\n\n";
+                nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
+                nativeShader += "    constant _Constants &constants [[buffer(1)]])\n{\n";
+                nativeShader += "    float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n";
+                nativeShader += "    float4 output_color[4] = {};\n    _FN _fn = _FN(framedata, constants);\n\n";
                 
                 std::string codeBlock;
                 
@@ -601,7 +624,7 @@ namespace foundation {
                 
                 nativeShader += codeBlock;
                 nativeShader += "\n    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";
-                nativeShader += "    (void)fragment_coord;\n";
+                nativeShader += "    (void)fragment_coord;(void)_fn;\n";
                 nativeShader += "}\n";
                 fssrcBlockDone = true;
                 continue;
@@ -611,7 +634,7 @@ namespace foundation {
         }
         
         nativeShader = shaderUtils::makeLines(nativeShader);
-        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
+        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -621,7 +644,7 @@ namespace foundation {
                 compileOptions.fastMathEnabled = true;
                 
                 id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
-
+                
                 if (library) {
                     layout.repeat = std::max(layout.repeat, std::uint32_t(1));
                     result = std::make_shared<MetalShader>(name, std::move(layout), library, constBlockLength);

@@ -222,9 +222,10 @@ namespace foundation {
     
     WASMRendering::~WASMRendering() {}
     
-    void WASMRendering::updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) {
-        _frameConstants->stdVPMatrix = view * proj;
-        _frameConstants->invVPMatrix = _frameConstants->stdVPMatrix.inverted();
+    void WASMRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
+        _frameConstants->plmVPMatrix = vp;
+        _frameConstants->stdVPMatrix = svp;
+        _frameConstants->invVPMatrix = ivp;
         _frameConstants->cameraPosition.xyz = camPos;
         _frameConstants->cameraDirection.xyz = camDir;
     }
@@ -326,6 +327,16 @@ namespace foundation {
 
             return totalLength;
         };
+        auto transformCode = [](std::string &target) {
+            shaderUtils::replace(target, "float", "vec", SEPARATORS, "234");
+            shaderUtils::replace(target, "int", "ivec", SEPARATORS, "234");
+            shaderUtils::replace(target, "uint", "uvec", SEPARATORS, "234");
+            shaderUtils::replace(target, "float1", "float", SEPARATORS, SEPARATORS);
+            shaderUtils::replace(target, "int1", "int", SEPARATORS, SEPARATORS);
+            shaderUtils::replace(target, "uint1", "uint", SEPARATORS, SEPARATORS);
+            shaderUtils::replace(target, "const_", "constants.", SEPARATORS);
+            shaderUtils::replace(target, "frame_", "framedata.", SEPARATORS);
+        };
         
         std::string shaderDefines =
             "#version 300 es\n"
@@ -356,6 +367,7 @@ namespace foundation {
             "precision mediump float;\n"
             "\n"
             "layout(std140) uniform _FrameData {\n"
+            "    mediump mat4 plmVPMatrix;\n"
             "    mediump mat4 stdVPMatrix;\n"
             "    mediump mat4 invVPMatrix;\n"
             "    mediump vec4 cameraPosition;\n"
@@ -429,16 +441,9 @@ namespace foundation {
                     std::string codeBlock;
                     
                     if (shaderUtils::formCodeBlock(indent, input, codeBlock)) {
-                        shaderFunctions += "\n" + funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
+                        shaderFunctions += funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
                         shaderFunctions += codeBlock;
                         shaderFunctions += "}\n\n";
-                        
-                        shaderUtils::replace(shaderFunctions, "float", "vec", SEPARATORS, "234");
-                        shaderUtils::replace(shaderFunctions, "int", "ivec", SEPARATORS, "234");
-                        shaderUtils::replace(shaderFunctions, "uint", "uvec", SEPARATORS, "234");
-                        shaderUtils::replace(shaderFunctions, "float1", "float", SEPARATORS, SEPARATORS);
-                        shaderUtils::replace(shaderFunctions, "int1", "int", SEPARATORS, SEPARATORS);
-                        shaderUtils::replace(shaderFunctions, "uint1", "uint", SEPARATORS, SEPARATORS);
                     }
                     else {
                         _platform->logError("[WASMRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
@@ -456,6 +461,7 @@ namespace foundation {
             if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
                 std::string shaderVS = shaderDefines;
                 
+                transformCode(shaderFunctions);
                 shaderVS += "#define output_position gl_Position\n\n";
                 shaderVS = shaderVS + shaderFixed + shaderFunctions + shaderVSOutput;
                 std::string codeBlock;
@@ -471,19 +477,13 @@ namespace foundation {
                     const std::string type = std::string(g_formatConversionTable[int(attribute.format)].nativeTypeName);
                     shaderVS += "layout(location = " + std::to_string(i) + ") in " + type + " vertex_" + std::string(attribute.name) + ";\n";
                 }
+                if (layout.attributes.size()) {
+                    shaderVS += "\n";
+                }
                 
-                shaderVS += "\n";
                 shaderVS += "uniform float _vertical_flip;\n";
-                                
-                shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
-                shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
-                shaderUtils::replace(codeBlock, "uint", "uvec", SEPARATORS, "234");
-                shaderUtils::replace(codeBlock, "float1", "float", SEPARATORS, SEPARATORS);
-                shaderUtils::replace(codeBlock, "int1", "int", SEPARATORS, SEPARATORS);
-                shaderUtils::replace(codeBlock, "uint1", "uint", SEPARATORS, SEPARATORS);
                 
-                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
+                transformCode(codeBlock);
                 shaderUtils::replace(codeBlock, "output_", "passing.", SEPARATORS, {"output_position"});
                 
                 if (layout.repeat > 1) {
@@ -502,7 +502,7 @@ namespace foundation {
                 
                 shaderVS = shaderUtils::makeLines(shaderVS);
                 createNativeSrc(nativeShaderVS, shaderVS);
-                //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
+                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
                 
                 vssrcBlockDone = true;
                 continue;
@@ -523,15 +523,7 @@ namespace foundation {
                     break;
                 }
                 
-                shaderUtils::replace(codeBlock, "float", "vec", SEPARATORS, "234");
-                shaderUtils::replace(codeBlock, "int", "ivec", SEPARATORS, "234");
-                shaderUtils::replace(codeBlock, "uint", "uvec", SEPARATORS, "234");
-                shaderUtils::replace(codeBlock, "float1", "float", SEPARATORS, SEPARATORS);
-                shaderUtils::replace(codeBlock, "int1", "int", SEPARATORS, SEPARATORS);
-                shaderUtils::replace(codeBlock, "uint1", "uint", SEPARATORS, SEPARATORS);
-                
-                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
+                transformCode(codeBlock);
                 shaderUtils::replace(codeBlock, "input_", "passing.", SEPARATORS, {"input_position"});
                 
                 shaderFS += "uniform sampler2D _samplers[4];\n";
@@ -543,7 +535,7 @@ namespace foundation {
                 shaderFS = shaderUtils::makeLines(shaderFS);
                 createNativeSrc(nativeShaderFS, shaderFS);
 
-                //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
+                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
                 fssrcBlockDone = true;
                 continue;
             }

@@ -334,6 +334,7 @@ namespace math {
         static transform3f identity();
         static transform3f lookAtRH(const vector3f &eye, const vector3f &at, const vector3f &up);
         static transform3f perspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar);
+        static transform3f platformPerspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar);
         
         transform3f() = default;
         transform3f(const vector4f &r0, const vector4f &r1, const vector4f &r2, const vector4f &r3);
@@ -718,6 +719,18 @@ namespace math {
     }
     
     inline transform3f transform3f::perspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar) {
+        scalar yS = scalar(1.0f) / std::tan(fovY * scalar(0.5));
+        scalar xS = yS / aspect;
+        
+        return {
+            vector4f(xS, 0, 0, 0),
+            vector4f(0, yS, 0, 0),
+            vector4f(0, 0, zNear / (zFar - zNear), -scalar(1.0)),
+            vector4f(0, 0, (zFar * zNear) / (zFar - zNear), 0),
+        };
+    }
+    
+    inline transform3f transform3f::platformPerspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar) {
         scalar yS = scalar(1.0f) / std::tan(fovY * scalar(0.5));
         scalar xS = yS / aspect;
         

@@ -126,11 +126,12 @@ namespace foundation {
         
     public:
         // Set global per-frame constants, available from shaders
-        // @proj  - proj matrix
-        // @view  - view matrix
+        // @vp   - proj matrix with platform-dependent z-range in clip space
+        // @svp  - proj matrix with [0..1] z-range in clip space
+        // @ivp  - inverted svp
         // Matrices are row-major
         //
-        virtual void updateFrameConstants(const math::transform3f &view, const math::transform3f &proj, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
+        virtual void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
         
         // Create shader from source text
         // @name      - name that is used in error messages

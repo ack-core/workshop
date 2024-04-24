@@ -338,10 +338,12 @@ namespace shaderUtils {
     inline void replace(std::string& target, const std::string& bit, const std::string& replacement, const std::string& prevAllowed, const std::string& postAllowed) {
         std::size_t start_pos = 0;
         while ((start_pos = target.find(bit, start_pos)) != std::string::npos) {
-            if (prevAllowed.find(target.data()[start_pos - 1]) != std::string::npos && postAllowed.find(target.data()[start_pos + bit.length()]) != std::string::npos) {
-                target.replace(start_pos, bit.length(), replacement);
-                start_pos += replacement.length();
-                continue;
+            if (start_pos == 0 || prevAllowed.find(target.data()[start_pos - 1]) != std::string::npos) {
+                if (postAllowed.find(target.data()[start_pos + bit.length()]) != std::string::npos) {
+                    target.replace(start_pos, bit.length(), replacement);
+                    start_pos += replacement.length();
+                    continue;
+                }
             }
             
             start_pos++;
