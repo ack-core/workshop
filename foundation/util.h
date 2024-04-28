@@ -355,7 +355,11 @@ namespace shaderUtils {
         char prev = '\n', next;
         
         while (stream && ((next = stream.getChar()) != '}' || --braceCounter > 0)) {
-            if (prev == '\n') output += indent;
+            if (prev == '\n') {
+                for (int i = 0; i < braceCounter; i++) {
+                    output += indent;
+                }
+            }
             if (next == '{') braceCounter++;
             output += next;
             if (next == '\n')  stream.skipws();

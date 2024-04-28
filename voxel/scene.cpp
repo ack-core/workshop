@@ -213,8 +213,11 @@ namespace voxel {
         }
         
         struct Camera {
-            math::transform3f viewMatrix;
-            math::transform3f projMatrix;
+//            math::transform3f viewMatrix;
+//            math::transform3f projMatrix;
+            math::transform3f plmVPMatrix; // plm matrix transforms to clip space with platform-specific z-range
+            math::transform3f stdVPMatrix; // std matrix transforms to clip space with z-range [0..1]
+            math::transform3f invVPMatrix; // inv matrix assumes that clip space has z-range [0..1]
             math::vector3f position;
             math::vector3f target;
             math::vector3f forward;
@@ -261,7 +264,7 @@ namespace {
         }
         vssrc {
             float4 position = const_linePositions[vertex_ID] + const_globalPosition;
-            output_position = _transform(position, frame_stdVPMatrix);
+            output_position = _transform(position, frame_plmVPMatrix);
             output_color = const_lineColors[vertex_ID >> 1];
         }
         fssrc {
@@ -285,7 +288,7 @@ namespace {
         }
         vssrc {
             float4 position = _lerp(const_bbmin, const_bbmax, float4(fixed_lines[repeat_ID], 0.0));
-            output_position = _transform(position, frame_stdVPMatrix);
+            output_position = _transform(position, frame_plmVPMatrix);
         }
         fssrc {
             output_color[0] = const_color;
@@ -318,7 +321,7 @@ namespace {
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(vertex_scale_reserved.xyz), 0.0);
             
             output_normalc = float4(fixed_normal[faceIndex], float(colorIndex) / 255.0); //
-            output_position = _transform(absVertexPos, frame_stdVPMatrix);
+            output_position = _transform(absVertexPos, frame_plmVPMatrix);
         }
         fssrc {
             output_color[0] = input_normalc;
@@ -352,7 +355,7 @@ namespace {
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
             output_normalc = float4(_transform(fixed_normal[faceIndex], const_modelTransform).xyz * 0.5 + 0.5, float(colorIndex) / 255.0); //
-            output_position = _transform(absVertexPos, _transform(const_modelTransform, frame_stdVPMatrix));
+            output_position = _transform(absVertexPos, _transform(const_modelTransform, frame_plmVPMatrix));
         }
         fssrc {
             output_color[0] = input_normalc;
@@ -367,7 +370,7 @@ namespace {
             nrm : float3
         }
         vssrc {
-            output_position = _transform(float4(vertex_position_u.xyz + const_globalPosition.xyz, 1.0), frame_stdVPMatrix);
+            output_position = _transform(float4(vertex_position_u.xyz + const_globalPosition.xyz, 1.0), frame_plmVPMatrix);
             output_uv = float2(vertex_position_u.w, vertex_normal_v.w);
             output_nrm = vertex_normal_v.xyz;
         }
@@ -378,11 +381,29 @@ namespace {
     )";
     const char *g_gbufferToScreenShaderSrc = R"(
         fixed {
+            rndv[64] : float3 =
+                [0.62,0.02,0.78][0.43,-0.62,-0.40][-0.31,-0.34,0.53][0.22,0.44,0.35][0.49,0.06,0.04][0.12,-0.31,0.23][0.03,-0.07,-0.29][0.07,0.19,-0.03]
+                [0.92,0.24,0.31][0.31,-0.02,0.79][0.26,0.47,0.44][-0.50,0.32,-0.05][0.36,0.07,-0.34][0.23,0.32,-0.03][0.09,-0.27,-0.10][-0.06,0.15,-0.11]
+                [0.69,-0.60,0.42][0.24,-0.63,-0.52][-0.46,-0.05,0.53][-0.39,-0.23,-0.40][-0.44,-0.23,0.03][-0.01,-0.27,0.29][-0.06,-0.29,-0.01][-0.01,-0.01,-0.20]
+                [-0.72,0.65,0.24][0.12,-0.64,0.54][-0.68,-0.12,0.10][0.14,0.41,0.42][-0.41,0.05,-0.29][-0.23,0.05,0.33][-0.14,-0.27,0.02][-0.04,0.00,-0.20]
+                [-0.59,0.50,0.64][-0.33,-0.78,-0.04][-0.55,-0.24,-0.36][0.42,0.22,-0.37][-0.24,0.26,-0.35][0.04,-0.01,-0.40][-0.27,0.13,-0.01][-0.03,-0.14,-0.14]
+                [-0.98,0.16,0.16][-0.12,0.75,0.38][0.01,0.48,-0.51][-0.28,0.13,0.51][0.31,0.34,0.19][-0.26,0.11,-0.28][-0.22,-0.16,0.14][0.12,-0.16,0.03]
+                [-0.27,-0.58,-0.77][-0.42,0.39,-0.62][0.50,-0.07,-0.48][0.39,0.44,-0.11][-0.34,0.36,0.07][0.11,0.21,-0.32][-0.26,-0.06,-0.14][-0.02,0.19,-0.06]
+                [0.12,0.17,-0.98][0.61,0.54,-0.24][-0.39,-0.30,-0.50][0.38,-0.44,0.15][-0.38,0.12,0.31][-0.01,-0.37,-0.15][0.30,0.01,0.05][0.01,0.16,-0.12]
             quad[4] : float4 = [-1, 1, 0.1, 1][1, 1, 0.1, 1][-1, -1, 0.1, 1][1, -1, 0.1, 1]
             uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
         }
         inout {
             uv : float2
+        }
+        fndef getWPos(float2 uv, float depth) -> float3 {
+            float4 clipSpasePos = float4(uv * float2(2.0, -2.0) - float2(1.0, -1.0), depth, 1);
+            float4 wpos = _transform(clipSpasePos, frame_invVPMatrix);
+            return wpos.xyz / wpos.w;
+        }
+        fndef getDPos(float3 wpos) -> float3 {
+            float4 clipSpasePos = _transform(float4(wpos, 1.0), frame_stdVPMatrix);
+            return float3(0.5, -0.5, 1.0) * clipSpasePos.xyz / clipSpasePos.w + float3(0.5, 0.5, 0.0);
         }
         vssrc {
             output_position = fixed_quad[repeat_ID];
@@ -390,11 +411,24 @@ namespace {
         }
         fssrc {
             float4 gbuffer = _tex2d(1, input_uv);
-            float3 normal = gbuffer.rgb;
             float  gdepth = _tex2d(2, input_uv).r;
+            float3 normal = _norm(float3(2.0, 2.0, 2.0) * gbuffer.rgb - float3(1.0, 1.0, 1.0));
+            float3 color = _tex2d(0, float2(gbuffer.w, 0)).rgb;
+            float3 wpos = getWPos(input_uv, gdepth);
+            float3 wnpos = wpos + 0.1 * normal;
+            float  rnd = 8.0 * _frac(_sin(_dot(floor(wpos * 32.0 + 0.5), float3(12.9898, 78.233, 37.719))) * 143758.5453);
+            float  lit = 0.0;
             
-            float4 color = _tex2d(0, float2(gbuffer.w, 0)); //
-            output_color[0] = color; //float4(gdepth * 100.0, 0, 0, 1); // //_tex2d(0, float2(colorIndex, 0));
+            for (int i = 0; i < 8; i++) {
+                float3 rv = fixed_rndv[int(rnd) * 8 + i];
+                float3 ray = _sign(_dot(normal, rv)) * rv;
+                float3 dpos = getDPos(wnpos + ray);
+                float  rdepth = _tex2d(2, dpos.xy).r;
+                lit += _step(rdepth, dpos.z) + _clamp(20000.0 * (rdepth - dpos.z));
+            }
+            
+            lit = _step(0.0000001, gdepth) * (lit * 0.125 * 0.6 + 0.3);
+            output_color[0] = float4(lit * color, 1);
         }
     )";
 }
@@ -461,8 +495,12 @@ namespace voxel {
         _camera.up = nrmright.cross(nrmlook).normalized();
         
         float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
-        _camera.viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
-        _camera.projMatrix = math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
+
+        math::transform3f viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
+        
+        _camera.plmVPMatrix = viewMatrix * math::transform3f::platformPerspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
+        _camera.stdVPMatrix = viewMatrix * math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
+        _camera.invVPMatrix = _camera.stdVPMatrix.inverted();
     }
     
     void SceneInterfaceImpl::setSun(const math::vector3f &directionToSun, const math::color &rgba) {
@@ -524,10 +562,9 @@ namespace voxel {
     }
     
     math::vector2f SceneInterfaceImpl::getScreenCoordinates(const math::vector3f &worldPosition) {
-        const math::transform3f vp = _camera.viewMatrix * _camera.projMatrix;
         math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
         
-        tpos = tpos.transformed(vp);
+        tpos = tpos.transformed(_camera.stdVPMatrix);
         tpos.x /= tpos.w;
         tpos.y /= tpos.w;
         tpos.z /= tpos.w;
@@ -543,22 +580,21 @@ namespace voxel {
     }
     
     math::vector3f SceneInterfaceImpl::getWorldDirection(const math::vector2f &screenPosition) {
-        const math::transform3f inv = (_camera.viewMatrix * _camera.projMatrix).inverted();
-        
         float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
         float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
         
-        const math::vector4f worldPos = math::vector4f(relScreenPosX, relScreenPosY, 0.0f, 1.0f).transformed(inv);
+        const math::vector4f worldPos = math::vector4f(relScreenPosX, relScreenPosY, 0.0f, 1.0f).transformed(_camera.invVPMatrix);
         return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
     }
     
     // Next:
     // v remove z-buffered lines/bboxes + integrate with deffered rendering
-    // + implement textured mesh for webgl
-    // + SSAO
-    // --+ reconstruct world position from depth
-    // --+ construct depth from world position and compare with depth
-    // --+ AO shader
+    // v implement textured mesh for webgl
+    // v SSAO
+    // --v reconstruct world position from depth
+    // --v construct depth from world position and compare with depth
+    // --v AO shader
+    // --+ filtering
     // + Skybox + texture types
     // + Particles
     //
@@ -570,9 +606,9 @@ namespace voxel {
         _cleanupUnused(_staticMeshes);
         _cleanupUnused(_texturedMeshes);
         _cleanupUnused(_dynamicMeshes);
-        _rendering->updateFrameConstants(_camera.viewMatrix, _camera.projMatrix, _camera.position, _camera.forward);
+        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
-        _rendering->forTarget(_gbuffer, {0.2, 0.2, 0.2, 1.0}, [&](foundation::RenderingInterface &rendering) {
+        _rendering->forTarget(_gbuffer, {0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_staticMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &staticMesh : _staticMeshes) {
                 rendering.applyShaderConstants(&staticMesh->position);

@@ -397,7 +397,6 @@ namespace foundation {
             "#define _cross(a, b) cross((a), (b))\n"
             "#define _len(a) length(a)\n"
             "#define _pow(a, b) pow((a), (b))\n"
-            "#define _fract(a) fract(a)\n"
             "#define _floor(a) floor(a)\n"
             "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
             "#define _norm(a) normalize(a)\n"
@@ -980,19 +979,6 @@ namespace foundation {
             }
         }
     }
-    
-//    void MetalRendering::draw(const RenderDataPtr &inputData, const RenderDataPtr &indexes) {
-//        if (_currentRenderCommandEncoder && _currentShader) {
-//            const InputLayout &layout = _currentShader->getInputLayout();
-//            const MetalData *implData = static_cast<const MetalData *>(inputData.get());
-//            const MetalData *idx = static_cast<const MetalData *>(indexes.get());
-//            const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
-//
-//            //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
-//            [_currentRenderCommandEncoder setVertexBuffer:implData->get() offset:0 atIndex:VERTEX_IN_BINDING_START];
-//            [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:indexes->getCount() indexType:MTLIndexTypeUInt32 indexBuffer:idx->get() indexBufferOffset:0];
-//        }
-//    }
         
     void MetalRendering::presentFrame() {
         _finishRenderCommandEncoder();

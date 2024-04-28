@@ -352,7 +352,6 @@ namespace foundation {
             "#define _cross(a, b) cross((a), (b))\n"
             "#define _len(a) length(a)\n"
             "#define _pow(a, b) pow((a), (b))\n"
-            "#define _fract(a) fract(a)\n"
             "#define _floor(a) floor(a)\n"
             "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
             "#define _norm(a) normalize(a)\n"
