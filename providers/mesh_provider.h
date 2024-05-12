@@ -1,6 +1,7 @@
 
 #pragma once
 #include "foundation/platform.h"
+#include "foundation/rendering.h"
 
 namespace resource {
     struct MeshInfo {
@@ -9,23 +10,9 @@ namespace resource {
         int sizeZ;
     };
     
-    struct VoxelMesh {
-        struct Voxel {
-            std::int16_t positionX, positionY, positionZ;
-            std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
-        };
-        struct Frame {
-            std::unique_ptr<Voxel[]> voxels;
-            std::uint16_t voxelCount = 0;
-        };
-        
-        std::unique_ptr<Frame[]> frames;
-        std::uint16_t frameCount = 0;
-    };
-    
     class MeshProvider {
     public:
-        static std::shared_ptr<MeshProvider> instance(const foundation::PlatformInterfacePtr &platform);
+        static std::shared_ptr<MeshProvider> instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
         
     public:
         // Get mesh info
@@ -33,12 +20,18 @@ namespace resource {
         // @return  - info or nullptr
         //
         virtual const MeshInfo *getMeshInfo(const char *voxPath) = 0;
-        
-        // Asynchronously load voxels from file if they aren't loaded yet
+
+        // Asynchronously load voxels with VTXSVOX layout from file if they aren't loaded yet
         // @voxPath - path to file without extension
-        // @return  - pointer to Mesh or nullptr
+        // @return  - pointer to mesh or nullptr
         //
-        virtual void getOrLoadVoxelMesh(const char *voxPath, util::callback<void(const std::unique_ptr<resource::VoxelMesh> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelStatic(const char *voxPath, util::callback<void(const foundation::RenderDataPtr &)> &&completion) = 0;
+
+        // Asynchronously load voxels with VTXDVOX layout from file if they aren't loaded yet
+        // @voxPath - path to file without extension
+        // @return  - mesh frames (zero size if not loaded)
+        //
+        virtual void getOrLoadVoxelObject(const char *voxPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) = 0;
         
         // Provider tracks resources life time and tries to free them
         //
@@ -50,4 +43,3 @@ namespace resource {
     
     using MeshProviderPtr = std::shared_ptr<MeshProvider>;
 }
-

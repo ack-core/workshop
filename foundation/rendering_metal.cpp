@@ -99,9 +99,9 @@ namespace {
 }
 
 namespace foundation {
-    MetalShader::MetalShader(const std::string &name, InputLayout &&layout, id<MTLLibrary> library, std::uint32_t constBufferLength)
+    MetalShader::MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength)
         : _name(name)
-        , _layout(std::move(layout))
+        , _layout(layout)
         , _constBufferLength(constBufferLength)
         , _library(library)
     {}
@@ -286,8 +286,6 @@ namespace foundation {
     
     MetalRendering::~MetalRendering() {}
     
-    static bool dbg = false;
-    
     void MetalRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
         _frameConstants.plmVPMatrix = vp;
         _frameConstants.stdVPMatrix = svp;
@@ -296,7 +294,9 @@ namespace foundation {
         _frameConstants.cameraDirection.xyz = camDir;
     }
     
-    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, InputLayout &&layout) {
+    // TODO: dedicate shader generator (DRY)
+    //
+    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const InputLayout &layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(shadersrc, strlen(shadersrc));
         const std::string indent = "    ";
@@ -645,8 +645,7 @@ namespace foundation {
                 id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
                 
                 if (library) {
-                    layout.repeat = std::max(layout.repeat, std::uint32_t(1));
-                    result = std::make_shared<MetalShader>(name, std::move(layout), library, constBlockLength);
+                    result = std::make_shared<MetalShader>(name, layout, library, constBlockLength);
                 }
                 else {
                     const char *errorDesc = [[nsError localizedDescription] UTF8String];

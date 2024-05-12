@@ -10,18 +10,6 @@ namespace resource {
         int sizeZ;
     };
     
-    struct GroundData : public GroundInfo {
-        struct Vertex {
-            float x, y, z;
-            float nx, ny, nz;
-            float u, v;
-        };
-    
-        std::vector<Vertex> vertexes;
-        std::vector<std::uint32_t> indexes;
-        foundation::RenderTexturePtr texture;
-    };
-    
     class GroundProvider {
     public:
         static std::shared_ptr<GroundProvider> instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
@@ -37,7 +25,7 @@ namespace resource {
         // @groundPath - path to file without extension
         // @return  - primitives to construct ground object or nullptr's
         //
-        virtual void getOrLoadGround(const char *groundPath, util::callback<void(const std::unique_ptr<resource::GroundData> &)> &&completion) = 0;
+        virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
         
         // Provider tracks resources life time and tries to free them
         //

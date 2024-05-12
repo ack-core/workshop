@@ -7,7 +7,7 @@
 namespace foundation {
     class MetalShader : public RenderShader {
     public:
-        MetalShader(const std::string &name, InputLayout &&layout, id<MTLLibrary> library, std::uint32_t constBufferLength);
+        MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength);
         ~MetalShader() override;
         
         const InputLayout &getInputLayout() const override;
@@ -119,7 +119,7 @@ namespace foundation {
         
         void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) override;
         
-        RenderShaderPtr createShader(const char *name, const char *src, InputLayout &&layout) override;
+        RenderShaderPtr createShader(const char *name, const char *src, const InputLayout &layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;

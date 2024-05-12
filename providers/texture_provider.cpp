@@ -55,44 +55,6 @@ namespace resource {
         return index != TEXTURES_LIST.end() ? &index->second : nullptr;
     }
     
-//    namespace {
-
-        
-//        void decodePngToContext(const foundation::PlatformInterfacePtr &platform, AsyncContext &ctx, const char *path, std::uint8_t *source, std::size_t len) {
-//            upng_t *upng = upng_new_from_bytes(source, (unsigned long)(len));
-//            
-//            if (upng != nullptr && *reinterpret_cast<const unsigned *>(source) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-//                foundation::RenderTextureFormat format = foundation::RenderTextureFormat::UNKNOWN;
-//                std::uint32_t bytesPerPixel = 0;
-//                
-//                if (upng_get_format(upng) == UPNG_RGBA8) {
-//                    format = foundation::RenderTextureFormat::RGBA8UN;
-//                    bytesPerPixel = 4;
-//                }
-//                else if (upng_get_format(upng) == UPNG_LUMINANCE8) {
-//                    format = foundation::RenderTextureFormat::R8UN;
-//                    bytesPerPixel = 1;
-//                }
-//                
-//                if (format != foundation::RenderTextureFormat::UNKNOWN) {
-//                    ctx.format = format;
-//                    ctx.w = upng_get_width(upng);
-//                    ctx.h = upng_get_height(upng);
-//                    ctx.data = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h * bytesPerPixel);
-//                    std::memcpy(ctx.data.get(), upng_get_buffer(upng), ctx.w * ctx.h * bytesPerPixel);
-//                }
-//                else {
-//                    platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' must have a valid format (rgba8, lum8)", path);
-//                }
-//                
-//                upng_free(upng);
-//            }
-//            else {
-//                platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' is not a valid png file", path);
-//            }
-//        }
-    //}
-    
     void TextureProviderImpl::getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueue.emplace_back(QueueEntry {

@@ -12,14 +12,13 @@ set(
 	"${m_source_root}/platform_ios.cpp"
 	"${m_source_root}/platform_wasm.h"
 	"${m_source_root}/platform_wasm.cpp"
+	"${m_source_root}/layouts.h"
 )
 source_group("" FILES ${m_sources_platform_list})
 
 set(
 	m_sources_rendering_list
 	"${m_source_root}/rendering.h"
-	"${m_source_root}/rendering_dx11.h"
-	"${m_source_root}/rendering_dx11.cpp"
 	"${m_source_root}/rendering_metal.h"
 	"${m_source_root}/rendering_metal.cpp"
 	"${m_source_root}/rendering_wasm.h"

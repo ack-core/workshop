@@ -284,6 +284,7 @@ namespace util {
     }
 }
 
+// TODO: move to dedicated shader generator
 namespace shaderUtils {
     struct ShaderTypeInfo{
         const char *typeName;

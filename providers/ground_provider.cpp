@@ -1,6 +1,7 @@
 
 #include "ground_provider.h"
 #include "grounds_list.h"
+#include "foundation/layouts.h"
 #include "thirdparty/upng/upng.h"
 
 #include <list>
@@ -12,18 +13,33 @@ namespace resource {
         ~GroundProviderImpl() override;
         
         const GroundInfo *getGroundInfo(const char *groundPath) override;
-        void getOrLoadGround(const char *groundPath, util::callback<void(const std::unique_ptr<GroundData> &)> &&completion) override;
+        void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void update(float dtSec) override;
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         const std::shared_ptr<foundation::RenderingInterface> _rendering;
         
-        std::unordered_map<std::string, std::unique_ptr<GroundData>> _grounds;
+        struct GroundData : public GroundInfo {
+            struct Vertex {
+                float x, y, z;
+                float nx, ny, nz;
+                float u, v;
+            };
+
+            std::vector<Vertex> vertexes;
+            std::vector<std::uint32_t> indexes;
+        };
+        struct GroundMesh {
+            foundation::RenderDataPtr data;
+            foundation::RenderTexturePtr texture;
+        };
+        
+        std::unordered_map<std::string, GroundMesh> _grounds;
         
         struct QueueEntry {
             std::string groundPath;
-            util::callback<void(const std::unique_ptr<GroundData> &)> callback;
+            util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> callback;
         };
         
         std::list<QueueEntry> _callsQueue;
@@ -48,7 +64,7 @@ namespace resource {
         return index != GROUNDS_LIST.end() ? &index->second : nullptr;
     }
     
-    void GroundProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const std::unique_ptr<GroundData> &)> &&completion) {
+    void GroundProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueue.emplace_back(QueueEntry {
                 .groundPath = groundPath,
@@ -62,7 +78,7 @@ namespace resource {
         
         auto index = _grounds.find(path);
         if (index != _grounds.end()) {
-            completion(index->second);
+            completion(index->second.data, index->second.texture);
         }
         else {
             _asyncInProgress = true;
@@ -121,17 +137,21 @@ namespace resource {
                                     }
                                 }
                             },
-                            [weak, path, completion = std::move(completion), groundData = std::move(ground)](AsyncContext &ctx) mutable {
+                            [weak, path, completion = std::move(completion), gd = std::move(ground)](AsyncContext &ctx) mutable {
                                 if (std::shared_ptr<GroundProviderImpl> self = weak.lock()) {
                                     self->_asyncInProgress = false;
                                     
-                                    if (ctx.data && groundData) {
-                                        groundData->texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
-                                        const std::unique_ptr<GroundData> &ground = self->_grounds.emplace(path, std::move(groundData)).first->second;
-                                        completion(ground);
+                                    if (ctx.data && gd) {
+                                        std::uint32_t vcnt = std::uint32_t(gd->vertexes.size());
+                                        std::uint32_t icnt = std::uint32_t(gd->indexes.size());
+                                        
+                                        GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
+                                        groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
+                                        groundMesh.data = self->_rendering->createData(gd->vertexes.data(), layouts::VTXNRMUV, vcnt, gd->indexes.data(), icnt);
+                                        completion(groundMesh.data, groundMesh.texture);
                                     }
                                     else {
-                                        completion(nullptr);
+                                        completion(nullptr, nullptr);
                                     }
                                 }
                             }));
@@ -142,7 +162,7 @@ namespace resource {
                     }
                     else {
                         self->_platform->logError("[MeshProviderImpl::getOrLoadGround] Unable to find file '%s'", path.data());
-                        completion(nullptr);
+                        completion(nullptr, nullptr);
                     }
                 }
             });
