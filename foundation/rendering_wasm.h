@@ -7,7 +7,7 @@ using WebGLId = std::uint32_t;
 namespace foundation {
     class WASMShader : public RenderShader {
     public:
-        WASMShader(WebGLId shader, InputLayout &&layout, std::uint32_t constBufferLength);
+        WASMShader(WebGLId shader, const InputLayout &layout, std::uint32_t constBufferLength);
         ~WASMShader() override;
         
         auto getInputLayout() const -> const InputLayout & override;
@@ -109,7 +109,7 @@ namespace foundation {
         
         void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) override;
         
-        auto createShader(const char *name, const char *src, InputLayout &&layout) -> RenderShaderPtr override;
+        auto createShader(const char *name, const char *src, const InputLayout &layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
         auto createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr override;
@@ -117,7 +117,7 @@ namespace foundation {
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
         
-        void forTarget(const RenderTargetPtr &target, const math::color &clear, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) override;
+        void forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
@@ -147,10 +147,6 @@ namespace foundation {
         std::unordered_set<std::string> _shaderNames;
         std::shared_ptr<WASMShader> _currentShader;
         
-        BlendType _lastBlendType = BlendType(-1);
-        DepthBehavior _lastDepthBehavior = DepthBehavior(-1);
-        
-        WebGLId _lastGLTarget = -1;
         RenderTopology _topology;
     };
 }

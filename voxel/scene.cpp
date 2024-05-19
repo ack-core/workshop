@@ -1,6 +1,7 @@
 
 #include "scene.h"
 #include "palette.h"
+#include "foundation/layouts.h"
 
 #include <cfloat>
 #include <memory>
@@ -88,29 +89,16 @@ namespace voxel {
 
     class StaticMeshImpl : public SceneInterface::StaticMesh {
     public:
-        std::unique_ptr<foundation::RenderDataPtr[]> frames;
-        std::uint32_t frameIndex;
-        std::uint32_t frameCount;
+        foundation::RenderDataPtr mesh;
         math::vector4f position = {0, 0, 0, 1};
         
     public:
         void setPosition(const math::vector3f &position) override {
             this->position = position.atv4start(1.0f);
         }
-        void setFrame(std::uint32_t index) override {
-            frameIndex = std::min(index, frameCount - 1);
-        }        
         
     public:
-        StaticMeshImpl(foundation::RenderDataPtr *frameArray, std::uint32_t count) {
-            frameIndex = 0;
-            frameCount = count;
-            frames = std::make_unique<foundation::RenderDataPtr[]>(count);
-
-            for (std::uint32_t i = 0; i < count; i++) {
-                frames[i] = std::move(frameArray[i]);
-            }
-        }
+        StaticMeshImpl(const foundation::RenderDataPtr &m) : mesh(m) {}
         ~StaticMeshImpl() override {}
     };
     
@@ -124,7 +112,7 @@ namespace voxel {
         math::transform3f transform;
         
     public:
-        DynamicMeshImpl(foundation::RenderDataPtr *frameArray, std::uint32_t count) : transform(math::transform3f::identity()) {
+        DynamicMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count) : transform(math::transform3f::identity()) {
             frameIndex = 0;
             frameCount = count;
             frames = std::make_unique<foundation::RenderDataPtr[]>(count);
@@ -141,6 +129,10 @@ namespace voxel {
         void setFrame(std::uint32_t index) override {
             frameIndex = std::min(index, frameCount - 1);
         }
+        auto getFrameCount() -> std::uint32_t override {
+            return frameCount;
+        }
+        
     };
     
     //---
@@ -157,10 +149,7 @@ namespace voxel {
         }
         
     public:
-        TexturedMeshImpl(foundation::RenderDataPtr &&indexedData, const foundation::RenderTexturePtr &t) {
-            data = std::move(indexedData);
-            texture = t;
-        }
+        TexturedMeshImpl(const foundation::RenderDataPtr &idx, const foundation::RenderTexturePtr &tx) : data(idx), texture(tx) {}
         ~TexturedMeshImpl() override {}
     };
     
@@ -172,7 +161,69 @@ namespace voxel {
         ~LightSourceImpl() override {}
         
         void setPosition(const math::vector3f &position) override {
+
         }
+    };
+    
+    //---
+    
+    class ParticlesImpl : public SceneInterface::Particles {
+    public:
+        foundation::RenderTexturePtr texture;
+        foundation::RenderTexturePtr map;
+                
+        ParticlesImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const SceneInterface::EmitterParams &emitterParams)
+        : texture(texture)
+        , map(map)
+        , _constants({})
+        {
+            if (emitterParams.orientation == SceneInterface::EmitterParams::Orientation::AXIS) {
+                _updateOrientation = [](ParticlesImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
+                    self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
+                    self._constants.right = camRight;
+                    self._constants.normal = -1.0 * camDir;
+                };
+            }
+            else if (emitterParams.orientation == SceneInterface::EmitterParams::Orientation::WORLD) {
+                _updateOrientation = [](ParticlesImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
+                    self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
+                    self._constants.right = math::vector3f(self._transform.m11, self._transform.m12, self._transform.m13);
+                    self._constants.normal = math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23);
+                };
+            }
+            else {
+                _updateOrientation = [](ParticlesImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
+                    self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
+                    self._constants.right = camRight;
+                    self._constants.normal = -1.0 * camDir;
+                };
+            }
+        }
+        ~ParticlesImpl() override {}
+        
+        void *getUpdatedConstants(const math::vector3f &camDir, const math::vector3f &camRight) {
+            _updateOrientation(*this, camDir, camRight);
+            return &_constants;
+        }
+        void setTransform(const math::transform3f &trfm) override {
+            _transform = trfm;
+        }
+        void setTime(float timeSec) override {
+            
+        }
+        
+    private:
+        SceneInterface::EmitterParams::Orientation _orientation;
+        math::transform3f _transform = math::transform3f::identity();
+
+        struct Constants {
+            math::vector3f position; float time;
+            math::vector3f normal; float alpha;
+            math::vector3f right; float r0;
+        }
+        _constants;
+        
+        void (*_updateOrientation)(ParticlesImpl &self, const math::vector3f &camRight, const math::vector3f &camUp);
     };
     
     //---
@@ -190,10 +241,11 @@ namespace voxel {
         
         auto addLineSet(std::uint32_t count) -> LineSetPtr override;
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
-        auto addStaticMesh(const std::vector<VTXSVOX> *frames, std::size_t frameCount) -> StaticMeshPtr override;
-        auto addDynamicMesh(const std::vector<VTXDVOX> *frames, std::size_t frameCount) -> DynamicMeshPtr override;
-        auto addTexturedMesh(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) -> TexturedMeshPtr override;
-        auto addLightSource(const math::vector3f &position, float r, float g, float b, float radius) -> LightSourcePtr override;
+        auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr override;
+        auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr override;
+        auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
+        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const EmitterParams &emitter) -> ParticlesPtr override;
+        auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         
         auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
         auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
@@ -213,14 +265,13 @@ namespace voxel {
         }
         
         struct Camera {
-//            math::transform3f viewMatrix;
-//            math::transform3f projMatrix;
             math::transform3f plmVPMatrix; // plm matrix transforms to clip space with platform-specific z-range
             math::transform3f stdVPMatrix; // std matrix transforms to clip space with z-range [0..1]
             math::transform3f invVPMatrix; // inv matrix assumes that clip space has z-range [0..1]
             math::vector3f position;
             math::vector3f target;
             math::vector3f forward;
+            math::vector3f right;
             math::vector3f up;
         }
         _camera;
@@ -233,9 +284,9 @@ namespace voxel {
         foundation::RenderShaderPtr _lineSetShader;
         foundation::RenderShaderPtr _boundingBoxShader;
         foundation::RenderShaderPtr _staticMeshShader;
-        foundation::RenderShaderPtr _texturedMeshShader;
         foundation::RenderShaderPtr _dynamicMeshShader;
-        foundation::RenderShaderPtr _axisShader;
+        foundation::RenderShaderPtr _texturedMeshShader;
+        foundation::RenderShaderPtr _particlesShader;
         
         foundation::RenderTargetPtr _gbuffer;
         foundation::RenderShaderPtr _gbufferToScreenShader;
@@ -243,8 +294,9 @@ namespace voxel {
         std::vector<std::shared_ptr<LineSetImpl>> _lineSets;
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<StaticMeshImpl>> _staticMeshes;
-        std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
         std::vector<std::shared_ptr<DynamicMeshImpl>> _dynamicMeshes;
+        std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
+        std::vector<std::shared_ptr<ParticlesImpl>> _particles;
     };
     
     std::shared_ptr<SceneInterface> SceneInterface::instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering) {
@@ -252,6 +304,13 @@ namespace voxel {
     }
 }
 
+// TODO: shader evolution
+// + const {...} const {...} <- few 'const' blocks
+// + myOpenArray[] : float4 <- open arrays in constant block
+// + structsArray[] : struct { position: float4 color: float4 } <- arrays of structures in constant block
+// + fssrc [tex2d tex3d cube] {...} <- types of samplers
+// + _staticloop() {...}
+//
 namespace {
     const char *g_lineSetShaderSrc = R"(
         const {
@@ -370,26 +429,49 @@ namespace {
             nrm : float3
         }
         vssrc {
-            output_position = _transform(float4(vertex_position_u.xyz + const_globalPosition.xyz, 1.0), frame_plmVPMatrix);
-            output_uv = float2(vertex_position_u.w, vertex_normal_v.w);
-            output_nrm = vertex_normal_v.xyz;
+            output_position = _transform(float4(vertex_position.xyz + const_globalPosition.xyz, 1.0), frame_plmVPMatrix);
+            output_uv = vertex_uv;
+            output_nrm = vertex_normal.xyz;
         }
         fssrc {
             float paletteIndex = _tex2d(0, input_uv).r; //
             output_color[0] = float4(input_nrm * 0.5 + 0.5, paletteIndex);
         }
     )";
+    const char *g_particlesShaderSrc = R"(
+        fixed {
+            quad[4] : float2 = [-0.5, 0.5][0.5, 0.5][-0.5, -0.5][0.5, -0.5]
+            uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
+        }
+        const {
+            position_t : float4
+            normal_a : float4
+            right : float4
+        }
+        inout {
+            uv : float2
+        }
+        vssrc {
+            float3 up = _cross(const_normal_a.xyz, const_right.xyz);
+            float3 relVertexPos = const_right.xyz * fixed_quad[repeat_ID].x + up * fixed_quad[repeat_ID].y;
+            output_position = float4(const_position_t.xyz + relVertexPos, 1.0);
+            output_uv = fixed_uv[repeat_ID];
+        }
+        fssrc {
+            output_color[0] = float4(1, 0, 0, 1);
+        }
+    )";
     const char *g_gbufferToScreenShaderSrc = R"(
         fixed {
             rndv[64] : float3 =
-                [0.62,0.02,0.78][0.43,-0.62,-0.40][-0.31,-0.34,0.53][0.22,0.44,0.35][0.49,0.06,0.04][0.12,-0.31,0.23][0.03,-0.07,-0.29][0.07,0.19,-0.03]
-                [0.92,0.24,0.31][0.31,-0.02,0.79][0.26,0.47,0.44][-0.50,0.32,-0.05][0.36,0.07,-0.34][0.23,0.32,-0.03][0.09,-0.27,-0.10][-0.06,0.15,-0.11]
-                [0.69,-0.60,0.42][0.24,-0.63,-0.52][-0.46,-0.05,0.53][-0.39,-0.23,-0.40][-0.44,-0.23,0.03][-0.01,-0.27,0.29][-0.06,-0.29,-0.01][-0.01,-0.01,-0.20]
-                [-0.72,0.65,0.24][0.12,-0.64,0.54][-0.68,-0.12,0.10][0.14,0.41,0.42][-0.41,0.05,-0.29][-0.23,0.05,0.33][-0.14,-0.27,0.02][-0.04,0.00,-0.20]
-                [-0.59,0.50,0.64][-0.33,-0.78,-0.04][-0.55,-0.24,-0.36][0.42,0.22,-0.37][-0.24,0.26,-0.35][0.04,-0.01,-0.40][-0.27,0.13,-0.01][-0.03,-0.14,-0.14]
-                [-0.98,0.16,0.16][-0.12,0.75,0.38][0.01,0.48,-0.51][-0.28,0.13,0.51][0.31,0.34,0.19][-0.26,0.11,-0.28][-0.22,-0.16,0.14][0.12,-0.16,0.03]
-                [-0.27,-0.58,-0.77][-0.42,0.39,-0.62][0.50,-0.07,-0.48][0.39,0.44,-0.11][-0.34,0.36,0.07][0.11,0.21,-0.32][-0.26,-0.06,-0.14][-0.02,0.19,-0.06]
-                [0.12,0.17,-0.98][0.61,0.54,-0.24][-0.39,-0.30,-0.50][0.38,-0.44,0.15][-0.38,0.12,0.31][-0.01,-0.37,-0.15][0.30,0.01,0.05][0.01,0.16,-0.12]
+                [0.80,0.76,0.69][-0.67,0.62,-0.25][0.32,-0.06,-0.68][-0.07,-0.60,-0.03][0.16,-0.11,0.46][-0.33,-0.20,0.11][-0.18,0.25,0.17][-0.07,-0.22,0.20]
+                [-0.89,-0.90,-0.28][-0.65,0.44,-0.54][0.42,-0.38,-0.50][0.39,0.32,-0.33][-0.09,0.48,-0.10][0.01,0.06,-0.39][-0.07,-0.21,-0.27][-0.30,0.03,0.01]
+                [1.18,0.28,-0.46][-0.65,0.53,0.45][-0.26,-0.66,-0.25][0.07,-0.25,0.54][0.30,0.13,0.37][0.28,-0.21,0.18][-0.15,-0.27,0.17][0.04,-0.09,-0.28]
+                [-0.78,-0.67,0.79][-0.85,-0.37,-0.21][0.07,0.34,0.67][0.20,-0.43,0.37][0.39,-0.11,-0.29][0.01,0.39,0.07][0.31,-0.16,0.06][0.19,-0.01,0.23]
+                [-0.30,0.92,-0.87][-0.08,-0.10,0.94][0.40,0.46,-0.43][0.19,0.31,0.48][-0.12,0.46,0.14][-0.27,0.12,0.27][-0.29,0.18,-0.08][0.27,0.11,0.08]
+                [1.12,0.43,0.50][-0.24,-0.56,-0.73][-0.60,0.35,-0.28][0.22,0.20,-0.52][0.38,-0.27,-0.19][-0.03,0.35,-0.19][-0.22,-0.26,0.07][-0.11,0.05,-0.27]
+                [0.43,-1.16,-0.41][0.42,0.66,-0.54][0.35,-0.08,0.66][-0.44,0.02,0.41][0.46,0.20,0.01][0.36,-0.17,0.04][0.12,0.22,0.25][0.10,-0.24,0.15]
+                [-0.45,-0.84,0.88][-0.64,-0.31,-0.63][-0.31,0.68,0.02][-0.28,0.35,-0.40][0.05,-0.01,0.50][0.14,-0.22,-0.30][0.11,0.32,0.10][-0.29,0.05,0.04]
             quad[4] : float4 = [-1, 1, 0.1, 1][1, 1, 0.1, 1][-1, -1, 0.1, 1][1, -1, 0.1, 1]
             uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
         }
@@ -416,18 +498,18 @@ namespace {
             float3 color = _tex2d(0, float2(gbuffer.w, 0)).rgb;
             float3 wpos = getWPos(input_uv, gdepth);
             float3 wnpos = wpos + 0.1 * normal;
-            float  rnd = 8.0 * _frac(_sin(_dot(floor(wpos * 32.0 + 0.5), float3(12.9898, 78.233, 37.719))) * 143758.5453);
             float  lit = 0.0;
+            float  rnd = _sin(_dot(wpos, float3(12.9898, 78.233, 37.719)));
             
-            for (int i = 0; i < 8; i++) {
-                float3 rv = fixed_rndv[int(rnd) * 8 + i];
-                float3 ray = _sign(_dot(normal, rv)) * rv;
-                float3 dpos = getDPos(wnpos + ray);
+            for (int i = 0; i < 12; i++) {
+                rnd = 0.1 + _frac(rnd * 143758.5453);
+                float3 rv = _norm(fixed_rndv[i]) * rnd;
+                float3 dpos = getDPos(wnpos + _sign(_dot(normal, rv)) * rv);
                 float  rdepth = _tex2d(2, dpos.xy).r;
                 lit += _step(rdepth, dpos.z) + _clamp(20000.0 * (rdepth - dpos.z));
             }
             
-            lit = _step(0.0000001, gdepth) * (lit * 0.125 * 0.6 + 0.3);
+            lit = _step(0.0000001, gdepth) * (lit * 0.0625 * 0.5 + 0.5);
             output_color[0] = float4(lit * color, 1);
         }
     )";
@@ -446,31 +528,17 @@ namespace voxel {
         _boundingBoxShader = rendering->createShader("scene_static_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
             .repeat = 24
         });
-        _staticMeshShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshShaderSrc, foundation::InputLayout {
-            .repeat = 12,
-            .attributes = {
-                {"position_color_mask", foundation::InputAttributeFormat::SHORT4},
-                {"scale_reserved", foundation::InputAttributeFormat::BYTE4},
-            }
-        });
-        _dynamicMeshShader = rendering->createShader("scene_dynamic_voxel_mesh", g_dynamicMeshShaderSrc, foundation::InputLayout {
-            .repeat = 12,
-            .attributes = {
-                {"position", foundation::InputAttributeFormat::FLOAT3},
-                {"color_mask", foundation::InputAttributeFormat::BYTE4},
-            }
-        });
-        _texturedMeshShader = rendering->createShader("scene_static_textured_mesh", g_texturedMeshShaderSrc, foundation::InputLayout {
-            .attributes = {
-                {"position_u", foundation::InputAttributeFormat::FLOAT4},
-                {"normal_v", foundation::InputAttributeFormat::FLOAT4},
-            }
+        _staticMeshShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshShaderSrc, layouts::VTXSVOX);
+        _dynamicMeshShader = rendering->createShader("scene_dynamic_voxel_mesh", g_dynamicMeshShaderSrc, layouts::VTXDVOX);
+        _texturedMeshShader = rendering->createShader("scene_static_textured_mesh", g_texturedMeshShaderSrc, layouts::VTXNRMUV);
+        _particlesShader = rendering->createShader("scene_particles", g_particlesShaderSrc, foundation::InputLayout {
+            .repeat = 4
         });
         _gbufferToScreenShader = rendering->createShader("scene_gbuffer_to_screen", g_gbufferToScreenShaderSrc, foundation::InputLayout {
             .repeat = 4
         });
-
-
+        
+        // TODO: memory test for wasm-backend
         _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         _platform->setResizeHandler([&]() {
             _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
@@ -489,10 +557,10 @@ namespace voxel {
         
         math::vector3f right = math::vector3f(0, 1, 0).cross(position - sceneCenter).normalized();
         math::vector3f nrmlook = (sceneCenter - position).normalized();
-        math::vector3f nrmright = right.normalized();
-        
+
+        _camera.right = right.normalized();
         _camera.forward = nrmlook;
-        _camera.up = nrmright.cross(nrmlook).normalized();
+        _camera.up = _camera.right.cross(nrmlook).normalized();
         
         float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
 
@@ -515,49 +583,27 @@ namespace voxel {
         return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox));
     }
     
-    SceneInterface::StaticMeshPtr SceneInterfaceImpl::addStaticMesh(const std::vector<VTXSVOX> *frames, std::size_t frameCount) {
-        std::shared_ptr<StaticMeshImpl> mesh = nullptr;
-        std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
-        
-        for (std::size_t i = 0; i < frameCount; i++) {
-            voxFrames[i] = _rendering->createData(frames[i].data(), _staticMeshShader->getInputLayout(),  std::uint32_t(frames[i].size()));
-        }
-        if (frameCount) {
-            mesh = std::make_shared<StaticMeshImpl>(voxFrames.get(), frameCount);
-            _staticMeshes.emplace_back(mesh);
-        }
-        
-        return mesh;
+    SceneInterface::StaticMeshPtr SceneInterfaceImpl::addStaticMesh(const foundation::RenderDataPtr &mesh) {
+        std::shared_ptr<StaticMeshImpl> result = std::make_shared<StaticMeshImpl>(mesh);
+        return _staticMeshes.emplace_back(result);
     }
     
-    SceneInterface::DynamicMeshPtr SceneInterfaceImpl::addDynamicMesh(const std::vector<VTXDVOX> *frames, std::size_t frameCount) {
-        std::shared_ptr<DynamicMeshImpl> mesh = nullptr;
-        std::unique_ptr<foundation::RenderDataPtr[]> voxFrames = std::make_unique<foundation::RenderDataPtr[]>(frameCount);
-        
-        for (std::size_t i = 0; i < frameCount; i++) {
-            voxFrames[i] = _rendering->createData(frames[i].data(), _dynamicMeshShader->getInputLayout(), std::uint32_t(frames[i].size()));
-        }
-        if (frameCount) {
-            mesh = std::make_shared<DynamicMeshImpl>(voxFrames.get(), frameCount);
-            _dynamicMeshes.emplace_back(mesh);
-        }
-        
-        return mesh;
+    SceneInterface::DynamicMeshPtr SceneInterfaceImpl::addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) {
+        std::shared_ptr<DynamicMeshImpl> result = std::make_shared<DynamicMeshImpl>(frames.data(), std::uint32_t(frames.size()));
+        return _dynamicMeshes.emplace_back(result);
     }
     
-    SceneInterface::TexturedMeshPtr SceneInterfaceImpl::addTexturedMesh(const std::vector<VTXNRMUV> &vtx, const std::vector<std::uint32_t> &idx, const foundation::RenderTexturePtr &tx) {
-        std::shared_ptr<TexturedMeshImpl> mesh = nullptr;
-        foundation::RenderDataPtr data = _rendering->createData(vtx.data(), _texturedMeshShader->getInputLayout(), std::uint32_t(vtx.size()), idx.data(), std::uint32_t(idx.size()));
-        
-        if (data && tx) {
-            mesh = std::make_shared<TexturedMeshImpl>(std::move(data), tx);
-            _texturedMeshes.emplace_back(mesh);
-        }
-        
-        return mesh;
+    SceneInterface::TexturedMeshPtr SceneInterfaceImpl::addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) {
+        std::shared_ptr<TexturedMeshImpl> result = std::make_shared<TexturedMeshImpl>(mesh, texture);
+        return _texturedMeshes.emplace_back(result);
     }
     
-    SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(const math::vector3f &position, float r, float g, float b, float radius) {
+    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const EmitterParams &params) {
+        std::shared_ptr<ParticlesImpl> result = std::make_shared<ParticlesImpl>(tx, map, params);
+        return _particles.emplace_back(result);
+    }
+    
+    SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(float r, float g, float b, float radius) {
         return nullptr;
     }
     
@@ -595,8 +641,8 @@ namespace voxel {
     // --v construct depth from world position and compare with depth
     // --v AO shader
     // --+ filtering
-    // + Skybox + texture types
     // + Particles
+    // + Skybox + texture types
     //
     // TODO:
     // + forTarget - depthTexture from other target
@@ -604,15 +650,16 @@ namespace voxel {
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _cleanupUnused(_boundingBoxes);
         _cleanupUnused(_staticMeshes);
-        _cleanupUnused(_texturedMeshes);
         _cleanupUnused(_dynamicMeshes);
+        _cleanupUnused(_texturedMeshes);
+        _cleanupUnused(_particles);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
-        _rendering->forTarget(_gbuffer, {0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
+        _rendering->forTarget(_gbuffer, {0.0, 0.0, 0.0, 1.0}, nullptr, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_staticMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &staticMesh : _staticMeshes) {
                 rendering.applyShaderConstants(&staticMesh->position);
-                rendering.draw(staticMesh->frames[0]);
+                rendering.draw(staticMesh->mesh);
             }
             
             rendering.applyShader(_dynamicMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
@@ -630,7 +677,7 @@ namespace voxel {
                 rendering.draw(texturedMesh->data);
             }
         });
-        _rendering->forTarget(nullptr, {0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
+        _rendering->forTarget(nullptr, {0.0, 0.0, 0.0, 0.0}, _gbuffer->getDepth(), [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
             rendering.applyTextures({
                 {_palette, foundation::SamplerType::NEAREST},
@@ -639,14 +686,14 @@ namespace voxel {
             });
             rendering.draw();
 
-            rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+            rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &set : _lineSets) {
                 for (std::size_t i = 0; i < set->blocks.size(); i++) {
                     rendering.applyShaderConstants(&set->blocks[i]);
                     rendering.draw(set->blocks[i].lineCount * 2);
                 }
             }
-            rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+            rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &bbox : _boundingBoxes) {
                 rendering.applyShaderConstants(&bbox->bboxData);
                 rendering.draw();

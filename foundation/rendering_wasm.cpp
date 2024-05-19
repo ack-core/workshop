@@ -12,7 +12,7 @@ extern "C" {
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
     auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
     void webgl_viewPort(std::uint32_t w, std::uint32_t h);
-    void webgl_applyTarget(WebGLId target, GLenum cmask, float r, float g, float b, float a, float d);
+    void webgl_applyTarget(WebGLId target, WebGLId depth, GLenum cmask, float r, float g, float b, float a, float d);
     void webgl_applyShader(WebGLId shader, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
@@ -96,10 +96,10 @@ namespace {
 }
 
 namespace foundation {
-    WASMShader::WASMShader(WebGLId shader, InputLayout &&layout, std::uint32_t constBufferLength)
+    WASMShader::WASMShader(WebGLId shader, const InputLayout &layout, std::uint32_t constBufferLength)
         : _shader(shader)
         , _constBufferLength(constBufferLength)
-        , _inputLayout(std::move(layout))
+        , _inputLayout(layout)
     {
     }
     WASMShader::~WASMShader() {
@@ -230,7 +230,7 @@ namespace foundation {
         _frameConstants->cameraDirection.xyz = camDir;
     }
         
-    RenderShaderPtr WASMRendering::createShader(const char *name, const char *src, InputLayout &&layout) {
+    RenderShaderPtr WASMRendering::createShader(const char *name, const char *src, const InputLayout &layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(src, strlen(src));
         const std::string indent = "    ";
@@ -373,7 +373,8 @@ namespace foundation {
             "    mediump vec4 cameraDirection;\n"
             "    mediump vec4 rtBounds;\n"
             "}\n"
-            "framedata;\n\n";
+            "framedata;\n\n"
+            "uniform sampler2D _samplers[4];\n\n";
             
         std::string shaderFixed;
         std::string shaderFunctions;
@@ -525,7 +526,6 @@ namespace foundation {
                 transformCode(codeBlock);
                 shaderUtils::replace(codeBlock, "input_", "passing.", SEPARATORS, {"input_position"});
                 
-                shaderFS += "uniform sampler2D _samplers[4];\n";
                 shaderFS += "out vec4 output_color[4];\n\n";
                 shaderFS += "void main() {\n";
                 shaderFS += codeBlock;
@@ -543,9 +543,8 @@ namespace foundation {
         }
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
-            layout.repeat = std::max(layout.repeat, std::uint32_t(1));
             WebGLId webglShader = webgl_createProgram(nativeShaderVS.src.get(), nativeShaderVS.length, nativeShaderFS.src.get(), nativeShaderFS.length);
-            result = std::make_shared<WASMShader>(webglShader, std::move(layout), constBlockLength);
+            result = std::make_shared<WASMShader>(webglShader, layout, constBlockLength);
         }
         else if(vssrcBlockDone == false) {
             _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
@@ -630,8 +629,9 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
-    void WASMRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
+    void WASMRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
         const WASMTarget *platformTarget = static_cast<const WASMTarget *>(target.get());
+        const WebGLId platformDepth = depth ? static_cast<const WASMTexture *>(depth.get())->getWebGLTexture() : 0;
         const GLenum cmask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
         
         WebGLId glTarget = 0;
@@ -646,41 +646,18 @@ namespace foundation {
             _frameConstants->rtBounds.y = _platform->getScreenHeight();
         }
         
-        if (_lastGLTarget != glTarget) {
-            _lastGLTarget = glTarget;
-            
-            webgl_applyTarget(glTarget, cmask, clear.r, clear.g, clear.b, clear.a, 0.0f);
-            webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
-            webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
-        }
+        webgl_applyTarget(glTarget, platformDepth, cmask, clear.r, clear.g, clear.b, clear.a, 0.0f);
+        webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
+        webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
         
         pass(*this);
-        
-        if (platformTarget) {
-            webgl_applyTarget(0, cmask, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-            webgl_viewPort(_platform->getScreenWidth(), _platform->getScreenHeight());
-            webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
-            _lastGLTarget = 0;
-        }
     }
     
     void WASMRendering::applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
         if (shader) {
             _topology = topology;
             _currentShader = std::static_pointer_cast<WASMShader>(shader);
-            
-            std::uint32_t dtype = 0, btype = 0;
-            
-            if (_lastBlendType != blendType) {
-                _lastBlendType = blendType;
-                btype = std::uint32_t(blendType);
-            }
-            if (_lastDepthBehavior != depthBehavior) {
-                _lastDepthBehavior = depthBehavior;
-                dtype = std::uint32_t(depthBehavior);
-            }
-            
-            webgl_applyShader(_currentShader->getWebGLShader(), dtype, btype);
+            webgl_applyShader(_currentShader->getWebGLShader(), std::uint32_t(depthBehavior), std::uint32_t(blendType));
         }
     }
     
@@ -743,10 +720,6 @@ namespace foundation {
     }
     
     void WASMRendering::presentFrame() {
-        _lastGLTarget = -1;
-        _lastBlendType = BlendType(-1);
-        _lastDepthBehavior = DepthBehavior(-1);
-        
         for (std::size_t i = 0; i < MAX_TEXTURES; i++) {
             webgl_applyTexture(i, 0, 0);
         }

@@ -523,8 +523,16 @@ namespace foundation {
                 shaderUtils::replace(functions, "const_", "constants.", SEPARATORS);
                 shaderUtils::replace(functions, "frame_", "framedata.", SEPARATORS);
                 
-                nativeShader += "struct _FN {\n    constant _FrameData &framedata;\n    constant _Constants &constants;\n";
-                nativeShader += "    _FN(constant _FrameData &f, constant _Constants &c) : framedata(f), constants(c) {}\n\n";
+                nativeShader +=
+                    "struct _FN {\n    "
+                    "constant const _FrameData &framedata;\n    "
+                    "constant const _Constants &constants;\n    "
+                    "thread const texture2d<float> &_texture0;\n    "
+                    "thread const texture2d<float> &_texture1;\n    "
+                    "thread const texture2d<float> &_texture2;\n    "
+                    "thread const texture2d<float> &_texture3;\n    "
+                    "thread const sampler &_sampler;\n\n";
+                    
                 nativeShader += functions;
                 nativeShader += "};\n";
                 nativeShader += functionDefines;
@@ -561,7 +569,7 @@ namespace foundation {
                 }
                 
                 nativeShader += variables;
-                nativeShader += "    _FN _fn = _FN(framedata, constants);\n    _InOut output;\n\n";
+                nativeShader += "    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, {}};\n    _InOut output;\n\n";
 
                 std::string codeBlock;
                 
@@ -607,7 +615,7 @@ namespace foundation {
                 nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
                 nativeShader += "    constant _Constants &constants [[buffer(1)]])\n{\n";
                 nativeShader += "    float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n";
-                nativeShader += "    float4 output_color[4] = {};\n    _FN _fn = _FN(framedata, constants);\n\n";
+                nativeShader += "    float4 output_color[4] = {};\n    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n\n";
                 
                 std::string codeBlock;
                 
@@ -785,13 +793,22 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
-    void MetalRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
+    void MetalRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
         }
         if (_view) {
             MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
             MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+            
+            if (depth) {
+                renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+                renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(depth.get())->getNativeTexture();
+            }
+            else {
+                renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
+                renderPassDescriptor.depthAttachment.clearDepth = 0.0;
+            }
             
             if (target) {
                 for (std::uint32_t i = 0; i < target->getTextureCount(); i++) {
@@ -803,15 +820,21 @@ namespace foundation {
                 
                 renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
                 renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
-                renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
-                renderPassDescriptor.depthAttachment.clearDepth = 0.0;
-
+                
                 viewPort.width = _frameConstants.rtBounds.x = float(target->getWidth());
                 viewPort.height = _frameConstants.rtBounds.y = float(target->getHeight());
             }
             else {
-                _initializeDefaultRenderPassDescriptor(renderPassDescriptor, clear);
-
+                renderPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
+                renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+                renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+                renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(clear.r, clear.g, clear.b, clear.a);
+                renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+                
+                if (depth == nullptr) {
+                    renderPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
+                }
+                
                 viewPort.width = _frameConstants.rtBounds.x = _platform->getScreenWidth();
                 viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
             }
@@ -834,7 +857,16 @@ namespace foundation {
     void MetalRendering::applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
         if (_currentRenderCommandEncoder == nil) {
             MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-            _initializeDefaultRenderPassDescriptor(renderPassDescriptor, {0, 0, 0, 0});
+            
+            renderPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
+            renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+            renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
+            renderPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
+            renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+            renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
+            renderPassDescriptor.depthAttachment.clearDepth = 0.0f;
+            
             _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
             
             MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
@@ -998,16 +1030,9 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::_initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear) {
-        renderPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
-        renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-        renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(clear.r, clear.g, clear.b, clear.a);
-        renderPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
-        renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
-        renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
-        renderPassDescriptor.depthAttachment.clearDepth = 0.0f;
-    }
+//    void MetalRendering::_initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear) {
+//
+//    }
     
     void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
         std::uint32_t roundedSize = roundTo256(size);
