@@ -117,7 +117,7 @@ namespace foundation {
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
         
-        void forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) override;
+        void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;

@@ -27,7 +27,7 @@ voxel::SceneInterface::LineSetPtr axis;
 voxel::SceneInterface::StaticMeshPtr thing;
 voxel::SceneInterface::TexturedMeshPtr ground;
 voxel::SceneInterface::DynamicMeshPtr actor;
-
+voxel::SceneInterface::ParticlesPtr ptc;
 
 std::size_t pointerId = foundation::INVALID_POINTER_ID;
 math::vector2f lockedCoordinates;
@@ -89,6 +89,17 @@ extern "C" void initialize() {
     groundProvider->getOrLoadGround("grounds/white", [](const foundation::RenderDataPtr &data, const foundation::RenderTexturePtr &texture) {
         if (data && texture) {
             ground = scene->addTexturedMesh(data, texture);
+        }
+    });
+    textureProvider->getOrLoadTexture("textures/particles/test", [](const foundation::RenderTexturePtr &texture){
+        if (texture) {
+            std::uint32_t ptcparamssrc[] = {
+                0x00000000
+            };
+            foundation::RenderTexturePtr ptcparams = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 2, { ptcparamssrc });
+            ptc = scene->addParticles(texture, ptcparams, voxel::SceneInterface::EmitterParams {
+            
+            });
         }
     });
     

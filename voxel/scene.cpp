@@ -634,18 +634,9 @@ namespace voxel {
     }
     
     // Next:
-    // v remove z-buffered lines/bboxes + integrate with deffered rendering
-    // v implement textured mesh for webgl
-    // v SSAO
-    // --v reconstruct world position from depth
-    // --v construct depth from world position and compare with depth
-    // --v AO shader
-    // --+ filtering
     // + Particles
     // + Skybox + texture types
     //
-    // TODO:
-    // + forTarget - depthTexture from other target
     //
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _cleanupUnused(_boundingBoxes);
@@ -655,7 +646,7 @@ namespace voxel {
         _cleanupUnused(_particles);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
-        _rendering->forTarget(_gbuffer, {0.0, 0.0, 0.0, 1.0}, nullptr, [&](foundation::RenderingInterface &rendering) {
+        _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_staticMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &staticMesh : _staticMeshes) {
                 rendering.applyShaderConstants(&staticMesh->position);
@@ -677,7 +668,7 @@ namespace voxel {
                 rendering.draw(texturedMesh->data);
             }
         });
-        _rendering->forTarget(nullptr, {0.0, 0.0, 0.0, 0.0}, _gbuffer->getDepth(), [&](foundation::RenderingInterface &rendering) {
+        _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
             rendering.applyTextures({
                 {_palette, foundation::SamplerType::NEAREST},
@@ -685,7 +676,8 @@ namespace voxel {
                 {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
             });
             rendering.draw();
-
+        });
+        _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &set : _lineSets) {
                 for (std::size_t i = 0; i < set->blocks.size(); i++) {

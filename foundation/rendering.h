@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <optional>
 
 // TODO: 8 textures max
 
@@ -209,11 +210,11 @@ namespace foundation {
         virtual auto getBackBufferHeight() const -> float = 0;
         
         // Set target configuration
-        // @target      - render target where to perform rendering. Can be nullptr
-        // @clear       - clear color
-        // @depth       - Optionally override depth buffer from @target or nullptr
+        // @t           - render target where to perform rendering. Can be nullptr
+        // @d           - Optionally override depth buffer from @target or nullptr. If not null depth buffer won't be cleared
+        // @rgba        - clear color or nullopt if no clear
         //
-        virtual void forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) = 0;
+        virtual void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) = 0;
         
         // Apply shader
         // @shader      - shader object

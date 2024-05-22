@@ -12,7 +12,8 @@ extern "C" {
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
     auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
     void webgl_viewPort(std::uint32_t w, std::uint32_t h);
-    void webgl_applyTarget(WebGLId target, WebGLId depth, GLenum cmask, float r, float g, float b, float a, float d);
+    void webgl_beginTarget(WebGLId target, WebGLId depth, GLenum cmask, float r, float g, float b, float a, float d);
+    void webgl_endTarget(WebGLId target, WebGLId depth);
     void webgl_applyShader(WebGLId shader, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType);
@@ -481,8 +482,6 @@ namespace foundation {
                     shaderVS += "\n";
                 }
                 
-                shaderVS += "uniform float _vertical_flip;\n";
-                
                 transformCode(codeBlock);
                 shaderUtils::replace(codeBlock, "output_", "passing.", SEPARATORS, {"output_position"});
                 
@@ -497,7 +496,7 @@ namespace foundation {
                 }
                                 
                 shaderVS += codeBlock;
-                shaderVS += "    gl_Position.y *= _vertical_flip;\n";
+                shaderVS += "    gl_Position.y *= -1.0;\n";
                 shaderVS += "}\n\n";
                 
                 shaderVS = shaderUtils::makeLines(shaderVS);
@@ -629,12 +628,11 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
-    void WASMRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
+    void WASMRendering::forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) {
         const WASMTarget *platformTarget = static_cast<const WASMTarget *>(target.get());
-        const WebGLId platformDepth = depth ? static_cast<const WASMTexture *>(depth.get())->getWebGLTexture() : 0;
-        const GLenum cmask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
-        
+        WebGLId platformDepth = 0;
         WebGLId glTarget = 0;
+        GLenum cmask = 0;
         
         if (platformTarget) {
             _frameConstants->rtBounds.x = platformTarget->getWidth();
@@ -646,11 +644,23 @@ namespace foundation {
             _frameConstants->rtBounds.y = _platform->getScreenHeight();
         }
         
-        webgl_applyTarget(glTarget, platformDepth, cmask, clear.r, clear.g, clear.b, clear.a, 0.0f);
+        if (depth) {
+            platformDepth = static_cast<const WASMTexture *>(depth.get())->getWebGLTexture();
+        }
+        else {
+            cmask = cmask | GL_DEPTH_BUFFER_BIT;
+        }
+        if (rgba.has_value()) {
+            cmask = cmask | GL_COLOR_BUFFER_BIT;
+        }
+        
+        webgl_beginTarget(glTarget, platformDepth, cmask, rgba->r, rgba->g, rgba->b, rgba->a, 0.0f);
         webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
         webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
         
         pass(*this);
+
+        webgl_endTarget(glTarget, platformDepth);
     }
     
     void WASMRendering::applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {

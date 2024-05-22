@@ -793,7 +793,7 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
-    void MetalRendering::forTarget(const RenderTargetPtr &target, const math::color &clear, const RenderTexturePtr &depth, util::callback<void(foundation::RenderingInterface &rendering)> &&pass) {
+    void MetalRendering::forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) {
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);
         }
@@ -810,12 +810,20 @@ namespace foundation {
                 renderPassDescriptor.depthAttachment.clearDepth = 0.0;
             }
             
+            MTLLoadAction colorClearAction = MTLLoadActionLoad;
+            MTLClearColor colorClearValue = MTLClearColorMake(0, 0, 0, 0);
+            
+            if (rgba.has_value()) {
+                colorClearAction = MTLLoadActionClear;
+                colorClearValue = MTLClearColorMake(rgba->r, rgba->g, rgba->b, rgba->a);
+            }
+            
             if (target) {
                 for (std::uint32_t i = 0; i < target->getTextureCount(); i++) {
                     renderPassDescriptor.colorAttachments[i].texture = static_cast<const MetalTexBase *>(target->getTexture(i).get())->getNativeTexture();
                     renderPassDescriptor.colorAttachments[i].storeAction = MTLStoreActionStore;
-                    renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionClear;
-                    renderPassDescriptor.colorAttachments[i].clearColor = MTLClearColorMake(clear.r, clear.g, clear.b, clear.a);
+                    renderPassDescriptor.colorAttachments[i].loadAction = colorClearAction;
+                    renderPassDescriptor.colorAttachments[i].clearColor = colorClearValue;
                 }
                 
                 renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
@@ -827,8 +835,8 @@ namespace foundation {
             else {
                 renderPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
                 renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-                renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-                renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(clear.r, clear.g, clear.b, clear.a);
+                renderPassDescriptor.colorAttachments[0].loadAction = colorClearAction;
+                renderPassDescriptor.colorAttachments[0].clearColor = colorClearValue;
                 renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
                 
                 if (depth == nullptr) {

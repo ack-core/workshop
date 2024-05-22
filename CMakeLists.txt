@@ -72,7 +72,7 @@ get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_
 #file(MAKE_DIRECTORY "${m_binary_root}")
 
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.ttf")
-file(COPY "${m_resources_root}/ui" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
+file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
 file(COPY "${m_resources_root}/objects" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_resources_root}/statics" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
