@@ -94,12 +94,23 @@ extern "C" void initialize() {
     textureProvider->getOrLoadTexture("textures/particles/test", [](const foundation::RenderTexturePtr &texture){
         if (texture) {
             std::uint32_t ptcparamssrc[] = {
-                0x00000000
+                0x00000000,
+                0x00000000,
+                
+                0x000000ff,
+                0x00000000,
             };
-            foundation::RenderTexturePtr ptcparams = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 2, { ptcparamssrc });
+            foundation::RenderTexturePtr ptcparams = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 4, { ptcparamssrc });
             ptc = scene->addParticles(texture, ptcparams, voxel::SceneInterface::EmitterParams {
-            
+                .additiveBlend = false,
+                .orientation = voxel::SceneInterface::EmitterParams::Orientation::WORLD,
+                .particleCount = 2,
+                .minXYZ = {-5.0, 0, 0},
+                .maxXYZ = {5.0, 0, 0},
+                .minMaxWidth = {10.0f, 10.0f},
+                .minMaxHeight = {10.0f, 10.0f},
             });
+            ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
         }
     });
     

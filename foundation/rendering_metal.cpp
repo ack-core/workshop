@@ -555,6 +555,7 @@ namespace foundation {
                     
                 nativeShader += std::to_string(VERTEX_IN_VERTEX_COUNT);
                 nativeShader += ")]],\n"
+                    "    sampler _sampler [[sampler(0)]],\n"
                     "    texture2d<float> _texture0 [[texture(0)]],\n"
                     "    texture2d<float> _texture1 [[texture(1)]],\n"
                     "    texture2d<float> _texture2 [[texture(2)]],\n"
@@ -569,7 +570,7 @@ namespace foundation {
                 }
                 
                 nativeShader += variables;
-                nativeShader += "    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, {}};\n    _InOut output;\n\n";
+                nativeShader += "    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n    _InOut output;\n\n";
 
                 std::string codeBlock;
                 
@@ -641,7 +642,7 @@ namespace foundation {
         }
         
         nativeShader = shaderUtils::makeLines(nativeShader);
-        printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
+        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
         
         if (completed && vssrcBlockDone && fssrcBlockDone) {
             @autoreleasepool {
@@ -850,7 +851,8 @@ namespace foundation {
             _finishRenderCommandEncoder();
             _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
             _currentTarget = target;
-                        
+            _isForTarget = true;
+            
             _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
             [_currentRenderCommandEncoder setViewport:viewPort];
             
@@ -859,77 +861,80 @@ namespace foundation {
             [_currentRenderCommandEncoder endEncoding];
             _currentRenderCommandEncoder = nil;
             _currentTarget = nullptr;
+            _isForTarget = false;
         }
     }
     
     void MetalRendering::applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
-        if (_currentRenderCommandEncoder == nil) {
-            MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-            
-            renderPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
-            renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-            renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
-            renderPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
-            renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
-            renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
-            renderPassDescriptor.depthAttachment.clearDepth = 0.0f;
-            
-            _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-            
-            MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-            viewPort.width = _frameConstants.rtBounds.x = _platform->getScreenWidth();
-            viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
-            _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
-            [_currentRenderCommandEncoder setViewport:viewPort];
-        }
-        
-        const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
-        const MetalTarget *platformTarget = static_cast<const MetalTarget *>(_currentTarget.get());
-        
-        if (platformShader) {
-            id<MTLRenderPipelineState> state = nil;
-            const std::string &stateName = generateRenderPipelineStateName(platformShader, platformTarget, blendType);
-            
-            auto index = _renderPipelineStates.find(stateName);
-            if (index == _renderPipelineStates.end()) {
-                MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
-                desc.vertexFunction = platformShader->getVertexShader();
-                desc.fragmentFunction = platformShader->getFragmentShader();
+        if (_isForTarget) {
+            if (_currentRenderCommandEncoder == nil) {
+                MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
                 
-                if (platformTarget) {
-                    for (std::uint32_t i = 0; i < platformTarget->getTextureCount(); i++) {
-                        desc.colorAttachments[i].pixelFormat = nativeTextureFormat[int(platformTarget->getTexture(0)->getFormat())];
-                        initializeBlendOptions[int(blendType)](desc.colorAttachments[i]);
+                renderPassDescriptor.colorAttachments[0].texture = _view.currentDrawable.texture;
+                renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+                renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+                renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
+                renderPassDescriptor.depthAttachment.texture = _view.depthStencilTexture;
+                renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+                renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
+                renderPassDescriptor.depthAttachment.clearDepth = 0.0f;
+                
+                _currentRenderCommandEncoder = [_currentCommandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+                
+                MTLViewport viewPort {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+                viewPort.width = _frameConstants.rtBounds.x = _platform->getScreenWidth();
+                viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
+                _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
+                [_currentRenderCommandEncoder setViewport:viewPort];
+            }
+            
+            const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
+            const MetalTarget *platformTarget = static_cast<const MetalTarget *>(_currentTarget.get());
+            
+            if (platformShader) {
+                id<MTLRenderPipelineState> state = nil;
+                const std::string &stateName = generateRenderPipelineStateName(platformShader, platformTarget, blendType);
+                
+                auto index = _renderPipelineStates.find(stateName);
+                if (index == _renderPipelineStates.end()) {
+                    MTLRenderPipelineDescriptor *desc = [MTLRenderPipelineDescriptor new];
+                    desc.vertexFunction = platformShader->getVertexShader();
+                    desc.fragmentFunction = platformShader->getFragmentShader();
+                    
+                    if (platformTarget) {
+                        for (std::uint32_t i = 0; i < platformTarget->getTextureCount(); i++) {
+                            desc.colorAttachments[i].pixelFormat = nativeTextureFormat[int(platformTarget->getTexture(0)->getFormat())];
+                            initializeBlendOptions[int(blendType)](desc.colorAttachments[i]);
+                        }
+                        if (platformTarget->getDepth()) {
+                            desc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+                        }
                     }
-                    if (platformTarget->getDepth()) {
-                        desc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+                    else {
+                        desc.colorAttachments[0].pixelFormat = _view.colorPixelFormat;
+                        desc.depthAttachmentPixelFormat = _view.depthStencilPixelFormat;
+                        initializeBlendOptions[int(blendType)](desc.colorAttachments[0]);
+                    }
+                    
+                    NSError *error;
+                    if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
+                        _renderPipelineStates.emplace(stateName, state);
+                    }
+                    else {
+                        _platform->logError("[MetalRendering::applyState] %s\n", [[error localizedDescription] UTF8String]);
                     }
                 }
                 else {
-                    desc.colorAttachments[0].pixelFormat = _view.colorPixelFormat;
-                    desc.depthAttachmentPixelFormat = _view.depthStencilPixelFormat;
-                    initializeBlendOptions[int(blendType)](desc.colorAttachments[0]);
+                    state = index->second;
                 }
                 
-                NSError *error;
-                if ((state = [_device newRenderPipelineStateWithDescriptor:desc error:&error]) != nil) {
-                    _renderPipelineStates.emplace(stateName, state);
+                if (state) {
+                    [_currentRenderCommandEncoder setRenderPipelineState:state];
+                    [_currentRenderCommandEncoder setDepthStencilState:_depthStates[int(depthBehavior)]];
+                    
+                    _currentTopology = topology;
+                    _currentShader = shader;
                 }
-                else {
-                    _platform->logError("[MetalRendering::applyState] %s\n", [[error localizedDescription] UTF8String]);
-                }
-            }
-            else {
-                state = index->second;
-            }
-            
-            if (state) {
-                [_currentRenderCommandEncoder setRenderPipelineState:state];
-                [_currentRenderCommandEncoder setDepthStencilState:_depthStates[int(depthBehavior)]];
-                
-                _currentTopology = topology;
-                _currentShader = shader;
             }
         }
     }
@@ -975,6 +980,7 @@ namespace foundation {
             [_currentRenderCommandEncoder setVertexBuffer:nil offset:0 atIndex:VERTEX_IN_BINDING_START];
             
             if (layout.repeat > 1) {
+                [_currentRenderCommandEncoder setVertexBytes:&vertexCount length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vertexCount];
             }
             else {
@@ -1037,10 +1043,6 @@ namespace foundation {
             dispatch_semaphore_wait(_constBufferSemaphore, DISPATCH_TIME_FOREVER);
         }
     }
-    
-//    void MetalRendering::_initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear) {
-//
-//    }
     
     void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
         std::uint32_t roundedSize = roundTo256(size);

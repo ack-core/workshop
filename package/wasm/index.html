@@ -101,6 +101,8 @@
         var targetHeight = window.devicePixelRatio * canvas.scrollHeight;
         var activePointerIDs = {};
         var prevFrameTimeStamp = 0;
+        var glDefaultTarget = null;
+        var glDefaultRTShader = null;
         var glShaderIDCounter = 0x10000000;
         var glBufferIDCounter = 0x20000000;
         var glTextureIDCounter = 0x30000000;
@@ -110,7 +112,7 @@
         var gltextures = {};
         var glsamplers = {};
         var glframebuffers = {};
-        var glcontext = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false, alpha: true });
+        var glcontext = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false, premultipliedAlpha: true, preserveDrawingBuffer: true });
         var glEnabledAttribCount = 0;
         var shaderConstantBuffers = [];
         var shaderConstantIndex = 0;
@@ -240,7 +242,7 @@
                                 glcontext.uniformBlockBinding(program, glcontext.getUniformBlockIndex(program, "_Constants"), DRAW_CONST_BINDING_INDEX);
                             }
                             
-                            program.uniformSamplersLocation = glcontext.getUniformLocation(program, "_samplers");                            
+                            program.uniformSamplersLocation = glcontext.getUniformLocation(program, "_samplers");
                             program.uniformInstanceCountLocation = glcontext.getUniformLocation(program, "_instance_count");
 
                             if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
@@ -435,6 +437,9 @@
                     glcontext.bindSampler(index, glsamplers[samplingType]);
                 },
                 webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {
+                    if (uniformInstanceCountLocation) {
+                        glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);
+                    }
                     glcontext.bindVertexArray(glbuffers[buffer].layout);
                     glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
                 },
@@ -443,10 +448,10 @@
                     glcontext.drawElementsInstanced(topology, indexCount, glcontext.UNSIGNED_INT, 0, instanceCount);
                 },
                 webgl_drawWithRepeat: function(buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) {
-                    glcontext.bindVertexArray(glbuffers[buffer].layout);
                     if (uniformInstanceCountLocation) {
                         glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);
                     }
+                    glcontext.bindVertexArray(glbuffers[buffer].layout);
                     for (let i = 0; i < attrCount; i++) {
                         glcontext.vertexAttribDivisor(i, instanceCount);
                     }
@@ -474,18 +479,17 @@
 
         function recreateDefaultFBO() {
             const defaultFBO = glcontext.createFramebuffer();
-            const defaultColor = glcontext.createRenderbuffer();
             const defaultDepth = glcontext.createTexture();
+            glDefaultTarget = glcontext.createTexture();
             glcontext.activeTexture(glcontext.TEXTURE0);
-            glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, defaultColor);
-            glcontext.renderbufferStorage(glcontext.RENDERBUFFER, glcontext.RGBA8, targetWidth, targetHeight)
+            glcontext.bindTexture(glcontext.TEXTURE_2D, glDefaultTarget);
+            glcontext.texImage2D(glcontext.TEXTURE_2D, 0, glcontext.RGBA8, targetWidth, targetHeight, 0, glcontext.RGBA, glcontext.UNSIGNED_BYTE, null);
             glcontext.bindTexture(glcontext.TEXTURE_2D, defaultDepth);
             glcontext.texImage2D(glcontext.TEXTURE_2D, 0, glcontext.DEPTH_COMPONENT32F, targetWidth, targetHeight, 0, glcontext.DEPTH_COMPONENT, glcontext.FLOAT, null);
             glcontext.bindTexture(glcontext.TEXTURE_2D, null);
-            glcontext.bindRenderbuffer(glcontext.RENDERBUFFER, null);
             glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, defaultFBO);
+            glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0, glcontext.TEXTURE_2D, glDefaultTarget, 0);
             glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.TEXTURE_2D, defaultDepth, 0);
-            glcontext.framebufferRenderbuffer(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0, glcontext.RENDERBUFFER, defaultColor);
             glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, null);
             glframebuffers[0] = {fb: defaultFBO, depth: defaultDepth, attachments: [glcontext.COLOR_ATTACHMENT0]};
         }
@@ -499,23 +503,25 @@
                 instance.exports.resized(targetWidth, targetHeight);
                 
                 if (glcontext.getParameter(glcontext.MAX_COLOR_ATTACHMENTS) < 4) {
-                    throw "[WebGL] Max fb attachment count is too low"
+                    print("[WebGL] Max fb attachment count is too low");
+                    throw new Error;
                 }
                 if (glcontext.getExtension("EXT_color_buffer_float") == null) {
-                    throw "[WebGL] Float textures aren't supported"
+                    print("[WebGL] Float textures aren't supported");
+                    throw new Error;
                 }
 
                 glsamplers[0] = glcontext.createSampler();
                 glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MIN_FILTER, glcontext.NEAREST);
                 glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MAG_FILTER, glcontext.NEAREST);
-                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_S, glcontext.CLAMP_TO_EDGE);
-                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_T, glcontext.CLAMP_TO_EDGE);
+                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_S, glcontext.REPEAT);
+                glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_T, glcontext.REPEAT);
 
                 glsamplers[1] = glcontext.createSampler();
                 glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MIN_FILTER, glcontext.LINEAR);
                 glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MAG_FILTER, glcontext.LINEAR);
-                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_S, glcontext.CLAMP_TO_EDGE);
-                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_T, glcontext.CLAMP_TO_EDGE);
+                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_S, glcontext.REPEAT);
+                glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_T, glcontext.REPEAT);
 
                 for (let i = 0; i < BUFFERS_REUSE_MAX; i++) {
                     shaderConstantBuffers[i] = glcontext.createBuffer();
@@ -533,6 +539,39 @@
                 glcontext.bindBuffer(glcontext.ARRAY_BUFFER, null);
                 glcontext.depthFunc(glcontext.GREATER);
                 
+                const quadVSource = `#version 300 es
+                precision mediump float;
+                const mediump vec4 quad[4] = vec4[](vec4(-1, 1, 0, 0), vec4(1, 1, 1, 0), vec4(-1, -1, 0, 1), vec4(1, -1, 1, 1));
+                out vec2 texcoord;
+                void main() {
+                    texcoord = quad[gl_VertexID].zw;
+                    gl_Position = vec4(quad[gl_VertexID].xy, 0.1, 1.0);
+                }`;
+                const quadFSource = `#version 300 es
+                precision mediump float;
+                uniform sampler2D smp;
+                in vec2 texcoord;
+                out vec4 outcolor;
+                void main() {
+                    outcolor = texture(smp, texcoord);
+                }`;
+                const vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
+                const fshader = glcontext.createShader(glcontext.FRAGMENT_SHADER);
+                glDefaultRTShader = glcontext.createProgram();
+                glcontext.shaderSource(vshader, quadVSource);
+                glcontext.shaderSource(fshader, quadFSource);
+                glcontext.compileShader(vshader);
+                glcontext.compileShader(fshader);
+                glcontext.attachShader(glDefaultRTShader, vshader);
+                glcontext.attachShader(glDefaultRTShader, fshader);
+                glcontext.linkProgram(glDefaultRTShader);
+                glcontext.validateProgram(glDefaultRTShader);
+
+                if (!glcontext.getProgramParameter(glDefaultRTShader, glcontext.LINK_STATUS)) {
+                    print("[WebGL] Can't create quad shader program");
+                    throw new Error;
+                }
+
                 recreateDefaultFBO();
                 instance.exports.initialize();
 
@@ -543,21 +582,28 @@
                     return [x, y];
                 }
                 function onFrame(timestamp) {
-                    const interval = 1000.0 / 30.0;
+                    const interval = 1000.0 / 33.0;
                     const dt = timestamp - prevFrameTimeStamp;
                     
                     if (dt > interval) {
                         prevFrameTimeStamp = timestamp;
                         glcontext.viewport(0, 0, targetWidth, targetHeight);
                         instance.exports.updateFrame(dt);
+
+                        glcontext.bindFramebuffer(glcontext.FRAMEBUFFER, null);
+                        glcontext.drawBuffers([glcontext.BACK]);
+                        glcontext.useProgram(glDefaultRTShader);
+                        glcontext.activeTexture(glcontext.TEXTURE0);
+                        glcontext.bindTexture(glcontext.TEXTURE_2D, glDefaultTarget);
+                        glcontext.bindSampler(0, glsamplers[0]);
+                        glcontext.bindVertexArray(glbuffers[0].layout);
+                        glcontext.drawArrays(glcontext.TRIANGLE_STRIP, 0, 4);
                     }
 
                     //throw "test";
 
-                    glcontext.bindFramebuffer(glcontext.READ_FRAMEBUFFER, glframebuffers[0].fb);
-                    glcontext.bindFramebuffer(glcontext.DRAW_FRAMEBUFFER, null);
-                    glcontext.blitFramebuffer(0, targetHeight, targetWidth, 0, 0, 0, targetWidth, targetHeight, glcontext.COLOR_BUFFER_BIT, glcontext.NEAREST);
                     window.requestAnimationFrame(onFrame);
+                    uniformInstanceCountLocation = null;
                 }
                 window.requestAnimationFrame(timestamp => {
                     prevFrameTimeStamp = timestamp;

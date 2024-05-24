@@ -178,5 +178,7 @@ namespace foundation {
         id<MTLBuffer> _constantsBuffers[CONSTANT_BUFFER_FRAMES_MAX];
         std::uint32_t _constantsBuffersIndex = 0;
         std::uint32_t _constantsBufferOffset = 0;
+        
+        bool _isForTarget = false;
     };
 }

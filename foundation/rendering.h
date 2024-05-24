@@ -235,12 +235,12 @@ namespace foundation {
         
         // Draw vertexes
         //
-        virtual void draw(std::uint32_t vertexCount) = 0;
+        virtual void draw(std::uint32_t vertexCount = 1) = 0;
         
         // Draw vertexes from RenderData
         // @inputData layout has to match current shader's layout
         //
-        virtual void draw(const RenderDataPtr &inputData = nullptr, std::uint32_t instanceCount = 1) = 0;
+        virtual void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) = 0;
         
         // Frame finalization
         //

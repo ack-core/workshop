@@ -18,13 +18,16 @@ namespace voxel {
         
     public:
         struct EmitterParams {
+            bool additiveBlend = false;
             enum class Orientation {
-                CAMERA,
-                AXIS,
-                WORLD
-            };
-            
-            Orientation orientation;
+                CAMERA, AXIS, WORLD
+            }
+            orientation = Orientation::CAMERA;
+            std::uint32_t particleCount = 1;
+            math::vector3f minXYZ = {0, 0, 0};
+            math::vector3f maxXYZ = {0, 0, 0};
+            math::vector2f minMaxWidth = {1, 1};
+            math::vector2f minMaxHeight = {1, 1};
         };
         
     public:
@@ -54,7 +57,7 @@ namespace voxel {
         };
         struct Particles {
             virtual void setTransform(const math::transform3f &trfm) = 0;
-            virtual void setTime(float timeSec) = 0;
+            virtual void setTime(float timeKoeff) = 0;
             virtual ~Particles() = default;
         };
         struct LightSource {

@@ -147,6 +147,9 @@ namespace foundation {
         std::unordered_set<std::string> _shaderNames;
         std::shared_ptr<WASMShader> _currentShader;
         
+        RenderTargetPtr _currentTarget;
         RenderTopology _topology;
+        
+        bool _isForTarget = false;
     };
 }

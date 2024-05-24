@@ -488,7 +488,8 @@ namespace foundation {
                 if (layout.repeat > 1) {
                     shaderVS += "uniform int _instance_count;\n";
                     shaderVS += "\n#define repeat_ID gl_VertexID\n";
-                    shaderVS += "\nvoid main() {\n    int vertex_ID = gl_InstanceID / _instance_count;\n    int instance_ID = gl_InstanceID % _instance_count;\n";
+                    shaderVS += "\nvoid main() {\n    int vertex_ID = gl_InstanceID % _instance_count;\n    int instance_ID = gl_InstanceID / _instance_count;\n";
+                    //shaderVS += "\nvoid main() {\n    int vertex_ID = gl_InstanceID / _instance_count;\n    int instance_ID = gl_InstanceID % _instance_count;\n";
                 }
                 else {
                     shaderVS += "\n#define repeat_ID 0\n#define vertex_ID gl_VertexID\n#define instance_ID gl_InstanceID\n";
@@ -501,7 +502,7 @@ namespace foundation {
                 
                 shaderVS = shaderUtils::makeLines(shaderVS);
                 createNativeSrc(nativeShaderVS, shaderVS);
-                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
+                //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderVS.data());
                 
                 vssrcBlockDone = true;
                 continue;
@@ -533,7 +534,7 @@ namespace foundation {
                 shaderFS = shaderUtils::makeLines(shaderFS);
                 createNativeSrc(nativeShaderFS, shaderFS);
 
-                _platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
+                //_platform->logMsg("---------- begin ----------\n%s\n----------- end -----------\n", shaderFS.data());
                 fssrcBlockDone = true;
                 continue;
             }
@@ -657,14 +658,16 @@ namespace foundation {
         webgl_beginTarget(glTarget, platformDepth, cmask, rgba->r, rgba->g, rgba->b, rgba->a, 0.0f);
         webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
         webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
+        _isForTarget = true;
         
         pass(*this);
-
+        
+        _isForTarget = false;
         webgl_endTarget(glTarget, platformDepth);
     }
     
     void WASMRendering::applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
-        if (shader) {
+        if (_isForTarget && shader) {
             _topology = topology;
             _currentShader = std::static_pointer_cast<WASMShader>(shader);
             webgl_applyShader(_currentShader->getWebGLShader(), std::uint32_t(depthBehavior), std::uint32_t(blendType));
@@ -684,9 +687,11 @@ namespace foundation {
     }
     
     void WASMRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) {
-        for (std::size_t i = 0; i < textures.size(); i++) {
-            const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first.get());
-            webgl_applyTexture(i, platformTexture ? platformTexture->getWebGLTexture() : 0, int(textures.begin()[i].second));
+        if (_currentShader) {
+            for (std::size_t i = 0; i < textures.size(); i++) {
+                const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first.get());
+                webgl_applyTexture(i, platformTexture ? platformTexture->getWebGLTexture() : 0, int(textures.begin()[i].second));
+            }
         }
     }
     

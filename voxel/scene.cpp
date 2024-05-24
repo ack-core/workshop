@@ -167,39 +167,50 @@ namespace voxel {
     
     //---
     
-    class ParticlesImpl : public SceneInterface::Particles {
+    class ParticleEmitterImpl : public SceneInterface::Particles {
     public:
+        bool additiveBlend;
+        std::uint32_t particleCount;
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
                 
-        ParticlesImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const SceneInterface::EmitterParams &emitterParams)
-        : texture(texture)
+        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const SceneInterface::EmitterParams &emitterParams)
+        : additiveBlend(emitterParams.additiveBlend)
+        , particleCount(emitterParams.particleCount)
+        , texture(texture)
         , map(map)
-        , _constants({})
         {
             if (emitterParams.orientation == SceneInterface::EmitterParams::Orientation::AXIS) {
-                _updateOrientation = [](ParticlesImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
+                _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
-                    self._constants.normal = -1.0 * camDir;
+                    self._constants.normal = camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
                 };
             }
             else if (emitterParams.orientation == SceneInterface::EmitterParams::Orientation::WORLD) {
-                _updateOrientation = [](ParticlesImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
+                _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = math::vector3f(self._transform.m11, self._transform.m12, self._transform.m13);
                     self._constants.normal = math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23);
                 };
             }
             else {
-                _updateOrientation = [](ParticlesImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
+                _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
                     self._constants.normal = -1.0 * camDir;
                 };
             }
+            
+            _constants.alpha = 1.0;
+            _constants.time = 0.0f;
+            _constants.mpix = 1.0f / float(map->getHeight());
+            _constants.minXYZ = emitterParams.minXYZ;
+            _constants.maxXYZ = emitterParams.maxXYZ;
+            _constants.minMaxW = emitterParams.minMaxWidth;
+            _constants.minMaxH = emitterParams.minMaxHeight;
         }
-        ~ParticlesImpl() override {}
+        ~ParticleEmitterImpl() override {}
         
         void *getUpdatedConstants(const math::vector3f &camDir, const math::vector3f &camRight) {
             _updateOrientation(*this, camDir, camRight);
@@ -208,8 +219,8 @@ namespace voxel {
         void setTransform(const math::transform3f &trfm) override {
             _transform = trfm;
         }
-        void setTime(float timeSec) override {
-            
+        void setTime(float timeKoeff) override {
+            _constants.time = timeKoeff;
         }
         
     private:
@@ -217,13 +228,16 @@ namespace voxel {
         math::transform3f _transform = math::transform3f::identity();
 
         struct Constants {
-            math::vector3f position; float time;
-            math::vector3f normal; float alpha;
-            math::vector3f right; float r0;
+            math::vector3f position; float alpha;
+            math::vector3f normal; float time;
+            math::vector3f right; float mpix;
+            math::vector2f minMaxW, minMaxH;
+            math::vector3f minXYZ; float r0;
+            math::vector3f maxXYZ; float r1;
         }
         _constants;
         
-        void (*_updateOrientation)(ParticlesImpl &self, const math::vector3f &camRight, const math::vector3f &camUp);
+        void (*_updateOrientation)(ParticleEmitterImpl &self, const math::vector3f &camRight, const math::vector3f &camUp);
     };
     
     //---
@@ -296,7 +310,7 @@ namespace voxel {
         std::vector<std::shared_ptr<StaticMeshImpl>> _staticMeshes;
         std::vector<std::shared_ptr<DynamicMeshImpl>> _dynamicMeshes;
         std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
-        std::vector<std::shared_ptr<ParticlesImpl>> _particles;
+        std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
     };
     
     std::shared_ptr<SceneInterface> SceneInterface::instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering) {
@@ -440,25 +454,34 @@ namespace {
     )";
     const char *g_particlesShaderSrc = R"(
         fixed {
-            quad[4] : float2 = [-0.5, 0.5][0.5, 0.5][-0.5, -0.5][0.5, -0.5]
-            uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
+            quad[4] : float4 = [-0.5, 0.5, 0, 0][0.5, 0.5, 1, 0][-0.5, -0.5, 0, 1][0.5, -0.5, 1, 1]
         }
         const {
-            position_t : float4
-            normal_a : float4
-            right : float4
+            position_alpha : float4
+            normal_time : float4
+            right_mpix : float4
+            width_height : float4
+            minXYZ_r0 : float4
+            maxXYZ_r1 : float4
         }
         inout {
             uv : float2
         }
         vssrc {
-            float3 up = _cross(const_normal_a.xyz, const_right.xyz);
-            float3 relVertexPos = const_right.xyz * fixed_quad[repeat_ID].x + up * fixed_quad[repeat_ID].y;
-            output_position = float4(const_position_t.xyz + relVertexPos, 1.0);
-            output_uv = fixed_uv[repeat_ID];
+            float  ptcv = 2.0 * const_right_mpix.w * float(vertex_ID);
+            float4 map0 = _tex2d(0, float2(const_normal_time.w, ptcv + 0.5 * const_right_mpix.w)); // x, y, z, history index
+            float4 map1 = _tex2d(0, float2(const_normal_time.w, ptcv + 1.5 * const_right_mpix.w)); // width, height, angle, reserved
+            
+            float3 ptcpos = const_minXYZ_r0.xyz + (const_maxXYZ_r1.xyz - const_minXYZ_r0.xyz) * map0.xyz;
+            float2 wh = const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map1.xy;
+            
+            float3 up = _cross(const_normal_time.xyz, const_right_mpix.xyz);
+            float3 relVertexPos = const_right_mpix.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            output_position = _transform(float4(const_position_alpha.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
+            output_uv = fixed_quad[repeat_ID].zw;
         }
         fssrc {
-            output_color[0] = float4(1, 0, 0, 1);
+            output_color[0] = _tex2d(1, input_uv);
         }
     )";
     const char *g_gbufferToScreenShaderSrc = R"(
@@ -472,8 +495,7 @@ namespace {
                 [1.12,0.43,0.50][-0.24,-0.56,-0.73][-0.60,0.35,-0.28][0.22,0.20,-0.52][0.38,-0.27,-0.19][-0.03,0.35,-0.19][-0.22,-0.26,0.07][-0.11,0.05,-0.27]
                 [0.43,-1.16,-0.41][0.42,0.66,-0.54][0.35,-0.08,0.66][-0.44,0.02,0.41][0.46,0.20,0.01][0.36,-0.17,0.04][0.12,0.22,0.25][0.10,-0.24,0.15]
                 [-0.45,-0.84,0.88][-0.64,-0.31,-0.63][-0.31,0.68,0.02][-0.28,0.35,-0.40][0.05,-0.01,0.50][0.14,-0.22,-0.30][0.11,0.32,0.10][-0.29,0.05,0.04]
-            quad[4] : float4 = [-1, 1, 0.1, 1][1, 1, 0.1, 1][-1, -1, 0.1, 1][1, -1, 0.1, 1]
-            uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
+            quad[4] : float4 = [-1, 1, 0, 0][1, 1, 1, 0][-1, -1, 0, 1][1, -1, 1, 1]
         }
         inout {
             uv : float2
@@ -488,8 +510,8 @@ namespace {
             return float3(0.5, -0.5, 1.0) * clipSpasePos.xyz / clipSpasePos.w + float3(0.5, 0.5, 0.0);
         }
         vssrc {
-            output_position = fixed_quad[repeat_ID];
-            output_uv = fixed_uv[repeat_ID];
+            output_position = float4(fixed_quad[repeat_ID].xy, 0.1, 1.0);
+            output_uv = fixed_quad[repeat_ID].zw;
         }
         fssrc {
             float4 gbuffer = _tex2d(1, input_uv);
@@ -599,8 +621,8 @@ namespace voxel {
     }
     
     SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const EmitterParams &params) {
-        std::shared_ptr<ParticlesImpl> result = std::make_shared<ParticlesImpl>(tx, map, params);
-        return _particles.emplace_back(result);
+        std::shared_ptr<ParticleEmitterImpl> result = std::make_shared<ParticleEmitterImpl>(tx, map, params);
+        return _particleEmitters.emplace_back(result);
     }
     
     SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(float r, float g, float b, float radius) {
@@ -643,7 +665,7 @@ namespace voxel {
         _cleanupUnused(_staticMeshes);
         _cleanupUnused(_dynamicMeshes);
         _cleanupUnused(_texturedMeshes);
-        _cleanupUnused(_particles);
+        _cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
@@ -662,7 +684,7 @@ namespace voxel {
             rendering.applyShader(_texturedMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &texturedMesh : _texturedMeshes) {
                 rendering.applyShaderConstants(&texturedMesh->position);
-                _rendering->applyTextures({
+                rendering.applyTextures({
                     {texturedMesh->texture, foundation::SamplerType::NEAREST}
                 });
                 rendering.draw(texturedMesh->data);
@@ -678,6 +700,15 @@ namespace voxel {
             rendering.draw();
         });
         _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
+            rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
+            for (const auto &emitter : _particleEmitters) {
+                rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));
+                rendering.applyTextures({
+                    {emitter->map, foundation::SamplerType::NEAREST},
+                    {emitter->texture, foundation::SamplerType::NEAREST}
+                });
+                rendering.draw(emitter->particleCount);
+            }
             rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &set : _lineSets) {
                 for (std::size_t i = 0; i < set->blocks.size(); i++) {
