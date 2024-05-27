@@ -4,20 +4,25 @@ cmake_policy(SET CMP0091 NEW)
 # platform-specific settings
 
 set(PLATFORM_POSTFIX "unknown")
-if(${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
+if (${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
 	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 	set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /EHsc /std:c++17")
 	set(PLATFORM_POSTFIX "win")
-elseif(${PLATFORM} STREQUAL "PLATFORM_IOS")
+
+elseif (${PLATFORM} STREQUAL "PLATFORM_IOS")
 	set(PLATFORM_POSTFIX "ios")
-elseif(${PLATFORM} STREQUAL "PLATFORM_WASM")
+
+elseif (${PLATFORM} STREQUAL "PLATFORM_WASM")
 	set(PLATFORM_POSTFIX "wasm")
 	set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O0")
+
 else()
 	message(FATAL_ERROR "Unsupported platform")
+
 endif()
 
 add_definitions(-D${PLATFORM})
+add_definitions(-D${APPTYPE})
 
 # common
 
@@ -104,30 +109,37 @@ execute_process(
 
 # specific
 
-if(${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
+if (${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT workshop)
-elseif(${PLATFORM} STREQUAL "PLATFORM_IOS")
+
+elseif (${PLATFORM} STREQUAL "PLATFORM_IOS")
 	set_source_files_properties(${m_source_root}/entry.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
 
-	target_link_libraries( workshop PUBLIC "-framework Metal" )
-	target_link_libraries( workshop PUBLIC "-framework MetalKit" )
-	target_link_libraries( workshop PUBLIC "-framework UIKit" )
+	target_link_libraries(workshop PUBLIC "-framework Metal")
+	target_link_libraries(workshop PUBLIC "-framework MetalKit")
+	target_link_libraries(workshop PUBLIC "-framework UIKit")
 
-	file( GLOB_RECURSE m_ipa_file_list "${m_binary_root}/data/*" )
+	file(GLOB_RECURSE m_ipa_file_list "${m_binary_root}/data/*")
 
-	source_group( TREE "${m_binary_root}/data" PREFIX "Resources" FILES ${m_ipa_file_list} )
-	target_sources( workshop PUBLIC ${m_ipa_file_list} )
+	source_group(TREE "${m_binary_root}/data" PREFIX "Resources" FILES ${m_ipa_file_list})
+	target_sources(workshop PUBLIC ${m_ipa_file_list})
 
-	foreach( m_ipa_file_path ${m_ipa_file_list} )
-		file( RELATIVE_PATH m_ipa_file_rel_path "${m_binary_root}/data" ${m_ipa_file_path} )
-		get_filename_component( m_ipa_rel_dir ${m_ipa_file_rel_path} DIRECTORY )
-		set_property( SOURCE ${m_ipa_file_path} PROPERTY MACOSX_PACKAGE_LOCATION "${m_ipa_rel_dir}" )
-		set_property( SOURCE ${m_ipa_file_path} PROPERTY XCODE_EXPLICIT_FILE_TYPE "Data" )
+	foreach (m_ipa_file_path ${m_ipa_file_list})
+		file(RELATIVE_PATH m_ipa_file_rel_path "${m_binary_root}/data" ${m_ipa_file_path})
+		get_filename_component( m_ipa_rel_dir ${m_ipa_file_rel_path} DIRECTORY)
+		set_property(SOURCE ${m_ipa_file_path} PROPERTY MACOSX_PACKAGE_LOCATION "${m_ipa_rel_dir}")
+		set_property(SOURCE ${m_ipa_file_path} PROPERTY XCODE_EXPLICIT_FILE_TYPE "Data")
 	endforeach()
 
 	set_property(TARGET workshop PROPERTY XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.ack-games.workshop")
 	set_property(TARGET workshop PROPERTY MACOSX_BUNDLE_INFO_PLIST "${m_binary_root}/info.plist")
-elseif(${PLATFORM} STREQUAL "PLATFORM_WASM")
+
+elseif (${PLATFORM} STREQUAL "PLATFORM_WASM")
+	if (${APPTYPE} STREQUAL "IS_CLIENT")
+		set_target_properties(workshop PROPERTIES OUTPUT_NAME "index")
+	elseif (${APPTYPE} STREQUAL "IS_PE")
+		set_target_properties(workshop PROPERTIES OUTPUT_NAME "pe")
+	endif()
 	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free --wrap=malloc --wrap=free)
 	target_link_options(workshop PUBLIC --export=updateFrame --export=fileLoaded --export=taskExecute --export=taskComplete)
 	target_link_options(workshop PUBLIC --export=pointerEvent --export=resized)

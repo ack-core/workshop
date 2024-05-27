@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ack-core demo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, viewport-fit=cover, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-title" content="ack-core-demo" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" href="data:;base64,=">
+    <style>
+        html, body {
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        .rt {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            z-index: 0;
+        }
+        .output {
+            background: rgba(255, 255, 255, 0.75);
+            position: fixed;
+            overflow-y: scroll;
+            padding: 4px;
+            bottom: 0;
+            right: 0;
+            height: 100px;
+            z-index: 9999;
+            font-size: 8pt;
+            font-family: Courier New;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.75);
+            position: fixed;
+            overflow-y: auto;
+            padding: 4px;
+            top: 0;
+            left: 0;
+            height: 50%;
+            z-index: 9999;
+            font-size: 8pt;
+            font-family: Verdana, sans-serif;
+        }
+        @media screen and (orientation:portrait) {
+            .rt {
+                visibility: hidden;
+            }
+            .panel {
+                visibility: hidden;
+            }
+            .output {
+                top: 0;
+                left: 0;
+                height: 100vh;
+            }
+        }
+        @media screen and (orientation:landscape) {
+            html, body {
+                position: fixed;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <canvas class="rt" id="render_target"></canvas>
+    <div class="output" id="output"></div>
+    <div class="panel" id="panel">
+        <table>
+            <tr>
+                <td><label for="cycled">Emitter is cycled</label></td><td><input type="checkbox" id="cycled"></td>
+            </tr>
+            <tr>
+                <td><label for="pcount">Particles to emit:</label></td><td><input type="range" id="pcount" min="1" max="256" step="1" value="1"></td>
+            </tr>
+            <tr>
+                <td><label for="pminlife">Min particle lifetime (ms):</label></td><td><input type="range" id="pminlife" min="10" max="10000" step="10" value="1000"></td>
+            </tr>
+            <tr>
+                <td><label for="pmaxlife">Max particle lifetime (ms):</label></td><td><input type="range" id="pmaxlife" min="10" max="10000" step="10" value="1000"></td>
+            </tr>
+            <tr>
+                <td><label for="emittime">Emitting time (ms):</label></td><td><input type="range" id="emittime" min="1" max="10000" step="1" value="1000"></td>
+            </tr>
+            <tr>
+                <td><label>Emitting time pattern:</label></td><td><input type="button" value="&#x2500"><input type="button" value="&#x2571"></td>
+            </tr>
+        </table>
+
+    </div>
+    <script type="text/javascript" src="wasm.js" binary="pe.wasm"></script>
+</body>
+</html>

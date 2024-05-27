@@ -109,19 +109,19 @@ def main(root: str, dst: str) -> None:
         ".vox": (
             list_vox,
             "    const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {\r\n",
-            "#include \"mesh_provider.h\"\r\n\r\n",
+            "#include \"resource_provider.h\"\r\n\r\n",
             "meshes_list.h"
         ),
         ".png": (
             list_png,
             "    const std::unordered_map<const char *, TextureInfo> TEXTURES_LIST = {\r\n",
-            "#include \"texture_provider.h\"\r\n\r\n",
+            "#include \"resource_provider.h\"\r\n\r\n",
             "textures_list.h"
         ),
         ".grd": (
             list_grd,
             "    const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {\r\n",
-            "#include \"ground_provider.h\"\r\n\r\n",
+            "#include \"resource_provider.h\"\r\n\r\n",
             "grounds_list.h"
         )
     }

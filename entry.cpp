@@ -10,16 +10,12 @@ Two Contexts:
 
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
-#include "providers/texture_provider.h"
-#include "providers/mesh_provider.h"
-#include "providers/ground_provider.h"
+#include "providers/resource_provider.h"
 #include "voxel/scene.h"
 
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
-resource::TextureProviderPtr textureProvider;
-resource::MeshProviderPtr meshProvider;
-resource::GroundProviderPtr groundProvider;
+resource::ResourceProviderPtr resourceProvider;
 voxel::SceneInterfacePtr scene;
 
 voxel::SceneInterface::BoundingBoxPtr bbox1;
@@ -36,9 +32,7 @@ math::vector3f orbit = { 45, 45, 45 };
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
-    textureProvider = resource::TextureProvider::instance(platform, rendering);
-    meshProvider = resource::MeshProvider::instance(platform, rendering);
-    groundProvider = resource::GroundProvider::instance(platform, rendering);
+    resourceProvider = resource::ResourceProvider::instance(platform, rendering);
     scene = voxel::SceneInterface::instance(platform, rendering);
     
     platform->addPointerEventHandler(
@@ -75,23 +69,23 @@ extern "C" void initialize() {
         }
     );
     
-    meshProvider->getOrLoadVoxelStatic("statics/ruins", [](const foundation::RenderDataPtr &mesh) {
+    resourceProvider->getOrLoadVoxelStatic("statics/ruins", [](const foundation::RenderDataPtr &mesh) {
         if (mesh) {
             thing = scene->addStaticMesh(mesh);
         }
     });
-    meshProvider->getOrLoadVoxelObject("objects/stool", [](const std::vector<foundation::RenderDataPtr> &frames) {
+    resourceProvider->getOrLoadVoxelObject("objects/stool", [](const std::vector<foundation::RenderDataPtr> &frames) {
         if (frames.size()) {
             actor = scene->addDynamicMesh(frames);
             actor->setTransform(math::transform3f({0, 1, 0}, M_PI / 4).translated({20, 0, 40}));
         }
     });
-    groundProvider->getOrLoadGround("grounds/white", [](const foundation::RenderDataPtr &data, const foundation::RenderTexturePtr &texture) {
+    resourceProvider->getOrLoadGround("grounds/white", [](const foundation::RenderDataPtr &data, const foundation::RenderTexturePtr &texture) {
         if (data && texture) {
             ground = scene->addTexturedMesh(data, texture);
         }
     });
-    textureProvider->getOrLoadTexture("textures/particles/test", [](const foundation::RenderTexturePtr &texture){
+    resourceProvider->getOrLoadTexture("textures/particles/test", [](const foundation::RenderTexturePtr &texture){
         if (texture) {
             std::uint32_t ptcparamssrc[] = {
                 0x00000000,
@@ -129,9 +123,7 @@ extern "C" void initialize() {
         
         rendering->presentFrame();
         
-        textureProvider->update(dtSec);
-        meshProvider->update(dtSec);
-        groundProvider->update(dtSec);
+        resourceProvider->update(dtSec);
     });
 }
 
