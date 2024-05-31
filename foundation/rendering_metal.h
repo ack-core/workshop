@@ -124,8 +124,9 @@ namespace foundation {
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
         
-        float getBackBufferWidth() const override;
-        float getBackBufferHeight() const override;
+        auto getBackBufferWidth() const -> float override;
+        auto getBackBufferHeight() const -> float override;
+        auto getStdVPMatrix() const -> math::transform3f override;
         
         void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;

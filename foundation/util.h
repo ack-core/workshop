@@ -110,6 +110,7 @@ namespace util {
             const std::int64_t v = atoi(_current, len);
             if (len) {
                 value = T(v);
+                _current += len;
             }
             else {
                 _error = true;
@@ -122,6 +123,7 @@ namespace util {
             const double v = atof(_current, len);
             if (len) {
                 value = T(v);
+                _current += len;
             }
             else {
                 _error = true;

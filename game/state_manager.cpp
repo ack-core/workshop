@@ -1,18 +1,20 @@
 
 #include "state_manager.h"
-
 #include "game.h"
 
 #include <unordered_map>
 #include <vector>
 
 namespace game {
-    class StateManagerImpl : public StateManager {
+    class StateManagerImpl : public StateManager, public std::enable_shared_from_this<StateManagerImpl> {
     public:
         StateManagerImpl(
             const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
+            const resource::ResourceProviderPtr &resourceProvider,
             const voxel::SceneInterfacePtr &scene,
-            const voxel::YardInterfacePtr &yard,
+            const voxel::SimulationInterfacePtr &simulation,
+            const voxel::RaycastInterfacePtr &raycast,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
         );
@@ -23,39 +25,48 @@ namespace game {
         
     private:
         const foundation::PlatformInterfacePtr _platform;
+        const foundation::RenderingInterfacePtr _rendering;
+        const resource::ResourceProviderPtr _resourceProvider;
         const voxel::SceneInterfacePtr _scene;
-        const voxel::YardInterfacePtr _yard;
+        const voxel::SimulationInterfacePtr _simulation;
+        const voxel::RaycastInterfacePtr _raycast;
         const ui::StageInterfacePtr _ui;
         const dh::DataHubPtr _dh;
         
-        std::string _currentStateName = "default";
+        std::string _currentStateName;
         std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> _currentContextList;
     };
     
     std::shared_ptr<StateManager> StateManager::instance(
         const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const resource::ResourceProviderPtr &resourceProvider,
         const voxel::SceneInterfacePtr &scene,
-        const voxel::YardInterfacePtr &yard,
+        const voxel::SimulationInterfacePtr &simulation,
+        const voxel::RaycastInterfacePtr &raycast,
         const ui::StageInterfacePtr &ui,
         const dh::DataHubPtr &dh
     ) {
-        return std::make_shared<StateManagerImpl>(platform, scene, yard, ui, dh);
+        return std::make_shared<StateManagerImpl>(platform, resourceProvider, scene, simulation, raycast, ui, dh);
     }
     
     StateManagerImpl::StateManagerImpl(
         const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const resource::ResourceProviderPtr &resourceProvider,
         const voxel::SceneInterfacePtr &scene,
-        const voxel::YardInterfacePtr &yard,
+        const voxel::SimulationInterfacePtr &simulation,
+        const voxel::RaycastInterfacePtr &raycast,
         const ui::StageInterfacePtr &ui,
         const dh::DataHubPtr &dh
     )
     : _platform(platform)
+    , _resourceProvider(resourceProvider)
     , _scene(scene)
-    , _yard(yard)
+    , _simulation(simulation)
     , _ui(ui)
     , _dh(dh)
     {
-        switchToState("default");
     }
     
     StateManagerImpl::~StateManagerImpl() {
@@ -63,25 +74,36 @@ namespace game {
     }
     
     void StateManagerImpl::switchToState(const char *name) {
-        auto index = states.find(name);
-        if (index != states.end()) {
-            std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> _newContextList;
-            
-            for (auto& makeContextFunction : index->second) {
-                auto index = _currentContextList.find(makeContextFunction);
-                if (index == _currentContextList.end()) {
-                    _newContextList.emplace(makeContextFunction, makeContextFunction(API{_platform, _scene, _yard, _ui, _dh}));
+        for (auto index = std::begin(states); index != std::end(states); ++index) {
+            if (::strcmp(name, index->name) == 0) {
+                std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> newContextList;
+
+                for (auto& makeContextFunction : index->makers) {
+                    auto index = _currentContextList.find(makeContextFunction);
+                    if (index == _currentContextList.end()) {
+                        newContextList.emplace(makeContextFunction, makeContextFunction(API{
+                            _platform,
+                            _rendering,
+                            _resourceProvider,
+                            _scene,
+                            _simulation,
+                            _raycast,
+                            _ui,
+                            _dh,
+                            shared_from_this()
+                        }));
+                    }
+                    else {
+                        newContextList.emplace(index->first, std::move(index->second));
+                    }
                 }
-                else {
-                    _newContextList.emplace(index->first, std::move(index->second));
-                }
+
+                std::swap(_currentContextList, newContextList);
+                return;
             }
-            
-            std::swap(_currentContextList, _newContextList);
         }
-        else {
-            _platform->logError("[StateManager] '%s' state not found");
-        }
+        
+        _platform->logError("[StateManager] '%s' state not found");
     }
     
     void StateManagerImpl::update(float dtSec) {

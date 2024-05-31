@@ -209,6 +209,10 @@ namespace foundation {
         virtual auto getBackBufferWidth() const -> float = 0;
         virtual auto getBackBufferHeight() const -> float = 0;
         
+        // Get svp transform passed to updateFrameConstants
+        //
+        virtual auto getStdVPMatrix() const -> math::transform3f = 0;
+        
         // Set target configuration
         // @t           - render target where to perform rendering. Can be nullptr
         // @d           - Optionally override depth buffer from @target or nullptr. If not null depth buffer won't be cleared

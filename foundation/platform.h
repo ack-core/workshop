@@ -19,6 +19,10 @@ namespace foundation {
         bool isDirectory = false;
     };
     
+    struct PlatformEditorEventArgs {
+        std::string event;
+        double params[4];
+    };
     struct PlatformKeyboardEventArgs {
         enum class Key : std::uint32_t {
             A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
@@ -38,7 +42,6 @@ namespace foundation {
         EventType type = EventType::UNKNOWN;
         Key key = Key(0xFF);
     };
-    
     struct PlatformPointerEventArgs {
         enum class EventType : std::uint32_t {
             UNKNOWN = 0,
@@ -118,6 +121,12 @@ namespace foundation {
         // @completion called from the main thread
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
+
+        // Let user to peek file to memory. Usable in editors
+        // @return   - data != nullptr and size != 0 if file opened successfully.
+        // @completion called from the main thread
+        //
+        virtual void peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
         
         // Returns native screen size in pixels
         //
@@ -137,7 +146,12 @@ namespace foundation {
         // Show/hide keyboard if supported
         virtual void showKeyboard() = 0;
         virtual void hideKeyboard() = 0;
-        
+
+        // Set handlers for editors
+        // @return nullptr if not supported
+        //
+        virtual EventHandlerToken addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) = 0;
+
         // Set handlers for keyboard
         // @return nullptr if not supported
         //

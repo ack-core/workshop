@@ -3,10 +3,10 @@
 #include "context.h"
 
 namespace game {
-    class DebugContext : public Context {
+    class ParticleEditorContext : public Context {
     public:
-        DebugContext(API &&api);
-        ~DebugContext() override;
+        ParticleEditorContext(API &&api);
+        ~ParticleEditorContext() override;
         
         void update(float dtSec) override;
         
@@ -19,10 +19,5 @@ namespace game {
         math::vector3f _orbit = { 45, 45, 45 };
         
         voxel::SceneInterface::LineSetPtr _axis;
-        voxel::SceneInterface::BoundingBoxPtr _bbox;
-        voxel::SceneInterface::StaticMeshPtr _thing;
-        voxel::SceneInterface::TexturedMeshPtr _ground;
-        voxel::SceneInterface::DynamicMeshPtr _actor;
-        voxel::SceneInterface::ParticlesPtr _ptc;
     };
 }

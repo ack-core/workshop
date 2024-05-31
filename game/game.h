@@ -1,10 +1,10 @@
 
 #pragma once
-#include <unordered_map>
+#include <initializer_list>
 
 #include "contexts/context.h"
 #include "contexts/debug_context.h"
-#include "contexts/yard_editor_context.h"
+#include "contexts/particle_editor_context.h"
 
 namespace game {
     // Main datahub description
@@ -24,21 +24,28 @@ namespace game {
         
         graphics {
             drawBoundBoxes : bool = true
-            drawActorCircles : bool = true
-            drawCollisionLines : bool = true
+            drawSimulation : bool = true
         }
     )";
     
     // Rule of states:
     // Context is created if the next state contains it and current state does not
     // Context is deleted if the next state does not contain it
-    static const std::unordered_map<const char *, std::vector<MakeContextFunc>> states = {
-        {"default",
-            {
-                &makeContext<DebugContext>
-            }
-        },
+    static const struct {
+        const char *name;
+        const std::initializer_list<MakeContextFunc> makers;
+    }
+    states[] = {
+#ifdef IS_CLIENT
+        {"default", {
+            &makeContext<DebugContext>
+        }}
+#endif
+#ifdef IS_PE
+        {"default", {
+            &makeContext<ParticleEditorContext>
+        }}
+#endif
     };
 }
 
-// TODO: multi-level state machine

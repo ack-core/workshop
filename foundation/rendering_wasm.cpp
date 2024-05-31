@@ -539,7 +539,7 @@ namespace foundation {
                 continue;
             }
             
-            _platform->logError("[MetalRendering::createShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
+            _platform->logError("[WASMRendering::createShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
         }
                 
         if (completed && vssrcBlockDone && fssrcBlockDone) {
@@ -547,10 +547,10 @@ namespace foundation {
             result = std::make_shared<WASMShader>(webglShader, layout, constBlockLength);
         }
         else if(vssrcBlockDone == false) {
-            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
+            _platform->logError("[WASMRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
         }
         else if(fssrcBlockDone == false) {
-            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'fssrc' block\n", name);
+            _platform->logError("[WASMRendering::createShader] shader '%s' missing 'fssrc' block\n", name);
         }
 
         return result;
@@ -599,7 +599,7 @@ namespace foundation {
         RenderDataPtr result = nullptr;
         
         if (indexes && layout.repeat > 1) {
-            _platform->logError("[MetalRendering::createData] Vertex repeat is incompatible with indexed data");
+            _platform->logError("[WASMRendering::createData] Vertex repeat is incompatible with indexed data");
             return nullptr;
         }
         if (vcnt && layout.attributes.empty() == false) {
@@ -627,6 +627,10 @@ namespace foundation {
     
     float WASMRendering::getBackBufferHeight() const {
         return _platform->getScreenHeight();
+    }
+    
+    math::transform3f WASMRendering::getStdVPMatrix() const {
+        return _frameConstants->stdVPMatrix;
     }
     
     void WASMRendering::forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) {

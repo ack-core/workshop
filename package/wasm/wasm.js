@@ -48,7 +48,7 @@ class EventType {
 }
 
 var instance = null;
-var memory = new WebAssembly.Memory({ initial: 4, maximum: 1024, shared: true });
+var memory = new WebAssembly.Memory({ initial: 16, maximum: 1024, shared: true });
 var worker = new Worker("worker.js");
 var canvas = document.getElementById("render_target");
 var targetWidth = window.devicePixelRatio * canvas.scrollWidth;

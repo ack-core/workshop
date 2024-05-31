@@ -8,9 +8,9 @@ namespace voxel {
         ~SimulationImpl() override;
         
     public:
-        auto addHoop(const math::vector3f &position, float radius) -> HoopPtr override;
-        auto addWall() -> WallPtr override;
-        void updateAndDraw(float dtSec) override;
+        auto addActor(const math::vector3f &position, float radius) -> ActorPtr override;
+        auto addFence() -> FencePtr override;
+        void update(float dtSec) override;
 
     public:
 
@@ -25,13 +25,13 @@ namespace voxel {
     
     }
         
-    SimulationInterface::HoopPtr SimulationImpl::addHoop(const math::vector3f &position, float radius) {
+    SimulationInterface::ActorPtr SimulationImpl::addActor(const math::vector3f &position, float radius) {
         return nullptr;
     }
-    SimulationInterface::WallPtr SimulationImpl::addWall() {
+    SimulationInterface::FencePtr SimulationImpl::addFence() {
         return nullptr;        
     }
-    void SimulationImpl::updateAndDraw(float dtSec) {
+    void SimulationImpl::update(float dtSec) {
         
     }
 }

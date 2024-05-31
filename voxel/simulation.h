@@ -3,8 +3,6 @@
 #include "foundation/util.h"
 #include "foundation/math.h"
 
-#include <cstddef>
-#include <cstdint>
 #include <memory>
 
 namespace voxel {
@@ -14,30 +12,29 @@ namespace voxel {
         
     public:
         enum class EntityType {
-            HOOP,
-            WALL
+            ACTOR,
+            FENCE
         };
-        
-        struct Hoop {
+        struct Actor {
             virtual void setImpulse(const math::vector3f &impulse) = 0;
             virtual void setImpactHandler(util::callback<void(const math::vector3f &point, const math::vector3f &impulse, EntityType type)> &&handler) = 0;
             virtual auto getPosition() const -> const math::vector3f & = 0;
-            virtual ~Hoop() = default;
+            virtual ~Actor() = default;
         };
-        struct Wall {
+        struct Fence {
             virtual void addSegment(const math::vector3f &pStart, const math::vector3f &pEnd) = 0;
             virtual void removeAllSegments() = 0;
-            virtual ~Wall() = default;
+            virtual ~Fence() = default;
         };
         
-        using HoopPtr = std::shared_ptr<Hoop>;
-        using WallPtr = std::shared_ptr<Wall>;
+        using ActorPtr = std::shared_ptr<Actor>;
+        using FencePtr = std::shared_ptr<Fence>;
         
     public:
-        virtual auto addHoop(const math::vector3f &position, float radius) -> HoopPtr = 0;
-        virtual auto addWall() -> WallPtr = 0;
+        virtual auto addActor(const math::vector3f &position, float radius) -> ActorPtr = 0;
+        virtual auto addFence() -> FencePtr = 0;
         
-        virtual void updateAndDraw(float dtSec) = 0;
+        virtual void update(float dtSec) = 0;
         
     public:
         virtual ~SimulationInterface() = default;

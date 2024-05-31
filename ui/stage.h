@@ -5,9 +5,9 @@
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
 #include "foundation/math.h"
+#include "foundation/util.h"
 
-#include "providers/texture_provider.h"
-#include "providers/fontatlas_provider.h"
+#include "providers/resource_provider.h"
 
 #include <memory>
 #include <functional>
@@ -38,8 +38,7 @@ namespace ui {
         static std::shared_ptr<StageInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const resource::TextureProviderPtr &textureProvider,
-            const resource::FontAtlasProviderPtr &fontAtlasProvider
+            const resource::ResourceProviderPtr &resourceProvider
         );
         
     public:
@@ -57,13 +56,7 @@ namespace ui {
             virtual void setWorldPosition(const math::vector3f &position) = 0;
         };
         struct Image : public virtual Interactor {
-            virtual void setColor(const math::color &rgba) = 0;
             virtual ~Image() = default;
-        };
-        struct Text : public virtual Element {
-            virtual void setText(const char *text) = 0;
-            virtual void setColor(const math::color &rgba) = 0;
-            virtual ~Text() = default;
         };
         
     public:
@@ -84,45 +77,10 @@ namespace ui {
             const float activeAreaRadius = 0.0f;
             const bool capturePointer = false;
         };
-        struct TextParams {
-            const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
-            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const math::vector2f shadowOffset = math::vector2f(1.0f, 1.0f);
-            const math::color rgba = math::color(1.0f, 1.0f, 1.0f, 1.0f);
-            const std::uint8_t fontSize = 10;
-            const bool shadowEnabled = false;
-        };
-        struct JoystickParams {
-            const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
-            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const char *textureBackground = "";
-            const char *textureThumb = "";
-            const float maxThumbOffset = 50.0f;
-            util::callback<void(const math::vector2f &direction)> handler;
-        };
-        struct StepperParams {
-            const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
-            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
-            const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const char *textureLeftBase = "";
-            const char *textureLeftAction = "";
-            const char *textureRightBase = "";
-            const char *textureRightAction = "";
-            util::callback<void(float value)> handler;
-        };
         
     public:
-        virtual auto addPivot(const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
-        virtual auto addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> = 0;
-        virtual auto addText(const std::shared_ptr<Element> &parent, TextParams &&params) -> std::shared_ptr<Text> = 0;
-        
-        virtual auto addJoystick(const std::shared_ptr<Element> &parent, JoystickParams &&params) -> std::shared_ptr<StageInterface::Element> = 0;
-        virtual auto addStepper(const std::shared_ptr<Element> &parent, StepperParams &&params) -> std::shared_ptr<StageInterface::Element> = 0;
+        virtual auto addPivot(const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
+        virtual auto addImage(const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
         
         virtual void clear() = 0;
         virtual void updateAndDraw(float dtSec) = 0;
@@ -135,6 +93,5 @@ namespace ui {
     using ElementPtr = std::shared_ptr<StageInterface::Element>;
     using PivotPtr = std::shared_ptr<StageInterface::Pivot>;
     using ImagePtr = std::shared_ptr<StageInterface::Image>;
-    using TextPtr = std::shared_ptr<StageInterface::Text>;
 }
 

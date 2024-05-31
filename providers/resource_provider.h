@@ -22,7 +22,6 @@ namespace resource {
         std::uint32_t sizeZ;
     };
     
-    
     class ResourceProvider {
     public:
         static std::shared_ptr<ResourceProvider> instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);

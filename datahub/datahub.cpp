@@ -1,5 +1,6 @@
 
 #include "datahub.h"
+#include "foundation/util.h"
 
 #include <memory>
 #include <variant>
@@ -7,47 +8,8 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
-#include <sstream>
 
-// TODO: tests, expect lib
-
-namespace {
-    template <typename = void> std::istream &expect(std::istream &stream) {
-        return stream;
-    }
-    template <char Ch, char... Chs> std::istream &expect(std::istream &stream) {
-        if ((stream >> std::ws).peek() == Ch) {
-            stream.ignore();
-        }
-        else {
-            stream.setstate(std::ios_base::failbit);
-        }
-        return expect<Chs...>(stream);
-    }
-    
-    bool readUntilMatchingBrace(std::istringstream &stream, char start, char end, std::string &output) {
-        output.clear();
-        stream >> std::ws;
-        int  braceCounter = 1;
-        char next;
-
-        while (((next = stream.get()) != end || --braceCounter > 0) && stream) {
-            if (next == start) braceCounter++;
-            output += next;
-            if (next == '\n')  stream >> std::ws;
-        }
-        
-        return braceCounter == 0;
-    };
-
-    void readUntilChar(std::istringstream &stream, char ch, std::string &output) {
-        char next;
-        while ((next = stream.get()) && stream) {
-            output += next;
-            if (next == ch) break;
-        }
-    };
-}
+// TODO: tests
 
 namespace {
     using ElementIndex = std::uint8_t;
@@ -57,13 +19,17 @@ namespace {
     static const std::size_t MAX_ELEMENTS_PER_SCOPE = 254;
     static const std::size_t MAX_SCOPE_TEMPLATES = 254;
     
+    std::uint8_t g_stringBuffer[MAX_STRING_LENGTH + sizeof(std::uint16_t)];
+    dh::EventToken g_nextEventToken = 0x10;
+    dh::ScopeId g_nextScopeId = 0x800000;
+    
+    template<typename T> T g_dummy;
+    
     dh::EventToken getNextEventToken() {
-        static dh::EventToken g_nextEventToken = 0x10;
         return g_nextEventToken++;
     }
 
     dh::ScopeId getNextScopeId() {
-        static dh::ScopeId g_nextScopeId = 0x800000;
         return g_nextScopeId = (g_nextScopeId + 1) & 0xffffff;
     }
 
@@ -383,15 +349,9 @@ namespace dh {
         for (ElementIndex i = 0; i <_elements.size(); i++) {
             if (_elements[i].first == name) {
                 if (std::holds_alternative<Value<std::string>>(_elements[i].second.data)) {
-                    if (value.length() <= MAX_STRING_LENGTH) {
-                        std::uint8_t buffer[MAX_STRING_LENGTH + sizeof(std::uint16_t)];
-                        *(std::uint16_t *)(buffer) = value.length();
-                        memcpy(buffer + sizeof(std::uint16_t), value.data(), value.length());
-                        _queue.enqueue(MsgHeader{MSG_TYPE_VALUE_CHANGED, getCurrentTimeStamp(), Location{i, _id}}, buffer, sizeof(std::uint16_t) + value.length());
-                    }
-                    else {
-                        _logger.logError("[ScopeImpl::setValue] String is too large to asign to '%s'\n", name);
-                    }
+                    *(std::uint16_t *)(g_stringBuffer) = value.length();
+                    memcpy(g_stringBuffer + sizeof(std::uint16_t), value.data(), std::min(value.length(), MAX_STRING_LENGTH));
+                    _queue.enqueue(MsgHeader{MSG_TYPE_VALUE_CHANGED, getCurrentTimeStamp(), Location{i, _id}}, g_stringBuffer, sizeof(std::uint16_t) + value.length());
                 }
                 else {
                     _logger.logError("[ScopeImpl::setValue] '%s' is not a value\n", name);
@@ -405,7 +365,6 @@ namespace dh {
     }
 
     template<typename T> const T &ScopeImpl::_getValue(const char *name) const {
-        static T dummy = {};
         for (auto &element : _elements) {
             if (element.first == name) {
                 if (const Value<T> *ptr = std::get_if<Value<T>>(&element.second.data)) {
@@ -413,17 +372,16 @@ namespace dh {
                 }
                 else {
                     _logger.logError("[ScopeImpl::getValue] '%s' is not a value\n", name);
-                    return dummy;
+                    return g_dummy<T>;
                 }
             }
         }
         
         _logger.logError("[ScopeImpl::getValue] Value '%s' not found\n", name);
-        return dummy;
+        return g_dummy<T>;
     }
 
 }
-
 
 namespace dh {
     class DataHubImpl : public DataHub, public std::enable_shared_from_this<DataHubImpl> {
@@ -458,121 +416,60 @@ namespace dh {
     DataHubImpl::~DataHubImpl() {}
     
     void DataHubImpl::initialize(const char *src) {
-        std::istringstream input(src);
+        util::strstream input(src, std::strlen(src));
         
         struct fn {
             static bool parseScope(foundation::LoggerInterface &logger, const std::string &name, const std::string &src, TemplateArray &templates) {
-                std::istringstream input(src);
+                util::strstream input(src.data(), src.length());
                 std::string elementName;
                 ScopeTemplate result;
                 
                 while (input >> elementName) {
                     std::string type;
                     std::string valueString;
+                    math::scalar valueFloat[3] = {};
+                    int valueInt = 0;
                     
                     if (result.size() < MAX_ELEMENTS_PER_SCOPE) {
-                        if (input >> expect<':'> >> type) {
-                            if (type != "array") {
-                                if (input >> expect<'='> >> valueString) {
-                                    if (type == "bool") {
-                                        if (valueString == "true" || valueString == "false") {
-                                            result.emplace_back(std::make_pair(elementName, Element(valueString == "true")));
-                                            continue;
-                                        }
-
-                                        logger.logError("[DataHubImpl::initialize] Bad value for '%s' in '%s'\n", elementName.data(), name.data());
-                                    }
-                                    else if (type == "integer") {
-                                        int value = 0;
-                                        if (sscanf(valueString.data(), "%d", &value) == 1) {
-                                            result.emplace_back(std::make_pair(elementName, Element(value)));
-                                            continue;
-                                        }
-
-                                        logger.logError("[DataHubImpl::initialize] Bad value for '%s' in '%s'\n", elementName.data(), name.data());
-                                    }
-                                    else if (type == "number") {
-                                        double value = 0;
-                                        if (sscanf(valueString.data(), "%lf", &value) == 1) {
-                                            result.emplace_back(std::make_pair(elementName, Element(value)));
-                                            continue;
-                                        }
-
-                                        logger.logError("[DataHubImpl::initialize] Bad value for '%s' in '%s'\n", elementName.data(), name.data());
-                                    }
-                                    else if (type == "string") {
-                                        if (valueString[valueString.size() - 1] != '"') {
-                                            readUntilChar(input, '"', valueString);
-                                        }
-                                        if (valueString[0] == '"' && valueString[valueString.size() - 1] == '"') {
-                                            if (valueString.length() <= MAX_STRING_LENGTH) {
-                                                valueString.pop_back();
-                                                result.emplace_back(std::make_pair(elementName, Element(valueString.data() + 1)));
-                                                continue;
-                                            }
-                                        }
-
-                                        logger.logError("[DataHubImpl::initialize] Bad value for '%s' in '%s'\n", elementName.data(), name.data());
-                                    }
-                                    else if (type == "vector2f") {
-                                        std::string str1;
-                                        math::vector2f value;
-
-                                        if (input >> str1) {
-                                            if (sscanf((valueString + " " + str1).data(), "%f %f", &value.x, &value.y) == 2) {
-                                                result.emplace_back(std::make_pair(elementName, Element(value)));
-                                                continue;
-                                            }
-                                        }
-
-                                        logger.logError("[DataHubImpl::initialize] Bad value for '%s' in '%s'\n", elementName.data(), name.data());
-                                    }
-                                    else if (type == "vector3f") {
-                                        std::string str1, str2;
-                                        math::vector3f value;
-
-                                        if (input >> str1 >> str2) {
-                                            if (sscanf((valueString + " " + str1 + " " + str2).data(), "%f %f %f", &value.x, &value.y, &value.z) == 3) {
-                                                result.emplace_back(std::make_pair(elementName, Element(value)));
-                                                continue;
-                                            }
-                                        }
-
-                                        logger.logError("[DataHubImpl::initialize] Bad value for '%s' in '%s'\n", elementName.data(), name.data());
-                                    }
-                                    else {
-                                        logger.logError("[DataHubImpl::initialize] Unknown type '%s' in '%s'\n", type.data(), name.data());
-                                    }
-                                }
-                                else {
-                                    logger.logError("[DataHubImpl::initialize] Expected '= <value>' after '%s' in '%s'\n", elementName.data(), name.data());
+                        if (input >> util::sequence(":") >> type) {
+                            if (type == "array" && input >> util::braced(valueString, '{', '}')) {
+                                if (parseScope(logger, name + "." + elementName, valueString, templates)) {
+                                    TemplateIndex scopeTemplateIndex = static_cast<TemplateIndex>(templates.size() - 1);
+                                    result.emplace_back(std::make_pair(elementName, Element(Array(scopeTemplateIndex))));
                                 }
                             }
-                            else if (input >> expect<'{'>) {
-                                if (readUntilMatchingBrace(input, '{', '}', valueString)) {
-                                    if (parseScope(logger, name + "." + elementName, valueString, templates)) {
-                                        TemplateIndex scopeTemplateIndex = static_cast<TemplateIndex>(templates.size() - 1);
-                                        result.emplace_back(std::make_pair(elementName, Element(Array(scopeTemplateIndex))));
-                                        continue;
-                                    }
-                                }
-                                else {
-                                    logger.logError("[DataHubImpl::initialize] Braces aren't match for '%s' in '%s'\n", elementName.data(), name.data());
-                                }
+                            else if (type == "string" && input >> util::sequence("=") >> util::braced(valueString, '"', '"')) {
+                                result.emplace_back(std::make_pair(elementName, Element(valueString.data())));
+                            }
+                            else if (type == "integer" && input >> util::sequence("=") >> valueInt) {
+                                result.emplace_back(std::make_pair(elementName, Element(valueInt)));
+                            }
+                            else if (type == "number" && input >> util::sequence("=") >> valueFloat[0]) {
+                                result.emplace_back(std::make_pair(elementName, Element(valueFloat[0])));
+                            }
+                            else if (type == "vector2f" && input >> util::sequence("=") >> valueFloat[0] >> valueFloat[1]) {
+                                result.emplace_back(std::make_pair(elementName, Element(math::vector2f(valueFloat[0], valueFloat[1]))));
+                            }
+                            else if (type == "vector3f" && input >> util::sequence("=") >> valueFloat[0] >> valueFloat[1] >> valueFloat[2]) {
+                                result.emplace_back(std::make_pair(elementName, Element(math::vector3f(valueFloat[0], valueFloat[1], valueFloat[2]))));
+                            }
+                            else if (type == "bool" && input >> util::sequence("=") >> valueString) {
+                                result.emplace_back(std::make_pair(elementName, Element(valueString == "true")));
                             }
                             else {
-                                logger.logError("[DataHubImpl::initialize] Expected '{' after array '%s' in '%s'\n", elementName.data(), name.data());
+                                logger.logError("[DataHubImpl::initialize] Invalid initialisation for '%s' in '%s'\n", elementName.data(), name.data());
+                                return false;
                             }
                         }
                         else {
-                            logger.logError("[DataHubImpl::initialize] Expected ':' after name '%s' in '%s'\n", elementName.data(), name.data());
+                            logger.logError("[DataHubImpl::initialize] Expected ':' and type after name '%s' in '%s'\n", elementName.data(), name.data());
+                            return false;
                         }
                     }
                     else {
                         logger.logError("[DataHubImpl::initialize] Too many elements in scope '%s'\n", name.data());
+                        return false;
                     }
-
-                    return false;
                 }
                 
                 if (templates.size() >= MAX_SCOPE_TEMPLATES) {
@@ -589,20 +486,14 @@ namespace dh {
         std::string scopeText;
 
         while (input >> name) {
-            if (input >> expect<'{'>) {
-                if (readUntilMatchingBrace(input, '{', '}', scopeText)) {
-                    if (fn::parseScope(*_logger, name, scopeText, _scopeTemplates) == false) {
-                        _scopeTemplates.clear();
-                        break;
-                    }
-                }
-                else {
-                    _logger->logError("[DataHubImpl::initialize] Braces aren't match for '%s'\n", name.data());
+            if (input >> util::braced(scopeText, '{', '}')) {
+                if (fn::parseScope(*_logger, name, scopeText, _scopeTemplates) == false) {
+                    _scopeTemplates.clear();
                     break;
                 }
             }
             else {
-                _logger->logError("[DataHubImpl::initialize] Expected '{' after scope name '%s'\n", name.data());
+                _logger->logError("[DataHubImpl::initialize] Braces aren't match for '%s'\n", name.data());
                 break;
             }
         }

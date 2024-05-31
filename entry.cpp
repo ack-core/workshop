@@ -1,7 +1,7 @@
 
 /*
 Two Contexts:
-    YardContext - configures yard according to datahub section
+    WorldContext - configures world according to datahub section
     UIContext - configures ui according to datahub section
     
     datahub section can be filled from text
@@ -12,115 +12,42 @@ Two Contexts:
 #include "foundation/rendering.h"
 #include "providers/resource_provider.h"
 #include "voxel/scene.h"
+#include "voxel/simulation.h"
+#include "voxel/raycast.h"
+#include "ui/stage.h"
+
+#include "game/game.h"
+#include "game/state_manager.h"
+#include "datahub/datahub.h"
 
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 resource::ResourceProviderPtr resourceProvider;
 voxel::SceneInterfacePtr scene;
-
-voxel::SceneInterface::BoundingBoxPtr bbox1;
-voxel::SceneInterface::LineSetPtr axis;
-voxel::SceneInterface::StaticMeshPtr thing;
-voxel::SceneInterface::TexturedMeshPtr ground;
-voxel::SceneInterface::DynamicMeshPtr actor;
-voxel::SceneInterface::ParticlesPtr ptc;
-
-std::size_t pointerId = foundation::INVALID_POINTER_ID;
-math::vector2f lockedCoordinates;
-math::vector3f orbit = { 45, 45, 45 };
+voxel::SimulationInterfacePtr simulation;
+voxel::RaycastInterfacePtr raycast;
+ui::StageInterfacePtr stage;
+game::StateManagerPtr stateManager;
+dh::DataHubPtr datahub;
 
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
     resourceProvider = resource::ResourceProvider::instance(platform, rendering);
     scene = voxel::SceneInterface::instance(platform, rendering);
-    
-    platform->addPointerEventHandler(
-        [](const foundation::PlatformPointerEventArgs &args) -> bool {
-            if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
-                pointerId = args.pointerID;
-                lockedCoordinates = { args.coordinateX, args.coordinateY };
-            }
-            if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
-                if (pointerId != foundation::INVALID_POINTER_ID) {
-                    float dx = args.coordinateX - lockedCoordinates.x;
-                    float dy = args.coordinateY - lockedCoordinates.y;
-                    
-                    orbit.xz = orbit.xz.rotated(dx / 200.0f);
-                    
-                    math::vector3f right = math::vector3f(0, 1, 0).cross(orbit).normalized();
-                    math::vector3f rotatedOrbit = orbit.rotated(right, dy / 200.0f);
-                    
-                    if (fabs(math::vector3f(0, 1, 0).dot(rotatedOrbit.normalized())) < 0.96f) {
-                        orbit = rotatedOrbit;
-                    }
-                    
-                    lockedCoordinates = { args.coordinateX, args.coordinateY };
-                }
-            }
-            if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
-                pointerId = foundation::INVALID_POINTER_ID;
-            }
-            if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
-                pointerId = foundation::INVALID_POINTER_ID;
-            }
-            
-            return true;
-        }
-    );
-    
-    resourceProvider->getOrLoadVoxelStatic("statics/ruins", [](const foundation::RenderDataPtr &mesh) {
-        if (mesh) {
-            thing = scene->addStaticMesh(mesh);
-        }
-    });
-    resourceProvider->getOrLoadVoxelObject("objects/stool", [](const std::vector<foundation::RenderDataPtr> &frames) {
-        if (frames.size()) {
-            actor = scene->addDynamicMesh(frames);
-            actor->setTransform(math::transform3f({0, 1, 0}, M_PI / 4).translated({20, 0, 40}));
-        }
-    });
-    resourceProvider->getOrLoadGround("grounds/white", [](const foundation::RenderDataPtr &data, const foundation::RenderTexturePtr &texture) {
-        if (data && texture) {
-            ground = scene->addTexturedMesh(data, texture);
-        }
-    });
-    resourceProvider->getOrLoadTexture("textures/particles/test", [](const foundation::RenderTexturePtr &texture){
-        if (texture) {
-            std::uint32_t ptcparamssrc[] = {
-                0x00000000,
-                0x00000000,
-                
-                0x000000ff,
-                0x00000000,
-            };
-            foundation::RenderTexturePtr ptcparams = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 4, { ptcparamssrc });
-            ptc = scene->addParticles(texture, ptcparams, voxel::SceneInterface::EmitterParams {
-                .additiveBlend = false,
-                .orientation = voxel::SceneInterface::EmitterParams::Orientation::WORLD,
-                .particleCount = 2,
-                .minXYZ = {-5.0, 0, 0},
-                .maxXYZ = {5.0, 0, 0},
-                .minMaxWidth = {10.0f, 10.0f},
-                .minMaxHeight = {10.0f, 10.0f},
-            });
-            ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
-        }
-    });
-    
-    math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
-    bbox1 = scene->addBoundingBox(bb1);
-    bbox1->setColor({0.5f, 0.5f, 0.5f, 0.5f});
-    
-    axis = scene->addLineSet(3);
-    axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.5});
-    axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
-    axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.5});
-    
-    platform->setLoop([](float dtSec) {
-        scene->setCameraLookAt(orbit + math::vector3f{32, 0, 32}, {32, 0, 32});
-        scene->updateAndDraw(dtSec);
+    simulation = voxel::SimulationInterface::instance();
+    raycast = voxel::RaycastInterface::instance();
+    stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
+    datahub = dh::DataHub::instance(platform, game::datahub);
+    stateManager = game::StateManager::instance(platform, resourceProvider, scene, simulation, raycast, stage, datahub);
+    stateManager->switchToState("default");
         
+    platform->setLoop([](float dtSec) {
+        datahub->update(dtSec);
+        stateManager->update(dtSec);
+        simulation->update(dtSec);
+        scene->updateAndDraw(dtSec);
+        stage->updateAndDraw(dtSec);
         rendering->presentFrame();
         
         resourceProvider->update(dtSec);

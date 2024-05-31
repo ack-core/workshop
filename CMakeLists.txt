@@ -43,9 +43,9 @@ add_subdirectory("${m_source_root}/thirdparty/stb_mini_ttf")
 add_subdirectory("${m_source_root}/foundation")
 add_subdirectory("${m_source_root}/providers")
 add_subdirectory("${m_source_root}/voxel")
-#add_subdirectory("${m_source_root}/ui")
-#add_subdirectory("${m_source_root}/datahub")
-#add_subdirectory("${m_source_root}/game")
+add_subdirectory("${m_source_root}/ui")
+add_subdirectory("${m_source_root}/datahub")
+add_subdirectory("${m_source_root}/game")
 
 set(
 	m_sources_list
@@ -60,9 +60,9 @@ target_link_libraries(workshop PUBLIC stb_mini_ttf)
 target_link_libraries(workshop PUBLIC foundation)
 target_link_libraries(workshop PUBLIC providers)
 target_link_libraries(workshop PUBLIC voxel)
-#target_link_libraries(workshop PUBLIC ui)
-#target_link_libraries(workshop PUBLIC datahub)
-#target_link_libraries(workshop PUBLIC game)
+target_link_libraries(workshop PUBLIC ui)
+target_link_libraries(workshop PUBLIC datahub)
+target_link_libraries(workshop PUBLIC game)
 
 set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary")
 
@@ -109,10 +109,10 @@ execute_process(
 
 # specific
 
-if (${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
+if (PLATFORM STREQUAL "PLATFORM_WINDOWS")
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT workshop)
 
-elseif (${PLATFORM} STREQUAL "PLATFORM_IOS")
+elseif (PLATFORM STREQUAL "PLATFORM_IOS")
 	set_source_files_properties(${m_source_root}/entry.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
 
 	target_link_libraries(workshop PUBLIC "-framework Metal")
@@ -134,10 +134,10 @@ elseif (${PLATFORM} STREQUAL "PLATFORM_IOS")
 	set_property(TARGET workshop PROPERTY XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.ack-games.workshop")
 	set_property(TARGET workshop PROPERTY MACOSX_BUNDLE_INFO_PLIST "${m_binary_root}/info.plist")
 
-elseif (${PLATFORM} STREQUAL "PLATFORM_WASM")
-	if (${APPTYPE} STREQUAL "IS_CLIENT")
+elseif (PLATFORM STREQUAL "PLATFORM_WASM")
+	if (APPTYPE STREQUAL "IS_CLIENT")
 		set_target_properties(workshop PROPERTIES OUTPUT_NAME "index")
-	elseif (${APPTYPE} STREQUAL "IS_PE")
+	elseif (APPTYPE STREQUAL "IS_PE")
 		set_target_properties(workshop PROPERTIES OUTPUT_NAME "pe")
 	endif()
 	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free --wrap=malloc --wrap=free)

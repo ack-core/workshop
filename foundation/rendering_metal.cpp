@@ -794,6 +794,10 @@ namespace foundation {
         return _platform->getScreenHeight();
     }
     
+    math::transform3f MetalRendering::getStdVPMatrix() const {
+        return _frameConstants.stdVPMatrix;
+    }
+    
     void MetalRendering::forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) {
         if (_view == nil) {
             _view = (__bridge MTKView *)_platform->attachNativeRenderingContext((__bridge void *)_device);

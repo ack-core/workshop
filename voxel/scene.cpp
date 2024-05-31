@@ -129,10 +129,6 @@ namespace voxel {
         void setFrame(std::uint32_t index) override {
             frameIndex = std::min(index, frameCount - 1);
         }
-        auto getFrameCount() -> std::uint32_t override {
-            return frameCount;
-        }
-        
     };
     
     //---
@@ -545,6 +541,8 @@ namespace voxel {
     : _platform(platform)
     , _rendering(rendering)
     {
+        _platform->logMsg("--->> %s - %s\n", "scene_static_lineset", g_lineSetShaderSrc);
+    
         _palette = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, {resource::PALETTE});
         _lineSetShader = rendering->createShader("scene_static_lineset", g_lineSetShaderSrc, foundation::InputLayout {});
         _boundingBoxShader = rendering->createShader("scene_static_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
