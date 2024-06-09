@@ -47,7 +47,7 @@ namespace game {
         const ui::StageInterfacePtr &ui,
         const dh::DataHubPtr &dh
     ) {
-        return std::make_shared<StateManagerImpl>(platform, resourceProvider, scene, simulation, raycast, ui, dh);
+        return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, simulation, raycast, ui, dh);
     }
     
     StateManagerImpl::StateManagerImpl(
@@ -61,6 +61,7 @@ namespace game {
         const dh::DataHubPtr &dh
     )
     : _platform(platform)
+    , _rendering(rendering)
     , _resourceProvider(resourceProvider)
     , _scene(scene)
     , _simulation(simulation)

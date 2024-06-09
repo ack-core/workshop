@@ -48,7 +48,7 @@ class EventType {
 }
 
 var instance = null;
-var memory = new WebAssembly.Memory({ initial: 16, maximum: 1024, shared: true });
+var memory = new WebAssembly.Memory({ initial: 4, maximum: 4096, shared: true });
 var worker = new Worker("worker.js");
 var canvas = document.getElementById("render_target");
 var targetWidth = window.devicePixelRatio * canvas.scrollWidth;
@@ -153,11 +153,11 @@ const imports = {
                 }
                 throw response.status + " " + response.statusText;
             }).then(buffer => {
-                print("[WASM] " + path + " loaded successfully");
-                const data = instance.exports.__wrap_malloc(buffer.byteLength);
+                const data = instance.exports.malloc(buffer.byteLength);
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
                 instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
+                print("[WASM] " + path + " loaded successfully");
             })
             .catch(error => {
                 print("[WASM] " + path + " loading failed with " + error);
@@ -168,6 +168,9 @@ const imports = {
         },
         abort: function() {
             throw "aborted";
+        },
+        js_dbg: function(s, value) {
+            console.log("M--->>> ", s, " | ", value);
         },
         webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
             const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
@@ -416,6 +419,7 @@ const imports = {
 if (glcontext != null) {
     WebAssembly.instantiateStreaming(fetch(WASM_BINARY), imports).then(m => {
         instance = m.instance;
+        instance.exports.__init();
 
         if (instance.exports.__wasm_call_ctors) {
             instance.exports.__wasm_call_ctors();
@@ -452,7 +456,6 @@ worker.onmessage = (msg) => {
 
         canvas.width = targetWidth;
         canvas.height = targetHeight;
-        instance.exports.resized(targetWidth, targetHeight);
         
         if (glcontext.getParameter(glcontext.MAX_COLOR_ATTACHMENTS) < 4) {
             print("[WebGL] Max fb attachment count is too low");
@@ -493,6 +496,7 @@ worker.onmessage = (msg) => {
         
         recreateDefaultFBO();
         instance.exports.initialize();
+        instance.exports.resized(targetWidth, targetHeight);
 
         function getCoord(event) {
             const rect = canvas.getBoundingClientRect();

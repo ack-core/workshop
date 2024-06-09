@@ -142,45 +142,11 @@ namespace util {
             return *this;
         }
         
-        static std::int64_t atoi(const char *s, std::size_t &len) {
-            const char *input = s;
-            std::int64_t sign = 1;
-            std::int64_t out = 0;
-            
-            if (*input == '+') input++;
-            if (*input == '-' && std::isdigit(*(input + 1))) {
-                sign = -1;
-                input++;
-            }
-            while (std::isdigit(*input)) {
-                out = out * 10 + (*input - '0');
-                input++;
-            }
-            
-            len = input - s;
-            return out * sign;
-        }
-        static double atof(const char *s, std::size_t &len) {
-            const char *input = s;
-            std::size_t length = 0;
-            std::int64_t ipart = atoi(input, length);
-            
-            double power = ipart < 0 ? -1.0 : 1.0;
-            double out = 0.0;
-            
-            if (length) {
-                input += length;
-                if (*input == '.') {
-                    while (std::isdigit(*++input)) {
-                        power *= 10.0;
-                        out += (*input - '0') / power;
-                    }
-                }
-            }
-            
-            len = input - s;
-            return out + double(ipart);
-        }
+        static std::int64_t atoi(const char *s, std::size_t &len);
+        static double atof(const char *s, std::size_t &len);
+        static std::size_t ptoa(std::uint16_t *p, const void *ptr);
+        static std::size_t ltoa(std::uint16_t* p, std::int64_t value);
+        static std::size_t ftoa(std::uint16_t *p, double f);
         
         const char *_end;
         const char *_current;

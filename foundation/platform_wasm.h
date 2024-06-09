@@ -9,6 +9,7 @@ namespace foundation {
         
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
         void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) override;
+        void peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) override;
         
         float getScreenWidth() const override;
         float getScreenHeight() const override;
@@ -21,6 +22,7 @@ namespace foundation {
         void showKeyboard() override;
         void hideKeyboard() override;
         
+        EventHandlerToken addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) override;
         EventHandlerToken addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) override;
         EventHandlerToken addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) override;
         EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) override;

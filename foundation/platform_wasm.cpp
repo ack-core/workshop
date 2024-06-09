@@ -1,8 +1,4 @@
 
-// TODO: unique_ptr
-// TODO: tlsf allocator
-// 
-
 #ifdef PLATFORM_WASM
 #include "platform_wasm.h"
 
@@ -10,12 +6,15 @@
 #include <cstdio>
 #include <list>
 
+#include "thirdparty/tlsf/tlsf.h"
+
 namespace {
     const std::size_t PAGESIZE = 65536;
 
-    std::size_t g_currentMemoryPages = __builtin_wasm_memory_size(0);
-    std::size_t g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
-    std::atomic<bool> g_memoryLock {false};
+    std::atomic_flag g_memoryLock {false};
+    std::size_t g_currentMemoryPages;
+    std::size_t g_currentMemoryOffset;
+    void *g_dynamicMemoryStart;
     
     std::uint32_t g_width;
     std::uint32_t g_height;
@@ -25,24 +24,13 @@ void fatal() {
     *(volatile int *)0xffffffff = 0;
 }
 
-// These function shouldn't be called
-extern "C" {
-    void *realloc(void *ptr, size_t size) {
-        fatal();
-        return nullptr;
-    }
-    void *aligned_alloc(size_t alignment, size_t size) {
-        fatal();
-        return nullptr;
-    }
-}
-
 // From js
 extern "C" {
     void js_waiting();
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
+    void js_dbg(size_t s, size_t value);
 }
 
 // Missing part of runtime
@@ -50,52 +38,6 @@ extern "C" {
     int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle) {
         return 0;
     }
-    void *sbrk(intptr_t increment) {
-        if (increment == 0) {
-            return (void *)(__builtin_wasm_memory_size(0) * PAGESIZE);
-        }
-        if (increment < 0) {
-            increment = 0;
-        }
-        
-        std::size_t oldOffset = g_currentMemoryOffset;
-        g_currentMemoryOffset += increment;
-        
-        std::size_t incMemoryPages = ((g_currentMemoryOffset + PAGESIZE - 1) / PAGESIZE) - g_currentMemoryPages;
-        
-        if (incMemoryPages) {
-            std::size_t oldMemoryPages = __builtin_wasm_memory_grow(0, incMemoryPages);
-            
-            if (oldMemoryPages == std::size_t(-1)) {
-                fatal();
-            }
-            
-            g_currentMemoryPages += incMemoryPages;
-        }
-        
-        return (void *)oldOffset;
-    }
-        
-    void *__real_malloc(size_t size);
-    void *__wrap_malloc(size_t size) {
-        while (g_memoryLock.exchange(true) == true) {
-            js_waiting();
-        }
-        void *result = __real_malloc(size);
-        g_memoryLock.store(false);
-        return result;
-    }
-    void __real_free(void *ptr);
-    void __wrap_free(void *ptr) {
-        if (ptr) {
-            while (g_memoryLock.exchange(true) == true) {
-                js_waiting();
-            }
-            __real_free(ptr);
-            g_memoryLock.store(false);
-        }
-    }
-    
     std::size_t strlen(const char *str) {
         const char *s = str;
         while (*s != 0) s++;
@@ -134,92 +76,86 @@ extern "C" {
         return isalpha(c) || isdigit(c);
     }
 }
+    
+// Memory management
+extern "C" {
+    void *sbrk(intptr_t increment) {
+        if (increment == 0) {
+            return (void *)(__builtin_wasm_memory_size(0) * PAGESIZE);
+        }
+        if (increment < 0) {
+            increment = 0;
+        }
+        
+        std::size_t oldOffset = g_currentMemoryOffset;
+        g_currentMemoryOffset += increment;
+        
+        std::size_t incMemoryPages = ((g_currentMemoryOffset + PAGESIZE - 1) / PAGESIZE) - g_currentMemoryPages;
+        
+        if (incMemoryPages) {
+            std::size_t oldMemoryPages = __builtin_wasm_memory_grow(0, incMemoryPages);
+            
+            if (oldMemoryPages == std::size_t(-1)) {
+                fatal();
+            }
+            
+            g_currentMemoryPages += incMemoryPages;
+        }
+        
+        return (void *)oldOffset;
+    }
+    void __init() { // This function is called before global ctors
+        js_dbg(0, 0);
+        g_currentMemoryPages = __builtin_wasm_memory_size(0);
+        g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
+        g_dynamicMemoryStart = sbrk(PAGESIZE);
+        tlsf::init_memory_pool(PAGESIZE, g_dynamicMemoryStart);
+    }
+    void *malloc(size_t size) {
+        while (g_memoryLock.test_and_set() == true);
+        
+        void *result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
+        if (result == nullptr) {
+            size_t areaSize = PAGESIZE * (size / PAGESIZE + 1);
+            tlsf::add_new_area(sbrk(areaSize), areaSize, g_dynamicMemoryStart);
+            result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
+        }
+        
+        g_memoryLock.clear();
+        ::memset(result, 0, size);
+        return result;
+    }
+    void *aligned_alloc(size_t alignment, size_t size) {
+        return ::malloc(size);
+    }
+    void free(void *ptr) {
+        if (ptr) {
+            while (g_memoryLock.test_and_set() == true);
+            
+            tlsf::free_ex(ptr, g_dynamicMemoryStart);
+            g_memoryLock.clear();
+        }
+    }
+}
 
 // Message formatting
-// TODO: move to common util
+//
 namespace {
-    std::size_t align64(std::size_t len) {
-        return (len + 63) & ~std::size_t(63);
-    }
-    std::size_t ptoa(std::uint16_t *p, const void *ptr) {
-        const int len = 2 * sizeof(std::size_t);
-        std::uint16_t *output = p + len - 1;
-        std::size_t n = std::size_t(ptr);
-        
-        for (int i = 0; i < len; i++) {
-            *output-- = "0123456789ABCDEF"[n % 16];
-            n /= 16;
-        }
-        return len;
-    }
-    std::size_t ltoa(std::uint16_t* p, std::int64_t value) {
-        std::int64_t absvalue = value < 0 ? -value : value;
-        std::uint16_t *output = p;
-
-        do {
-            *output++ = "0123456789ABCDEF"[absvalue % 10];
-            absvalue /= 10;
-        }
-        while (absvalue);
-
-        if (value < 0) *output++ = '-';
-        std::size_t result = output - p;
-        output--;
-        
-        while(p < output) {
-            char tmp = *output;
-            *output-- = *p;
-            *p++ = tmp;
-        }
-
-        return result;
-    }
-    std::size_t ftoa(std::uint16_t *p, double f) {
-        std::uint16_t *output = p;
-        const double af = std::abs(f);
-        std::int64_t ipart = std::int64_t(af);
-        double remainder = 1000000000.0 * (af - double(ipart));
-        std::int64_t fpart = std::int64_t(remainder);
-        
-        if ((remainder - double(fpart)) > 0.5) {
-            fpart++;
-            if (fpart > 1000000000) {
-                fpart = 0;
-                ipart++;
-            }
-        }
-        
-        if (f < 0.0) *output++ = '-';
-        output += ltoa(output, ipart);
-        
-        int width = 9;
-        while (fpart % 10 == 0 && width-- > 0) {
-            fpart /= 10;
-        }
-        output += width + 1;
-        std::size_t result = output - p;
-        while (width--) {
-            *--output = fpart % 10 + '0';
-            fpart /= 10;
-        }
-        *--output = '.';
-        return result;
-    }
     std::size_t msgFormat(std::uint16_t *output, const char *fmt, va_list arglist) {
         const std::uint16_t *start = output;
         while (*fmt != '\0') {
             if (*fmt == '%') {
                 if (*++fmt == 'p') {
                     const void *p = va_arg(arglist, void *);
-                    output += ptoa(output, p);
+                    output += util::strstream::ptoa(output, p);
                 }
                 else if (*fmt == 'd') {
                     const std::intptr_t d = va_arg(arglist, std::intptr_t);
-                    output += ltoa(output, d);
+                    output += util::strstream::ltoa(output, d);
                 }
                 else if (*fmt == 'f') {
                     const double f = va_arg(arglist, double);
-                    output += ftoa(output, f);
+                    output += util::strstream::ftoa(output, f);
                 }
                 else if (*fmt == 's') {
                     const char *s = va_arg(arglist, const char *);
@@ -257,7 +193,7 @@ namespace {
                 }
                 else if (*fmt == 's') {
                     const char *s = va_arg(arglist, const char *);
-                    result += align64(int(strlen(s)));
+                    result += (strlen(s) + 63) & ~std::size_t(63);
                 }
                 else {
                     result++;
@@ -280,10 +216,13 @@ namespace {
     };
     
     std::weak_ptr<foundation::PlatformInterface> g_instance;
+
+    std::list<Handler> g_editorHandlers;
     std::list<Handler> g_pointerHandlers;
 
     util::callback<void(float)> g_updateAndDraw;
     util::callback<void()> g_resizeHandler;
+    
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
 }
 
@@ -297,6 +236,10 @@ namespace foundation {
     
     void WASMPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
         js_task(task.release());
+    }
+    
+    void WASMPlatform::peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
+        completion(nullptr, 0);
     }
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
@@ -333,20 +276,20 @@ namespace foundation {
     void WASMPlatform::showKeyboard() {}
     void WASMPlatform::hideKeyboard() {}
     
+    EventHandlerToken WASMPlatform::addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) {
+        return nullptr;
+    }
     EventHandlerToken WASMPlatform::addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) {
         return nullptr;
     }
-    
     EventHandlerToken WASMPlatform::addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) {
         return nullptr;
     }
-    
     EventHandlerToken WASMPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) {
         EventHandlerToken token = g_tokenCounter++;
         g_pointerHandlers.emplace_back(Handler{token, std::move(handler)});
         return token;
     }
-    
     EventHandlerToken WASMPlatform::addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) {
         return nullptr;
     }
@@ -422,7 +365,7 @@ extern "C" {
         ::free(cb);
     }
     void taskExecute(foundation::AsyncTask *ptr) {
-        // TODO: TLSF allocator with manual thread safety
+
     }
     void taskComplete(foundation::AsyncTask *ptr) {
         ptr->executeInBackground();

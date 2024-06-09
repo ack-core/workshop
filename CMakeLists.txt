@@ -37,6 +37,7 @@ project(workshop CXX)
 get_filename_component(m_source_root "${PROJECT_SOURCE_DIR}" ABSOLUTE)
 include_directories("${m_source_root}")
 
+add_subdirectory("${m_source_root}/thirdparty/tlsf")
 add_subdirectory("${m_source_root}/thirdparty/upng")
 add_subdirectory("${m_source_root}/thirdparty/stb_mini_ttf")
 
@@ -54,6 +55,7 @@ set(
 source_group("" FILES ${m_sources_list})
 add_executable(workshop ${m_sources_list})
 
+target_link_libraries(workshop PUBLIC tlsf)
 target_link_libraries(workshop PUBLIC upng)
 target_link_libraries(workshop PUBLIC stb_mini_ttf)
 
@@ -140,7 +142,7 @@ elseif (PLATFORM STREQUAL "PLATFORM_WASM")
 	elseif (APPTYPE STREQUAL "IS_PE")
 		set_target_properties(workshop PROPERTIES OUTPUT_NAME "pe")
 	endif()
-	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free --wrap=malloc --wrap=free)
+	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free) # --wrap=malloc --wrap=free
 	target_link_options(workshop PUBLIC --export=updateFrame --export=fileLoaded --export=taskExecute --export=taskComplete)
 	target_link_options(workshop PUBLIC --export=pointerEvent --export=resized)
 endif()

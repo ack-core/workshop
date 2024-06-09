@@ -39,7 +39,7 @@ extern "C" void initialize() {
     raycast = voxel::RaycastInterface::instance();
     stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
     datahub = dh::DataHub::instance(platform, game::datahub);
-    stateManager = game::StateManager::instance(platform, resourceProvider, scene, simulation, raycast, stage, datahub);
+    stateManager = game::StateManager::instance(platform, rendering, resourceProvider, scene, simulation, raycast, stage, datahub);
     stateManager->switchToState("default");
         
     platform->setLoop([](float dtSec) {

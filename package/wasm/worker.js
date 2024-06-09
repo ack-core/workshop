@@ -29,6 +29,7 @@ onmessage = (msg) => {
                 js_fetch: (block, pathLen) => { throw "can't read files in background" },
                 js_canvas_width: () => { throw "can't access canvas from background" },
                 js_canvas_height: () => { throw "can't access canvas from background" },
+                js_dbg: (s, value) => { console.log("T--->>> ", s, " | ", value); },
                 webgl_createProgram: (vsrc, vlen, fsrc, flen) => { throw "can't access webgl from background" },
                 webgl_createData: (layout, layoutLen, ptr, dataLen, stride, idx, icount) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },

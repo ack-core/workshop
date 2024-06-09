@@ -146,12 +146,12 @@ namespace foundation {
         // Show/hide keyboard if supported
         virtual void showKeyboard() = 0;
         virtual void hideKeyboard() = 0;
-
+        
         // Set handlers for editors
         // @return nullptr if not supported
         //
         virtual EventHandlerToken addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) = 0;
-
+        
         // Set handlers for keyboard
         // @return nullptr if not supported
         //

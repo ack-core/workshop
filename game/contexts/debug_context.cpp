@@ -46,15 +46,15 @@ namespace game {
         _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
         _axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.5});
         
-        _api.resources->getOrLoadVoxelStatic("statics/ruins", [this](const foundation::RenderDataPtr &mesh) {
-            if (mesh) {
-                _thing = _api.scene->addStaticMesh(mesh);
-            }
-        });
         _api.resources->getOrLoadVoxelObject("objects/stool", [this](const std::vector<foundation::RenderDataPtr> &frames) {
             if (frames.size()) {
                 _actor = _api.scene->addDynamicMesh(frames);
                 _actor->setTransform(math::transform3f({0, 1, 0}, M_PI / 4).translated({20, 0, 40}));
+            }
+        });
+        _api.resources->getOrLoadVoxelStatic("statics/ruins", [this](const foundation::RenderDataPtr &mesh) {
+            if (mesh) {
+                _thing = _api.scene->addStaticMesh(mesh);
             }
         });
         _api.resources->getOrLoadGround("grounds/white", [this](const foundation::RenderDataPtr &data, const foundation::RenderTexturePtr &texture) {
@@ -62,27 +62,27 @@ namespace game {
                 _ground = _api.scene->addTexturedMesh(data, texture);
             }
         });
-        //_api.resources->getOrLoadTexture("textures/particles/test", [this](const foundation::RenderTexturePtr &texture){
-        //    if (texture) {
-        //        std::uint32_t ptcparamssrc[] = {
-        //            0x00000000,
-        //            0x00000000,
-        //            0x000000ff,
-        //            0x00000000,
-        //        };
-        //        foundation::RenderTexturePtr ptcparams = _api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 4, { ptcparamssrc });
-        //        ptc = scene->addParticles(texture, ptcparams, voxel::SceneInterface::EmitterParams {
-        //            .additiveBlend = false,
-        //            .orientation = voxel::SceneInterface::EmitterParams::Orientation::WORLD,
-        //            .particleCount = 2,
-        //            .minXYZ = {-5.0, 0, 0},
-        //            .maxXYZ = {5.0, 0, 0},
-        //            .minMaxWidth = {10.0f, 10.0f},
-        //            .minMaxHeight = {10.0f, 10.0f},
-        //        });
-        //        ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
-        //    }
-        //});
+        _api.resources->getOrLoadTexture("textures/particles/test", [this](const foundation::RenderTexturePtr &texture){
+            if (texture) {
+                std::uint32_t ptcparamssrc[] = {
+                    0x00000000,
+                    0x00000000,
+                    0x000000ff,
+                    0x00000000,
+                };
+                foundation::RenderTexturePtr ptcparams = _api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 4, { ptcparamssrc });
+                _ptc = _api.scene->addParticles(texture, ptcparams, voxel::SceneInterface::EmitterParams {
+                    .additiveBlend = false,
+                    .orientation = voxel::SceneInterface::EmitterParams::Orientation::WORLD,
+                    .particleCount = 2,
+                    .minXYZ = {-5.0, 0, 0},
+                    .maxXYZ = {5.0, 0, 0},
+                    .minMaxWidth = {10.0f, 10.0f},
+                    .minMaxHeight = {10.0f, 10.0f},
+                });
+                _ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
+            }
+        });
 
         math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
         _bbox = _api.scene->addBoundingBox(bb1);

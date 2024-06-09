@@ -346,6 +346,9 @@ namespace foundation {
         }
         g_io.notifier.notify_one();
     }
+    void IOSPlatform::peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
+        completion(nullptr, 0);
+    }
         
     float IOSPlatform::getScreenWidth() const {
         return g_nativeScreenWidth;
@@ -363,6 +366,10 @@ namespace foundation {
     void IOSPlatform::hideCursor() {}
     void IOSPlatform::showKeyboard() {}
     void IOSPlatform::hideKeyboard() {}
+    
+    EventHandlerToken IOSPlatform::addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) {
+        return nullptr;
+    }
     
     EventHandlerToken IOSPlatform::addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) {
         return nullptr;
