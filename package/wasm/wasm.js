@@ -37,8 +37,9 @@ const FRAME_CONST_BINDING_INDEX = 0;
 const DRAW_CONST_BINDING_INDEX = 1;
 const POINTER_DOWN = 1;
 const POINTER_MOVE = 2;
-const POINTER_UP = 3;
-const POINTER_CANCEL = 4;
+const POINTER_HOVER = 3;
+const POINTER_UP = 4;
+const POINTER_CANCEL = 5;
 
 class EventType {
     static INIT  = 1
@@ -51,6 +52,7 @@ var instance = null;
 var memory = new WebAssembly.Memory({ initial: 4, maximum: 4096, shared: true });
 var worker = new Worker("worker.js");
 var canvas = document.getElementById("render_target");
+var eventSource = document.getElementById("editor") || document.getElementById("render_target");
 var targetWidth = window.devicePixelRatio * canvas.scrollWidth;
 var targetHeight = window.devicePixelRatio * canvas.scrollHeight;
 var activePointerIDs = {};
@@ -64,12 +66,13 @@ var glbuffers = {};
 var gltextures = {};
 var glsamplers = {};
 var glframebuffers = {};
-var glcontext = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false, premultipliedAlpha: true, preserveDrawingBuffer: true });
+var glcontext = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false, desynchronized: true, preserveDrawingBuffer: true });
 var glEnabledAttribCount = 0;
 var shaderConstantBuffers = [];
 var shaderConstantIndex = 0;
 var uniformInstanceCountLocation = null;
 var resizeTimeoutHandler = null;
+var uiEditor = { msgHandler: null, sendMsg: function(msg) {} };
 
 const vertexAttribFunctions = [
     (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.HALF_FLOAT, false, stride, offset); return 4; },
@@ -141,7 +144,7 @@ const imports = {
             print(String.fromCharCode(...u16str));
         },
         js_task: function(task) {
-            worker.postMessage({type: EventType.BTASK, task});
+            worker.postMessage({type: EventType.BTASK, task: task});
         },
         js_fetch: function(block, pathLen) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
@@ -166,11 +169,14 @@ const imports = {
                 }
             });
         },
+        js_editorMsg: function(str, len) {
+            const u8str = new Uint8Array(memory.buffer, str, len);
+            if (uiEditor.msgHandler) {
+                uiEditor.msgHandler(String.fromCharCode(...u8str));
+            }
+        },
         abort: function() {
             throw "aborted";
-        },
-        js_dbg: function(s, value) {
-            console.log("M--->>> ", s, " | ", value);
         },
         webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
             const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
@@ -426,7 +432,7 @@ if (glcontext != null) {
         }
 
         const module = m.module;
-        worker.postMessage({type: EventType.INIT, module, memory}); //
+        worker.postMessage({type: EventType.INIT, module: module, memory: memory}); //
     });
 }
 else {
@@ -505,7 +511,7 @@ worker.onmessage = (msg) => {
             return [x, y];
         }
         function onFrame(timestamp) {
-            const interval = 1000.0 / 15.0;
+            const interval = 1000.0 / 20.0;
             const dt = timestamp - prevFrameTimeStamp;
             
             if (dt > interval) {
@@ -522,12 +528,19 @@ worker.onmessage = (msg) => {
 
             window.requestAnimationFrame(onFrame);
             uniformInstanceCountLocation = null;
+
+            uiEditor.sendMsg = function(msg) {
+                const data = instance.exports.malloc(msg.length);
+                const u8data = new Uint8Array(memory.buffer, data, msg.length);
+                for (let i = 0; i < msg.length; i++) u8data[i] = msg.charCodeAt(i) & 0xff;
+                instance.exports.editorEvent(data, msg.length);
+            }
         }
         window.requestAnimationFrame(timestamp => {
             prevFrameTimeStamp = timestamp;
             window.requestAnimationFrame(onFrame);
         });
-        canvas.addEventListener("pointerdown", (event) => {
+        eventSource.addEventListener("pointerdown", (event) => {
             [x, y] = getCoord(event);
             if (x >= 0 && y >= 0 && x <= targetWidth && y <= targetHeight) {
                 activePointerIDs[event.pointerId] = true;
@@ -535,14 +548,19 @@ worker.onmessage = (msg) => {
                 event.preventDefault();
             }
         });
-        canvas.addEventListener("pointermove", (event) => {
+        eventSource.addEventListener("pointermove", (event) => {
             if (activePointerIDs[event.pointerId]) {
                 [x, y] = getCoord(event);
                 instance.exports.pointerEvent(POINTER_MOVE, event.pointerId, x, y);
                 event.preventDefault();
             }
+            else {
+                [x, y] = getCoord(event);
+                instance.exports.pointerEvent(POINTER_HOVER, event.pointerId, x, y);
+                event.preventDefault();                
+            }
         });
-        canvas.addEventListener("pointerup", (event) => {
+        eventSource.addEventListener("pointerup", (event) => {
             if (activePointerIDs[event.pointerId]) {
                 delete activePointerIDs[event.pointerId];
                 [x, y] = getCoord(event);
@@ -550,7 +568,7 @@ worker.onmessage = (msg) => {
                 event.preventDefault();
             }
         });
-        canvas.addEventListener("pointercancel", (event) => {
+        eventSource.addEventListener("pointercancel", (event) => {
             if (activePointerIDs[event.pointerId]) {
                 delete activePointerIDs[event.pointerId];
                 [x, y] = getCoord(event);

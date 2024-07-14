@@ -2,9 +2,9 @@
 #include "debug_context.h"
 
 namespace game {
-    template <> std::unique_ptr<Context> makeContext<DebugContext>(API &&api) {
-        return std::make_unique<DebugContext>(std::move(api));
-    }
+//    template <> std::unique_ptr<Context> makeContext<DebugContext>(API &&api) {
+//        return std::make_unique<DebugContext>(std::move(api));
+//    }
     
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
         _token = _api.platform->addPointerEventHandler(
@@ -41,7 +41,7 @@ namespace game {
             }
         );
         
-        _axis = _api.scene->addLineSet(3);
+        _axis = _api.scene->addLineSet();
         _axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.5});
         _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
         _axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.5});

@@ -9,6 +9,7 @@ namespace ui {
         math::vector4f positionAndSize;
         math::vector4f textureCoords;
         math::vector4f flags; // [is R component only, 0, 0, 0]
+        math::color color;
     };
 
     class StageFacility {
@@ -116,6 +117,11 @@ namespace ui {
             
             return false;
         }
+        virtual void draw(ShaderConstants &constStorage) {
+            for (auto &item : _attachedElements) {
+                item->draw(constStorage);
+            }
+        }
         
     protected:
         const StageFacility &_facility;
@@ -192,7 +198,7 @@ namespace ui {
                 }
             }
 
-            if (isInArea && action == ui::Action::CAPTURE) {
+            if (isInArea && action == ui::Action::PRESS) {
                 if (_handlers[int(action)]) {
                     _pointerId = id;
                     _currentAction = action;
@@ -337,6 +343,28 @@ namespace ui {
                 }
             });
         }
+        void draw(ShaderConstants &constStorage) override {
+            const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
+            
+            constStorage.positionAndSize = math::vector4f(_globalPosition, _size);
+            constStorage.textureCoords = math::vector4f(0, 0, 1, 1);
+            constStorage.flags = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+            constStorage.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+            
+            if (_currentAction != ui::Action::RELEASE && _actionTexture) {
+                rendering->applyTextures({{_actionTexture, foundation::SamplerType::NEAREST}});
+            }
+            else {
+                rendering->applyTextures({{_baseTexture, foundation::SamplerType::NEAREST}});
+            }
+            
+            rendering->applyShaderConstants(&constStorage);
+            rendering->draw();
+            
+            for (auto &item : _attachedElements) {
+                item->draw(constStorage);
+            }
+        }
         
     private:
         foundation::RenderTexturePtr _baseTexture;
@@ -400,7 +428,7 @@ namespace {
         }
         vssrc {
             float2 screenTransform = float2(2.0, -2.0) / frame_rtBounds.xy;
-            float2 vertexCoord = float2(vertex_ID & 0x1, vertex_ID >> 0x1);
+            float2 vertexCoord = float2(repeat_ID & 0x1, repeat_ID >> 0x1);
             output_texcoord = _lerp(const_texcoord.xy, const_texcoord.zw, vertexCoord);
             vertexCoord = vertexCoord * const_position_size.zw + const_position_size.xy;
             output_position = float4(vertexCoord.xy * screenTransform + float2(-1.0, 1.0), 0.1, 1); //
@@ -424,15 +452,15 @@ namespace ui {
     , _touchEventsToken(nullptr)
     {
         _shaderConstants = ShaderConstants {};
-//        _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, foundation::InputLayout {
-//            .repeat = 4
-//        });
+        _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, foundation::InputLayout {
+            .repeat = 4
+        });
         
         _touchEventsToken = _platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) {
             ui::Action action = ui::Action::RELEASE;
             
             if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
-                action = ui::Action::CAPTURE;
+                action = ui::Action::PRESS;
             }
             if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
                 action = ui::Action::MOVE;
@@ -498,13 +526,13 @@ namespace ui {
     }
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
-//        _rendering->forTarget(nullptr, nullptr, std::nullopt, [&](foundation::RenderingInterface &rendering) {
-//            rendering.applyShader(_uiShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-//            for (const auto &topLevelElement : _topLevelElements) {
-//                topLevelElement->updateCoordinates();
-//
-//            }
-//        });
+        _rendering->forTarget(nullptr, nullptr, std::nullopt, [&](foundation::RenderingInterface &rendering) {
+            rendering.applyShader(_uiShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+            for (const auto &topLevelElement : _topLevelElements) {
+                topLevelElement->updateCoordinates();
+                topLevelElement->draw(_shaderConstants);
+            }
+        });
     }
     
 }

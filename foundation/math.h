@@ -893,6 +893,7 @@ namespace math {
         color() = default;
         color(unsigned rgba) : r(float(rgba & 255) / 255.0f), g(float((rgba >> 8) & 255) / 255.0f), b(float((rgba >> 16) & 255) / 255.0f), a(float((rgba >> 24) & 255) / 255.0f) {}
         color(scalar r, scalar g, scalar b, scalar a) : r(r), g(g), b(b), a(a) {}
+        color(const vector4f &v) : r(v.x), g(v.y), b(v.z), a(v.w) {}
         
         operator unsigned() const {
             return (unsigned(r * 255.0f) & 255) << 0 | (unsigned(g * 255.0f) & 255) << 8 | (unsigned(b * 255.0f) & 255) << 16 | (unsigned(a * 255.0f) & 255) << 24;
@@ -903,21 +904,42 @@ namespace math {
     };
 
     // Find intersection point between Ray and Plane
-    // Assuming @dir and @planeNormal are normalised
+    // Assuming @rayDir and @planeNormal are normalised
     //
-    inline bool intersectRayPlane(const vector3f &origin, const vector3f &dir, const vector3f &planeRef, const vector3f &planeNormal, vector3f &out) {
-        float d = planeRef.dot(planeNormal);
-        float n = dir.dot(planeNormal);
+    inline bool intersectRayPlane(const vector3f &rayOrigin, const vector3f &rayDir, const vector3f &planeRef, const vector3f &planeNormal, vector3f &out) {
+        const float d = planeRef.dot(planeNormal);
+        const float n = rayDir.dot(planeNormal);
         
         if (std::fabs(n) > std::numeric_limits<float>::epsilon()) {
-            float k = (d - origin.dot(planeNormal)) / n;
+            const float k = (d - rayOrigin.dot(planeNormal)) / n;
             
             if (k > 0.0f) {
-                out = origin + k * dir;
+                out = rayOrigin + k * rayDir;
                 return true;
             }
         }
         
         return false;
+    }
+
+    // Find the distance between Ray and Line
+    // Assuming @rayDir is normalised
+    //
+    inline float distanceRayLine(const vector3f &rayOrigin, const vector3f &rayDir, const vector3f &linePoint0, const vector3f &linePoint1) {
+        const vector3f lineDir = (linePoint1 - linePoint0);
+        const vector3f normal = rayDir.cross(lineDir);
+        const float kRay = std::max(0.0f, lineDir.cross(normal).dot(linePoint0 - rayOrigin) / normal.dot(normal));
+        const float kLine = std::min(1.0f, std::max(0.0f, rayDir.cross(normal).dot(linePoint0 - rayOrigin) / normal.dot(normal)));
+        return (rayOrigin + kRay * rayDir).distanceTo(linePoint0 + kLine * lineDir);
+    }
+
+    // Find the nearest koefficients on two Rays
+    // Assuming @rayADir and @rayBDir are normalised
+    //
+    inline vector2f nearestKoeffsRayRay(const vector3f &rayAOrigin, const vector3f &rayADir, const vector3f &rayBOrigin, const vector3f &rayBDir) {
+        const vector3f normal = rayADir.cross(rayBDir);
+        const float kRayA = rayBDir.cross(normal).dot(rayBOrigin - rayAOrigin) / normal.dot(normal);
+        const float kRayB = rayADir.cross(normal).dot(rayBOrigin - rayAOrigin) / normal.dot(normal);
+        return {kRayA, kRayB};
     }
 }

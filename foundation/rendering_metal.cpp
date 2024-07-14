@@ -541,10 +541,10 @@ namespace foundation {
                 nativeShader += "};\n\nvertex _InOut main_vertex(\n";
                 
                 if (layout.repeat > 1) {
-                    nativeShader += "    unsigned int repeat_ID [[vertex_id]],\n    unsigned int _i_ID [[instance_id]],\n";
+                    nativeShader += "    unsigned int _r_ID [[vertex_id]],\n    unsigned int _i_ID [[instance_id]],\n";
                 }
                 else {
-                    nativeShader += "    unsigned int vertex_ID [[vertex_id]],\n    unsigned int instance_ID [[instance_id]],\n";
+                    nativeShader += "    unsigned int _v_ID [[vertex_id]],\n    unsigned int _i_ID [[instance_id]],\n";
                 }
                 
                 nativeShader +=
@@ -562,11 +562,14 @@ namespace foundation {
                     "    texture2d<float> _texture3 [[texture(3)]])\n{\n";
                 
                 if (layout.repeat > 1) {
-                    nativeShader += "    const uint vertex_ID = _i_ID % _vertexCount;\n";
-                    nativeShader += "    const uint instance_ID = _i_ID / _vertexCount;\n";
+                    nativeShader += "    const int repeat_ID = _r_ID;\n";
+                    nativeShader += "    const int vertex_ID = _i_ID % _vertexCount;\n";
+                    nativeShader += "    const int instance_ID = _i_ID / _vertexCount;\n";
                 }
                 else {
-                    nativeShader += "    const uint repeat_ID = 0;\n";
+                    nativeShader += "    const int repeat_ID = 0;\n";
+                    nativeShader += "    const int vertex_ID = _v_ID;\n";
+                    nativeShader += "    const int instance_ID = _i_ID;\n";
                 }
                 
                 nativeShader += variables;

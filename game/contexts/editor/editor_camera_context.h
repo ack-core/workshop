@@ -1,23 +1,21 @@
 
 #pragma once
-#include "context.h"
+#include <game/context.h>
+#include <unordered_map>
 
 namespace game {
-    class ParticleEditorContext : public Context {
+    class EditorCameraContext : public Context {
     public:
-        ParticleEditorContext(API &&api);
-        ~ParticleEditorContext() override;
+        EditorCameraContext(API &&api);
+        ~EditorCameraContext() override;
         
         void update(float dtSec) override;
         
     private:
         const API _api;
-        
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
-        math::vector3f _orbit = { 45, 45, 45 };
-        
-        voxel::SceneInterface::LineSetPtr _axis;
+        math::vector3f _orbit = {35, 0, 0};
     };
 }

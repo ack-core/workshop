@@ -26,12 +26,16 @@ namespace {
     
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
     
-    struct Handler {
-        foundation::EventHandlerToken token;
-        util::callback<bool(const foundation::PlatformPointerEventArgs &)> handler;
-    };
-    
-    std::list<Handler> g_pointerHandlers;
+//    struct Handler {
+//        foundation::EventHandlerToken token;
+//        util::callback<bool(const foundation::PlatformPointerEventArgs &)> handler;
+//    };
+//
+//    std::list<Handler> g_pointerHandlers;
+
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &)>>> g_editorHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
+
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
     
@@ -199,7 +203,7 @@ namespace {
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
         for (auto &index : g_pointerHandlers) {
-            if (index.handler(args)) {
+            if (index.second(args)) {
                 break;
             }
         }
@@ -215,7 +219,7 @@ namespace {
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
         for (auto &index : g_pointerHandlers) {
-            if (index.handler(args)) {
+            if (index.second(args)) {
                 break;
             }
         }
@@ -231,7 +235,7 @@ namespace {
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
         for (auto &index : g_pointerHandlers) {
-            if (index.handler(args)) {
+            if (index.second(args)) {
                 break;
             }
         }
@@ -247,7 +251,7 @@ namespace {
         args.coordinateY = [item locationInView:nil].y * g_nativeScreenScale;
         
         for (auto &index : g_pointerHandlers) {
-            if (index.handler(args)) {
+            if (index.second(args)) {
                 break;
             }
         }
@@ -366,32 +370,54 @@ namespace foundation {
     void IOSPlatform::hideCursor() {}
     void IOSPlatform::showKeyboard() {}
     void IOSPlatform::hideKeyboard() {}
+    void IOSPlatform::sendEditorMsg(const std::string &msg) {
     
-    EventHandlerToken IOSPlatform::addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) {
-        return nullptr;
+    }
+    void IOSPlatform::editorLoopbackMsg(const std::string &msg) {
+        for (auto &index : g_editorHandlers) {
+            if (index.second(msg)) {
+                break;
+            }
+        }
     }
     
-    EventHandlerToken IOSPlatform::addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) {
-        return nullptr;
-    }
-    
-    EventHandlerToken IOSPlatform::addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) {
-        return nullptr;
-    }
-    
-    EventHandlerToken IOSPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) {
+    EventHandlerToken IOSPlatform::addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop) {
         EventHandlerToken token = g_tokenCounter++;
-        g_pointerHandlers.emplace_back(Handler{token, std::move(handler)});
+        if (setTop) {
+            g_editorHandlers.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            g_editorHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        }
         return token;
     }
     
-    EventHandlerToken IOSPlatform::addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) {
+    EventHandlerToken IOSPlatform::addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) {
+        return nullptr;
+    }
+    
+    EventHandlerToken IOSPlatform::addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) {
+        return nullptr;
+    }
+    
+    EventHandlerToken IOSPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) {
+        EventHandlerToken token = g_tokenCounter++;
+        if (setTop) {
+            g_pointerHandlers.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            g_pointerHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        }
+        return token;
+    }
+    
+    EventHandlerToken IOSPlatform::addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) {
         return nullptr;
     }
     
     void IOSPlatform::removeEventHandler(EventHandlerToken token) {
         for (auto index = g_pointerHandlers.begin(); index != g_pointerHandlers.end(); ++index) {
-            if (index->token == token) {
+            if (index->first == token) {
                 g_pointerHandlers.erase(index);
                 return;
             }

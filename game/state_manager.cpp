@@ -17,8 +17,17 @@ namespace game {
             const voxel::RaycastInterfacePtr &raycast,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
-        );
-        ~StateManagerImpl() override;
+        )
+        : _platform(platform)
+        , _rendering(rendering)
+        , _resourceProvider(resourceProvider)
+        , _scene(scene)
+        , _simulation(simulation)
+        , _ui(ui)
+        , _dh(dh)
+        {
+        }
+        ~StateManagerImpl() override {}
         
         void switchToState(const char *name) override;
         void update(float dtSec) override;
@@ -50,52 +59,32 @@ namespace game {
         return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, simulation, raycast, ui, dh);
     }
     
-    StateManagerImpl::StateManagerImpl(
-        const foundation::PlatformInterfacePtr &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        const resource::ResourceProviderPtr &resourceProvider,
-        const voxel::SceneInterfacePtr &scene,
-        const voxel::SimulationInterfacePtr &simulation,
-        const voxel::RaycastInterfacePtr &raycast,
-        const ui::StageInterfacePtr &ui,
-        const dh::DataHubPtr &dh
-    )
-    : _platform(platform)
-    , _rendering(rendering)
-    , _resourceProvider(resourceProvider)
-    , _scene(scene)
-    , _simulation(simulation)
-    , _ui(ui)
-    , _dh(dh)
-    {
-    }
-    
-    StateManagerImpl::~StateManagerImpl() {
-    
-    }
-    
     void StateManagerImpl::switchToState(const char *name) {
         for (auto index = std::begin(states); index != std::end(states); ++index) {
             if (::strcmp(name, index->name) == 0) {
                 std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> newContextList;
-
+                std::vector<Interface *> interfaces;
+                
                 for (auto& makeContextFunction : index->makers) {
+                    std::unique_ptr<Context> ctx = nullptr;
+                    
                     auto index = _currentContextList.find(makeContextFunction);
                     if (index == _currentContextList.end()) {
-                        newContextList.emplace(makeContextFunction, makeContextFunction(API{
-                            _platform,
-                            _rendering,
-                            _resourceProvider,
-                            _scene,
-                            _simulation,
-                            _raycast,
-                            _ui,
-                            _dh,
-                            shared_from_this()
-                        }));
+                        ctx = makeContextFunction(API { _platform, _rendering, _resourceProvider, _scene, _simulation, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
                     }
                     else {
-                        newContextList.emplace(index->first, std::move(index->second));
+                        ctx = std::move(index->second);
+                    }
+                    
+                    if (ctx) {
+                        if (Interface *iface = dynamic_cast<Interface *>(ctx.get())) {
+                            interfaces.push_back(iface);
+                        }
+                        
+                        newContextList.emplace(makeContextFunction, std::move(ctx));
+                    }
+                    else {
+                        _platform->logError("[StateManager] Unexpected state while switching to '%s'");
                     }
                 }
 

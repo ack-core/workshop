@@ -23,6 +23,11 @@ namespace game {
         const game::StateManagerPtr &stateManager;
     };
     
+    class Interface {
+    public:
+        virtual ~Interface() = default;
+    };
+    
     class Context {
     public:
         virtual void update(float dtSec) = 0;
@@ -30,7 +35,21 @@ namespace game {
     public:
         virtual ~Context() = default;
     };
+
+    template <typename I> I& makeArg(Interface **existInterfaces, std::size_t count) {
+        I *ptr = nullptr;
+        
+        for (std::size_t i = 0; i < count; i++) {
+            if ((ptr = dynamic_cast<I *>(existInterfaces[i])) != nullptr) {
+                break;
+            }
+        }
+        
+        return *ptr;
+    }
+    template <typename Ctx, typename... Interfaces> std::unique_ptr<Context> makeContext(API &&api, Interface **existInterfaces, std::size_t count) {
+        return std::unique_ptr<Context>(new Ctx (std::move(api), makeArg<Interfaces>(existInterfaces, count)...));
+    }
     
-    template <typename Ctx> std::unique_ptr<Context> makeContext(API &&api);
-    using MakeContextFunc = std::unique_ptr<Context>(*)(API &&api);
+    using MakeContextFunc = std::unique_ptr<Context>(*)(API &&api, Interface **existInterfaces, std::size_t count);
 }

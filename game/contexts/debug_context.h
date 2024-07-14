@@ -1,6 +1,6 @@
 
 #pragma once
-#include "context.h"
+#include <game/context.h>
 
 namespace game {
     class DebugContext : public Context {

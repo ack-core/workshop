@@ -11,7 +11,7 @@
 namespace {
     const std::size_t PAGESIZE = 65536;
 
-    std::atomic_flag g_memoryLock {false};
+    std::atomic<std::uint32_t> g_memoryLock {0};
     std::size_t g_currentMemoryPages;
     std::size_t g_currentMemoryOffset;
     void *g_dynamicMemoryStart;
@@ -24,13 +24,13 @@ void fatal() {
     *(volatile int *)0xffffffff = 0;
 }
 
-// From js
+// Imported from js
 extern "C" {
     void js_waiting();
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
-    void js_dbg(size_t s, size_t value);
+    void js_editorMsg(const std::uint16_t *ptr, int length);
 }
 
 // Missing part of runtime
@@ -105,14 +105,14 @@ extern "C" {
         return (void *)oldOffset;
     }
     void __init() { // This function is called before global ctors
-        js_dbg(0, 0);
         g_currentMemoryPages = __builtin_wasm_memory_size(0);
         g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
         g_dynamicMemoryStart = sbrk(PAGESIZE);
         tlsf::init_memory_pool(PAGESIZE, g_dynamicMemoryStart);
     }
     void *malloc(size_t size) {
-        while (g_memoryLock.test_and_set() == true);
+        std::uint32_t expected = 0;
+        while (g_memoryLock.compare_exchange_strong(expected, 1) == false);
         
         void *result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         if (result == nullptr) {
@@ -121,7 +121,7 @@ extern "C" {
             result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         }
         
-        g_memoryLock.clear();
+        g_memoryLock.store(0);
         ::memset(result, 0, size);
         return result;
     }
@@ -130,95 +130,20 @@ extern "C" {
     }
     void free(void *ptr) {
         if (ptr) {
-            while (g_memoryLock.test_and_set() == true);
+            std::uint32_t expected = 0;
+            while (g_memoryLock.compare_exchange_strong(expected, 1) == false);
             
             tlsf::free_ex(ptr, g_dynamicMemoryStart);
-            g_memoryLock.clear();
+            g_memoryLock.store(0);
         }
     }
 }
 
-// Message formatting
-//
 namespace {
-    std::size_t msgFormat(std::uint16_t *output, const char *fmt, va_list arglist) {
-        const std::uint16_t *start = output;
-        while (*fmt != '\0') {
-            if (*fmt == '%') {
-                if (*++fmt == 'p') {
-                    const void *p = va_arg(arglist, void *);
-                    output += util::strstream::ptoa(output, p);
-                }
-                else if (*fmt == 'd') {
-                    const std::intptr_t d = va_arg(arglist, std::intptr_t);
-                    output += util::strstream::ltoa(output, d);
-                }
-                else if (*fmt == 'f') {
-                    const double f = va_arg(arglist, double);
-                    output += util::strstream::ftoa(output, f);
-                }
-                else if (*fmt == 's') {
-                    const char *s = va_arg(arglist, const char *);
-                    while (*s != 0) {
-                        *output++ = *s++;
-                    }
-                }
-                else {
-                    *output++ = *fmt;
-                }
-            }
-            else {
-                *output++ = *fmt;
-            }
-            fmt++;
-        }
-        *output++ = 0;
-        return output - start;
-    }
-    std::size_t msgLength(const char *fmt, va_list arglist) {
-        std::size_t result = 0;
-        while (*fmt != '\0') {
-            if (*fmt == '%') {
-                if (*++fmt == 'p') {
-                    va_arg(arglist, void *);
-                    result += sizeof(std::size_t);
-                }
-                else if (*fmt == 'd') {
-                    va_arg(arglist, std::intptr_t);
-                    result += 32;
-                }
-                else if (*fmt == 'f') {
-                    va_arg(arglist, double);
-                    result += 48;
-                }
-                else if (*fmt == 's') {
-                    const char *s = va_arg(arglist, const char *);
-                    result += (strlen(s) + 63) & ~std::size_t(63);
-                }
-                else {
-                    result++;
-                }
-            }
-            else {
-                result++;
-            }
-            fmt++;
-        }
-        
-        return result;
-    }
-}
-
-namespace {
-    struct Handler {
-        foundation::EventHandlerToken token;
-        util::callback<bool(const foundation::PlatformPointerEventArgs &)> handler;
-    };
-    
     std::weak_ptr<foundation::PlatformInterface> g_instance;
 
-    std::list<Handler> g_editorHandlers;
-    std::list<Handler> g_pointerHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &)>>> g_editorHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
 
     util::callback<void(float)> g_updateAndDraw;
     util::callback<void()> g_resizeHandler;
@@ -276,27 +201,60 @@ namespace foundation {
     void WASMPlatform::showKeyboard() {}
     void WASMPlatform::hideKeyboard() {}
     
-    EventHandlerToken WASMPlatform::addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) {
-        return nullptr;
+    void WASMPlatform::sendEditorMsg(const std::string &msg) {
+        const std::unique_ptr<std::uint16_t[]> msgJS = std::make_unique<std::uint16_t[]>(msg.length());
+        for (std::size_t i = 0; i < msg.length(); i++) {
+            msgJS[i] = msg[i];
+        }
+        js_editorMsg(msgJS.get(), msg.length());
     }
-    EventHandlerToken WASMPlatform::addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) {
-        return nullptr;
+    void WASMPlatform::editorLoopbackMsg(const std::string &msg) {
+        for (auto &index : g_editorHandlers) {
+            if (index.second(msg)) {
+                break;
+            }
+        }
     }
-    EventHandlerToken WASMPlatform::addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) {
-        return nullptr;
-    }
-    EventHandlerToken WASMPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) {
+    
+    EventHandlerToken WASMPlatform::addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop) {
         EventHandlerToken token = g_tokenCounter++;
-        g_pointerHandlers.emplace_back(Handler{token, std::move(handler)});
+        if (setTop) {
+            g_editorHandlers.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            g_editorHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        }
         return token;
     }
-    EventHandlerToken WASMPlatform::addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) {
+    EventHandlerToken WASMPlatform::addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) {
+        return nullptr;
+    }
+    EventHandlerToken WASMPlatform::addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) {
+        return nullptr;
+    }
+    EventHandlerToken WASMPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) {
+        EventHandlerToken token = g_tokenCounter++;
+        if (setTop) {
+            g_pointerHandlers.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            g_pointerHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        }
+        return token;
+    }
+    EventHandlerToken WASMPlatform::addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) {
         return nullptr;
     }
     
     void WASMPlatform::removeEventHandler(EventHandlerToken token) {
+        for (auto index = g_editorHandlers.begin(); index != g_editorHandlers.end(); ++index) {
+            if (index->first == token) {
+                g_editorHandlers.erase(index);
+                return;
+            }
+        }
         for (auto index = g_pointerHandlers.begin(); index != g_pointerHandlers.end(); ++index) {
-            if (index->token == token) {
+            if (index->first == token) {
                 g_pointerHandlers.erase(index);
                 return;
             }
@@ -318,31 +276,93 @@ namespace foundation {
     void WASMPlatform::logMsg(const char *fmt, ...) {
         va_list arglist;
         va_start(arglist, fmt);
-        const std::size_t capacity = msgLength(fmt, arglist);
-        //std::unique_ptr<std::uint16_t[]> logBuffer = std::make_unique<std::uint16_t[]>(capacity);
-        std::uint16_t *logBuffer = new std::uint16_t [capacity];
+        _output(false, fmt, arglist);
         va_end(arglist);
-        va_start(arglist, fmt);
-        const std::size_t length = msgFormat(logBuffer, fmt, arglist);
-        va_end(arglist);
-        js_log(logBuffer, length);
-        delete [] logBuffer;
     }
     void WASMPlatform::logError(const char *fmt, ...) {
         va_list arglist;
         va_start(arglist, fmt);
-        const std::size_t capacity = msgLength(fmt, arglist);
-        std::uint16_t *logBuffer = new std::uint16_t [capacity];
+        _output(true, fmt, arglist);
         va_end(arglist);
-        va_start(arglist, fmt);
-        const std::size_t length = msgFormat(logBuffer, fmt, arglist);
-        va_end(arglist);
-        js_log(logBuffer, length);
-        delete [] logBuffer;
         fatal();
+    }
+    
+    void WASMPlatform::_output(bool error, const char *fmt, va_list arglist) {
+        auto msgFormat = [](std::uint16_t *output, const char *fmt, va_list arglist) {
+            const std::uint16_t *start = output;
+            while (*fmt != '\0') {
+                if (*fmt == '%') {
+                    if (*++fmt == 'p') {
+                        const void *p = va_arg(arglist, void *);
+                        output += util::strstream::ptoa(output, p);
+                    }
+                    else if (*fmt == 'd') {
+                        const std::intptr_t d = va_arg(arglist, std::intptr_t);
+                        output += util::strstream::ltoa(output, d);
+                    }
+                    else if (*fmt == 'f') {
+                        const double f = va_arg(arglist, double);
+                        output += util::strstream::ftoa(output, f);
+                    }
+                    else if (*fmt == 's') {
+                        const char *s = va_arg(arglist, const char *);
+                        while (*s != 0) {
+                            *output++ = *s++;
+                        }
+                    }
+                    else {
+                        *output++ = *fmt;
+                    }
+                }
+                else {
+                    *output++ = *fmt;
+                }
+                fmt++;
+            }
+            *output++ = 0;
+            return output - start;
+        };
+        auto msgLength = [](const char *fmt, va_list arglist) {
+            std::size_t result = 0;
+            while (*fmt != '\0') {
+                if (*fmt == '%') {
+                    if (*++fmt == 'p') {
+                        va_arg(arglist, void *);
+                        result += sizeof(std::size_t);
+                    }
+                    else if (*fmt == 'd') {
+                        va_arg(arglist, std::intptr_t);
+                        result += 32;
+                    }
+                    else if (*fmt == 'f') {
+                        va_arg(arglist, double);
+                        result += 48;
+                    }
+                    else if (*fmt == 's') {
+                        const char *s = va_arg(arglist, const char *);
+                        result += (strlen(s) + 63) & ~std::size_t(63);
+                    }
+                    else {
+                        result++;
+                    }
+                }
+                else {
+                    result++;
+                }
+                fmt++;
+            }
+            
+            return result;
+        };
+        
+        const std::size_t capacity = msgLength(fmt, arglist);
+        const std::unique_ptr<std::uint16_t[]> logBuffer = std::make_unique<std::uint16_t[]>(capacity);
+        const std::size_t length = msgFormat(logBuffer.get(), fmt, arglist);
+        js_log(logBuffer.get(), length);
     }
 }
 
+// Exported to JS
 extern "C" {
     void updateFrame(float dt) {
         if (g_updateAndDraw) {
@@ -365,12 +385,26 @@ extern "C" {
         ::free(cb);
     }
     void taskExecute(foundation::AsyncTask *ptr) {
-
+        // TODO:
+        // Migrate to WASI-SDK (wasm32-wasi-threads)
     }
     void taskComplete(foundation::AsyncTask *ptr) {
         ptr->executeInBackground();
         ptr->executeInMainThread();
         delete ptr;
+    }
+    void editorEvent(std::uint16_t *evs, std::size_t length) {
+        if (auto p = g_instance.lock()) {
+            std::string msg = std::string(length + 1, 0);
+            for (std::size_t i = 0; i < length; i++) {
+                msg[i] = char(evs[i]);
+            }
+            for (auto &index : g_editorHandlers) {
+                if (index.second(msg)) {
+                    break;
+                }
+            }
+        }
     }
     void pointerEvent(foundation::PlatformPointerEventArgs::EventType type, std::uint32_t id, float x, float y) {
         if (auto p = g_instance.lock()) {
@@ -381,7 +415,7 @@ extern "C" {
                 .coordinateY = y
             };
             for (auto &index : g_pointerHandlers) {
-                if (index.handler(args)) {
+                if (index.second(args)) {
                     break;
                 }
             }

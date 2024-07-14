@@ -14,7 +14,7 @@
 
 namespace ui {
     enum class Action {
-        CAPTURE,
+        PRESS,
         MOVE,
         RELEASE
     };
@@ -48,7 +48,7 @@ namespace ui {
             virtual ~Element() = default;
         };
         struct Interactor : public virtual Element {
-            virtual void setActionHandler(Action action, util::callback<void(float x, float y)> &&handler) = 0;
+            virtual void setActionHandler(ui::Action action, util::callback<void(float x, float y)> &&handler) = 0;
             virtual ~Interactor() = default;
         };
         struct Pivot : public virtual Element {

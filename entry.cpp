@@ -41,7 +41,7 @@ extern "C" void initialize() {
     datahub = dh::DataHub::instance(platform, game::datahub);
     stateManager = game::StateManager::instance(platform, rendering, resourceProvider, scene, simulation, raycast, stage, datahub);
     stateManager->switchToState("default");
-        
+    
     platform->setLoop([](float dtSec) {
         datahub->update(dtSec);
         stateManager->update(dtSec);

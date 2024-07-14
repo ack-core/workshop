@@ -19,10 +19,6 @@ namespace foundation {
         bool isDirectory = false;
     };
     
-    struct PlatformEditorEventArgs {
-        std::string event;
-        double params[4];
-    };
     struct PlatformKeyboardEventArgs {
         enum class Key : std::uint32_t {
             A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
@@ -47,6 +43,7 @@ namespace foundation {
             UNKNOWN = 0,
             START,
             MOVE,
+            HOVER,
             FINISH,
             CANCEL
         };
@@ -121,7 +118,7 @@ namespace foundation {
         // @completion called from the main thread
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
-
+        
         // Let user to peek file to memory. Usable in editors
         // @return   - data != nullptr and size != 0 if file opened successfully.
         // @completion called from the main thread
@@ -147,31 +144,34 @@ namespace foundation {
         virtual void showKeyboard() = 0;
         virtual void hideKeyboard() = 0;
         
+        virtual void sendEditorMsg(const std::string &msg) = 0;
+        virtual void editorLoopbackMsg(const std::string &msg) = 0;
+        
         // Set handlers for editors
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) = 0;
+        virtual EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop = false) = 0;
         
         // Set handlers for keyboard
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) = 0;
+        virtual EventHandlerToken addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop = false) = 0;
         
         // Set handlers for User's input (virtual keyboard)
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) = 0;
+        virtual EventHandlerToken addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop = false) = 0;
         
         // Set handlers for PC mouse or touch
         // coordinateX/coordinateY of PlatformPointerEventArgs struct can be replaced on PC with user's value (PlatformInterface will set new pointer coordinates)
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) = 0;
+        virtual EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop = false) = 0;
         
         // Set handlers for gamepad
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) = 0;
+        virtual EventHandlerToken addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop = false) = 0;
         
         // Remove handlers of any type
         //

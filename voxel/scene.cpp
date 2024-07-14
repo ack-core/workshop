@@ -11,50 +11,55 @@
 
 #include <list>
 
-#define LINES_IN_BLOCK_MAX 7
-#define LINES_IN_BLOCK_MAX_2 14
-#define MSTR(s) STR(s)
-#define STR(s) #s
-
 namespace voxel {
     class LineSetImpl : public SceneInterface::LineSet {
     public:
-        struct LinesBlock {
-            math::vector4f position = {0, 0, 0, 1};
-            math::vector4f positions[LINES_IN_BLOCK_MAX_2];
-            math::color colors[LINES_IN_BLOCK_MAX];
-            std::uint32_t lineCount;
+        struct Line {
+            math::color rgba;
+            math::vector3f start;
+            math::vector3f end;
+            bool arrowHead = false;
         };
+
+        std::vector<Line> lines;
+        math::vector3f position;
         
-        std::vector<LinesBlock> blocks;
+        struct {
+            math::color rgba;
+            math::vector4f binormal;
+            math::vector4f tangent;
+            math::vector4f positions[2];
+        }
+        shaderConstants;
         
     public:
-        void setPosition(const math::vector3f &position) override {
-            for (auto &block : blocks) {
-                block.position = math::vector4f(position, 1.0f);
-            }
+        void setPosition(const math::vector3f &pos) override {
+            position = pos;
         }
-        void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) override {
-            std::uint32_t bindex = index / LINES_IN_BLOCK_MAX;
-            std::uint32_t offset = index % LINES_IN_BLOCK_MAX;
+        void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow) override {
+            if (index >= lines.size()) {
+                lines.resize(index + 1);
+            }
             
-            if (bindex < blocks.size()) {
-                blocks[bindex].positions[offset * 2 + 0] = math::vector4f(start, 0.0f);
-                blocks[bindex].positions[offset * 2 + 1] = math::vector4f(end, 0.0f);
-                blocks[bindex].colors[offset] = rgba;
-            }
+            lines[index].start = start;
+            lines[index].end = end;
+            lines[index].rgba = rgba;
+            lines[index].arrowHead = isArrow;
+        }
+        void fillShaderConstants(const Line &line) {
+            shaderConstants.rgba = line.rgba;
+            shaderConstants.positions[0].xyz = line.start + position;
+            shaderConstants.positions[1].xyz = line.end + position;
+            
+            const math::vector3f lineDir = (line.end - line.start).normalized();
+            const math::vector3f axis = lineDir.dot({0, 1, 0}) > 0.9f ? math::vector3f(0, 0, 1) : math::vector3f(0, 1, 0);
+
+            shaderConstants.binormal.xyz = lineDir.cross(axis).normalized();
+            shaderConstants.tangent.xyz = shaderConstants.binormal.xyz.cross(lineDir);
         }
         
     public:
-        LineSetImpl(std::uint32_t count) {
-            std::uint32_t left = count % LINES_IN_BLOCK_MAX;
-            for (std::uint32_t i = 0; i < count / LINES_IN_BLOCK_MAX; i++) {
-                blocks.emplace_back().lineCount = LINES_IN_BLOCK_MAX;
-            }
-            if (left) {
-                blocks.emplace_back().lineCount = left;
-            }
-        }
+        LineSetImpl() {}
         ~LineSetImpl() override {}
     };
     
@@ -249,16 +254,16 @@ namespace voxel {
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
-        auto addLineSet(std::uint32_t count) -> LineSetPtr override;
+        auto addLineSet() -> LineSetPtr override;
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
         auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr override;
         auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const EmitterParams &emitter) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
-        
-        auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f override;
-        auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f override;
+        auto getCameraPosition() const -> math::vector3f override;
+        auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f override;
+        auto getWorldDirection(const math::vector2f &screenPosition, math::vector3f *outCamPosition) const -> math::vector3f override;
         void updateAndDraw(float dtSec) override;
         
     private:
@@ -291,7 +296,7 @@ namespace voxel {
         
         foundation::RenderTexturePtr _palette;
         
-        foundation::RenderShaderPtr _lineSetShader;
+        foundation::RenderShaderPtr _lineShader;
         foundation::RenderShaderPtr _boundingBoxShader;
         foundation::RenderShaderPtr _staticMeshShader;
         foundation::RenderShaderPtr _dynamicMeshShader;
@@ -317,24 +322,38 @@ namespace voxel {
 // TODO: shader evolution
 // + const {...} const {...} <- few 'const' blocks
 // + myOpenArray[] : float4 <- open arrays in constant block
-// + structsArray[] : struct { position: float4 color: float4 } <- arrays of structures in constant block
 // + fssrc [tex2d tex3d cube] {...} <- types of samplers
-// + _staticloop() {...}
 //
 namespace {
-    const char *g_lineSetShaderSrc = R"(
+    const char *g_lineShaderSrc = R"(
+        fixed {
+            offset[34] : float3 =
+                [0.00, 0.00, 0][0.00, 0.00, 0]
+                [0.00, 0.00, 0][0.00, 1.00, 0.5][0.00, 1.00, 0.5][0.71, 0.71, 0.5]
+                [0.00, 0.00, 0][0.71, 0.71, 0.5][0.71, 0.71, 0.5][1.00, 0.00, 0.5]
+                [0.00, 0.00, 0][1.00, 0.00, 0.5][1.00, 0.00, 0.5][0.71, -0.71, 0.5]
+                [0.00, 0.00, 0][0.71, -0.71, 0.5][0.71, -0.71, 0.5][0.00, -1.00, 0.5]
+                [0.00, 0.00, 0][0.00, -1.00, 0.5][0.00, -1.00, 0.5][-0.71, -0.71, 0.5]
+                [0.00, 0.00, 0][-0.71, -0.71, 0.5][-0.71, -0.71, 0.5][-1.00, 0.00, 0.5]
+                [0.00, 0.00, 0][-1.00, 0.00, 0.5][-1.00, 0.00, 0.5][-0.71, 0.71, 0.5]
+                [0.00, 0.00, 0][-0.71, 0.71, 0.5][-0.71, 0.71, 0.5][0.00, 1.00, 0.5]
+        }
         const {
-            globalPosition : float4
-            linePositions[)" MSTR(LINES_IN_BLOCK_MAX_2) R"(] : float4
-            lineColors[)" MSTR(LINES_IN_BLOCK_MAX) R"(] : float4
+            color : float4
+            binormal : float4
+            tangent : float4
+            positions[2] : float4
         }
         inout {
             color : float4
         }
         vssrc {
-            float4 position = const_linePositions[vertex_ID] + const_globalPosition;
-            output_position = _transform(position, frame_plmVPMatrix);
-            output_color = const_lineColors[vertex_ID >> 1];
+            float3 inrm = _cross(const_binormal.xyz, const_tangent.xyz) * fixed_offset[vertex_ID].z;
+            float3 headDir = 0.15 * (fixed_offset[vertex_ID].x * const_binormal.xyz + fixed_offset[vertex_ID].y * const_tangent.xyz) + inrm;
+            float3 position = const_positions[_min(vertex_ID, 1)].xyz + headDir;
+            
+            output_position = _transform(float4(position, 1.0), frame_plmVPMatrix);
+            output_color = const_color;
         }
         fssrc {
             output_color[0] = input_color;
@@ -542,7 +561,7 @@ namespace voxel {
     , _rendering(rendering)
     {
         _palette = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, {resource::PALETTE});
-        _lineSetShader = rendering->createShader("scene_static_lineset", g_lineSetShaderSrc, foundation::InputLayout {});
+        _lineShader = rendering->createShader("scene_static_lineset", g_lineShaderSrc, foundation::InputLayout {});
         _boundingBoxShader = rendering->createShader("scene_static_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
             .repeat = 24
         });
@@ -593,8 +612,8 @@ namespace voxel {
     
     }
     
-    SceneInterface::LineSetPtr SceneInterfaceImpl::addLineSet(std::uint32_t count) {
-        return _lineSets.emplace_back(std::make_shared<LineSetImpl>(count));
+    SceneInterface::LineSetPtr SceneInterfaceImpl::addLineSet() {
+        return _lineSets.emplace_back(std::make_shared<LineSetImpl>());
     }
     
     SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::bound3f &bbox) {
@@ -625,7 +644,11 @@ namespace voxel {
         return nullptr;
     }
     
-    math::vector2f SceneInterfaceImpl::getScreenCoordinates(const math::vector3f &worldPosition) {
+    math::vector3f SceneInterfaceImpl::getCameraPosition() const {
+        return _camera.position;
+    }
+    
+    math::vector2f SceneInterfaceImpl::getScreenCoordinates(const math::vector3f &worldPosition) const {
         math::vector4f tpos = math::vector4f(worldPosition, 1.0f);
         
         tpos = tpos.transformed(_camera.stdVPMatrix);
@@ -643,7 +666,11 @@ namespace voxel {
         return result;
     }
     
-    math::vector3f SceneInterfaceImpl::getWorldDirection(const math::vector2f &screenPosition) {
+    math::vector3f SceneInterfaceImpl::getWorldDirection(const math::vector2f &screenPosition, math::vector3f *outCamPosition) const {
+        if (outCamPosition) {
+            *outCamPosition = _camera.position;
+        }
+        
         float relScreenPosX = 2.0f * screenPosition.x / _platform->getScreenWidth() - 1.0f;
         float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
         
@@ -705,11 +732,12 @@ namespace voxel {
                 });
                 rendering.draw(emitter->particleCount);
             }
-            rendering.applyShader(_lineSetShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
+            rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &set : _lineSets) {
-                for (std::size_t i = 0; i < set->blocks.size(); i++) {
-                    rendering.applyShaderConstants(&set->blocks[i]);
-                    rendering.draw(set->blocks[i].lineCount * 2);
+                for (const auto &line : set->lines) {
+                    set->fillShaderConstants(line);
+                    rendering.applyShaderConstants(&set->shaderConstants);
+                    rendering.draw(2 + (line.arrowHead ? 32 : 0));
                 }
             }
             rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);

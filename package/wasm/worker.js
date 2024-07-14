@@ -27,9 +27,9 @@ onmessage = (msg) => {
                 },
                 js_task: (task) => { throw "can't start task in background" },
                 js_fetch: (block, pathLen) => { throw "can't read files in background" },
+                js_editorMsg: (str, len) => { throw "can't message to editor from background" },
                 js_canvas_width: () => { throw "can't access canvas from background" },
                 js_canvas_height: () => { throw "can't access canvas from background" },
-                js_dbg: (s, value) => { console.log("T--->>> ", s, " | ", value); },
                 webgl_createProgram: (vsrc, vlen, fsrc, flen) => { throw "can't access webgl from background" },
                 webgl_createData: (layout, layoutLen, ptr, dataLen, stride, idx, icount) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },
@@ -56,8 +56,7 @@ onmessage = (msg) => {
         });
     }
     if (msg.data.type == EventType.BTASK) {
-        const task = msg.data.task;
-        instance.exports.taskExecute(task);
-        postMessage({type: EventType.FTASK, task});
+        instance.exports.taskExecute(msg.data.task);
+        postMessage({type: EventType.FTASK, task: msg.data.task});
     }
 };

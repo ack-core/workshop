@@ -21,12 +21,14 @@ namespace foundation {
         
         void showKeyboard() override;
         void hideKeyboard() override;
+        void sendEditorMsg(const std::string &msg) override;
+        void editorLoopbackMsg(const std::string &msg) override;
         
-        EventHandlerToken addEditorEventHandler(util::callback<void(const PlatformEditorEventArgs &)> &&handler) override;
-        EventHandlerToken addKeyboardEventHandler(util::callback<void(const PlatformKeyboardEventArgs &)> &&handler) override;
-        EventHandlerToken addInputEventHandler(util::callback<void(const char(&utf8char)[4])> &&input, util::callback<void()> &&backspace) override;
-        EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler) override;
-        EventHandlerToken addGamepadEventHandler(util::callback<void(const PlatformGamepadEventArgs &)> &&handler) override;
+        EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop) override;
+        EventHandlerToken addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) override;
+        EventHandlerToken addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) override;
+        EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) override;
+        EventHandlerToken addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) override;
         
         void removeEventHandler(EventHandlerToken token) override;
 
@@ -38,6 +40,8 @@ namespace foundation {
         void logError(const char *fmt, ...) override;
 
     private:
+        void _output(bool error, const char *fmt, va_list arglist);
+
         std::string _dataPath;
     };
 }

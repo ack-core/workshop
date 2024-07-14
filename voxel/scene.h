@@ -33,7 +33,7 @@ namespace voxel {
     public:
         struct LineSet {
             virtual void setPosition(const math::vector3f &position) = 0;
-            virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
+            virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow = false) = 0;
             virtual ~LineSet() = default;
         };
         struct BoundingBox {
@@ -76,7 +76,7 @@ namespace voxel {
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
-        virtual auto addLineSet(std::uint32_t count) -> LineSetPtr = 0;
+        virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
         virtual auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr = 0;
         virtual auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr = 0;
@@ -84,9 +84,10 @@ namespace voxel {
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const voxel::SceneInterface::EmitterParams &emitter) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
-        virtual auto getScreenCoordinates(const math::vector3f &worldPosition) -> math::vector2f = 0;
-        virtual auto getWorldDirection(const math::vector2f &screenPosition) -> math::vector3f = 0;
-
+        virtual auto getCameraPosition() const -> math::vector3f = 0;
+        virtual auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f = 0;
+        virtual auto getWorldDirection(const math::vector2f &screenPosition, math::vector3f *outCamPosition = nullptr) const -> math::vector3f = 0;
+        
         virtual void updateAndDraw(float dtSec) = 0;
         
     public:

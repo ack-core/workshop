@@ -139,12 +139,12 @@ elseif (PLATFORM STREQUAL "PLATFORM_IOS")
 elseif (PLATFORM STREQUAL "PLATFORM_WASM")
 	if (APPTYPE STREQUAL "IS_CLIENT")
 		set_target_properties(workshop PROPERTIES OUTPUT_NAME "index")
-	elseif (APPTYPE STREQUAL "IS_PE")
-		set_target_properties(workshop PROPERTIES OUTPUT_NAME "pe")
+	elseif (APPTYPE STREQUAL "IS_EDITOR")
+		set_target_properties(workshop PROPERTIES OUTPUT_NAME "editor")
 	endif()
-	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free) # --wrap=malloc --wrap=free
+	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free)
 	target_link_options(workshop PUBLIC --export=updateFrame --export=fileLoaded --export=taskExecute --export=taskComplete)
-	target_link_options(workshop PUBLIC --export=pointerEvent --export=resized)
+	target_link_options(workshop PUBLIC --export=pointerEvent --export=editorEvent --export=resized)
 endif()
 
 
