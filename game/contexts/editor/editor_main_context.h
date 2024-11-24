@@ -10,6 +10,9 @@ namespace game {
         MovingTool(const API &api, math::vector3f &target);
         ~MovingTool();
         
+        void setPosition(const math::vector3f &position);
+        const math::vector3f &getPosition() const;
+        
     public:
         const API &_api;
         math::vector3f &_target;
@@ -32,12 +35,23 @@ namespace game {
         
     private:
         const API _api;
+        foundation::EventHandlerToken _editorEventsToken;
         voxel::SceneInterface::LineSetPtr _axis;
         
         std::unique_ptr<MovingTool> _movingTool;
-        std::unordered_map<std::string, EditorNode> _nodes;
+        std::unordered_map<std::string, std::unique_ptr<EditorNode>> _nodes;
+        std::unordered_map<std::string, void (EditorMainContext::*)(const std::string &)> _handlers;
         
         ui::ImagePtr _testButton1;
         ui::ImagePtr _testButton2;
+        
+    private:
+        void _createNode(const std::string &data);
+        void _selectNode(const std::string &data);
+        void _renameNode(const std::string &data);
+        void _moveNodeX(const std::string &data);
+        void _moveNodeY(const std::string &data);
+        void _moveNodeZ(const std::string &data);
+        void _clearNodeSelection(const std::string &data);
     };
 }

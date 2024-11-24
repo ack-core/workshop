@@ -101,7 +101,7 @@ namespace util {
         }
         
         operator bool() const {
-            return _current < _end && !_error;
+            return _current <= _end && !_error;
         }
         
         template<typename T, typename std::enable_if_t<std::is_integral_v<T>>* = nullptr> strstream &operator >> (T& value) {
@@ -144,10 +144,13 @@ namespace util {
         
         static std::int64_t atoi(const char *s, std::size_t &len);
         static double atof(const char *s, std::size_t &len);
-        static std::size_t ptoa(std::uint16_t *p, const void *ptr);
-        static std::size_t ltoa(std::uint16_t* p, std::int64_t value);
-        static std::size_t ftoa(std::uint16_t *p, double f);
         
+        static std::size_t ptow(std::uint16_t *p, const void *ptr);
+        static std::size_t ltow(std::uint16_t *p, std::int64_t value);
+        static std::size_t ftow(std::uint16_t *p, double f);
+        static std::size_t ltoa(char *p, std::int64_t value);
+        static std::string ftos(double f);
+
         const char *_end;
         const char *_current;
         bool _error;

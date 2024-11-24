@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 <head>
     <title>ack-core editor</title>
     <meta charset="utf-8">
@@ -21,7 +21,7 @@
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
-            z-index: 0;
+            z-index: -999;
         }
         .editor {
             background: transparent;
@@ -30,10 +30,9 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 999;
         }
         .top {
-            background: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.7);
             position: fixed;
             top: 0;
             left: 0;
@@ -41,9 +40,10 @@
             width: 100%;
         }
         .nodes {
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.5);
             position: fixed;
             overflow-y: auto;
+            scrollbar-color: rgba(255, 255, 255, 0.6) transparent;
             top: 25px;
             left: 0;
             min-width: 100px;
@@ -61,7 +61,7 @@
             font-family: Courier New;
         }
         .inspect {
-            background: transparent; /*rgba(255, 255, 255, 0.6);*/
+            background: transparent;
             position: fixed;
             overflow-y: auto;
             top: 25px;
@@ -74,14 +74,41 @@
             background-position: top 0px right 0.5px;
         }
         .webix_el_text input {
-            padding: 1px;
+            padding: 2px;
         }
         .webix_inp_label, .webix_el_box {
             font-size: 8pt !important;
         }
+        .webix_list_item, .webix_list .webix_list_item.webix_selected {
+            line-height: 20px;
+            padding-top: 0;
+        }
         .webix_button {
-            padding-top: 0.5px;
-            padding-left: 3px;
+            padding: 0.5px 2px 0px 2px
+        }
+        .webix_secondary .webix_button {
+            background: #d8d8d8;
+        }
+        .webix_view .webix_list {
+            background-color: rgba(255, 255, 255, 0.6);
+        }
+        .webix_el_text input {
+            background-color: #eeeeee;
+        }
+        .webix_el_combo input {
+            padding: 0px 2px 0px 2px !important;
+        }
+        .webix_el_combo .webix_input_icon {
+            width: 19px;
+        }        
+        .webix_segment_0.webix_selected, .webix_segment_1.webix_selected, .webix_segment_N.webix_selected {
+            background-color: #cfcfef;
+        }
+        .webix_segment_0.webix_selected:focus, .webix_segment_1.webix_selected:focus, .webix_segment_N.webix_selected:focus {
+            background-color: #cfcfef;
+        }
+        .webix_segment_0.webix_selected:hover, .webix_segment_1.webix_selected:hover, .webix_segment_N.webix_selected:hover {
+            background-color: #cfcfef;
         }
         .webix_accordionitem_button {
             font-size: 10px !important;
@@ -98,6 +125,7 @@
         .webix_accordionitem.collapsed .webix_accordionitem_header {
             background-color: lightGray;
         }
+        
         input[type=number]::-webkit-inner-spin-button {
             transform: scaleX(0.75);
             position: absolute;
@@ -134,13 +162,14 @@
     
     <!-- <script type="text/javascript" src="wasm.js" binary="editor.wasm"></script> -->
     <script type="text/javascript" charset="utf-8">
-        ["nodes", "output"].forEach(name => {
+        ["nodes", "output", "inspect", "top"].forEach(name => {
             document.getElementById(name).addEventListener("pointerdown", (event) => {
                 event.stopPropagation();
                 return false;
             });
         })
 
+        const TOOLTIP_DELAY = 800;
         var uiNodeTree = null;
 
         let utility = {
@@ -151,14 +180,9 @@
                 uiNodeTree.define("width", leaves.clientWidth);
                 uiNodeTree.define("height", leaves.clientHeight);
                 uiNodeTree.resize();
-            }
-        }
-
-        let actions = {
-            saveAll: function(id) {
-                var name = "root_0.nnn.aaaaaaaaaa_0";
+            },
+            addItemToNodeTree: function(name) {
                 var lastParent = null;
-
                 name.split('.').forEach(node => {
                     const current = lastParent ? lastParent + "." + node : node;
                     if (uiNodeTree.exists(current) == false) {
@@ -167,140 +191,271 @@
 
                     lastParent = current;
                 });
-            },
-            setCamera: function(id) {
 
+                uiNodeTree.select(name);
+            }
+        }
 
-            },
+        let actions = {
             openProjectDir: async function(id) {
                 const directoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
                 $$("top_label_project_dir").setValue("Project directory: " + directoryHandle.name);
             },
-            addStaticMesh: function(id) {
+        }
+        let elements = {
+            label: function(value, align = "left") {
+                return { 
+                    view: "label", label: value, height: 24, autowidth: true, align: align
+                };
+            },
+            button: function(value, tooltip, action = null) {
+                const id = webix.uid().toString();
+                return { 
+                    id: id, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: TOOLTIP_DELAY },
+                    click: () => { if (action) action($$(id)); }
+                };
+            },
+            text: function(id, value, readonly, action = null) {
+                return { 
+                    id: id, view: "text", type: "text", value: value, height: 24, readonly: readonly,
+                    on: {
+                        onEnter: function() { this.blur(); },
+                        onChange: function(nv, old) {
+                            if (action) action($$(id), nv, old);
+                        }
+                    }
+                };
+            },
+            number: function(id, tooltip, width, format, value, step, min, max, action = null) {
+                return { 
+                    id: id, view: "text", type:"number", format: format, value: value, height: 24, width: width, 
+                    on: {
+                        onEnter: function() { this.blur(); },
+                        onChange: function(nv, old) {
+                            if (action) action($$(id), nv, old);
+                        }
+                    },
+                    attributes:{ step: step, min: min, max: max }
+                };
+            },
+            toggle: function() {
 
             },
-            addParticles: function(id) {
+            combo: function(value, list, action = null) {
+                const id = webix.uid().toString();
+                return {
+                    id: id, view: "combo", container: "editor", value: value, height: 24,
+                    options:{
+                        view: "suggest",
+                        body: {
+                            view: "list",
+                            type: {
+                                height: 22
+                            },
+                            data: list,
+                        }
+                    },
+                    on: {
+                        onChange: (nv, old) => { if (action) action($$(id), nv, old); }
+                    }
+                };
+            },
+            segmented: function() {
 
             }
         }
-
+        
         webix.ui({
             container: "top",
             margin: 0,
             rows: [
                 {cols: [
-                    { view: "button",  id: "top_save_all",  value: "\uD83D\uDCBE", width: 24, height: 24, click: actions.saveAll },
-                    { view: "button",  id: "top_set_camera",  value: "\uD83C\uDFA5", width: 24, height: 24, click: actions.setCamera },
-                    { view: "button",  id: "top_open_project_dir",  value: "\uD83D\uDDC4", width: 24, height: 24, click: actions.openProjectDir },
-                    { view: "label", id: "top_label_project_dir", label: "Project directory: D:/?", height: 24 },
-                    
+                    elements.button("\uD83D\uDCE4", "Load scene"),
+                    elements.button("\uD83D\uDCBE", "Save scene"),                    
                 ], autoheight: true}
             ]
         });
         webix.ui({
             container: "nodes",
-            id: "nodesPanel",
-            rows: [
+            cols: [
                 {
-                    id: "nodeTree",
-                    view: "tree",
-                    type: "lineTree",
-                    select: true,
-                    template: "{common.icon()}&nbsp;#value#",
-                    css: { "background" : "transparent", "color" : "lightGray" },
-                    borderless: true,
-                    scroll: false,
-                    data: [],
-                    on: {
-                        onAfterOpen: utility.adjustTree,
-                        onAfterClose: utility.adjustTree,
-                        onAfterAdd: utility.adjustTree,
-                        onBeforeSelect: function(id, selection) {
-                            return selection == false || uiNodeTree.isBranch(id) == false;
-                        },
-                        onBlur: function(e) {
-                            uiNodeTree.unselectAll();
-                        }
-                    }
+                    rows: [
+                        elements.button("\u2795", "New node", (e) => {
+                            $$("new_node_menu").show(e.getNode(), {pos: "right"});
+                        }),
+                        elements.button("\u274C", "Delete node", (e) => {
+
+                        }),
+                        {}
+                    ]
                 },
-                {}
+                {
+                    rows: [
+                        {
+                            id: "nodeTree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, data: [],
+                            template: "{common.icon()}&nbsp;#value#",
+                            css: { "background" : "transparent", "color" : "lightGray" },
+                            on: {
+                                onAfterOpen: utility.adjustTree,
+                                onAfterClose: utility.adjustTree,
+                                onAfterAdd: utility.adjustTree,
+                                onBeforeSelect: function(id, selection) {
+                                    return selection == false || uiNodeTree.isBranch(id) == false;
+                                },
+                                onAfterSelect: function(id) {
+                                    uiEditor.sendMsg("editor.selectNode", id);
+                                }
+                            }
+                        },
+                        { id: "space"}
+                    ]
+                }
             ]
         });
+        webix.event($$("space").getNode(), "click", function(e) {
+            uiNodeTree.unselectAll();
+            uiEditor.sendMsg("editor.clearNodeSelection", "");
+        });
         webix.ui({
-            container: "editor",
-            view: "contextmenu",
+            id: "new_node_menu", container: "editor", view: "contextmenu", master: "nodes",
             data: [
-                { value: "Add Static Mesh", click: actions.addStaticMesh },
-                { value: "Add Particles", click: actions.addParticles }
+                { id: "0", value: "Add Static Mesh" },
+                { id: "1", value: "Add Particles" }
             ],
-            master: "nodes",
             submenuConfig: {
                 type: {
-                    height: 28
+                    height: 22
                 },
             },
+            on: {
+                onMenuItemClick: function(id, e, node) {
+                    uiEditor.sendMsg("editor.createNode", id);
+                }
+            }
         });
         webix.ui({
-            id: "inspect_static_mesh",
-            container: "inspect",
-            view: "accordion",
-            type: "clean",
-            multi: true,
-            borderless: true,
+            id: "inspectPanel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true,
             rows: [
                 {
-                    view: "accordionitem",
-                    header: "Node Parameters",
-                    headerHeight: 10,
-                    headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.6)", "color" : "lightGray" },
+                    id: "node_0", view: "accordionitem", hidden: false, header: "Node Parameters", headerHeight: 10, headerAltHeight: 10,
+                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
                     body: {
                         padding: 3,
                         rows: [
                             {cols: [
-                                { view: "label", label: "Name:", height: 24, autowidth: true }, 
-                                { id: "inspect_node_name", view: "text", type:"text", value: "unnamed_000", height: 24, on: {
-                                    onEnter: function(e) {
-                                        $$("inspect_node_name").blur();
+                                elements.label("Name:"),
+                                elements.text("inspect_node_name", "", false, (e, nv, old) => {
+                                    if (/^[A-Za-z0-9_\.]*$/.test(nv) && !uiNodeTree.exists(nv)) {
+                                        uiEditor.sendMsg("editor.renameNode", old + " " + nv);
                                     }
-                                } },
+                                    else {
+                                        this.blockEvent();
+                                        this.setValue(old);
+                                        this.unblockEvent();
+                                    }
+                                }),
                             ]},
                             {cols: [
-                                { view: "label", label: "X:", height: 24, autowidth: true }, 
-                                { id: "inspect_node_x", view: "text", type:"number", format:"1.0", value: 0.0, height: 24, width: 50, on: {
-                                    onEnter: function(e) {
-                                        $$("inspect_node_x").blur();
-                                    }
-                                } },
-                                { view: "label", label: "Y:", height: 24, autowidth: true }, 
-                                { id: "inspect_node_y", view: "text", type:"number", format:"1.0", value: 0.0, height: 24, width: 50, on: {
-                                    onEnter: function(e) {
-                                        $$("inspect_node_y").blur();
-                                    }
-                                } },
-                                { view: "label", label: "Z:", height: 24, autowidth: true }, 
-                                { id: "inspect_node_z", view: "text", type:"number", format:"1.0", value: 0.0, height: 24, width: 50, on: {
-                                    onEnter: function(e) {
-                                        $$("inspect_node_z").blur();
-                                    }
-                                } },
+                                elements.label("X:"),
+                                elements.number("inspect_node_x", null, 60, "11111.00", 0.0, 0.01, -9999.0, 9999.0, (e, nv, old) => {
+                                    uiEditor.sendMsg("editor.moveNodeX", nv.toString());
+                                }),
+                                elements.label("Y:"),
+                                elements.number("inspect_node_y", null, 60, "11111.00", 0.0, 0.01, -9999.0, 9999.0, (e, nv, old) => {
+                                    uiEditor.sendMsg("editor.moveNodeY", nv.toString());
+                                }),
+                                elements.label("Z:"),
+                                elements.number("inspect_node_z", null, 60, "11111.00", 0.0, 0.01, -9999.0, 9999.0, (e, nv, old) => {
+                                    uiEditor.sendMsg("editor.moveNodeZ", nv.toString());
+                                }),
                             ]},
                             { height: 16 }
                         ]
                     }
                 },
                 {
-                    view: "accordionitem",
-                    header: "Static Mesh Parameters",
-                    headerHeight: 10,
-                    headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.6)", "color" : "lightGray" },
+                    id: "static_mesh_0", view: "accordionitem", hidden: false, header: "Static Mesh Resource", headerHeight: 10, headerAltHeight: 10,
+                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
                     body: {
                         padding: 3,
                         rows: [
                             {cols: [
-                                { view: "label", label: "Path: Undefined", height: 24 },
+                                elements.label("Path:"),
+                                elements.text("inspect_mesh_path", "<Not selected>", true),
+                                elements.button("\uD83D\uDD0E", "Browse resource"),
+                                elements.button('<img src="editor/wastebin.svg"></img>', "Delete resource"),
                             ]},
+                            elements.label("Already in resources:", "center"),
+                            {
+                                view: "list", height: 300, select: true,
+                                type: {
+                                    height: 22
+                                },
+                                data: [
+                                    "lib/path/aaa1", "lib/path/bbbbbbbb1", "lib/path/cc1",
+                                    "lib/path/aaa2", "lib/path/bbbbbbbb2", "lib/path/cc2",
+                                    "lib/path/aaa3", "lib/path/bbbbbbbb3", "lib/path/cc3",
+                                    "lib/path/aaa4", "lib/path/bbbbbbbb4", "lib/path/cc4",
+                                    "lib/path/aaa5", "lib/path/bbbbbbbb5", "lib/path/cc5"
+                                ]
+                            },
+                            { height: 16 }
+                        ]
+                    }
+                },
+                {
+                    id: "particles_0", view: "accordionitem", hidden: false, header: "Particles Shape", headerHeight: 10, headerAltHeight: 10,
+                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                    body: {
+                        padding: 3,
+                        rows: [
+                            {cols: [
+                                elements.label("Start shape:"),
+                                elements.combo("Sphere", ["Sphere", "CircleXZ", "DiskXZ", "Custom..."], (e, nv, old) => {
+
+                                }),
+                                elements.number("inspect_ptc_sshape_radius", "Start shape radius", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
+
+                                }),
+                                { 
+                                    view: "toggle",  offLabel: ' ', onLabel: '<img src="editor/arrows.svg"></img>', width: 24, height: 24, value: true,
+                                    tooltip: { template: "Hide/show moving tool", delay: TOOLTIP_DELAY } 
+                                },
+                            ]},
+                            {cols: [
+                                elements.label("End shape:"),
+                                elements.combo("Sphere", ["Sphere", "CircleXZ", "DiskXZ", "Custom..."], (e, nv, old) => {
+
+                                }),
+                                elements.number("inspect_ptc_eshape_radius", "End shape radius", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
+
+                                }),
+                                {
+                                    view: "toggle", offLabel: ' ', onLabel: '<img src="editor/arrows.svg"></img>', width: 24, height: 24, value: true,
+                                    tooltip: { template: "Hide/show moving tool", delay: TOOLTIP_DELAY }
+                                }
+                            ]},
+                            {cols: [
+                                elements.label("Start-to-End Mapping:"),
+                                elements.combo("Nearest", ["Nearest", "Random"], (e, nv, old) => {
+                                    console.log("-->>> ", e.getList().getIndexById(nv));
+                                }),
+                            ]},
+                            elements.label("Coordinates graph:", "center"),
+                            { 
+                                view: "segmented", height: 24, 
+                                options: [
+                                    { id: "1", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "2", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "3", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "4", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "5", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "6", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "7", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "8", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "9", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                ]
+                            },                            
                             { height: 16 }
                         ]
                     }
@@ -309,9 +464,62 @@
             ]
         });
 
+        uiNodeName = $$("inspect_node_name");
         uiNodeTree = $$("nodeTree");
+        uiInspectPanel = $$("inspectPanel");
+        uiInspectType = null;
+        uiInspectMapping = {
+            "null" : [],
+            "inspect_static_mesh" : ["node_0", "static_mesh_0"],
+            "inspect_particles" : ["node_0", "particles_0"]
+        };
 
+        function showInspectPanel(panel) {
+            uiInspectMapping[uiInspectType].forEach(item => {
+                $$(item).hide();
+            });
+            uiInspectMapping[panel].forEach(item => {
+                $$(item).show();
+            });
+            uiInspectType = panel;
+        }
 
+        if (typeof uiEditor != 'undefined') {
+            uiEditor["engine.nodeCreated"] = function(data) {
+                const [name, panel] = data.split(' ');
+                utility.addItemToNodeTree(name);
+                uiNodeName.blockEvent();
+                uiNodeName.setValue(name);
+                uiNodeName.unblockEvent();
+                showInspectPanel(panel);
+            }
+            uiEditor["engine.nodeSelected"] = function(data) {
+                const [name, panel] = data.split(' ');
+                showInspectPanel(panel);
+                uiNodeName.blockEvent();
+                uiNodeName.setValue(name);
+                uiNodeName.unblockEvent();
+            }
+            uiEditor["engine.nodeRenamed"] = function(data) {
+                var [old, nv] = data.split(' ');
+                do {
+                    parentId = uiNodeTree.getParentId(old);
+                    uiNodeTree.remove(old);
+                    old = parentId;
+                }
+                while (uiNodeTree.isBranch(old) == false);
+                utility.addItemToNodeTree(nv);
+            }
+            uiEditor["engine.nodeCoordinates"] = function(data) {
+                const [x, y, z] = data.split(' ');
+                Object.entries({inspect_node_x: x, inspect_node_y: y, inspect_node_z: z}).forEach(([k, v]) => {
+                    const element = $$(k);
+                    element.blockEvent();
+                    element.setValue(v);
+                    element.unblockEvent();
+                });
+            }
+        }
     </script>
 </body>
 </html>

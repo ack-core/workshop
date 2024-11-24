@@ -41,7 +41,7 @@ namespace util {
         len = input - s;
         return out + double(ipart);
     }
-    std::size_t strstream::ptoa(std::uint16_t *p, const void *ptr) {
+    std::size_t strstream::ptow(std::uint16_t *p, const void *ptr) {
         const int len = 2 * sizeof(std::size_t);
         std::uint16_t *output = p + len - 1;
         std::size_t n = std::size_t(ptr);
@@ -52,7 +52,7 @@ namespace util {
         }
         return len;
     }
-    std::size_t strstream::ltoa(std::uint16_t* p, std::int64_t value) {
+    std::size_t strstream::ltow(std::uint16_t *p, std::int64_t value) {
         std::int64_t absvalue = value < 0 ? -value : value;
         std::uint16_t *output = p;
 
@@ -74,16 +74,66 @@ namespace util {
 
         return result;
     }
-    std::size_t strstream::ftoa(std::uint16_t *p, double f) {
+    std::size_t strstream::ftow(std::uint16_t *p, double f) {
         std::uint16_t *output = p;
         const double af = std::abs(f);
         std::int64_t ipart = std::int64_t(af);
-        double remainder = 1000000000.0 * (af - double(ipart));
+        double remainder = 10000000.0 * (af - double(ipart));
         std::int64_t fpart = std::int64_t(remainder);
         
         if ((remainder - double(fpart)) > 0.5) {
             fpart++;
-            if (fpart > 1000000000) {
+            if (fpart > 10000000) {
+                fpart = 0;
+                ipart++;
+            }
+        }
+        
+        if (f < 0.0) *output++ = '-';
+        output += ltow(output, ipart);
+        
+        int width = 10;
+        while (fpart % 10 == 0 && width-- > 0) {
+            fpart /= 10;
+        }
+        *output++ = '.';
+        
+        output += ltow(output, fpart);
+        return output - p;
+    }
+    std::size_t strstream::ltoa(char *p, std::int64_t value) {
+        std::int64_t absvalue = value < 0 ? -value : value;
+        char *output = p;
+
+        do {
+            *output++ = "0123456789ABCDEF"[absvalue % 10];
+            absvalue /= 10;
+        }
+        while (absvalue);
+
+        if (value < 0) *output++ = '-';
+        std::size_t result = output - p;
+        output--;
+        
+        while(p < output) {
+            char tmp = *output;
+            *output-- = *p;
+            *p++ = tmp;
+        }
+
+        return result;
+    }
+    std::string strstream::ftos(double f) {
+        std::string result = std::string(48, 0);
+        char *output = result.data();
+        const double af = std::abs(f);
+        std::int64_t ipart = std::int64_t(af);
+        double remainder = 10000000.0 * (af - double(ipart));
+        std::int64_t fpart = std::int64_t(remainder);
+        
+        if ((remainder - double(fpart)) > 0.5) {
+            fpart++;
+            if (fpart > 10000000) {
                 fpart = 0;
                 ipart++;
             }
@@ -92,18 +142,16 @@ namespace util {
         if (f < 0.0) *output++ = '-';
         output += ltoa(output, ipart);
         
-        int width = 9;
+        int width = 10;
         while (fpart % 10 == 0 && width-- > 0) {
             fpart /= 10;
         }
-        output += width + 1;
-        std::size_t result = output - p;
-        while (width--) {
-            *--output = fpart % 10 + '0';
-            fpart /= 10;
-        }
-        *--output = '.';
+        *output++ = '.';
+        
+        output += ltoa(output, fpart);
+        result.resize(output - result.data());
         return result;
     }
+    
 
 }

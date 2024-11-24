@@ -144,13 +144,13 @@ namespace foundation {
         virtual void showKeyboard() = 0;
         virtual void hideKeyboard() = 0;
         
-        virtual void sendEditorMsg(const std::string &msg) = 0;
-        virtual void editorLoopbackMsg(const std::string &msg) = 0;
+        virtual void sendEditorMsg(const std::string &msg, const std::string &data) = 0;
+        virtual void editorLoopbackMsg(const std::string &msg, const std::string &data) = 0;
         
         // Set handlers for editors
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop = false) = 0;
+        virtual EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop = false) = 0;
         
         // Set handlers for keyboard
         // @return nullptr if not supported

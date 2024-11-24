@@ -26,14 +26,7 @@ namespace {
     
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
     
-//    struct Handler {
-//        foundation::EventHandlerToken token;
-//        util::callback<bool(const foundation::PlatformPointerEventArgs &)> handler;
-//    };
-//
-//    std::list<Handler> g_pointerHandlers;
-
-    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &)>>> g_editorHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
 
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
@@ -370,18 +363,18 @@ namespace foundation {
     void IOSPlatform::hideCursor() {}
     void IOSPlatform::showKeyboard() {}
     void IOSPlatform::hideKeyboard() {}
-    void IOSPlatform::sendEditorMsg(const std::string &msg) {
+    void IOSPlatform::sendEditorMsg(const std::string &msg, const std::string &data) {
     
     }
-    void IOSPlatform::editorLoopbackMsg(const std::string &msg) {
+    void IOSPlatform::editorLoopbackMsg(const std::string &msg, const std::string &data) {
         for (auto &index : g_editorHandlers) {
-            if (index.second(msg)) {
+            if (index.second(msg, data)) {
                 break;
             }
         }
     }
     
-    EventHandlerToken IOSPlatform::addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop) {
+    EventHandlerToken IOSPlatform::addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop) {
         EventHandlerToken token = g_tokenCounter++;
         if (setTop) {
             g_editorHandlers.emplace_front(std::make_pair(token, std::move(handler)));

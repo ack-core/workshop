@@ -30,7 +30,7 @@ extern "C" {
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
-    void js_editorMsg(const std::uint16_t *ptr, int length);
+    void js_editorMsg(const char *msg, int msglen, const char *data, int datalen);
 }
 
 // Missing part of runtime
@@ -142,7 +142,7 @@ extern "C" {
 namespace {
     std::weak_ptr<foundation::PlatformInterface> g_instance;
 
-    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &)>>> g_editorHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
 
     util::callback<void(float)> g_updateAndDraw;
@@ -201,22 +201,18 @@ namespace foundation {
     void WASMPlatform::showKeyboard() {}
     void WASMPlatform::hideKeyboard() {}
     
-    void WASMPlatform::sendEditorMsg(const std::string &msg) {
-        const std::unique_ptr<std::uint16_t[]> msgJS = std::make_unique<std::uint16_t[]>(msg.length());
-        for (std::size_t i = 0; i < msg.length(); i++) {
-            msgJS[i] = msg[i];
-        }
-        js_editorMsg(msgJS.get(), msg.length());
+    void WASMPlatform::sendEditorMsg(const std::string &msg, const std::string &data) {
+        js_editorMsg(msg.c_str(), msg.length(), data.c_str(), data.length());
     }
-    void WASMPlatform::editorLoopbackMsg(const std::string &msg) {
+    void WASMPlatform::editorLoopbackMsg(const std::string &msg, const std::string &data) {
         for (auto &index : g_editorHandlers) {
-            if (index.second(msg)) {
+            if (index.second(msg, data)) {
                 break;
             }
         }
     }
     
-    EventHandlerToken WASMPlatform::addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop) {
+    EventHandlerToken WASMPlatform::addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop) {
         EventHandlerToken token = g_tokenCounter++;
         if (setTop) {
             g_editorHandlers.emplace_front(std::make_pair(token, std::move(handler)));
@@ -294,15 +290,15 @@ namespace foundation {
                 if (*fmt == '%') {
                     if (*++fmt == 'p') {
                         const void *p = va_arg(arglist, void *);
-                        output += util::strstream::ptoa(output, p);
+                        output += util::strstream::ptow(output, p);
                     }
                     else if (*fmt == 'd') {
                         const std::intptr_t d = va_arg(arglist, std::intptr_t);
-                        output += util::strstream::ltoa(output, d);
+                        output += util::strstream::ltow(output, d);
                     }
                     else if (*fmt == 'f') {
                         const double f = va_arg(arglist, double);
-                        output += util::strstream::ftoa(output, f);
+                        output += util::strstream::ftow(output, f);
                     }
                     else if (*fmt == 's') {
                         const char *s = va_arg(arglist, const char *);
@@ -393,14 +389,13 @@ extern "C" {
         ptr->executeInMainThread();
         delete ptr;
     }
-    void editorEvent(std::uint16_t *evs, std::size_t length) {
+    void editorEvent(const char *msg, std::size_t msglen, const char *data, std::size_t datalen) {
         if (auto p = g_instance.lock()) {
-            std::string msg = std::string(length + 1, 0);
-            for (std::size_t i = 0; i < length; i++) {
-                msg[i] = char(evs[i]);
-            }
+            std::string amsg = std::string(msg, msglen);
+            std::string adata = std::string(data, datalen);
+            
             for (auto &index : g_editorHandlers) {
-                if (index.second(msg)) {
+                if (index.second(amsg, adata)) {
                     break;
                 }
             }

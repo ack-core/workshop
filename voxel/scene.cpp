@@ -684,6 +684,7 @@ namespace voxel {
     //
     //
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
+        _cleanupUnused(_lineSets);
         _cleanupUnused(_boundingBoxes);
         _cleanupUnused(_staticMeshes);
         _cleanupUnused(_dynamicMeshes);

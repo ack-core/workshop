@@ -72,7 +72,7 @@ var shaderConstantBuffers = [];
 var shaderConstantIndex = 0;
 var uniformInstanceCountLocation = null;
 var resizeTimeoutHandler = null;
-var uiEditor = { msgHandler: null, sendMsg: function(msg) {} };
+var uiEditor = { msgHandler: null, sendMsg: function(msg, data) {} };
 
 const vertexAttribFunctions = [
     (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.HALF_FLOAT, false, stride, offset); return 4; },
@@ -169,10 +169,13 @@ const imports = {
                 }
             });
         },
-        js_editorMsg: function(str, len) {
-            const u8str = new Uint8Array(memory.buffer, str, len);
-            if (uiEditor.msgHandler) {
-                uiEditor.msgHandler(String.fromCharCode(...u8str));
+        js_editorMsg: function(msg, msglen, data, datalen) {
+            const u8msg = new Uint8Array(memory.buffer, msg, msglen);
+            const u8data = new Uint8Array(memory.buffer, data, datalen);
+            const handler = uiEditor[String.fromCharCode(...u8msg)];
+
+            if (handler) {
+                handler(String.fromCharCode(...u8data));
             }
         },
         abort: function() {
@@ -511,7 +514,7 @@ worker.onmessage = (msg) => {
             return [x, y];
         }
         function onFrame(timestamp) {
-            const interval = 1000.0 / 20.0;
+            const interval = 1000.0 / 10.0;
             const dt = timestamp - prevFrameTimeStamp;
             
             if (dt > interval) {
@@ -529,11 +532,16 @@ worker.onmessage = (msg) => {
             window.requestAnimationFrame(onFrame);
             uniformInstanceCountLocation = null;
 
-            uiEditor.sendMsg = function(msg) {
-                const data = instance.exports.malloc(msg.length);
-                const u8data = new Uint8Array(memory.buffer, data, msg.length);
-                for (let i = 0; i < msg.length; i++) u8data[i] = msg.charCodeAt(i) & 0xff;
-                instance.exports.editorEvent(data, msg.length);
+            uiEditor.sendMsg = function(msg, data) {
+                const msgmem = instance.exports.malloc(msg.length);
+                const u8msg = new Uint8Array(memory.buffer, msgmem, msg.length);
+                const datamem = instance.exports.malloc(data.length);
+                const u8data = new Uint8Array(memory.buffer, datamem, data.length);
+
+                for (let i = 0; i < msg.length; i++) u8msg[i] = msg.charCodeAt(i) & 0xff;
+                for (let i = 0; i < data.length; i++) u8data[i] = data.charCodeAt(i) & 0xff;
+
+                instance.exports.editorEvent(msgmem, msg.length, datamem, data.length);
             }
         }
         window.requestAnimationFrame(timestamp => {

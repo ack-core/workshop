@@ -10,6 +10,16 @@ namespace game {
         const math::vector4f lineColors[] = {
             {1, 0, 0, 1.0}, {0, 0.8, 0, 1.0}, {0, 0, 1, 1.0}
         };
+        
+        std::size_t g_unknownNodeIndex = 0;
+        std::string getNextUnknownName() {
+            return "Unnamed_" + std::to_string(g_unknownNodeIndex++);
+        }
+        
+        std::string nodeTypeToPanelMapping[] = {
+            "inspect_static_mesh",
+            "inspect_particles",
+        };
     }
     
     MovingTool::MovingTool(const API &api, math::vector3f &target) : _api(api), _target(target) {
@@ -57,6 +67,7 @@ namespace game {
                     const float lineMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _capturedPosition, lineDirs[_capturedLineIndex]).y;
                     _target = _capturedPosition + (lineMovingKoeff - _capturedMovingKoeff) * lineDirs[_capturedLineIndex];
                     _lineset->setPosition(_target);
+                    _api.platform->sendEditorMsg("engine.nodeCoordinates", util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
                     return true;
                 }
             }
@@ -68,12 +79,41 @@ namespace game {
             return false;
         }, true);
         
+        _api.platform->sendEditorMsg("engine.nodeCoordinates", util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
     }
     MovingTool::~MovingTool() {
         _api.platform->removeEventHandler(_token);
     }
     
+    void MovingTool::setPosition(const math::vector3f &position) {
+        _target = position;
+        _lineset->setPosition(_target);
+    }
+    const math::vector3f &MovingTool::getPosition() const {
+        return _target;
+    }
+    
     EditorMainContext::EditorMainContext(API &&api) : _api(std::move(api)) {
+        _handlers["editor.createNode"] = &EditorMainContext::_createNode;
+        _handlers["editor.selectNode"] = &EditorMainContext::_selectNode;
+        _handlers["editor.renameNode"] = &EditorMainContext::_renameNode;
+        _handlers["editor.moveNodeX"] = &EditorMainContext::_moveNodeX;
+        _handlers["editor.moveNodeY"] = &EditorMainContext::_moveNodeY;
+        _handlers["editor.moveNodeZ"] = &EditorMainContext::_moveNodeZ;
+        _handlers["editor.clearNodeSelection"] = &EditorMainContext::_clearNodeSelection;
+        
+        _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
+            auto handler = _handlers[msg];
+            if (handler) {
+                _api.platform->logMsg("[Editor] msg = '%s' arg = '%s'", msg.data(), data.c_str());
+                (this->*handler)(data);
+            }
+            else {
+                _api.platform->logMsg("Unknown handler for '%s'", msg.data());
+            }
+            return false;
+        });
+        
         _axis = _api.scene->addLineSet();
         _axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.5});
         _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
@@ -83,35 +123,33 @@ namespace game {
         _axis->setLine(5, {10, 0, 10}, {-10, 0, 10}, {0.3, 0.3, 0.3, 0.5});
         _axis->setLine(6, {-10, 0, 10}, {-10, 0, -10}, {0.3, 0.3, 0.3, 0.5});
         
-        //_movingTool = std::make_unique<MovingTool>(_api, _target);
-        
-        _testButton1 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
-            .anchorOffset = math::vector2f(10.0f, 10.0f),
-            .anchorH = ui::HorizontalAnchor::LEFT,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .textureBase = "textures/ui/btn_square_up",
-            .textureAction = "textures/ui/btn_square_down",
-        });
-        _testButton1->setActionHandler(ui::Action::PRESS, [](float, float) {
-            
-        });
-        
-        _testButton2 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
-            .anchorTarget = _testButton1,
-            .anchorOffset = math::vector2f(10.0f, 0.0f),
-            .anchorH = ui::HorizontalAnchor::RIGHTSIDE,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .textureBase = "textures/ui/btn_square_up",
-            .textureAction = "textures/ui/btn_square_down",
-        });
-        _testButton2->setActionHandler(ui::Action::PRESS, [](float, float) {
-        
-        });
+//        _testButton1 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
+//            .anchorOffset = math::vector2f(100.0f, 100.0f),
+//            .anchorH = ui::HorizontalAnchor::LEFT,
+//            .anchorV = ui::VerticalAnchor::TOP,
+//            .textureBase = "textures/ui/btn_square_up",
+//            .textureAction = "textures/ui/btn_square_down",
+//        });
+//        _testButton1->setActionHandler(ui::Action::PRESS, [this](float, float) {
+//            _api.platform->editorLoopbackMsg("editor.createNode", "0");
+//        });
+//
+//        _testButton2 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
+//            .anchorTarget = _testButton1,
+//            .anchorOffset = math::vector2f(10.0f, 0.0f),
+//            .anchorH = ui::HorizontalAnchor::RIGHTSIDE,
+//            .anchorV = ui::VerticalAnchor::TOP,
+//            .textureBase = "textures/ui/btn_square_up",
+//            .textureAction = "textures/ui/btn_square_down",
+//        });
+//        _testButton2->setActionHandler(ui::Action::PRESS, [this](float, float) {
+//            _api.platform->editorLoopbackMsg("editor.createNode", "1");
+//        });
         
     }
     
     EditorMainContext::~EditorMainContext() {
-
+        _api.platform->removeEventHandler(_editorEventsToken);
     }
     
     EditorNode *EditorMainContext::getNode(const std::string &name) const {
@@ -121,5 +159,78 @@ namespace game {
     void EditorMainContext::update(float dtSec) {
         
     }
+    
+    void EditorMainContext::_createNode(const std::string &data) {
+        util::strstream args(data.c_str(), data.length());
+        std::size_t typeIndex;
+        if (args >> typeIndex) {
+            const auto &index = _nodes.emplace(getNextUnknownName(), std::make_unique<EditorNode>(_api.platform, typeIndex)).first;
+            _movingTool = std::make_unique<MovingTool>(_api, index->second->position);
+            _api.platform->sendEditorMsg("engine.nodeCreated", index->first + " " + nodeTypeToPanelMapping[typeIndex]);
+        }
+        else {
+            _api.platform->logError("[EditorMainContext::_createNode] Invalid arguments");
+        }
+    }
+    
+    void EditorMainContext::_selectNode(const std::string &data) {
+        const auto &index = _nodes.find(data);
+        if (index != _nodes.end()) {
+            _movingTool = std::make_unique<MovingTool>(_api, index->second->position);
+            _api.platform->sendEditorMsg("engine.nodeSelected", data + " " + nodeTypeToPanelMapping[index->second->value.index()]);
+        }
+        else {
+            _api.platform->logError("[EditorMainContext::_selectNode] Node '%s' not found", data.data());
+        }
+    }
+    
+    void EditorMainContext::_renameNode(const std::string &data) {
+        util::strstream args(data.c_str(), data.length());
+        std::string old, nv;
+        if (args >> old >> nv) {
+            if (_nodes.find(nv) == _nodes.end()) {
+                const auto &index = _nodes.find(old);
+                if (index != _nodes.end()) {
+                    std::unique_ptr<EditorNode> tmp = std::move(index->second);
+                    _nodes.erase(index);
+                    _nodes.emplace(nv, std::move(tmp));
+                    _api.platform->sendEditorMsg("engine.nodeRenamed", data);
+                }
+                else {
+                    _api.platform->logError("[EditorMainContext::_renameNode] Node '%s' not found", old.data());
+                }
+            }
+            else {
+                _api.platform->logError("[EditorMainContext::_renameNode] Node '%s' already in collection", old.data());
+            }
+        }
+        else {
+            _api.platform->logError("[EditorMainContext::_renameNode] Invalid arguments");
+        }
+    }
+    
+    void EditorMainContext::_moveNodeX(const std::string &data) {
+        std::size_t len = 0;
+        const float newPos = float(util::strstream::atof(data.c_str(), len));
+        const math::vector3f currentPosition = _movingTool->getPosition();
+        _movingTool->setPosition(math::vector3f(newPos, currentPosition.y, currentPosition.z));
+    }
+    void EditorMainContext::_moveNodeY(const std::string &data) {
+        std::size_t len = 0;
+        const float newPos = float(util::strstream::atof(data.c_str(), len));
+        const math::vector3f currentPosition = _movingTool->getPosition();
+        _movingTool->setPosition(math::vector3f(currentPosition.x, newPos, currentPosition.z));
+    }
+    void EditorMainContext::_moveNodeZ(const std::string &data) {
+        std::size_t len = 0;
+        const float newPos = float(util::strstream::atof(data.c_str(), len));
+        const math::vector3f currentPosition = _movingTool->getPosition();
+        _movingTool->setPosition(math::vector3f(currentPosition.x, currentPosition.y, newPos));
+    }
+    
+    void EditorMainContext::_clearNodeSelection(const std::string &data) {
+        _movingTool = nullptr;
+    }
+    
 }
 

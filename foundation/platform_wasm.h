@@ -21,10 +21,10 @@ namespace foundation {
         
         void showKeyboard() override;
         void hideKeyboard() override;
-        void sendEditorMsg(const std::string &msg) override;
-        void editorLoopbackMsg(const std::string &msg) override;
+        void sendEditorMsg(const std::string &msg, const std::string &data) override;
+        void editorLoopbackMsg(const std::string &msg, const std::string &data) override;
         
-        EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &)> &&handler, bool setTop) override;
+        EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop) override;
         EventHandlerToken addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) override;
         EventHandlerToken addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) override;
         EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) override;
