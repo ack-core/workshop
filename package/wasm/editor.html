@@ -100,7 +100,14 @@
         }
         .webix_el_combo .webix_input_icon {
             width: 19px;
-        }        
+        }
+        .webix_custom_checkbox {
+            margin-top: -2px;
+            color: #8888a3;
+        }
+        .webix_custom_checkbox:focus {
+            color: #8888a3;
+        }
         .webix_segment_0.webix_selected, .webix_segment_1.webix_selected, .webix_segment_N.webix_selected {
             background-color: #cfcfef;
         }
@@ -169,8 +176,11 @@
             });
         })
 
-        const TOOLTIP_DELAY = 800;
         var uiNodeTree = null;
+        var uiNodeName = null;
+        var uiNodeTree = null;
+        var uiInspectPanel = null;
+        var uiInspectType = null;        
 
         let utility = {
             adjustTree: function(id, index) {
@@ -196,12 +206,6 @@
             }
         }
 
-        let actions = {
-            openProjectDir: async function(id) {
-                const directoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
-                $$("top_label_project_dir").setValue("Project directory: " + directoryHandle.name);
-            },
-        }
         let elements = {
             label: function(value, align = "left") {
                 return { 
@@ -211,13 +215,25 @@
             button: function(value, tooltip, action = null) {
                 const id = webix.uid().toString();
                 return { 
-                    id: id, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: TOOLTIP_DELAY },
+                    id: id, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: 800 },
                     click: () => { if (action) action($$(id)); }
                 };
             },
+            toggle: function(on, off, value, tooltip, action = null) {
+                const id = webix.uid().toString();
+                return {
+                    id: id, view: "toggle", offLabel: off, onLabel: on, width: 24, height: 24, value: value,
+                    tooltip: { template: tooltip, delay: 800 },
+                    on: {
+                        onChange: function(nv) {
+                            if (action) action($$(id), nv === "true");
+                        }
+                    }
+                }
+            },
             text: function(id, value, readonly, action = null) {
                 return { 
-                    id: id, view: "text", type: "text", value: value, height: 24, readonly: readonly,
+                    id: id, view: "text", type: "text", value: value, height: 24, readonly: readonly, 
                     on: {
                         onEnter: function() { this.blur(); },
                         onChange: function(nv, old) {
@@ -229,6 +245,7 @@
             number: function(id, tooltip, width, format, value, step, min, max, action = null) {
                 return { 
                     id: id, view: "text", type:"number", format: format, value: value, height: 24, width: width, 
+                    tooltip: { template: tooltip, delay: 800 },
                     on: {
                         onEnter: function() { this.blur(); },
                         onChange: function(nv, old) {
@@ -237,9 +254,6 @@
                     },
                     attributes:{ step: step, min: min, max: max }
                 };
-            },
-            toggle: function() {
-
             },
             combo: function(value, list, action = null) {
                 const id = webix.uid().toString();
@@ -357,15 +371,15 @@
                             ]},
                             {cols: [
                                 elements.label("X:"),
-                                elements.number("inspect_node_x", null, 60, "11111.00", 0.0, 0.01, -9999.0, 9999.0, (e, nv, old) => {
+                                elements.number("inspect_node_x", null, 64, "11111.0", 0.0, 0.1, -9999.0, 9999.0, (e, nv, old) => {
                                     uiEditor.sendMsg("editor.moveNodeX", nv.toString());
                                 }),
                                 elements.label("Y:"),
-                                elements.number("inspect_node_y", null, 60, "11111.00", 0.0, 0.01, -9999.0, 9999.0, (e, nv, old) => {
+                                elements.number("inspect_node_y", null, 64, "11111.0", 0.0, 0.1, -9999.0, 9999.0, (e, nv, old) => {
                                     uiEditor.sendMsg("editor.moveNodeY", nv.toString());
                                 }),
                                 elements.label("Z:"),
-                                elements.number("inspect_node_z", null, 60, "11111.00", 0.0, 0.01, -9999.0, 9999.0, (e, nv, old) => {
+                                elements.number("inspect_node_z", null, 64, "11111.0", 0.0, 0.1, -9999.0, 9999.0, (e, nv, old) => {
                                     uiEditor.sendMsg("editor.moveNodeZ", nv.toString());
                                 }),
                             ]},
@@ -374,7 +388,7 @@
                     }
                 },
                 {
-                    id: "static_mesh_0", view: "accordionitem", hidden: false, header: "Static Mesh Resource", headerHeight: 10, headerAltHeight: 10,
+                    id: "static_mesh_0", view: "accordionitem", hidden: true, header: "Static Mesh Resource", headerHeight: 10, headerAltHeight: 10,
                     css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
                     body: {
                         padding: 3,
@@ -404,7 +418,75 @@
                     }
                 },
                 {
-                    id: "particles_0", view: "accordionitem", hidden: false, header: "Particles Shape", headerHeight: 10, headerAltHeight: 10,
+                    id: "particles_0", view: "accordionitem", hidden: false, header: "Emission", headerHeight: 10, headerAltHeight: 10,
+                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                    body: {
+                        padding: 3,
+                        rows: [
+                            {cols: [
+                                elements.label("Random seed:"),
+                                elements.text("inspect_ptc_rnd", "0", true),
+                                elements.button("\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
+                            ]},
+                            {cols: [
+                                elements.label("Max particles:"),
+                                elements.number("inspect_ptc_count", "Maximum particle count to be emitted", 44, "11111", 1, 1, 1, 100, (e, nv, old) => {
+
+                                }),
+                                {},
+                                elements.label("Frame (ms):"),
+                                elements.number("inspect_ptc_ftime", "Length of one animation frame in milliseconds", 44, "11111", 33, 1, 10, 100, (e, nv, old) => {
+
+                                })
+                            ]},
+                            {cols: [
+                                elements.label("Emission time (ms):"),
+                                elements.number("inspect_ptc_mtime", "Emission time in milliseconds", 52, "11111", 1, 1, 1, 2000, (e, nv, old) => {
+
+                                }),
+                                { width: 12 },
+                                elements.label("Looped:"),
+                                {
+                                    view: "checkbox", 
+                                    value: 0,
+                                    height: 24
+                                }
+                            ]},
+                            elements.label("Emission graph:", "center"),
+                            { 
+                                view: "segmented", height: 24,
+                                align: "center", 
+                                options: [
+                                    { id: "1", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "2", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "3", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "4", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "5", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "6", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "7", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "8", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "9", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "a", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "b", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                ]
+                            },
+                            {cols: [
+                                elements.label("Particle life Min:"),
+                                elements.number("inspect_ptc_ptime_min", null, 52, "11111", 1000, 1, 1, 1000, (e, nv, old) => {
+
+                                }),
+                                {},
+                                elements.label("Max:"),
+                                elements.number("inspect_ptc_ptime_max", null, 52, "11111", 1000, 1, 1, 1000, (e, nv, old) => {
+
+                                })
+                            ]},
+                            { height: 16 }
+                        ]
+                    }
+                },
+                {
+                    id: "particles_1", view: "accordionitem", hidden: false, header: "Emitter Shape", headerHeight: 10, headerAltHeight: 10,
                     css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
                     body: {
                         padding: 3,
@@ -417,10 +499,9 @@
                                 elements.number("inspect_ptc_sshape_radius", "Start shape radius", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
 
                                 }),
-                                { 
-                                    view: "toggle",  offLabel: ' ', onLabel: '<img src="editor/arrows.svg"></img>', width: 24, height: 24, value: true,
-                                    tooltip: { template: "Hide/show moving tool", delay: TOOLTIP_DELAY } 
-                                },
+                                elements.toggle('<img src="editor/arrows.svg"></img>', ' ', true, "Hide/show moving tool", (e, nv) => {
+                                    console.log(e, "-----", nv);
+                                })
                             ]},
                             {cols: [
                                 elements.label("End shape:"),
@@ -430,10 +511,9 @@
                                 elements.number("inspect_ptc_eshape_radius", "End shape radius", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
 
                                 }),
-                                {
-                                    view: "toggle", offLabel: ' ', onLabel: '<img src="editor/arrows.svg"></img>', width: 24, height: 24, value: true,
-                                    tooltip: { template: "Hide/show moving tool", delay: TOOLTIP_DELAY }
-                                }
+                                elements.toggle('<img src="editor/arrows.svg"></img>', ' ', true, "Hide/show moving tool", (e, nv) => {
+                                    console.log(e, "-----", nv);
+                                })
                             ]},
                             {cols: [
                                 elements.label("Start-to-End Mapping:"),
@@ -443,7 +523,8 @@
                             ]},
                             elements.label("Coordinates graph:", "center"),
                             { 
-                                view: "segmented", height: 24, 
+                                view: "segmented", height: 24,
+                                align: "center", 
                                 options: [
                                     { id: "1", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
                                     { id: "2", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
@@ -454,8 +535,10 @@
                                     { id: "7", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
                                     { id: "8", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
                                     { id: "9", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "a", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
+                                    { id: "b", value: '<img style="vertical-align: top; height: 92%" src="editor/graph_linear.svg"></img>' }, 
                                 ]
-                            },                            
+                            },
                             { height: 16 }
                         ]
                     }
@@ -467,11 +550,10 @@
         uiNodeName = $$("inspect_node_name");
         uiNodeTree = $$("nodeTree");
         uiInspectPanel = $$("inspectPanel");
-        uiInspectType = null;
         uiInspectMapping = {
             "null" : [],
             "inspect_static_mesh" : ["node_0", "static_mesh_0"],
-            "inspect_particles" : ["node_0", "particles_0"]
+            "inspect_particles" : ["node_0", "particles_0", "particles_1"]
         };
 
         function showInspectPanel(panel) {
