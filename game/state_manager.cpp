@@ -43,7 +43,7 @@ namespace game {
         const dh::DataHubPtr _dh;
         
         std::string _currentStateName;
-        std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> _currentContextList;
+        std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> _currentContextList;
     };
     
     std::shared_ptr<StateManager> StateManager::instance(
@@ -62,18 +62,18 @@ namespace game {
     void StateManagerImpl::switchToState(const char *name) {
         for (auto index = std::begin(states); index != std::end(states); ++index) {
             if (::strcmp(name, index->name) == 0) {
-                std::unordered_map<MakeContextFunc, std::unique_ptr<Context>> newContextList;
+                std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> newContextList;
                 std::vector<Interface *> interfaces;
                 
                 for (auto& makeContextFunction : index->makers) {
-                    std::unique_ptr<Context> ctx = nullptr;
+                    std::shared_ptr<Context> ctx = nullptr;
                     
                     auto index = _currentContextList.find(makeContextFunction);
                     if (index == _currentContextList.end()) {
                         ctx = makeContextFunction(API { _platform, _rendering, _resourceProvider, _scene, _simulation, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
                     }
                     else {
-                        ctx = std::move(index->second);
+                        ctx = index->second;
                     }
                     
                     if (ctx) {

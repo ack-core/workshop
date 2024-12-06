@@ -16,6 +16,6 @@ namespace game {
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
-        math::vector3f _orbit = {35, 0, 0};
+        math::vector3f _orbit = {135, 0, 0};
     };
 }

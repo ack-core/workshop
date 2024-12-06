@@ -2,6 +2,8 @@
 #include "editor_main_context.h"
 
 namespace game {
+    std::shared_ptr<EditorNode> (*EditorNode::makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex) = {nullptr};
+    
     namespace {
         const float MOVING_TOOL_SIZE = 5.0f;
         const math::vector3f lineDirs[] = {
@@ -16,7 +18,7 @@ namespace game {
             return "Unnamed_" + std::to_string(g_unknownNodeIndex++);
         }
         
-        std::string nodeTypeToPanelMapping[] = {
+        std::string nodeTypeToPanelMapping[std::size_t(EditorNodeType::_count)] = {
             "inspect_static_mesh",
             "inspect_particles",
         };
@@ -106,10 +108,7 @@ namespace game {
             auto handler = _handlers[msg];
             if (handler) {
                 _api.platform->logMsg("[Editor] msg = '%s' arg = '%s'", msg.data(), data.c_str());
-                (this->*handler)(data);
-            }
-            else {
-                _api.platform->logMsg("Unknown handler for '%s'", msg.data());
+                return (this->*handler)(data);
             }
             return false;
         });
@@ -146,54 +145,70 @@ namespace game {
 //            _api.platform->editorLoopbackMsg("editor.createNode", "1");
 //        });
         
+//        _api.resources->getOrLoadVoxelStatic("statics/ruins", [this](const foundation::RenderDataPtr &mesh) {
+//            if (mesh) {
+//                _thing = _api.scene->addStaticMesh(mesh);
+//            }
+//        });
+        
+        
     }
     
     EditorMainContext::~EditorMainContext() {
         _api.platform->removeEventHandler(_editorEventsToken);
     }
     
-    EditorNode *EditorMainContext::getNode(const std::string &name) const {
-        return nullptr;
+    const std::weak_ptr<EditorNode> &EditorMainContext::getSelectedNode() const {
+        return _currentNode;
     }
     
     void EditorMainContext::update(float dtSec) {
         
     }
     
-    void EditorMainContext::_createNode(const std::string &data) {
+    bool EditorMainContext::_createNode(const std::string &data) {
         util::strstream args(data.c_str(), data.length());
         std::size_t typeIndex;
         if (args >> typeIndex) {
-            const auto &index = _nodes.emplace(getNextUnknownName(), std::make_unique<EditorNode>(_api.platform, typeIndex)).first;
-            _movingTool = std::make_unique<MovingTool>(_api, index->second->position);
-            _api.platform->sendEditorMsg("engine.nodeCreated", index->first + " " + nodeTypeToPanelMapping[typeIndex]);
+            if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
+                const auto &value = _nodes.emplace(getNextUnknownName(), EditorNode::makeByType[typeIndex](typeIndex)).first;
+                _movingTool = std::make_unique<MovingTool>(_api, value->second->position);
+                _api.platform->sendEditorMsg("engine.nodeCreated", value->first + " " + nodeTypeToPanelMapping[typeIndex]);
+            }
+            else {
+                _api.platform->logError("[EditorMainContext::_createNode] Unknown node type");
+            }
         }
         else {
             _api.platform->logError("[EditorMainContext::_createNode] Invalid arguments");
         }
+        return true;
     }
     
-    void EditorMainContext::_selectNode(const std::string &data) {
+    bool EditorMainContext::_selectNode(const std::string &data) {
         const auto &index = _nodes.find(data);
         if (index != _nodes.end()) {
+            _currentNode = index->second;
             _movingTool = std::make_unique<MovingTool>(_api, index->second->position);
-            _api.platform->sendEditorMsg("engine.nodeSelected", data + " " + nodeTypeToPanelMapping[index->second->value.index()]);
+            return false; // A typed context must handle this
         }
         else {
+            _currentNode.reset();
             _api.platform->logError("[EditorMainContext::_selectNode] Node '%s' not found", data.data());
         }
+        return true;
     }
     
-    void EditorMainContext::_renameNode(const std::string &data) {
+    bool EditorMainContext::_renameNode(const std::string &data) {
         util::strstream args(data.c_str(), data.length());
         std::string old, nv;
         if (args >> old >> nv) {
             if (_nodes.find(nv) == _nodes.end()) {
                 const auto &index = _nodes.find(old);
                 if (index != _nodes.end()) {
-                    std::unique_ptr<EditorNode> tmp = std::move(index->second);
+                    std::shared_ptr<EditorNode> tmp = index->second;
                     _nodes.erase(index);
-                    _nodes.emplace(nv, std::move(tmp));
+                    _nodes.emplace(nv, tmp);
                     _api.platform->sendEditorMsg("engine.nodeRenamed", data);
                 }
                 else {
@@ -207,29 +222,35 @@ namespace game {
         else {
             _api.platform->logError("[EditorMainContext::_renameNode] Invalid arguments");
         }
+        return true;
     }
     
-    void EditorMainContext::_moveNodeX(const std::string &data) {
+    bool EditorMainContext::_moveNodeX(const std::string &data) {
         std::size_t len = 0;
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(newPos, currentPosition.y, currentPosition.z));
+        return true;
     }
-    void EditorMainContext::_moveNodeY(const std::string &data) {
+    bool EditorMainContext::_moveNodeY(const std::string &data) {
         std::size_t len = 0;
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(currentPosition.x, newPos, currentPosition.z));
+        return true;
     }
-    void EditorMainContext::_moveNodeZ(const std::string &data) {
+    bool EditorMainContext::_moveNodeZ(const std::string &data) {
         std::size_t len = 0;
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(currentPosition.x, currentPosition.y, newPos));
+        return true;
     }
     
-    void EditorMainContext::_clearNodeSelection(const std::string &data) {
+    bool EditorMainContext::_clearNodeSelection(const std::string &data) {
         _movingTool = nullptr;
+        _currentNode.reset();
+        return true;
     }
     
 }

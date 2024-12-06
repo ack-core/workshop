@@ -29,7 +29,7 @@ namespace game {
         EditorMainContext(API &&api);
         ~EditorMainContext() override;
         
-        EditorNode *getNode(const std::string &name) const override;
+        const std::weak_ptr<EditorNode> &getSelectedNode() const override;
         
         void update(float dtSec) override;
         
@@ -39,19 +39,21 @@ namespace game {
         voxel::SceneInterface::LineSetPtr _axis;
         
         std::unique_ptr<MovingTool> _movingTool;
-        std::unordered_map<std::string, std::unique_ptr<EditorNode>> _nodes;
-        std::unordered_map<std::string, void (EditorMainContext::*)(const std::string &)> _handlers;
+        std::unordered_map<std::string, std::shared_ptr<EditorNode>> _nodes;
+        std::unordered_map<std::string, bool (EditorMainContext::*)(const std::string &)> _handlers;
         
-        ui::ImagePtr _testButton1;
-        ui::ImagePtr _testButton2;
+        std::weak_ptr<EditorNode> _currentNode;
+        
+//        ui::ImagePtr _testButton1;
+//        ui::ImagePtr _testButton2;
         
     private:
-        void _createNode(const std::string &data);
-        void _selectNode(const std::string &data);
-        void _renameNode(const std::string &data);
-        void _moveNodeX(const std::string &data);
-        void _moveNodeY(const std::string &data);
-        void _moveNodeZ(const std::string &data);
-        void _clearNodeSelection(const std::string &data);
+        bool _createNode(const std::string &data);
+        bool _selectNode(const std::string &data);
+        bool _renameNode(const std::string &data);
+        bool _moveNodeX(const std::string &data);
+        bool _moveNodeY(const std::string &data);
+        bool _moveNodeZ(const std::string &data);
+        bool _clearNodeSelection(const std::string &data);
     };
 }

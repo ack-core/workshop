@@ -733,7 +733,7 @@ namespace voxel {
                 });
                 rendering.draw(emitter->particleCount);
             }
-            rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
+            rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
             for (const auto &set : _lineSets) {
                 for (const auto &line : set->lines) {
                     set->fillShaderConstants(line);
@@ -741,7 +741,7 @@ namespace voxel {
                     rendering.draw(2 + (line.arrowHead ? 32 : 0));
                 }
             }
-            rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
+            rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
             for (const auto &bbox : _boundingBoxes) {
                 rendering.applyShaderConstants(&bbox->bboxData);
                 rendering.draw();

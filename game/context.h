@@ -47,9 +47,9 @@ namespace game {
         
         return *ptr;
     }
-    template <typename Ctx, typename... Interfaces> std::unique_ptr<Context> makeContext(API &&api, Interface **existInterfaces, std::size_t count) {
-        return std::unique_ptr<Context>(new Ctx (std::move(api), makeArg<Interfaces>(existInterfaces, count)...));
+    template <typename Ctx, typename... Interfaces> std::shared_ptr<Context> makeContext(API &&api, Interface **existInterfaces, std::size_t count) {
+        return std::make_shared<Ctx>(std::move(api), makeArg<Interfaces>(existInterfaces, count)...);
     }
     
-    using MakeContextFunc = std::unique_ptr<Context>(*)(API &&api, Interface **existInterfaces, std::size_t count);
+    using MakeContextFunc = std::shared_ptr<Context>(*)(API &&api, Interface **existInterfaces, std::size_t count);
 }
