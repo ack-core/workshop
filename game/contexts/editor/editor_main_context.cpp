@@ -5,7 +5,6 @@ namespace game {
     std::shared_ptr<EditorNode> (*EditorNode::makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex) = {nullptr};
     
     namespace {
-        const float MOVING_TOOL_SIZE = 5.0f;
         const math::vector3f lineDirs[] = {
             {1, 0, 0}, {0, 1, 0}, {0, 0, 1}
         };
@@ -24,17 +23,19 @@ namespace game {
         };
     }
     
-    MovingTool::MovingTool(const API &api, math::vector3f &target) : _api(api), _target(target) {
+    MovingTool::MovingTool(const API &api, const CameraAccessInterface &cameraAccess, math::vector3f &target) : _api(api), _cameraAccess(cameraAccess), _target(target) {
+        _toolSize = _cameraAccess.getOrbitSize() / 10.0f;
         _lineset = _api.scene->addLineSet();
-        _lineset->setLine(0, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[0], lineColors[0], true);
-        _lineset->setLine(1, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[1], lineColors[1], true);
-        _lineset->setLine(2, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[2], lineColors[2], true);
+        _lineset->setLine(0, {0, 0, 0}, _toolSize * lineDirs[0], lineColors[0], true);
+        _lineset->setLine(1, {0, 0, 0}, _toolSize * lineDirs[1], lineColors[1], true);
+        _lineset->setLine(2, {0, 0, 0}, _toolSize * lineDirs[2], lineColors[2], true);
         _lineset->setPosition(target);
         
         _token = _api.platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) -> bool {
-            _lineset->setLine(0, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[0], lineColors[0], true);
-            _lineset->setLine(1, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[1], lineColors[1], true);
-            _lineset->setLine(2, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[2], lineColors[2], true);
+            _toolSize = _cameraAccess.getOrbitSize() / 10.0f;
+            _lineset->setLine(0, {0, 0, 0}, _toolSize * lineDirs[0], lineColors[0], true);
+            _lineset->setLine(1, {0, 0, 0}, _toolSize * lineDirs[1], lineColors[1], true);
+            _lineset->setLine(2, {0, 0, 0}, _toolSize * lineDirs[2], lineColors[2], true);
 
             math::vector3f camPosition;
             math::vector3f cursorDir = _api.scene->getWorldDirection({args.coordinateX, args.coordinateY}, &camPosition);
@@ -46,15 +47,15 @@ namespace game {
                 minDistance = std::numeric_limits<float>::max();
 
                 for (std::uint32_t i = 0; i < 3; i++) {
-                    const float dist = math::distanceRayLine(camPosition, cursorDir, _target, _target + MOVING_TOOL_SIZE * lineDirs[i]);
+                    const float dist = math::distanceRayLine(camPosition, cursorDir, _target, _target + _toolSize * lineDirs[i]);
                     if (dist < minDistance) {
                         minDistance = dist;
                         index = i;
                     }
                 }
             }
-            if (minDistance < 0.5f) {
-                _lineset->setLine(index, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[index], lineColors[index] + math::vector4f(0.6, 0.6, 0.6, 0.0), true);
+            if (minDistance < 0.1f * _toolSize) {
+                _lineset->setLine(index, {0, 0, 0}, _toolSize * lineDirs[index], lineColors[index] + math::vector4f(0.6, 0.6, 0.6, 0.0), true);
 
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
                     _capturedLineIndex = index;
@@ -75,7 +76,7 @@ namespace game {
             }
             if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH || args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
                 _capturedPointerId = foundation::INVALID_POINTER_ID;
-                _lineset->setLine(_capturedLineIndex, {0, 0, 0}, MOVING_TOOL_SIZE * lineDirs[_capturedLineIndex], lineColors[_capturedLineIndex], true);
+                _lineset->setLine(_capturedLineIndex, {0, 0, 0}, _toolSize * lineDirs[_capturedLineIndex], lineColors[_capturedLineIndex], true);
             }
 
             return false;
@@ -95,7 +96,7 @@ namespace game {
         return _target;
     }
     
-    EditorMainContext::EditorMainContext(API &&api) : _api(std::move(api)) {
+    EditorMainContext::EditorMainContext(API &&api, CameraAccessInterface &cameraAccess) : _api(std::move(api)), _cameraAccess(cameraAccess) {
         _handlers["editor.createNode"] = &EditorMainContext::_createNode;
         _handlers["editor.selectNode"] = &EditorMainContext::_selectNode;
         _handlers["editor.renameNode"] = &EditorMainContext::_renameNode;
@@ -121,37 +122,6 @@ namespace game {
         _axis->setLine(4, {10, 0, -10}, {10, 0, 10}, {0.3, 0.3, 0.3, 0.5});
         _axis->setLine(5, {10, 0, 10}, {-10, 0, 10}, {0.3, 0.3, 0.3, 0.5});
         _axis->setLine(6, {-10, 0, 10}, {-10, 0, -10}, {0.3, 0.3, 0.3, 0.5});
-        
-//        _testButton1 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
-//            .anchorOffset = math::vector2f(100.0f, 100.0f),
-//            .anchorH = ui::HorizontalAnchor::LEFT,
-//            .anchorV = ui::VerticalAnchor::TOP,
-//            .textureBase = "textures/ui/btn_square_up",
-//            .textureAction = "textures/ui/btn_square_down",
-//        });
-//        _testButton1->setActionHandler(ui::Action::PRESS, [this](float, float) {
-//            _api.platform->editorLoopbackMsg("editor.createNode", "0");
-//        });
-//
-//        _testButton2 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
-//            .anchorTarget = _testButton1,
-//            .anchorOffset = math::vector2f(10.0f, 0.0f),
-//            .anchorH = ui::HorizontalAnchor::RIGHTSIDE,
-//            .anchorV = ui::VerticalAnchor::TOP,
-//            .textureBase = "textures/ui/btn_square_up",
-//            .textureAction = "textures/ui/btn_square_down",
-//        });
-//        _testButton2->setActionHandler(ui::Action::PRESS, [this](float, float) {
-//            _api.platform->editorLoopbackMsg("editor.createNode", "1");
-//        });
-        
-//        _api.resources->getOrLoadVoxelStatic("statics/ruins", [this](const foundation::RenderDataPtr &mesh) {
-//            if (mesh) {
-//                _thing = _api.scene->addStaticMesh(mesh);
-//            }
-//        });
-        
-        
     }
     
     EditorMainContext::~EditorMainContext() {
@@ -163,7 +133,7 @@ namespace game {
     }
     
     void EditorMainContext::update(float dtSec) {
-        
+
     }
     
     bool EditorMainContext::_createNode(const std::string &data) {
@@ -172,7 +142,7 @@ namespace game {
         if (args >> typeIndex) {
             if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
                 const auto &value = _nodes.emplace(getNextUnknownName(), EditorNode::makeByType[typeIndex](typeIndex)).first;
-                _movingTool = std::make_unique<MovingTool>(_api, value->second->position);
+                _movingTool = std::make_unique<MovingTool>(_api, _cameraAccess, value->second->position);
                 _api.platform->sendEditorMsg("engine.nodeCreated", value->first + " " + nodeTypeToPanelMapping[typeIndex]);
             }
             else {
@@ -189,7 +159,8 @@ namespace game {
         const auto &index = _nodes.find(data);
         if (index != _nodes.end()) {
             _currentNode = index->second;
-            _movingTool = std::make_unique<MovingTool>(_api, index->second->position);
+            _movingTool = std::make_unique<MovingTool>(_api, _cameraAccess, index->second->position);
+            _api.platform->sendEditorMsg("engine.refresh", "");
             return false; // A typed context must handle this
         }
         else {
@@ -230,6 +201,7 @@ namespace game {
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(newPos, currentPosition.y, currentPosition.z));
+        _api.platform->sendEditorMsg("engine.refresh", "");
         return true;
     }
     bool EditorMainContext::_moveNodeY(const std::string &data) {
@@ -237,6 +209,7 @@ namespace game {
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(currentPosition.x, newPos, currentPosition.z));
+        _api.platform->sendEditorMsg("engine.refresh", "");
         return true;
     }
     bool EditorMainContext::_moveNodeZ(const std::string &data) {
@@ -244,12 +217,14 @@ namespace game {
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(currentPosition.x, currentPosition.y, newPos));
+        _api.platform->sendEditorMsg("engine.refresh", "");
         return true;
     }
     
     bool EditorMainContext::_clearNodeSelection(const std::string &data) {
         _movingTool = nullptr;
         _currentNode.reset();
+        _api.platform->sendEditorMsg("engine.refresh", "");
         return true;
     }
     

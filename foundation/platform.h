@@ -45,6 +45,7 @@ namespace foundation {
             MOVE,
             HOVER,
             FINISH,
+            WHEEL,
             CANCEL
         };
         
@@ -54,7 +55,7 @@ namespace foundation {
         mutable float coordinateY = 0.0f;
         
         struct {
-            std::int32_t wheel : 8;
+            std::int32_t wheel : 16;
             std::int32_t isLeftButton : 1;
             std::int32_t isRightButton : 1;
         }

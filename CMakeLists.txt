@@ -144,7 +144,7 @@ elseif (PLATFORM STREQUAL "PLATFORM_WASM")
 	endif()
 	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free)
 	target_link_options(workshop PUBLIC --export=updateFrame --export=fileLoaded --export=taskExecute --export=taskComplete)
-	target_link_options(workshop PUBLIC --export=pointerEvent --export=editorEvent --export=resized)
+	target_link_options(workshop PUBLIC --export=pointerEvent --export=editorEvent --export=resized --export=wheelEvent)
 endif()
 
 

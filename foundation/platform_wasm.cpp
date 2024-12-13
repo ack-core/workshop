@@ -416,6 +416,22 @@ extern "C" {
             }
         }
     }
+    void wheelEvent(std::int16_t increment) {
+        if (auto p = g_instance.lock()) {
+            foundation::PlatformPointerEventArgs args = {
+                .type = foundation::PlatformPointerEventArgs::EventType::WHEEL,
+                .pointerID = 0,
+                .coordinateX = 0.0f,
+                .coordinateY = 0.0f
+            };
+            args.flags.wheel = increment;
+            for (auto &index : g_pointerHandlers) {
+                if (index.second(args)) {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 namespace foundation {

@@ -40,6 +40,7 @@ const POINTER_MOVE = 2;
 const POINTER_HOVER = 3;
 const POINTER_UP = 4;
 const POINTER_CANCEL = 5;
+const IS_EDITOR = document.getElementById("editor") != null;
 
 class EventType {
     static INIT  = 1
@@ -72,6 +73,7 @@ var shaderConstantBuffers = [];
 var shaderConstantIndex = 0;
 var uniformInstanceCountLocation = null;
 var resizeTimeoutHandler = null;
+var refreshCounter = 0;
 var uiEditor = { msgHandler: null, sendMsg: function(msg, data) {} };
 
 const vertexAttribFunctions = [
@@ -514,7 +516,7 @@ worker.onmessage = (msg) => {
             return [x, y];
         }
         function onFrame(timestamp) {
-            const interval = 1000.0 / 10.0;
+            const interval = 1000.0 / 60.0;
             const dt = timestamp - prevFrameTimeStamp;
             
             if (dt > interval) {
@@ -529,21 +531,34 @@ worker.onmessage = (msg) => {
 
             //throw "test";
 
-            window.requestAnimationFrame(onFrame);
-            uniformInstanceCountLocation = null;
-
-            uiEditor.sendMsg = function(msg, data) {
-                const msgmem = instance.exports.malloc(msg.length);
-                const u8msg = new Uint8Array(memory.buffer, msgmem, msg.length);
-                const datamem = instance.exports.malloc(data.length);
-                const u8data = new Uint8Array(memory.buffer, datamem, data.length);
-
-                for (let i = 0; i < msg.length; i++) u8msg[i] = msg.charCodeAt(i) & 0xff;
-                for (let i = 0; i < data.length; i++) u8data[i] = data.charCodeAt(i) & 0xff;
-
-                instance.exports.editorEvent(msgmem, msg.length, datamem, data.length);
+            if (IS_EDITOR == false) {
+                window.requestAnimationFrame(onFrame);
             }
+            else {
+                if (refreshCounter > 0) {
+                    refreshCounter--;
+                    window.requestAnimationFrame(onFrame);
+                }                
+            }
+            uniformInstanceCountLocation = null;
         }
+
+        uiEditor.sendMsg = function(msg, data) {
+            const msgmem = instance.exports.malloc(msg.length);
+            const u8msg = new Uint8Array(memory.buffer, msgmem, msg.length);
+            const datamem = instance.exports.malloc(data.length);
+            const u8data = new Uint8Array(memory.buffer, datamem, data.length);
+
+            for (let i = 0; i < msg.length; i++) u8msg[i] = msg.charCodeAt(i) & 0xff;
+            for (let i = 0; i < data.length; i++) u8data[i] = data.charCodeAt(i) & 0xff;
+
+            instance.exports.editorEvent(msgmem, msg.length, datamem, data.length);
+        }
+        uiEditor["engine.refresh"] = function(data) {
+            window.requestAnimationFrame(onFrame);
+            refreshCounter = 16;            
+        }
+
         window.requestAnimationFrame(timestamp => {
             prevFrameTimeStamp = timestamp;
             window.requestAnimationFrame(onFrame);
@@ -567,6 +582,7 @@ worker.onmessage = (msg) => {
                 instance.exports.pointerEvent(POINTER_HOVER, event.pointerId, x, y);
                 event.preventDefault();                
             }
+            uiEditor["engine.refresh"]();
         });
         eventSource.addEventListener("pointerup", (event) => {
             if (activePointerIDs[event.pointerId]) {
@@ -610,6 +626,9 @@ worker.onmessage = (msg) => {
         window.addEventListener("touchend", (event) => {
             event.preventDefault();
             return false;
+        });
+        window.addEventListener('wheel', function(event) {
+            instance.exports.wheelEvent(event.deltaY);
         });
     }
     if (msg.data.type == EventType.FTASK) {

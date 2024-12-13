@@ -349,8 +349,9 @@ namespace {
         }
         vssrc {
             float3 inrm = _cross(const_binormal.xyz, const_tangent.xyz) * fixed_offset[vertex_ID].z;
+            float  headScale = 0.25 * _len(const_positions[1].xyz - const_positions[0].xyz);
             float3 headDir = 0.15 * (fixed_offset[vertex_ID].x * const_binormal.xyz + fixed_offset[vertex_ID].y * const_tangent.xyz) + inrm;
-            float3 position = const_positions[_min(vertex_ID, 1)].xyz + headDir;
+            float3 position = const_positions[_min(vertex_ID, 1)].xyz + headScale * headDir;
             
             output_position = _transform(float4(position, 1.0), frame_plmVPMatrix);
             output_color = const_color;

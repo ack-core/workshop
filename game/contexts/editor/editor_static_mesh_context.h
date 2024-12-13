@@ -2,7 +2,6 @@
 #pragma once
 #include <game/context.h>
 #include <unordered_map>
-
 #include "node_access_interface.h"
 
 namespace game {

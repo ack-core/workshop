@@ -27,8 +27,8 @@ namespace game {
     }
     states[] = {
         {"default", {
-            &makeContext<EditorMainContext>,
             &makeContext<EditorCameraContext>,
+            &makeContext<EditorMainContext, CameraAccessInterface>,
             &makeContext<EditorStaticMeshContext, NodeAccessInterface>
         }}
 //        {"default", {

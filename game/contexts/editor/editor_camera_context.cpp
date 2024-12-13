@@ -33,7 +33,26 @@ namespace game {
             if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
                 _pointerId = foundation::INVALID_POINTER_ID;
             }
+            if (args.type == foundation::PlatformPointerEventArgs::EventType::WHEEL) {
+                float percent = std::max(1000.0f + float(args.flags.wheel), 900.0f) / 1000.0f;
+                float orbitLength = _orbit.length();
 
+                if (orbitLength < 50.0f) {
+                    if (percent > 1.0f) {
+                         _orbit = _orbit * percent;
+                    }
+                }
+                else if (orbitLength > 1000.0f) {
+                    if (percent < 1.0f) {
+                         _orbit = _orbit * percent;
+                    }
+                }
+                else {
+                    _orbit = _orbit * percent;
+                }
+                
+                _api.platform->sendEditorMsg("engine.refresh", "");
+            }
             return true;
         });
     }
@@ -42,6 +61,10 @@ namespace game {
         _api.platform->removeEventHandler(_token);
     }
     
+    float EditorCameraContext::getOrbitSize() const {
+        return _orbit.length();
+    }
+
     void EditorCameraContext::update(float dtSec) {
         _api.scene->setCameraLookAt(_orbit, {0, 0, 0});
     }

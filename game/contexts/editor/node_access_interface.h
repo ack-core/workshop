@@ -1,6 +1,5 @@
 
 #pragma once
-#include <variant>
 
 namespace game {
     enum class EditorNodeType : std::size_t {
@@ -18,7 +17,7 @@ namespace game {
         
         EditorNode(std::size_t typeIndex) : type(EditorNodeType(typeIndex)), position(0, 0, 0) {}
     };
-        
+    
     class NodeAccessInterface : public Interface {
     public:
         virtual const std::weak_ptr<EditorNode> &getSelectedNode() const = 0;
