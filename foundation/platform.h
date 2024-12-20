@@ -13,29 +13,27 @@ namespace foundation {
     using EventHandlerToken = unsigned char *;
     const EventHandlerToken INVALID_EVENT_TOKEN = nullptr;
     const std::size_t INVALID_POINTER_ID = std::size_t(-1);
-    
+
+    enum class Key : std::uint32_t {
+        A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+        NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
+        LEFT, RIGHT, UP, DOWN,
+        SPACE, ENTER, TAB,
+        F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
+        _count
+    };
+
     struct PlatformFileEntry {
         std::string name;
         bool isDirectory = false;
     };
-    
     struct PlatformKeyboardEventArgs {
-        enum class Key : std::uint32_t {
-            A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
-            NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
-            LEFT, RIGHT, UP, DOWN,
-            SPACE, ENTER, TAB,
-            CTRL, SHIFT, ALT,
-            F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
-            _count
-        };
         enum class EventType : std::uint32_t {
-            UNKNOWN,
             PRESS,
             RELEASE
         };
         
-        EventType type = EventType::UNKNOWN;
+        EventType type = EventType::PRESS;
         Key key = Key(0xFF);
     };
     struct PlatformPointerEventArgs {
@@ -156,7 +154,7 @@ namespace foundation {
         // Set handlers for keyboard
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop = false) = 0;
+        virtual EventHandlerToken addKeyboardEventHandler(util::callback<bool(const foundation::PlatformKeyboardEventArgs &)> &&handler, bool setTop = false) = 0;
         
         // Set handlers for User's input (virtual keyboard)
         // @return nullptr if not supported
@@ -167,12 +165,12 @@ namespace foundation {
         // coordinateX/coordinateY of PlatformPointerEventArgs struct can be replaced on PC with user's value (PlatformInterface will set new pointer coordinates)
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop = false) = 0;
+        virtual EventHandlerToken addPointerEventHandler(util::callback<bool(const foundation::PlatformPointerEventArgs &)> &&handler, bool setTop = false) = 0;
         
         // Set handlers for gamepad
         // @return nullptr if not supported
         //
-        virtual EventHandlerToken addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop = false) = 0;
+        virtual EventHandlerToken addGamepadEventHandler(util::callback<bool(const foundation::PlatformGamepadEventArgs &)> &&handler, bool setTop = false) = 0;
         
         // Remove handlers of any type
         //

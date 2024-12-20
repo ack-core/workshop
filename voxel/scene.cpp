@@ -676,7 +676,7 @@ namespace voxel {
         float relScreenPosY = 1.0f - 2.0f * screenPosition.y / _platform->getScreenHeight();
         
         const math::vector4f worldPos = math::vector4f(relScreenPosX, relScreenPosY, 0.0f, 1.0f).transformed(_camera.invVPMatrix);
-        return math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w).normalized();
+        return (math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w) - _camera.position).normalized();
     }
     
     // Next:

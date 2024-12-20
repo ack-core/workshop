@@ -40,6 +40,8 @@ const POINTER_MOVE = 2;
 const POINTER_HOVER = 3;
 const POINTER_UP = 4;
 const POINTER_CANCEL = 5;
+const KEYBOARD_PRESS = 0;
+const KEYBOARD_RELEASE = 1;
 const IS_EDITOR = document.getElementById("editor") != null;
 
 class EventType {
@@ -75,6 +77,16 @@ var uniformInstanceCountLocation = null;
 var resizeTimeoutHandler = null;
 var refreshCounter = 0;
 var uiEditor = { msgHandler: null, sendMsg: function(msg, data) {} };
+var keyCount = 0;
+
+const keyboardMap = {
+    KeyA: 0,  KeyB:  1, KeyC:  2, KeyD:  3, KeyE:  4, KeyF:  5, KeyG:  6, KeyH:  7, KeyI:  8, KeyJ:  9, KeyK: 10, KeyL: 11, KeyM: 12, KeyN: 13, KeyO: 14,
+    KeyP: 15, KeyQ: 16, KeyR: 17, KeyS: 18, KeyT: 19, KeyU: 20, KeyV: 21, KeyW: 22, KeyX: 23, KeyY: 24, KeyZ: 25,
+    Digit0: 26, Digit1: 27, Digit2: 28, Digit3: 29, Digit4: 30, Digit5: 31, Digit6: 32, Digit7: 33, Digit8: 34, Digit9: 35,
+    ArrowLeft: 36, ArrowRight: 37, ArrowUp: 38, ArrowDown: 39,
+    Space: 40, Enter: 41, Tab: 42,
+    F1: 43, F2: 44, F3: 45, F4: 46, F5: 47, F6: 48, F7: 49, F8: 50, F9: 51, F10: 52
+}
 
 const vertexAttribFunctions = [
     (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.HALF_FLOAT, false, stride, offset); return 4; },
@@ -538,9 +550,19 @@ worker.onmessage = (msg) => {
                 if (refreshCounter > 0) {
                     refreshCounter--;
                     window.requestAnimationFrame(onFrame);
-                }                
+                }
+                if (keyCount > 0) {
+                    window.requestAnimationFrame(onFrame);                    
+                }
             }
             uniformInstanceCountLocation = null;
+        }
+        function refreshFrame(data) {
+            refreshCounter = 4;
+            window.requestAnimationFrame(timestamp => {
+                prevFrameTimeStamp = timestamp;
+                window.requestAnimationFrame(onFrame);
+            });
         }
 
         uiEditor.sendMsg = function(msg, data) {
@@ -554,15 +576,14 @@ worker.onmessage = (msg) => {
 
             instance.exports.editorEvent(msgmem, msg.length, datamem, data.length);
         }
-        uiEditor["engine.refresh"] = function(data) {
-            window.requestAnimationFrame(onFrame);
-            refreshCounter = 16;            
-        }
+        uiEditor["engine.refresh"] = refreshFrame;
 
+        // start loop
         window.requestAnimationFrame(timestamp => {
             prevFrameTimeStamp = timestamp;
             window.requestAnimationFrame(onFrame);
         });
+
         eventSource.addEventListener("pointerdown", (event) => {
             [x, y] = getCoord(event);
             if (x >= 0 && y >= 0 && x <= targetWidth && y <= targetHeight) {
@@ -582,7 +603,7 @@ worker.onmessage = (msg) => {
                 instance.exports.pointerEvent(POINTER_HOVER, event.pointerId, x, y);
                 event.preventDefault();                
             }
-            uiEditor["engine.refresh"]();
+            refreshFrame();
         });
         eventSource.addEventListener("pointerup", (event) => {
             if (activePointerIDs[event.pointerId]) {
@@ -627,8 +648,27 @@ worker.onmessage = (msg) => {
             event.preventDefault();
             return false;
         });
+        window.addEventListener('keydown', function(event) {
+            if (event.repeat == false) {
+                if (event.code in keyboardMap) {
+                    instance.exports.keyboardEvent(KEYBOARD_PRESS, keyboardMap[event.code]);
+                    refreshFrame();
+                    keyCount++;
+                }
+            }
+        });
+        window.addEventListener('keyup', function(event) {
+            if (event.repeat == false) {
+                if (event.code in keyboardMap) {
+                    instance.exports.keyboardEvent(KEYBOARD_RELEASE, keyboardMap[event.code]);
+                    refreshFrame();
+                    keyCount--;
+                }
+            }
+        });        
         window.addEventListener('wheel', function(event) {
             instance.exports.wheelEvent(event.deltaY);
+            window.requestAnimationFrame(onFrame);
         });
     }
     if (msg.data.type == EventType.FTASK) {

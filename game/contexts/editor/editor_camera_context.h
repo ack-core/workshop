@@ -10,14 +10,21 @@ namespace game {
         EditorCameraContext(API &&api);
         ~EditorCameraContext() override;
         
-        float getOrbitSize() const override;
+        auto getOrbitSize() const -> float override;
+        auto getTarget() const -> math::vector3f override;
+        
         void update(float dtSec) override;
         
     private:
         const API _api;
-        foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
+        foundation::EventHandlerToken _pointerToken = foundation::INVALID_EVENT_TOKEN;
+        foundation::EventHandlerToken _keyboardToken = foundation::INVALID_EVENT_TOKEN;
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
+        math::vector3f _target = {0, 0, 0};
         math::vector3f _orbit = {100, 100, 100};
+        int movLR = 0, movBF = 0;
+
+        voxel::SceneInterface::LineSetPtr _axis;
     };
 }

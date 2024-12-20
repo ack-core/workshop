@@ -144,6 +144,7 @@ namespace {
 
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformKeyboardEventArgs &)>>> g_keyboardHandlers;
 
     util::callback<void(float)> g_updateAndDraw;
     util::callback<void()> g_resizeHandler;
@@ -223,7 +224,14 @@ namespace foundation {
         return token;
     }
     EventHandlerToken WASMPlatform::addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) {
-        return nullptr;
+        EventHandlerToken token = g_tokenCounter++;
+        if (setTop) {
+            g_keyboardHandlers.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            g_keyboardHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        }
+        return token;
     }
     EventHandlerToken WASMPlatform::addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) {
         return nullptr;
@@ -252,6 +260,12 @@ namespace foundation {
         for (auto index = g_pointerHandlers.begin(); index != g_pointerHandlers.end(); ++index) {
             if (index->first == token) {
                 g_pointerHandlers.erase(index);
+                return;
+            }
+        }
+        for (auto index = g_keyboardHandlers.begin(); index != g_keyboardHandlers.end(); ++index) {
+            if (index->first == token) {
+                g_keyboardHandlers.erase(index);
                 return;
             }
         }
@@ -410,6 +424,19 @@ extern "C" {
                 .coordinateY = y
             };
             for (auto &index : g_pointerHandlers) {
+                if (index.second(args)) {
+                    break;
+                }
+            }
+        }
+    }
+    void keyboardEvent(foundation::PlatformKeyboardEventArgs::EventType type, foundation::Key key) {
+        if (auto p = g_instance.lock()) {
+            foundation::PlatformKeyboardEventArgs args = {
+                .type = type,
+                .key = key
+            };
+            for (auto &index : g_keyboardHandlers) {
                 if (index.second(args)) {
                     break;
                 }

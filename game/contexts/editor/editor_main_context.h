@@ -48,9 +48,6 @@ namespace game {
         
         std::weak_ptr<EditorNode> _currentNode;
         
-//        ui::ImagePtr _testButton1;
-//        ui::ImagePtr _testButton2;
-        
     private:
         bool _createNode(const std::string &data);
         bool _selectNode(const std::string &data);

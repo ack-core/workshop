@@ -69,6 +69,9 @@ namespace game {
                 if (_capturedPointerId == args.pointerID) {
                     const float lineMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _capturedPosition, lineDirs[_capturedLineIndex]).y;
                     _target = _capturedPosition + (lineMovingKoeff - _capturedMovingKoeff) * lineDirs[_capturedLineIndex];
+                    _target.x = std::floor(_target.x);
+                    _target.y = std::floor(_target.y);
+                    _target.z = std::floor(_target.z);
                     _lineset->setPosition(_target);
                     _api.platform->sendEditorMsg("engine.nodeCoordinates", util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
                     return true;
@@ -133,7 +136,7 @@ namespace game {
     }
     
     void EditorMainContext::update(float dtSec) {
-
+        
     }
     
     bool EditorMainContext::_createNode(const std::string &data) {
@@ -142,6 +145,7 @@ namespace game {
         if (args >> typeIndex) {
             if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
                 const auto &value = _nodes.emplace(getNextUnknownName(), EditorNode::makeByType[typeIndex](typeIndex)).first;
+                value->second->position = _cameraAccess.getTarget();
                 _movingTool = std::make_unique<MovingTool>(_api, _cameraAccess, value->second->position);
                 _api.platform->sendEditorMsg("engine.nodeCreated", value->first + " " + nodeTypeToPanelMapping[typeIndex]);
             }
