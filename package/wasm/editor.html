@@ -381,7 +381,7 @@
                 {
                     rows: [
                         {
-                            id: "nodeTree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, data: [],
+                            id: "node_tree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, data: [],
                             template: "{common.icon()}&nbsp;#value#",
                             css: { "background" : "transparent", "color" : "lightGray" },
                             on: {
@@ -424,7 +424,7 @@
             }
         });
         webix.ui({
-            id: "inspectPanel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true,
+            id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true,
             rows: [
                 {
                     id: "node_0", view: "accordionitem", hidden: true, header: "Node Parameters", headerHeight: 10, headerAltHeight: 10,
@@ -488,7 +488,7 @@
                                 on: {
                                     onAfterSelect: function(path) {
                                         utility.setElementValue("inspect_mesh_path", path);
-                                        uiEditor.sendMsg("editor.static.set_path", path);
+                                        uiEditor.sendMsg("editor.static.set_mesh_path", path);
                                     }
                                 }
                             },
@@ -640,9 +640,9 @@
         //     }
         // }).show();
 
-        uiNodeTree = $$("nodeTree");
+        uiNodeTree = $$("node_tree");
         uiStaticMeshList = $$("static_mesh_list");
-        uiInspectPanel = $$("inspectPanel");
+        uiInspectPanel = $$("inspect_panel");
 
         if (typeof uiEditor != 'undefined') {
             uiEditor["engine.nodeCreated"] = function(data) {
@@ -669,6 +669,7 @@
                 utility.addItemToNodeTree(nv);
             }
             uiEditor["engine.nodeCoordinates"] = function(data) {
+                //console.log("[JS] engine.nodeCoordinates ", data);
                 const [x, y, z] = data.split(' ');
                 Object.entries({inspect_node_x: x, inspect_node_y: y, inspect_node_z: z}).forEach(([k, v]) => {
                     utility.setElementValue(k, v);

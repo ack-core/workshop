@@ -8,7 +8,7 @@ namespace game {
         };
         
         _handlers["editor.selectNode"] = &EditorStaticMeshContext::_selectNode;
-        _handlers["editor.static.set_path"] = &EditorStaticMeshContext::_setPath;
+        _handlers["editor.static.set_mesh_path"] = &EditorStaticMeshContext::_setMeshPath;
         
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
@@ -21,28 +21,29 @@ namespace game {
     }
     
     EditorStaticMeshContext::~EditorStaticMeshContext() {
-
+        _api.platform->removeEventHandler(_editorEventsToken);
     }
     
     void EditorStaticMeshContext::update(float dtSec) {
-        std::shared_ptr<EditorNodeStaticMesh> node = std::static_pointer_cast<EditorNodeStaticMesh>(_nodeAccess.getSelectedNode().lock());
-        if (node && node->mesh) {
-            node->mesh->setPosition(node->position);
+        if (std::shared_ptr<EditorNodeStaticMesh> node = std::dynamic_pointer_cast<EditorNodeStaticMesh>(_nodeAccess.getSelectedNode().lock())) {
+            if (node->mesh) {
+                node->mesh->setPosition(node->position);
+            }
         }
     }
     
     bool EditorStaticMeshContext::_selectNode(const std::string &data) {
-        std::shared_ptr<EditorNodeStaticMesh> node = std::static_pointer_cast<EditorNodeStaticMesh>(_nodeAccess.getSelectedNode().lock());
-        if (node) {
-            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_static_mesh " + node->path);
+        if (std::shared_ptr<EditorNodeStaticMesh> node = std::dynamic_pointer_cast<EditorNodeStaticMesh>(_nodeAccess.getSelectedNode().lock())) {
+            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_static_mesh " + node->meshPath);
+            return true;
         }
-        return true;
+        return false;
     }
-
-    bool EditorStaticMeshContext::_setPath(const std::string &data) {
+    
+    bool EditorStaticMeshContext::_setMeshPath(const std::string &data) {
         std::shared_ptr<EditorNodeStaticMesh> node = std::static_pointer_cast<EditorNodeStaticMesh>(_nodeAccess.getSelectedNode().lock());
         if (node) {
-            node->path = data;
+            node->meshPath = data;
             
             _api.resources->getOrLoadVoxelStatic(data.c_str(), [node, weak = weak_from_this()](const foundation::RenderDataPtr &data) {
                 if (std::shared_ptr<EditorStaticMeshContext> self = weak.lock()) {

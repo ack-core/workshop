@@ -29,7 +29,8 @@ namespace game {
         {"default", {
             &makeContext<EditorCameraContext>,
             &makeContext<EditorMainContext, CameraAccessInterface>,
-            &makeContext<EditorStaticMeshContext, NodeAccessInterface>
+            &makeContext<EditorStaticMeshContext, NodeAccessInterface>,
+            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
         }}
 //        {"default", {
 //            &makeContext<DebugContext>

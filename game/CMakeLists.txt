@@ -24,6 +24,8 @@ if (APPTYPE STREQUAL "IS_CLIENT" OR APPTYPE STREQUAL "IS_EDITOR")
 		m_editor_contexts_list
 		"${m_source_root}/contexts/editor/camera_access_interface.h"
 		"${m_source_root}/contexts/editor/node_access_interface.h"
+		"${m_source_root}/contexts/editor/editor_moving_tool.h"
+		"${m_source_root}/contexts/editor/editor_moving_tool.cpp"
 		"${m_source_root}/contexts/editor/editor_main_context.h"
 		"${m_source_root}/contexts/editor/editor_main_context.cpp"
 		"${m_source_root}/contexts/editor/editor_camera_context.h"

@@ -4,7 +4,7 @@
 namespace game {
     enum class EditorNodeType : std::size_t {
         STATIC,
-        PARTICLE,
+        PARTICLES,
         _count
     };
     
@@ -16,6 +16,7 @@ namespace game {
         voxel::SceneInterface::BoundingBoxPtr bbox;
         
         EditorNode(std::size_t typeIndex) : type(EditorNodeType(typeIndex)), position(0, 0, 0) {}
+        virtual ~EditorNode() {}
     };
     
     class NodeAccessInterface : public Interface {

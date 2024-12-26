@@ -5,13 +5,6 @@ namespace game {
     std::shared_ptr<EditorNode> (*EditorNode::makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex) = {nullptr};
     
     namespace {
-        const math::vector3f lineDirs[] = {
-            {1, 0, 0}, {0, 1, 0}, {0, 0, 1}
-        };
-        const math::vector4f lineColors[] = {
-            {1, 0, 0, 1.0}, {0, 0.8, 0, 1.0}, {0, 0, 1, 1.0}
-        };
-        
         std::size_t g_unknownNodeIndex = 0;
         std::string getNextUnknownName() {
             return "Unnamed_" + std::to_string(g_unknownNodeIndex++);
@@ -21,82 +14,6 @@ namespace game {
             "inspect_static_mesh",
             "inspect_particles",
         };
-    }
-    
-    MovingTool::MovingTool(const API &api, const CameraAccessInterface &cameraAccess, math::vector3f &target) : _api(api), _cameraAccess(cameraAccess), _target(target) {
-        _toolSize = _cameraAccess.getOrbitSize() / 10.0f;
-        _lineset = _api.scene->addLineSet();
-        _lineset->setLine(0, {0, 0, 0}, _toolSize * lineDirs[0], lineColors[0], true);
-        _lineset->setLine(1, {0, 0, 0}, _toolSize * lineDirs[1], lineColors[1], true);
-        _lineset->setLine(2, {0, 0, 0}, _toolSize * lineDirs[2], lineColors[2], true);
-        _lineset->setPosition(target);
-        
-        _token = _api.platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) -> bool {
-            _toolSize = _cameraAccess.getOrbitSize() / 10.0f;
-            _lineset->setLine(0, {0, 0, 0}, _toolSize * lineDirs[0], lineColors[0], true);
-            _lineset->setLine(1, {0, 0, 0}, _toolSize * lineDirs[1], lineColors[1], true);
-            _lineset->setLine(2, {0, 0, 0}, _toolSize * lineDirs[2], lineColors[2], true);
-
-            math::vector3f camPosition;
-            math::vector3f cursorDir = _api.scene->getWorldDirection({args.coordinateX, args.coordinateY}, &camPosition);
-            
-            std::uint32_t index = _capturedLineIndex;
-            float minDistance = 0.0f;
-            
-            if (_capturedPointerId == foundation::INVALID_POINTER_ID) {
-                minDistance = std::numeric_limits<float>::max();
-
-                for (std::uint32_t i = 0; i < 3; i++) {
-                    const float dist = math::distanceRayLine(camPosition, cursorDir, _target, _target + _toolSize * lineDirs[i]);
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        index = i;
-                    }
-                }
-            }
-            if (minDistance < 0.1f * _toolSize) {
-                _lineset->setLine(index, {0, 0, 0}, _toolSize * lineDirs[index], lineColors[index] + math::vector4f(0.6, 0.6, 0.6, 0.0), true);
-
-                if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
-                    _capturedLineIndex = index;
-                    _capturedPointerId = args.pointerID;
-                    _capturedPosition = _target;
-                    _capturedMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _target, lineDirs[_capturedLineIndex]).y;
-                    return true;
-                }
-            }
-            if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
-                if (_capturedPointerId == args.pointerID) {
-                    const float lineMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _capturedPosition, lineDirs[_capturedLineIndex]).y;
-                    _target = _capturedPosition + (lineMovingKoeff - _capturedMovingKoeff) * lineDirs[_capturedLineIndex];
-                    _target.x = std::floor(_target.x);
-                    _target.y = std::floor(_target.y);
-                    _target.z = std::floor(_target.z);
-                    _lineset->setPosition(_target);
-                    _api.platform->sendEditorMsg("engine.nodeCoordinates", util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
-                    return true;
-                }
-            }
-            if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH || args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
-                _capturedPointerId = foundation::INVALID_POINTER_ID;
-                _lineset->setLine(_capturedLineIndex, {0, 0, 0}, _toolSize * lineDirs[_capturedLineIndex], lineColors[_capturedLineIndex], true);
-            }
-
-            return false;
-        }, true);
-        
-        _api.platform->sendEditorMsg("engine.nodeCoordinates", util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
-    }
-    MovingTool::~MovingTool() {
-        _api.platform->removeEventHandler(_token);
-    }
-    
-    void MovingTool::setPosition(const math::vector3f &position) {
-        _target = position;
-        _lineset->setPosition(_target);
-    }
-    const math::vector3f &MovingTool::getPosition() const {
-        return _target;
     }
     
     EditorMainContext::EditorMainContext(API &&api, CameraAccessInterface &cameraAccess) : _api(std::move(api)), _cameraAccess(cameraAccess) {
@@ -139,6 +56,13 @@ namespace game {
         
     }
     
+    std::unique_ptr<MovingTool> EditorMainContext::_makeMovingTool(math::vector3f &target) {
+        auto result = std::make_unique<MovingTool>(_api, _cameraAccess, target, 1.0f);
+        result->setEditorMsg("engine.nodeCoordinates");
+        result->setUseGrid(true);
+        return result;
+    }
+    
     bool EditorMainContext::_createNode(const std::string &data) {
         util::strstream args(data.c_str(), data.length());
         std::size_t typeIndex;
@@ -146,7 +70,7 @@ namespace game {
             if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
                 const auto &value = _nodes.emplace(getNextUnknownName(), EditorNode::makeByType[typeIndex](typeIndex)).first;
                 value->second->position = _cameraAccess.getTarget();
-                _movingTool = std::make_unique<MovingTool>(_api, _cameraAccess, value->second->position);
+                _movingTool = _makeMovingTool(value->second->position);
                 _api.platform->sendEditorMsg("engine.nodeCreated", value->first + " " + nodeTypeToPanelMapping[typeIndex]);
             }
             else {
@@ -163,7 +87,7 @@ namespace game {
         const auto &index = _nodes.find(data);
         if (index != _nodes.end()) {
             _currentNode = index->second;
-            _movingTool = std::make_unique<MovingTool>(_api, _cameraAccess, index->second->position);
+            _movingTool = _makeMovingTool(index->second->position);
             _api.platform->sendEditorMsg("engine.refresh", "");
             return false; // A typed context must handle this
         }
@@ -229,7 +153,7 @@ namespace game {
         _movingTool = nullptr;
         _currentNode.reset();
         _api.platform->sendEditorMsg("engine.refresh", "");
-        return true;
+        return false;
     }
     
 }

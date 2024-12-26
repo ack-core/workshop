@@ -6,12 +6,11 @@
 
 namespace game {
     struct EditorNodeStaticMesh : public EditorNode {
-        std::string path = "<None>";
+        std::string meshPath = "<None>";
         voxel::SceneInterface::StaticMeshPtr mesh;
         
-        EditorNodeStaticMesh(std::size_t typeIndex) : EditorNode(typeIndex) {
-        
-        }
+        EditorNodeStaticMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}
+        ~EditorNodeStaticMesh() override {}
     };
 
     class EditorStaticMeshContext : public std::enable_shared_from_this<EditorStaticMeshContext>, public Context {
@@ -29,6 +28,6 @@ namespace game {
         
     private:
         bool _selectNode(const std::string &data);
-        bool _setPath(const std::string &data);
+        bool _setMeshPath(const std::string &data);
     };
 }
