@@ -175,20 +175,20 @@ namespace voxel {
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
                 
-        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const SceneInterface::EmitterParams &emitterParams)
-        : additiveBlend(emitterParams.additiveBlend)
-        , particleCount(emitterParams.particleCount)
+        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const ParticlesParams &particlesParams)
+        : additiveBlend(particlesParams.additiveBlend)
+        , particleCount(particlesParams.particleCount)
         , texture(texture)
         , map(map)
         {
-            if (emitterParams.orientation == SceneInterface::EmitterParams::Orientation::AXIS) {
+            if (particlesParams.orientation == ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
                     self._constants.normal = camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
                 };
             }
-            else if (emitterParams.orientation == SceneInterface::EmitterParams::Orientation::WORLD) {
+            else if (particlesParams.orientation == ParticlesOrientation::WORLD) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = math::vector3f(self._transform.m11, self._transform.m12, self._transform.m13);
@@ -206,10 +206,10 @@ namespace voxel {
             _constants.alpha = 1.0;
             _constants.time = 0.0f;
             _constants.mpix = 1.0f / float(map->getHeight());
-            _constants.minXYZ = emitterParams.minXYZ;
-            _constants.maxXYZ = emitterParams.maxXYZ;
-            _constants.minMaxW = emitterParams.minMaxWidth;
-            _constants.minMaxH = emitterParams.minMaxHeight;
+            _constants.minXYZ = particlesParams.minXYZ;
+            _constants.maxXYZ = particlesParams.maxXYZ;
+            _constants.minMaxW = particlesParams.minMaxWidth;
+            _constants.minMaxH = particlesParams.minMaxHeight;
         }
         ~ParticleEmitterImpl() override {}
         
@@ -225,7 +225,7 @@ namespace voxel {
         }
         
     private:
-        SceneInterface::EmitterParams::Orientation _orientation;
+        ParticlesOrientation _orientation;
         math::transform3f _transform = math::transform3f::identity();
 
         struct Constants {
@@ -259,7 +259,7 @@ namespace voxel {
         auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr override;
         auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
-        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const EmitterParams &emitter) -> ParticlesPtr override;
+        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
         auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f override;
@@ -636,7 +636,7 @@ namespace voxel {
         return _texturedMeshes.emplace_back(result);
     }
     
-    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const EmitterParams &params) {
+    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) {
         std::shared_ptr<ParticleEmitterImpl> result = std::make_shared<ParticleEmitterImpl>(tx, map, params);
         return _particleEmitters.emplace_back(result);
     }

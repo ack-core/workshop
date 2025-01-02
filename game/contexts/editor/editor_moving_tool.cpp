@@ -79,6 +79,10 @@ namespace game {
                 }
             }
             if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH || args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
+                if (_onDragEnd && _capturedPointerId != foundation::INVALID_POINTER_ID) {
+                    _onDragEnd();
+                }
+                
                 _capturedPointerId = foundation::INVALID_POINTER_ID;
                 _lineset->setLine(_capturedLineIndex, {0, 0, 0}, currentToolSize * lineDirs[_capturedLineIndex], lineColors[_capturedLineIndex], true);
             }

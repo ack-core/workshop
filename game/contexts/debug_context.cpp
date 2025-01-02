@@ -71,9 +71,9 @@ namespace game {
                     0x00000000,
                 };
                 foundation::RenderTexturePtr ptcparams = _api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 4, { ptcparamssrc });
-                _ptc = _api.scene->addParticles(texture, ptcparams, voxel::SceneInterface::EmitterParams {
+                _ptc = _api.scene->addParticles(texture, ptcparams, voxel::ParticlesParams {
                     .additiveBlend = false,
-                    .orientation = voxel::SceneInterface::EmitterParams::Orientation::WORLD,
+                    .orientation = voxel::ParticlesOrientation::WORLD,
                     .particleCount = 2,
                     .minXYZ = {-5.0, 0, 0},
                     .maxXYZ = {5.0, 0, 0},

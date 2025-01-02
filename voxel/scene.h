@@ -9,26 +9,26 @@
 #include <memory>
 
 namespace voxel {
+    enum class ParticlesOrientation {
+        CAMERA, AXIS, WORLD
+    };
+
+    struct ParticlesParams {
+        bool additiveBlend = false;
+        ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
+        std::uint32_t particleCount = 1;
+        math::vector3f minXYZ = {0, 0, 0};
+        math::vector3f maxXYZ = {0, 0, 0};
+        math::vector2f minMaxWidth = {1, 1};
+        math::vector2f minMaxHeight = {1, 1};
+    };
+
     class SceneInterface {
     public:
         static std::shared_ptr<SceneInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering
         );
-        
-    public:
-        struct EmitterParams {
-            bool additiveBlend = false;
-            enum class Orientation {
-                CAMERA, AXIS, WORLD
-            }
-            orientation = Orientation::CAMERA;
-            std::uint32_t particleCount = 1;
-            math::vector3f minXYZ = {0, 0, 0};
-            math::vector3f maxXYZ = {0, 0, 0};
-            math::vector2f minMaxWidth = {1, 1};
-            math::vector2f minMaxHeight = {1, 1};
-        };
         
     public:
         struct LineSet {
@@ -81,7 +81,7 @@ namespace voxel {
         virtual auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr = 0;
         virtual auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
-        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const voxel::SceneInterface::EmitterParams &emitter) -> ParticlesPtr = 0;
+        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const voxel::ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual auto getCameraPosition() const -> math::vector3f = 0;
