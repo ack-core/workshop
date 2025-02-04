@@ -5,6 +5,7 @@
 #include "node_access_interface.h"
 #include "editor_moving_tool.h"
 
+/*
 namespace game {
     enum class GraphType {
         CONSTANT
@@ -97,3 +98,4 @@ namespace game {
         bool _clearNodeSelection(const std::string &data);
     };
 }
+*/

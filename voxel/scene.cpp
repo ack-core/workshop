@@ -177,9 +177,10 @@ namespace voxel {
                 
         ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const ParticlesParams &particlesParams)
         : additiveBlend(particlesParams.additiveBlend)
-        , particleCount(particlesParams.particleCount)
+        , particleCount(map->getHeight() / VERTICAL_PIXELS_PER_PARTICLE)
         , texture(texture)
         , map(map)
+        , _secondsPerTextureWidth(particlesParams.secondsPerTextureWidth)
         {
             if (particlesParams.orientation == ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
@@ -205,7 +206,8 @@ namespace voxel {
             
             _constants.alpha = 1.0;
             _constants.time = 0.0f;
-            _constants.mpix = 1.0f / float(map->getHeight());
+            _constants.hpix = 1.0f / float(map->getWidth());
+            _constants.vpix = 1.0f / float(map->getHeight());
             _constants.minXYZ = particlesParams.minXYZ;
             _constants.maxXYZ = particlesParams.maxXYZ;
             _constants.minMaxW = particlesParams.minMaxWidth;
@@ -220,21 +222,21 @@ namespace voxel {
         void setTransform(const math::transform3f &trfm) override {
             _transform = trfm;
         }
-        void setTime(float timeKoeff) override {
-            _constants.time = timeKoeff;
+        void setTime(float timeSec) override {
+            _constants.time = std::min(std::fabs(timeSec) / _secondsPerTextureWidth, 1.0f);
         }
         
     private:
-        ParticlesOrientation _orientation;
         math::transform3f _transform = math::transform3f::identity();
+        const float _secondsPerTextureWidth;
 
         struct Constants {
-            math::vector3f position; float alpha;
-            math::vector3f normal; float time;
-            math::vector3f right; float mpix;
+            math::vector3f position; float time;
+            math::vector3f normal; float alpha;
+            math::vector3f right; float r0;
             math::vector2f minMaxW, minMaxH;
-            math::vector3f minXYZ; float r0;
-            math::vector3f maxXYZ; float r1;
+            math::vector3f minXYZ; float hpix;
+            math::vector3f maxXYZ; float vpix;
         }
         _constants;
         
@@ -473,27 +475,35 @@ namespace {
             quad[4] : float4 = [-0.5, 0.5, 0, 0][0.5, 0.5, 1, 0][-0.5, -0.5, 0, 1][0.5, -0.5, 1, 1]
         }
         const {
-            position_alpha : float4
-            normal_time : float4
-            right_mpix : float4
+            position_time : float4
+            normal_alpha : float4
+            right_r0 : float4
             width_height : float4
-            minXYZ_r0 : float4
-            maxXYZ_r1 : float4
+            minXYZ_hpix : float4
+            maxXYZ_vpix : float4
         }
         inout {
             uv : float2
         }
         vssrc {
-            float  ptcv = 2.0 * const_right_mpix.w * float(vertex_ID);
-            float4 map0 = _tex2d(0, float2(const_normal_time.w, ptcv + 0.5 * const_right_mpix.w)); // x, y, z, history index
-            float4 map1 = _tex2d(0, float2(const_normal_time.w, ptcv + 1.5 * const_right_mpix.w)); // width, height, angle, reserved
+            float  ptcv0 = 2.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
+            float  ptcv1 = ptcv0 + const_maxXYZ_vpix.w;
+
+            float  t0 = const_position_time.w - _frac(const_position_time.w / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
+            float  t1 = t0 + const_minXYZ_hpix.w;
+            float  tf = (const_position_time.w - t0) / const_minXYZ_hpix.w;
             
-            float3 ptcpos = const_minXYZ_r0.xyz + (const_maxXYZ_r1.xyz - const_minXYZ_r0.xyz) * map0.xyz;
-            float2 wh = const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map1.xy;
+            float4 m1t0 = _tex2d(0, float2(t0, ptcv1));
+            float4 m1t1 = _tex2d(0, float2(t1, ptcv1));
+            float4 map0 = _lerp(_tex2d(0, float2(t0, ptcv0)), _tex2d(0, float2(t1, ptcv0)), tf);    // x, y, z, history index
+            float4 map1 = float4(_lerp(m1t0.xyz, m1t0.xyz, tf), m1t0.w * m1t1.w);                   // width, height, angle, alive
             
-            float3 up = _cross(const_normal_time.xyz, const_right_mpix.xyz);
-            float3 relVertexPos = const_right_mpix.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
-            output_position = _transform(float4(const_position_alpha.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
+            float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * map0.xyz;
+            float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map1.xy) * map1.w;
+            
+            float3 up = _cross(const_normal_alpha.xyz, const_right_r0.xyz);
+            float3 relVertexPos = const_right_r0.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            output_position = _transform(float4(const_position_time.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv = fixed_quad[repeat_ID].zw;
         }
         fssrc {

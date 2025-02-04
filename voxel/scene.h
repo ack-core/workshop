@@ -9,14 +9,17 @@
 #include <memory>
 
 namespace voxel {
+    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 2;
+
     enum class ParticlesOrientation {
         CAMERA, AXIS, WORLD
     };
 
     struct ParticlesParams {
+        bool looped = false;
         bool additiveBlend = false;
+        float secondsPerTextureWidth = 1.0f;
         ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
-        std::uint32_t particleCount = 1;
         math::vector3f minXYZ = {0, 0, 0};
         math::vector3f maxXYZ = {0, 0, 0};
         math::vector2f minMaxWidth = {1, 1};
@@ -56,7 +59,7 @@ namespace voxel {
         };
         struct Particles {
             virtual void setTransform(const math::transform3f &trfm) = 0;
-            virtual void setTime(float timeKoeff) = 0;
+            virtual void setTime(float timeSec) = 0;
             virtual ~Particles() = default;
         };
         struct LightSource {

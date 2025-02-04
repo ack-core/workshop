@@ -2,6 +2,7 @@
 #include "editor_particles_context.h"
 #include <list>
 
+/*
 namespace game {
     namespace {
         const std::uint32_t PIXELS_PER_PARTICLE = 2;
@@ -161,3 +162,4 @@ namespace game {
     }
 }
 
+*/
