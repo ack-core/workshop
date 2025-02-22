@@ -9,7 +9,7 @@
 #include <memory>
 
 namespace voxel {
-    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 2;
+    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 3;
 
     enum class ParticlesOrientation {
         CAMERA, AXIS, WORLD

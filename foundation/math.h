@@ -79,6 +79,7 @@ namespace math {
         auto rotated(const vector3f &axis, scalar radians) const -> vector3f;
         auto distanceTo(const vector3f &other) const -> scalar;
         auto transformed(const transform3f &trfm, bool likePosition = false) const -> vector3f;
+        auto signs() const -> vector3f;
     };
     template<int Ix, int Iy, int Iz, int Iw> struct swizzle4f {
         vector4f &operator=(const swizzle4f &other);
@@ -665,7 +666,12 @@ namespace math {
             flat[0] * trfm.row0[2] + flat[1] * trfm.row1[2] + flat[2] * trfm.row2[2] + flat[3] * trfm.row3[2]
         };
     }
-    
+    template<int Ix, int Iy, int Iz>
+    inline vector3f swizzle3f<Ix, Iy, Iz>::signs() const {
+        const scalar (&flat)[4] = asFlat();
+        return {std::copysign(scalar(1.0), flat[Ix]), std::copysign(scalar(1.0), flat[Iy]), std::copysign(scalar(1.0), flat[Iz])};
+    }
+
     //---
     
     template<int Ix, int Iy, int Iz, int Iw>

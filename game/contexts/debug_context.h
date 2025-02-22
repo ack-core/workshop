@@ -2,26 +2,30 @@
 #pragma once
 #include <game/context.h>
 
+// Plan
+// v Shape refactor
+// + bbox calculation
+// + 16bit coords
+
 namespace game {
-    enum class Distribution {
-        RANDOM = 0,   // a random point from start shape to a random point of the end shape
-        SHUFFLED,     // a random point from start shape to the according point of the end shape
-        LINEAR,       // the i-th point from start shape to the according point of the end shape
-    };
     struct Graph {
         auto getFilling(float t) -> float;
     };
     struct Shape {
         enum class Type {
             DISK = 0,
-            CIRCLE,
-            SPHERE,
             MESH
         };
+        enum class Distribution {
+            RANDOM = 0,   // a random point from start shape to a random point of the end shape
+            SHUFFLED,     // a random point from start shape to the according point of the end shape
+            LINEAR,       // the i-th point from start shape to the according point of the end shape
+        };
+
         Type type;
-        float size;
-        std::vector<math::vector3f> points;
-        void generate(std::size_t randomSeed, std::size_t amount);
+        float size = 0.0f;
+        
+        void generate(std::vector<math::vector3f> &points, const math::vector3f &offset, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
     };
     
     class Emitter {
@@ -46,19 +50,21 @@ namespace game {
         };
         
         bool _isLooped = false;
-        
-        Shape _startShape = { Shape::Type::DISK, 0.0f };
-        Shape _endShape = { Shape::Type::DISK, 10.0f };
-        math::vector3f _endShapeOffset = {0, 10, 0};
-
         std::size_t _randomSeed = 0;
+
+        Shape::Distribution _shapeDistribution = Shape::Distribution::RANDOM;
+        Shape _startShape = { Shape::Type::DISK, 0.0f };
+        Shape _endShape = { Shape::Type::DISK, 15.0f };
+        std::vector<math::vector3f> _startShapePoints;
+        std::vector<math::vector3f> _endShapePoints;
+        math::vector3f _endShapeOffset = {0, 0, 0};
+
         foundation::RenderTexturePtr _texture;
         
         std::size_t _bakingFrameTimeMs = 100;
         std::size_t _particlesToEmit = 10;
         
         Graph _emissionGraph;
-        
         float _emissionTimeMs = 1000.0f;
         float _particleLifeTimeMs = 2000.0f;
         float _particleSpeed = 10.0f;
@@ -68,7 +74,6 @@ namespace game {
         voxel::ParticlesParams _ptcParams;
         
     private:
-        auto _nextRandom(std::size_t prev) -> std::size_t;
         auto _getShapePoints(float cycleOffset, std::size_t random) const -> std::pair<math::vector3f, math::vector3f>;
     };
 }

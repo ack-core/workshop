@@ -486,20 +486,25 @@ namespace {
             uv : float2
         }
         vssrc {
-            float  ptcv0 = 2.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
+            float  ptcv0 = 3.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
             float  ptcv1 = ptcv0 + const_maxXYZ_vpix.w;
+            float  ptcv2 = ptcv1 + const_maxXYZ_vpix.w;
 
             float  t0 = const_position_time.w - _frac(const_position_time.w / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
             float  t1 = t0 + const_minXYZ_hpix.w;
             float  tf = (const_position_time.w - t0) / const_minXYZ_hpix.w;
             
-            float4 m1t0 = _tex2d(0, float2(t0, ptcv1));
-            float4 m1t1 = _tex2d(0, float2(t1, ptcv1));
-            float4 map0 = _lerp(_tex2d(0, float2(t0, ptcv0)), _tex2d(0, float2(t1, ptcv0)), tf);    // x, y, z, history index
-            float4 map1 = float4(_lerp(m1t0.xyz, m1t0.xyz, tf), m1t0.w * m1t1.w);                   // width, height, angle, alive
-            
-            float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * map0.xyz;
-            float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map1.xy) * map1.w;
+            float4 map0 = _lerp(_tex2d(0, float2(t0, ptcv0)), _tex2d(0, float2(t1, ptcv0)), tf);    // x, y
+            float4 map1 = _lerp(_tex2d(0, float2(t0, ptcv1)), _tex2d(0, float2(t1, ptcv1)), tf);    // z, angle
+
+            float4 m2t0 = _tex2d(0, float2(t0, ptcv2));
+            float4 m2t1 = _tex2d(0, float2(t1, ptcv2));
+            float4 map2 = float4(_lerp(m2t0.xyz, m2t1.xyz, tf), m2t0.w * m2t1.w);    // w, h, history, alive
+
+            float3 posKoeff = float3(map0.x + map0.y / 255.0f, map0.z + map0.w / 255.0f, map1.x + map1.y / 255.0f);
+            float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeff;
+
+            float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map2.xy) * map2.w;
             
             float3 up = _cross(const_normal_alpha.xyz, const_right_r0.xyz);
             float3 relVertexPos = const_right_r0.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
