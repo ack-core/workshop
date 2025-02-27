@@ -169,6 +169,9 @@ namespace voxel {
     //---
     
     class ParticleEmitterImpl : public SceneInterface::Particles {
+        static constexpr float TYPE_MASK_NEWBORN = 1.0f;
+        static constexpr float TYPE_MASK_ALL = 3.0f;
+
     public:
         bool additiveBlend;
         std::uint32_t particleCount;
@@ -223,7 +226,15 @@ namespace voxel {
             _transform = trfm;
         }
         void setTime(float timeSec) override {
-            _constants.time = std::min(std::fabs(timeSec) / _secondsPerTextureWidth, 1.0f);
+            float koeff = std::max(timeSec, 0.0f) / _secondsPerTextureWidth;
+            if (koeff > 1.0f) {
+                koeff = std::fmod(koeff, 1.0f);
+                _constants.mask = TYPE_MASK_ALL;
+            }
+            else {
+                _constants.mask = TYPE_MASK_NEWBORN;
+            }
+            _constants.time = koeff;
         }
         
     private:
@@ -232,8 +243,8 @@ namespace voxel {
 
         struct Constants {
             math::vector3f position; float time;
-            math::vector3f normal; float alpha;
-            math::vector3f right; float r0;
+            math::vector3f normal; float mask;
+            math::vector3f right; float alpha;
             math::vector2f minMaxW, minMaxH;
             math::vector3f minXYZ; float hpix;
             math::vector3f maxXYZ; float vpix;
@@ -476,8 +487,8 @@ namespace {
         }
         const {
             position_time : float4
-            normal_alpha : float4
-            right_r0 : float4
+            normal_mask : float4
+            right_alpha : float4
             width_height : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
@@ -499,15 +510,16 @@ namespace {
 
             float4 m2t0 = _tex2d(0, float2(t0, ptcv2));
             float4 m2t1 = _tex2d(0, float2(t1, ptcv2));
-            float4 map2 = float4(_lerp(m2t0.xyz, m2t1.xyz, tf), m2t0.w * m2t1.w);    // w, h, history, alive
+            float3 map2 = _lerp(m2t0.xyz, m2t1.xyz, tf);    // w, h, history
+            float  isAlive = _step(0.5, float(uint(m2t0.w * 255.0f) & uint(m2t1.w * 255.0f) & uint(const_normal_mask.w)));
 
             float3 posKoeff = float3(map0.x + map0.y / 255.0f, map0.z + map0.w / 255.0f, map1.x + map1.y / 255.0f);
             float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeff;
 
-            float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map2.xy) * map2.w;
+            float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map2.xy) * isAlive;
             
-            float3 up = _cross(const_normal_alpha.xyz, const_right_r0.xyz);
-            float3 relVertexPos = const_right_r0.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            float3 up = _cross(const_normal_mask.xyz, const_right_alpha.xyz);
+            float3 relVertexPos = const_right_alpha.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
             output_position = _transform(float4(const_position_time.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv = fixed_quad[repeat_ID].zw;
         }

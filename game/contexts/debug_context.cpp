@@ -82,69 +82,78 @@ namespace game {
         
         std::list<ActiveParticle> activeParticles;
         std::size_t bornParticleCount = 0;
-        std::size_t bornRandom = combineRandom(_randomSeed, RND_BORN_PARTICLE);
 
-        // TODO: create particles from prev cycles (_isLooped)
-        
-        for (std::size_t i = 0; i < mapTextureWidth; i++) {
-            const float currAbsTimeMs = float((i + 0) * _bakingFrameTimeMs);
-            const float nextAbsTimeMs = float((i + 1) * _bakingFrameTimeMs);
-            const float currEmissionTimeKoeff = float(((i % cycleLength) + 0) * _bakingFrameTimeMs) / float(_emissionTimeMs);
-            const float nextEmissionTimeKoeff = float(((i % cycleLength) + 1) * _bakingFrameTimeMs) / float(_emissionTimeMs);
-            
-            float emissinGraphFilling = _emissionGraph.getFilling(nextEmissionTimeKoeff);
-            const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling));
-            const std::size_t nextParticleCount = std::min(i / cycleLength * _particlesToEmit + nextEmissionGraphValue, _isLooped ? std::size_t(-1) : _particlesToEmit);
-            
-            for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ) {
-                if (nextAbsTimeMs - ptc->bornTimeMs > ptc->lifeTimeMs) {
-                    ptc = activeParticles.erase(ptc);
+        // second loop is needed to bake old particles from previous cycle (_isLooped)
+        for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //
+            std::size_t bornRandom = combineRandom(_randomSeed, RND_BORN_PARTICLE);
+
+            for (std::size_t i = 0; i < mapTextureWidth; i++) {
+                const std::size_t timeIndex = i + loop * mapTextureWidth;
+                const float currAbsTimeMs = float((timeIndex + 0) * _bakingFrameTimeMs);
+                const float nextAbsTimeMs = float((timeIndex + 1) * _bakingFrameTimeMs);
+                const float currEmissionTimeKoeff = float(((timeIndex % cycleLength) + 0) * _bakingFrameTimeMs) / float(_emissionTimeMs);
+                const float nextEmissionTimeKoeff = float(((timeIndex % cycleLength) + 1) * _bakingFrameTimeMs) / float(_emissionTimeMs);
+                                
+                for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ) {
+                    if (nextAbsTimeMs - ptc->bornTimeMs > ptc->lifeTimeMs) {
+                        ptc = activeParticles.erase(ptc);
+                    }
+                    else {
+                        ++ptc;
+                    }
                 }
-                else {
-                    ++ptc;
+
+                if (loop == 0) {
+                    float emissinGraphFilling = _emissionGraph.getFilling(nextEmissionTimeKoeff);
+                    const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling));
+                    const std::size_t nextParticleCount = std::min(i / cycleLength * _particlesToEmit + nextEmissionGraphValue, _isLooped ? std::size_t(-1) : _particlesToEmit);
+
+                    for (std::size_t c = bornParticleCount; c < nextParticleCount; c++) {
+                        bornRandom = getNextRandom(bornRandom);
+                        const std::pair<math::vector3f, math::vector3f> shapePoints = _getShapePoints(currEmissionTimeKoeff, bornRandom);
+                        activeParticles.emplace_back(ActiveParticle {
+                            c, bornRandom, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second
+                        });
+                    }
+
+                    bornParticleCount = nextParticleCount;
                 }
+
+                for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ++ptc) {
+                    const std::size_t voff = ptc->index * voxel::VERTICAL_PIXELS_PER_PARTICLE;
+                    const float lifeKoeff = (currAbsTimeMs - ptc->bornTimeMs) / ptc->lifeTimeMs;
+
+                    if (voff >= mapTextureHeight) {
+                        printf("");
+                    }
+                    
+                    std::uint8_t *m0 = &_mapData[(voff + 0) * mapTextureWidth * 4 + i * 4];
+                    std::uint8_t *m1 = &_mapData[(voff + 1) * mapTextureWidth * 4 + i * 4];
+                    std::uint8_t *m2 = &_mapData[(voff + 2) * mapTextureWidth * 4 + i * 4];
+
+                    const math::vector3f direction = (ptc->end - ptc->start).normalized();
+                    math::vector3f position = ptc->start + direction * _particleSpeed * lifeKoeff;
+
+                    // TODO: ptc position modificators
+
+                    float tmp;
+                    const math::vector3f positionKoeff = 255.0f * (position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
+
+                    m0[0] = std::uint8_t(positionKoeff.x);                            // X hi
+                    m0[1] = std::uint8_t(255.0f * std::modf(positionKoeff.x, &tmp));  // X low
+                    m0[2] = std::uint8_t(positionKoeff.y);                            // Y hi
+                    m0[3] = std::uint8_t(255.0f * std::modf(positionKoeff.y, &tmp));  // Y low
+                    m1[0] = std::uint8_t(positionKoeff.z);                            // X hi
+                    m1[1] = std::uint8_t(255.0f * std::modf(positionKoeff.z, &tmp));  // X low
+                    m1[2] = 0.0f; // Angle hi
+                    m1[3] = 0.0f; // Angle low
+                    m2[0] = 0;                                      // Width
+                    m2[1] = 0;                                      // Height
+                    m2[2] = 0;                                      // Angle
+                    m2[3] |= (loop + 1);                            // Mask: 1 - newborn, 2 - old
+                }
+                
             }
-
-            for (std::size_t c = bornParticleCount; c < nextParticleCount; c++) {
-                bornRandom = getNextRandom(bornRandom);
-                const std::pair<math::vector3f, math::vector3f> shapePoints = _getShapePoints(currEmissionTimeKoeff, bornRandom);
-                activeParticles.emplace_back(ActiveParticle {
-                    c, bornRandom, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second
-                });
-            }
-
-            for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ++ptc) {
-                const std::size_t voff = ptc->index * voxel::VERTICAL_PIXELS_PER_PARTICLE;
-                const float lifeKoeff = (currAbsTimeMs - ptc->bornTimeMs) / ptc->lifeTimeMs;
-
-                std::uint8_t *m0 = &_mapData[(voff + 0) * mapTextureWidth * 4 + i * 4];
-                std::uint8_t *m1 = &_mapData[(voff + 1) * mapTextureWidth * 4 + i * 4];
-                std::uint8_t *m2 = &_mapData[(voff + 2) * mapTextureWidth * 4 + i * 4];
-
-                const math::vector3f direction = (ptc->end - ptc->start).normalized();
-                math::vector3f position = ptc->start + direction * _particleSpeed * lifeKoeff;
-
-                // TODO: ptc position modificators
-
-                float tmp;
-                const math::vector3f positionKoeff = 255.0f * (position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
-
-                m0[0] = std::uint8_t(positionKoeff.x);                            // X hi
-                m0[1] = std::uint8_t(255.0f * std::modf(positionKoeff.x, &tmp));  // X low
-                m0[2] = std::uint8_t(positionKoeff.y);                            // Y hi
-                m0[3] = std::uint8_t(255.0f * std::modf(positionKoeff.y, &tmp));  // Y low
-                m1[0] = std::uint8_t(positionKoeff.z);                            // X hi
-                m1[1] = std::uint8_t(255.0f * std::modf(positionKoeff.z, &tmp));  // X low
-                m1[2] = 0.0f; // Angle hi
-                m1[3] = 0.0f; // Angle low
-                m2[0] = 0;                                      // Width
-                m2[1] = 0;                                      // Height
-                m2[2] = 0;                                      // Angle
-                m2[3] = 0xff;                                   // isAlive
-
-            }
-            
-            bornParticleCount = nextParticleCount;
         }
         
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });

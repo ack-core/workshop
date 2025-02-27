@@ -4,8 +4,13 @@
 
 // Plan
 // v Shape refactor
-// + bbox calculation
-// + 16bit coords
+// v bbox calculation
+// v 16bit coords
+// v is looped
+// + t0_t1_mask_cap
+// + edge interpolation
+// + remove bit ops for mask
+// + smooth stopping
 
 namespace game {
     struct Graph {
@@ -49,7 +54,7 @@ namespace game {
             math::vector3f end;
         };
         
-        bool _isLooped = false;
+        bool _isLooped = true;
         std::size_t _randomSeed = 0;
 
         Shape::Distribution _shapeDistribution = Shape::Distribution::RANDOM;
@@ -61,8 +66,8 @@ namespace game {
 
         foundation::RenderTexturePtr _texture;
         
-        std::size_t _bakingFrameTimeMs = 100;
-        std::size_t _particlesToEmit = 10;
+        std::size_t _bakingFrameTimeMs = 10;
+        std::size_t _particlesToEmit = 5;
         
         Graph _emissionGraph;
         float _emissionTimeMs = 1000.0f;
