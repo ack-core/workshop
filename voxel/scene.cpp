@@ -170,6 +170,7 @@ namespace voxel {
     
     class ParticleEmitterImpl : public SceneInterface::Particles {
         static constexpr float TYPE_MASK_NEWBORN = 1.0f;
+        static constexpr float TYPE_MASK_OLD = 2.0f;
         static constexpr float TYPE_MASK_ALL = 3.0f;
 
     public:
@@ -208,7 +209,7 @@ namespace voxel {
             }
             
             _constants.alpha = 1.0;
-            _constants.time = 0.0f;
+            _constants.t0_t1_mask_cap = math::vector4f {0, 0, TYPE_MASK_NEWBORN, 1.0f};
             _constants.hpix = 1.0f / float(map->getWidth());
             _constants.vpix = 1.0f / float(map->getHeight());
             _constants.minXYZ = particlesParams.minXYZ;
@@ -227,14 +228,18 @@ namespace voxel {
         }
         void setTime(float timeSec) override {
             float koeff = std::max(timeSec, 0.0f) / _secondsPerTextureWidth;
-            if (koeff > 1.0f) {
+            if (koeff >= 1.0f) {
                 koeff = std::fmod(koeff, 1.0f);
-                _constants.mask = TYPE_MASK_ALL;
+                _constants.t0_t1_mask_cap.z = TYPE_MASK_ALL;
             }
             else {
-                _constants.mask = TYPE_MASK_NEWBORN;
+                _constants.t0_t1_mask_cap.z = TYPE_MASK_NEWBORN;
             }
-            _constants.time = koeff;
+            
+            float aligned = std::floor(koeff / _constants.hpix) * _constants.hpix;
+            
+            _constants.t0_t1_mask_cap.x = koeff;
+            _constants.t0_t1_mask_cap.y = aligned + _constants.hpix > 1.0f - std::numeric_limits<float>::epsilon() ? 0.0f : aligned + _constants.hpix;
         }
         
     private:
@@ -242,9 +247,10 @@ namespace voxel {
         const float _secondsPerTextureWidth;
 
         struct Constants {
-            math::vector3f position; float time;
-            math::vector3f normal; float mask;
-            math::vector3f right; float alpha;
+            math::vector4f t0_t1_mask_cap;
+            math::vector3f position; float alpha;
+            math::vector3f normal; float r0;
+            math::vector3f right; float r1;
             math::vector2f minMaxW, minMaxH;
             math::vector3f minXYZ; float hpix;
             math::vector3f maxXYZ; float vpix;
@@ -486,9 +492,10 @@ namespace {
             quad[4] : float4 = [-0.5, 0.5, 0, 0][0.5, 0.5, 1, 0][-0.5, -0.5, 0, 1][0.5, -0.5, 1, 1]
         }
         const {
-            position_time : float4
-            normal_mask : float4
-            right_alpha : float4
+            t0_t1_mask_cap : float4
+            position_alpha : float4
+            normal_r0 : float4
+            right_r1 : float4
             width_height : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
@@ -501,9 +508,9 @@ namespace {
             float  ptcv1 = ptcv0 + const_maxXYZ_vpix.w;
             float  ptcv2 = ptcv1 + const_maxXYZ_vpix.w;
 
-            float  t0 = const_position_time.w - _frac(const_position_time.w / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
-            float  t1 = t0 + const_minXYZ_hpix.w;
-            float  tf = (const_position_time.w - t0) / const_minXYZ_hpix.w;
+            float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w; //const_t0_t1_mask_cap.x - _frac(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
+            float  t1 = const_t0_t1_mask_cap.y; //t0 + const_minXYZ_hpix.w;
+            float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w;
             
             float4 map0 = _lerp(_tex2d(0, float2(t0, ptcv0)), _tex2d(0, float2(t1, ptcv0)), tf);    // x, y
             float4 map1 = _lerp(_tex2d(0, float2(t0, ptcv1)), _tex2d(0, float2(t1, ptcv1)), tf);    // z, angle
@@ -511,16 +518,17 @@ namespace {
             float4 m2t0 = _tex2d(0, float2(t0, ptcv2));
             float4 m2t1 = _tex2d(0, float2(t1, ptcv2));
             float3 map2 = _lerp(m2t0.xyz, m2t1.xyz, tf);    // w, h, history
-            float  isAlive = _step(0.5, float(uint(m2t0.w * 255.0f) & uint(m2t1.w * 255.0f) & uint(const_normal_mask.w)));
+
+            float  isAlive = _step(0.5, float(uint(m2t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m2t1.w < 0.5);
 
             float3 posKoeff = float3(map0.x + map0.y / 255.0f, map0.z + map0.w / 255.0f, map1.x + map1.y / 255.0f);
             float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeff;
 
             float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map2.xy) * isAlive;
             
-            float3 up = _cross(const_normal_mask.xyz, const_right_alpha.xyz);
-            float3 relVertexPos = const_right_alpha.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
-            output_position = _transform(float4(const_position_time.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
+            float3 up = _cross(const_normal_r0.xyz, const_right_r1.xyz);
+            float3 relVertexPos = const_right_r1.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            output_position = _transform(float4(const_position_alpha.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv = fixed_quad[repeat_ID].zw;
         }
         fssrc {

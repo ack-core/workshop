@@ -7,10 +7,10 @@
 // v bbox calculation
 // v 16bit coords
 // v is looped
-// + t0_t1_mask_cap
-// + edge interpolation
-// + remove bit ops for mask
-// + smooth stopping
+// v t0_t1_mask_cap
+// v edge interpolation
+// + smooth stopping (using vertical cap)
+// + 
 
 namespace game {
     struct Graph {
@@ -66,12 +66,12 @@ namespace game {
 
         foundation::RenderTexturePtr _texture;
         
-        std::size_t _bakingFrameTimeMs = 10;
-        std::size_t _particlesToEmit = 5;
+        std::size_t _bakingFrameTimeMs = 100;
+        std::size_t _particlesToEmit = 20;
         
         Graph _emissionGraph;
         float _emissionTimeMs = 1000.0f;
-        float _particleLifeTimeMs = 2000.0f;
+        float _particleLifeTimeMs = 1000.0f;
         float _particleSpeed = 10.0f;
         
         std::vector<std::uint8_t> _mapData;

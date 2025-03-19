@@ -69,7 +69,7 @@ namespace game {
         if (_ptcParams.minXYZ.z > _ptcParams.maxXYZ.z) std::swap(_ptcParams.minXYZ.z, _ptcParams.maxXYZ.z);
         
         const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
-        const std::size_t cyclesInRow = std::size_t(std::ceil((_emissionTimeMs + _particleLifeTimeMs) / _emissionTimeMs));
+        const std::size_t cyclesInRow = std::size_t(std::ceil((_isLooped ? std::max(_emissionTimeMs, _particleLifeTimeMs) : _emissionTimeMs + _particleLifeTimeMs) / _emissionTimeMs));
         
         _startShape.generate(_startShapePoints, {0, 0, 0}, emitterDir, combineRandom(_randomSeed, RND_SHAPE), 256);
         _endShape.generate(_endShapePoints, _endShapeOffset, emitterDir, combineRandom(_randomSeed, RND_SHAPE), 256);
@@ -78,7 +78,7 @@ namespace game {
         const std::uint32_t mapTextureHeight = std::uint32_t(voxel::VERTICAL_PIXELS_PER_PARTICLE * _particlesToEmit * (_isLooped ? cyclesInRow : 1));
         
         _mapData.resize(mapTextureWidth * mapTextureHeight * 4);
-        std::fill(_mapData.begin(), _mapData.end(), 0);
+        std::fill(_mapData.begin(), _mapData.end(), 128);
         
         std::list<ActiveParticle> activeParticles;
         std::size_t bornParticleCount = 0;
@@ -150,12 +150,25 @@ namespace game {
                     m2[0] = 0;                                      // Width
                     m2[1] = 0;                                      // Height
                     m2[2] = 0;                                      // Angle
-                    m2[3] |= (loop + 1);                            // Mask: 1 - newborn, 2 - old
+                    m2[3] = loop + 1;                               // Mask: 1 - newborn, 2 - old
+
+                    if (lifeKoeff < std::numeric_limits<float>::epsilon()) { // mark where the particle starts
+                        m2[3] |= 128;
+                    }
                 }
                 
             }
         }
         
+        for (std::size_t c = 0; c < _particlesToEmit * cyclesInRow; c++) {
+            for (std::size_t i = 0; i < mapTextureWidth; i++) {
+                std::uint8_t *m2 = &_mapData[(c * 3 + 2) * mapTextureWidth * 4 + i * 4];
+                printf("%02x ", int(m2[3]));
+            }
+            printf("\n");
+        }
+        printf("\n!!!\n");
+
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
         _ptcParams.looped = _isLooped;
         _ptcParams.secondsPerTextureWidth = float(mapTextureWidth) * (_bakingFrameTimeMs / 1000.0f);
