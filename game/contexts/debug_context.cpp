@@ -60,7 +60,7 @@ namespace game {
     void Emitter::refresh(const foundation::RenderingInterfacePtr &rendering) {
         const math::vector3f emitterDir = _endShapeOffset.lengthSq() > std::numeric_limits<float>::epsilon() ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
         const float maxShapeSize = std::max(_startShape.size, _endShape.size);
-
+        
         _ptcParams.minXYZ = -1.0f * maxShapeSize * emitterDir.signs();
         _ptcParams.maxXYZ = _endShapeOffset + 1.0f * maxShapeSize * emitterDir.signs();
         
@@ -82,11 +82,11 @@ namespace game {
         
         std::list<ActiveParticle> activeParticles;
         std::size_t bornParticleCount = 0;
-
+        
         // second loop is needed to bake old particles from previous cycle (_isLooped)
         for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //
             std::size_t bornRandom = combineRandom(_randomSeed, RND_BORN_PARTICLE);
-
+            
             for (std::size_t i = 0; i < mapTextureWidth; i++) {
                 const std::size_t timeIndex = i + loop * mapTextureWidth;
                 const float currAbsTimeMs = float((timeIndex + 0) * _bakingFrameTimeMs);
@@ -102,12 +102,12 @@ namespace game {
                         ++ptc;
                     }
                 }
-
+                
                 if (loop == 0) {
                     float emissinGraphFilling = _emissionGraph.getFilling(nextEmissionTimeKoeff);
                     const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling));
                     const std::size_t nextParticleCount = std::min(i / cycleLength * _particlesToEmit + nextEmissionGraphValue, _isLooped ? std::size_t(-1) : _particlesToEmit);
-
+                    
                     for (std::size_t c = bornParticleCount; c < nextParticleCount; c++) {
                         bornRandom = getNextRandom(bornRandom);
                         const std::pair<math::vector3f, math::vector3f> shapePoints = _getShapePoints(currEmissionTimeKoeff, bornRandom);
@@ -115,14 +115,15 @@ namespace game {
                             c, bornRandom, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second
                         });
                     }
-
+                    
                     bornParticleCount = nextParticleCount;
                 }
-
+                
                 for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ++ptc) {
                     const std::size_t voff = ptc->index * voxel::VERTICAL_PIXELS_PER_PARTICLE;
-                    const float lifeKoeff = (currAbsTimeMs - ptc->bornTimeMs) / ptc->lifeTimeMs;
-
+                    const float ptcAbsTimeMs = currAbsTimeMs - ptc->bornTimeMs;
+                    const float lifeKoeff = ptcAbsTimeMs / ptc->lifeTimeMs;
+                    
                     if (voff >= mapTextureHeight) {
                         printf("");
                     }
@@ -130,28 +131,30 @@ namespace game {
                     std::uint8_t *m0 = &_mapData[(voff + 0) * mapTextureWidth * 4 + i * 4];
                     std::uint8_t *m1 = &_mapData[(voff + 1) * mapTextureWidth * 4 + i * 4];
                     std::uint8_t *m2 = &_mapData[(voff + 2) * mapTextureWidth * 4 + i * 4];
-
+                    
                     const math::vector3f direction = (ptc->end - ptc->start).normalized();
                     math::vector3f position = ptc->start + direction * _particleSpeed * lifeKoeff;
-
+                    
                     // TODO: ptc position modificators
-
+                    
                     float tmp;
                     const math::vector3f positionKoeff = 255.0f * (position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
-
+                    
                     m0[0] = std::uint8_t(positionKoeff.x);                            // X hi
                     m0[1] = std::uint8_t(255.0f * std::modf(positionKoeff.x, &tmp));  // X low
                     m0[2] = std::uint8_t(positionKoeff.y);                            // Y hi
                     m0[3] = std::uint8_t(255.0f * std::modf(positionKoeff.y, &tmp));  // Y low
                     m1[0] = std::uint8_t(positionKoeff.z);                            // X hi
                     m1[1] = std::uint8_t(255.0f * std::modf(positionKoeff.z, &tmp));  // X low
-                    m1[2] = 0.0f; // Angle hi
-                    m1[3] = 0.0f; // Angle low
+                    m1[2] = 0.0f;                                                     // Angle hi
+                    m1[3] = 0.0f;                                                     // Angle low
+                    
                     m2[0] = 0;                                      // Width
                     m2[1] = 0;                                      // Height
-                    m2[2] = 0;                                      // Angle
                     m2[3] = loop + 1;                               // Mask: 1 - newborn, 2 - old
-
+                    
+                    m2[2] = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (0 - just born, 255 - 255 * BakingTimeSec)
+                    
                     if (lifeKoeff < std::numeric_limits<float>::epsilon()) { // mark where the particle starts
                         m2[3] |= 128;
                     }
@@ -163,17 +166,17 @@ namespace game {
         for (std::size_t c = 0; c < _particlesToEmit * cyclesInRow; c++) {
             for (std::size_t i = 0; i < mapTextureWidth; i++) {
                 std::uint8_t *m2 = &_mapData[(c * 3 + 2) * mapTextureWidth * 4 + i * 4];
-                printf("%02x ", int(m2[3]));
+                printf("%02x ", int(m2[2]));
             }
             printf("\n");
         }
         printf("\n!!!\n");
-
+        
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
         _ptcParams.looped = _isLooped;
-        _ptcParams.secondsPerTextureWidth = float(mapTextureWidth) * (_bakingFrameTimeMs / 1000.0f);
+        _ptcParams.bakingTimeSec = _bakingFrameTimeMs / 1000.0f;
     }
-
+    
     foundation::RenderTexturePtr Emitter::getMap() const {
         return _mapTexture;
     }
@@ -214,6 +217,8 @@ namespace game {
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
                     _pointerId = args.pointerID;
                     _lockedCoordinates = { args.coordinateX, args.coordinateY };
+                    _ptcTimeSec = 0.0f;
+                    _ptcFiniStamp = -1.0f;
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
                     if (_pointerId != foundation::INVALID_POINTER_ID) {
@@ -233,7 +238,7 @@ namespace game {
                     }
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
-                    _timeSec = 0.0f;
+                    _ptcFiniStamp = _ptcTimeSec;
                     _pointerId = foundation::INVALID_POINTER_ID;
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
@@ -302,10 +307,10 @@ namespace game {
     
     void DebugContext::update(float dtSec) {
         if (_ptc) {
-            _ptc->setTime(_timeSec);
+            _ptc->setTime(_ptcTimeSec, _ptcFiniStamp >= 0.0f ? _ptcTimeSec - _ptcFiniStamp : 0.0f);
         }
         
         _api.scene->setCameraLookAt(_orbit + math::vector3f{32, 10, 32}, {32, 10, 32});
-        _timeSec += dtSec;
+        _ptcTimeSec += dtSec * 0.5f;
     }
 }

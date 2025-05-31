@@ -10,7 +10,9 @@
 // v t0_t1_mask_cap
 // v edge interpolation
 // + smooth stopping (using vertical cap)
-// + 
+// + setters
+// + editor integration
+// + curves
 
 namespace game {
     struct Graph {
@@ -67,11 +69,11 @@ namespace game {
         foundation::RenderTexturePtr _texture;
         
         std::size_t _bakingFrameTimeMs = 100;
-        std::size_t _particlesToEmit = 20;
+        std::size_t _particlesToEmit = 10;
         
         Graph _emissionGraph;
         float _emissionTimeMs = 1000.0f;
-        float _particleLifeTimeMs = 1000.0f;
+        float _particleLifeTimeMs = 1000.0f; // real lifetime is less by '_bakingFrameTimeMs'
         float _particleSpeed = 10.0f;
         
         std::vector<std::uint8_t> _mapData;
@@ -107,6 +109,7 @@ namespace game {
         voxel::SceneInterface::ParticlesPtr _ptc;
         
         Emitter _emitter;
-        float _timeSec = 0;
+        float _ptcTimeSec = 0.0f;
+        float _ptcFiniStamp = -1.0f;
     };
 }

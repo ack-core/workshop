@@ -184,7 +184,8 @@ namespace voxel {
         , particleCount(map->getHeight() / VERTICAL_PIXELS_PER_PARTICLE)
         , texture(texture)
         , map(map)
-        , _secondsPerTextureWidth(particlesParams.secondsPerTextureWidth)
+        , _secondsPerTextureWidth(particlesParams.bakingTimeSec * float(map->getWidth()))
+        , _bakingTimeSec(particlesParams.bakingTimeSec)
         {
             if (particlesParams.orientation == ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
@@ -226,8 +227,8 @@ namespace voxel {
         void setTransform(const math::transform3f &trfm) override {
             _transform = trfm;
         }
-        void setTime(float timeSec) override {
-            float koeff = std::max(timeSec, 0.0f) / _secondsPerTextureWidth;
+        void setTime(float totalTimeSec, float fadingTimeSec) override {
+            float koeff = std::max(totalTimeSec, 0.0f) / _secondsPerTextureWidth;
             if (koeff >= 1.0f) {
                 koeff = std::fmod(koeff, 1.0f);
                 _constants.t0_t1_mask_cap.z = TYPE_MASK_ALL;
@@ -240,11 +241,13 @@ namespace voxel {
             
             _constants.t0_t1_mask_cap.x = koeff;
             _constants.t0_t1_mask_cap.y = aligned + _constants.hpix > 1.0f - std::numeric_limits<float>::epsilon() ? 0.0f : aligned + _constants.hpix;
+            _constants.t0_t1_mask_cap.w = fadingTimeSec / _bakingTimeSec;
         }
         
     private:
         math::transform3f _transform = math::transform3f::identity();
         const float _secondsPerTextureWidth;
+        const float _bakingTimeSec;
 
         struct Constants {
             math::vector4f t0_t1_mask_cap;
@@ -508,8 +511,8 @@ namespace {
             float  ptcv1 = ptcv0 + const_maxXYZ_vpix.w;
             float  ptcv2 = ptcv1 + const_maxXYZ_vpix.w;
 
-            float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w; //const_t0_t1_mask_cap.x - _frac(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
-            float  t1 = const_t0_t1_mask_cap.y; //t0 + const_minXYZ_hpix.w;
+            float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
+            float  t1 = const_t0_t1_mask_cap.y;
             float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w;
             
             float4 map0 = _lerp(_tex2d(0, float2(t0, ptcv0)), _tex2d(0, float2(t1, ptcv0)), tf);    // x, y
@@ -517,9 +520,10 @@ namespace {
 
             float4 m2t0 = _tex2d(0, float2(t0, ptcv2));
             float4 m2t1 = _tex2d(0, float2(t1, ptcv2));
-            float3 map2 = _lerp(m2t0.xyz, m2t1.xyz, tf);    // w, h, history
+            float3 map2 = _lerp(m2t0.xyz, m2t1.xyz, tf);    // w, h, old
 
-            float  isAlive = _step(0.5, float(uint(m2t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m2t1.w < 0.5);
+            float  fading = float(255.0f * map2.z > const_t0_t1_mask_cap.w);
+            float  isAlive = _step(0.5, float(uint(m2t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m2t1.w < 0.5) * fading;
 
             float3 posKoeff = float3(map0.x + map0.y / 255.0f, map0.z + map0.w / 255.0f, map1.x + map1.y / 255.0f);
             float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeff;

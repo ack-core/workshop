@@ -18,7 +18,7 @@ namespace voxel {
     struct ParticlesParams {
         bool looped = false;
         bool additiveBlend = false;
-        float secondsPerTextureWidth = 1.0f;
+        float bakingTimeSec = 0.0f; //secondsPerTextureWidth = 1.0f;
         ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
         math::vector3f minXYZ = {0, 0, 0};
         math::vector3f maxXYZ = {0, 0, 0};
@@ -59,7 +59,7 @@ namespace voxel {
         };
         struct Particles {
             virtual void setTransform(const math::transform3f &trfm) = 0;
-            virtual void setTime(float timeSec) = 0;
+            virtual void setTime(float totalTimeSec, float fadingTimeSec) = 0;
             virtual ~Particles() = default;
         };
         struct LightSource {
