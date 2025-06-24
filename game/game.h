@@ -26,15 +26,15 @@ namespace game {
         const std::initializer_list<MakeContextFunc> makers;
     }
     states[] = {
-//        {"default", {
-//            &makeContext<EditorCameraContext>,
-//            &makeContext<EditorMainContext, CameraAccessInterface>,
-//            &makeContext<EditorStaticMeshContext, NodeAccessInterface>,
-//            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
-//        }}
         {"default", {
-            &makeContext<DebugContext>
+            &makeContext<EditorCameraContext>,
+            &makeContext<EditorMainContext, CameraAccessInterface>,
+            &makeContext<EditorStaticMeshContext, NodeAccessInterface>,
+            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
         }}
+//        {"default", {
+//            &makeContext<DebugContext>
+//        }}
     };
 };
 

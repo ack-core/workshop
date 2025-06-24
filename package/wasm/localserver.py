@@ -23,6 +23,9 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
         SimpleHTTPRequestHandler.do_GET(self)
 
 def main():
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.load_cert_chain(certfile='./cert.pem', keyfile='./key.pem')
+
     handler = CustomRequestHandler
     handler.protocol_version='HTTP/1.1'
     handler.extensions_map['.js'] = 'text/javascript'
@@ -30,7 +33,7 @@ def main():
 
     httpd = http.server.ThreadingHTTPServer(("", 9001), handler)
     httpd.allow_reuse_address = True
-    httpd.socket = ssl.wrap_socket(httpd.socket, certfile='./server.pem', server_side=True)
+    httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     httpd.serve_forever()
 
 if __name__ == "__main__":

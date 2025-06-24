@@ -35,7 +35,6 @@ namespace game {
     bool EditorStaticMeshContext::_selectNode(const std::string &data) {
         if (std::shared_ptr<EditorNodeStaticMesh> node = std::dynamic_pointer_cast<EditorNodeStaticMesh>(_nodeAccess.getSelectedNode().lock())) {
             _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_static_mesh " + node->meshPath);
-            return true;
         }
         return false;
     }

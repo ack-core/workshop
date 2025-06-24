@@ -4,7 +4,7 @@ function print(...a) {
     console.log(...a);
 }
 
-
+/*
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("serviceworker.js").then(
         (registration) => {
@@ -25,7 +25,7 @@ if ("serviceWorker" in navigator) {
 else {
     throw "Service workers are not supported";
 }
-
+*/
 
 if (!crossOriginIsolated) {
     print("[PLATFORM] Page is not cross-origin isolated");
@@ -152,6 +152,7 @@ const imports = {
         tanf: Math.tan,
         sinf: Math.sin,
         cosf: Math.cos,
+        acosf: Math.acos,
         js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
         js_log: function(str, len) {
             const u16str = new Uint16Array(memory.buffer, str, len);

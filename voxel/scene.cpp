@@ -230,7 +230,7 @@ namespace voxel {
         void setTime(float totalTimeSec, float fadingTimeSec) override {
             float koeff = std::max(totalTimeSec, 0.0f) / _secondsPerTextureWidth;
             if (koeff >= 1.0f) {
-                koeff = std::fmod(koeff, 1.0f);
+                koeff = koeff - float(int(koeff));
                 _constants.t0_t1_mask_cap.z = TYPE_MASK_ALL;
             }
             else {

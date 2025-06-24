@@ -18,7 +18,7 @@ namespace voxel {
     struct ParticlesParams {
         bool looped = false;
         bool additiveBlend = false;
-        float bakingTimeSec = 0.0f; //secondsPerTextureWidth = 1.0f;
+        float bakingTimeSec = 0.0f;
         ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
         math::vector3f minXYZ = {0, 0, 0};
         math::vector3f maxXYZ = {0, 0, 0};
