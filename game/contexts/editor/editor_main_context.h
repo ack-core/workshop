@@ -6,7 +6,7 @@
 #include "camera_access_interface.h"
 #include "editor_moving_tool.h"
 
-namespace game {        
+namespace game {
     class EditorMainContext : public Context, public NodeAccessInterface {
     public:
         EditorMainContext(API &&api, CameraAccessInterface &cameraAccess);

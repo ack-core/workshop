@@ -91,10 +91,10 @@ namespace game {
         });
         
         _axis = _api.scene->addLineSet();
-        _axis->setLine(0, {-6, 0, -6}, {6, 0, -6}, {0.2, 0.2, 0.2, 0.5});
-        _axis->setLine(1, {6, 0, -6}, {6, 0, 6}, {0.2, 0.2, 0.2, 0.5});
-        _axis->setLine(2, {6, 0, 6}, {-6, 0, 6}, {0.2, 0.2, 0.2, 0.5});
-        _axis->setLine(3, {-6, 0, 6}, {-6, 0, -6}, {0.2, 0.2, 0.2, 0.5});
+        _axis->setLine(0, {-3, 0, -3}, {3, 0, -3}, {0.2, 0.2, 0.2, 0.25});
+        _axis->setLine(1, {3, 0, -3}, {3, 0, 3}, {0.2, 0.2, 0.2, 0.25});
+        _axis->setLine(2, {3, 0, 3}, {-3, 0, 3}, {0.2, 0.2, 0.2, 0.25});
+        _axis->setLine(3, {-3, 0, 3}, {-3, 0, -3}, {0.2, 0.2, 0.2, 0.25});
     }
     
     EditorCameraContext::~EditorCameraContext() {
@@ -113,9 +113,10 @@ namespace game {
     void EditorCameraContext::update(float dtSec) {
         const math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit).normalized();
         const math::vector3f forward = math::vector3f(0, 1, 0).cross(right).normalized();
+        const float orbitLength = _orbit.length();
 
-        _target = _target + right * float(movLR) * dtSec * 0.1f;
-        _target = _target + forward * float(movBF) * dtSec * 0.1f;
+        _target = _target + right * float(movLR) * dtSec * 0.2f * orbitLength;
+        _target = _target + forward * float(movBF) * dtSec * 0.2f * orbitLength;
 
         _api.scene->setCameraLookAt(_target + _orbit, _target);
         _axis->setPosition(_target);

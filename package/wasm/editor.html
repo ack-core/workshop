@@ -342,11 +342,11 @@
             rows: [
                 {cols: [
                     elements.button("\uD83D\uDDC4", "Set working directory", async e => {
-                        const rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });                        
-                        dirResources = await rootHandle.getDirectoryHandle("resources");
-                        dirBinaryData = await rootHandle.getDirectoryHandle("binary").then(r => r.getDirectoryHandle("data"));
-                        listStaticMeshes = await dirBinaryData.getDirectoryHandle("statics").then(r => utility.listFilesInDirectory("statics", r));
-                        listStaticMeshes.sort();
+                        // const rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });                        
+                        // dirResources = await rootHandle.getDirectoryHandle("resources");
+                        // dirBinaryData = await rootHandle.getDirectoryHandle("binary").then(r => r.getDirectoryHandle("data"));
+                        // listStaticMeshes = await dirBinaryData.getDirectoryHandle("statics").then(r => utility.listFilesInDirectory("statics", r));
+                        // listStaticMeshes.sort();
 
                         document.getElementById("nodes").style.visibility = "visible";
                         $$("top_buttons").show();

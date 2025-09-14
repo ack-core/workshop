@@ -53,7 +53,7 @@ namespace game {
     }
     
     void EditorMainContext::update(float dtSec) {
-        
+
     }
     
     std::unique_ptr<MovingTool> EditorMainContext::_makeMovingTool(math::vector3f &target) {
@@ -88,7 +88,7 @@ namespace game {
         if (index != _nodes.end()) {
             _currentNode = index->second;
             _movingTool = _makeMovingTool(index->second->position);
-            _api.platform->sendEditorMsg("engine.refresh", "");
+            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             return false; // A typed context must handle this
         }
         else {
@@ -129,7 +129,7 @@ namespace game {
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(newPos, currentPosition.y, currentPosition.z));
-        _api.platform->sendEditorMsg("engine.refresh", "");
+        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return true;
     }
     bool EditorMainContext::_moveNodeY(const std::string &data) {
@@ -137,7 +137,7 @@ namespace game {
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(currentPosition.x, newPos, currentPosition.z));
-        _api.platform->sendEditorMsg("engine.refresh", "");
+        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return true;
     }
     bool EditorMainContext::_moveNodeZ(const std::string &data) {
@@ -145,14 +145,14 @@ namespace game {
         const float newPos = float(util::strstream::atof(data.c_str(), len));
         const math::vector3f currentPosition = _movingTool->getPosition();
         _movingTool->setPosition(math::vector3f(currentPosition.x, currentPosition.y, newPos));
-        _api.platform->sendEditorMsg("engine.refresh", "");
+        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return true;
     }
     
     bool EditorMainContext::_clearNodeSelection(const std::string &data) {
         _movingTool = nullptr;
         _currentNode.reset();
-        _api.platform->sendEditorMsg("engine.refresh", "");
+        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return false;
     }
     

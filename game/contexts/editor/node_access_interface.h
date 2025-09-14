@@ -2,6 +2,8 @@
 #pragma once
 
 namespace game {
+    static const char EDITOR_REFRESH_PARAM[] = "4";
+    
     enum class EditorNodeType : std::size_t {
         STATIC,
         PARTICLES,

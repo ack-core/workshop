@@ -23,24 +23,28 @@
 // + rename node as existing one -> previous node isn't deleted
 
 namespace game {
+    enum class ShapeDistribution {
+        RANDOM = 0,   // a random point from start shape to a random point of the end shape
+        SHUFFLED,     // a random point from start shape to the corresponding point of the end shape
+        LINEAR,       // the i-th point from start shape to the corresponding point of the end shape
+    };
     struct Graph {
         auto getFilling(float t) -> float;
     };
     struct Shape {
         enum class Type {
-            DISK = 0,
-            MESH
-        };
-        enum class Distribution {
-            RANDOM = 0,   // a random point from start shape to a random point of the end shape
-            SHUFFLED,     // a random point from start shape to the according point of the end shape
-            LINEAR,       // the i-th point from start shape to the according point of the end shape
+            DISK = 0, // args: radius
+            BOX,      // args: x-size, y-size, z-size
+            MESH      // args: unused
         };
 
-        Type type;
-        float size = 0.0f;
+        Type type = Type::DISK;
+        bool fill = false;
+        math::vector3f args = {};
+        std::vector<math::vector3f> points;
         
-        void generate(std::vector<math::vector3f> &points, const math::vector3f &offset, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
+        float getMaxSize() const;
+        void generate(const voxel::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
     };
     
     class Emitter {
@@ -49,7 +53,7 @@ namespace game {
         ~Emitter();
         
         void setEndShapeOffset(const math::vector3f &offset);
-        void refresh(const foundation::RenderingInterfacePtr &rendering);
+        void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
         
         auto getMap() const -> foundation::RenderTexturePtr;
         auto getParams() const -> const voxel::ParticlesParams &;
@@ -67,12 +71,10 @@ namespace game {
         bool _isLooped = true;
         std::size_t _randomSeed = 0;
 
-        Shape::Distribution _shapeDistribution = Shape::Distribution::RANDOM;
-        Shape _startShape = { Shape::Type::DISK, 0.0f };
-        Shape _endShape = { Shape::Type::DISK, 15.0f };
-        std::vector<math::vector3f> _startShapePoints;
-        std::vector<math::vector3f> _endShapePoints;
-        math::vector3f _endShapeOffset = {0, 0, 0};
+        ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
+        Shape _startShape = {Shape::Type::BOX, false, {25.0f, 0.0f, 25.0f}};
+        Shape _endShape = {Shape::Type::BOX, false, {35.0f, 0.0f, 35.0f}};
+        math::vector3f _endShapeOffset = {0, 10.0f, 0};
 
         foundation::RenderTexturePtr _texture;
         
@@ -89,7 +91,7 @@ namespace game {
         voxel::ParticlesParams _ptcParams;
         
     private:
-        auto _getShapePoints(float cycleOffset, std::size_t random) const -> std::pair<math::vector3f, math::vector3f>;
+        auto _getShapePoints(float cycleOffset, std::size_t random, const math::vector3f &shapeOffset) const -> std::pair<math::vector3f, math::vector3f>;
     };
 }
 
@@ -118,9 +120,13 @@ namespace game {
         const CameraAccessInterface &_cameraAccess;
         foundation::EventHandlerToken _editorEventsToken;
         std::unordered_map<std::string, bool (EditorParticlesContext::*)(const std::string &)> _handlers;
-        std::unique_ptr<MovingTool> _movingTool;
-        voxel::SceneInterface::LineSetPtr _lineset;
         
+        std::unique_ptr<MovingTool> _movingTool;
+        voxel::SceneInterface::LineSetPtr _shapeConnectLineset;
+        voxel::SceneInterface::LineSetPtr _shapeStartLineset;
+        voxel::SceneInterface::LineSetPtr _shapeEndLineset;
+        float currentTime = 0.0f;
+
         foundation::RenderTexturePtr _texture;
         
     private:

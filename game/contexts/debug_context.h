@@ -20,6 +20,8 @@ namespace game {
         math::vector3f _orbit = { 15, 15, 15 };
         
         voxel::SceneInterface::LineSetPtr _axis;
+        voxel::SceneInterface::LineSetPtr _shapeStart;
+        voxel::SceneInterface::LineSetPtr _shapeEnd;
         voxel::SceneInterface::BoundingBoxPtr _bbox;
         voxel::SceneInterface::StaticMeshPtr _thing;
         voxel::SceneInterface::TexturedMeshPtr _ground;

@@ -40,6 +40,8 @@ namespace math {
             return reinterpret_cast<const scalar (&)[4]>(*this)[index];
         }
 
+        auto min() const -> scalar;
+        auto max() const -> scalar;
         auto length() const -> scalar;
         auto lengthSq() const -> scalar;
         auto normalized(scalar length = 1.0) const -> vector2f;
@@ -68,6 +70,8 @@ namespace math {
             return reinterpret_cast<const scalar (&)[4]>(*this)[index];
         }
         
+        auto min() const -> scalar;
+        auto max() const -> scalar;
         auto length() const -> scalar;
         auto lengthSq() const -> scalar;
         auto normalized(scalar length = 1.0) const -> vector3f;
@@ -527,7 +531,17 @@ namespace math {
     }
 
     //---
-    
+
+    template<int Ix, int Iy>
+    inline scalar swizzle2f<Ix, Iy>::min() const {
+        const scalar (&flat)[4] = asFlat();
+        return std::min(flat[Ix], flat[Iy]);
+    }
+    template<int Ix, int Iy>
+    inline scalar swizzle2f<Ix, Iy>::max() const {
+        const scalar (&flat)[4] = asFlat();
+        return std::max(flat[Ix], flat[Iy]);
+    }
     template<int Ix, int Iy>
     inline scalar swizzle2f<Ix, Iy>::length() const {
         const scalar (&flat)[4] = asFlat();
@@ -599,7 +613,17 @@ namespace math {
     }
     
     //---
-    
+
+    template<int Ix, int Iy, int Iz>
+    inline scalar swizzle3f<Ix, Iy, Iz>::min() const {
+        const scalar (&flat)[4] = asFlat();
+        return std::min(flat[Ix], std::min(flat[Iy], flat[Iz]));
+    }
+    template<int Ix, int Iy, int Iz>
+    inline scalar swizzle3f<Ix, Iy, Iz>::max() const {
+        const scalar (&flat)[4] = asFlat();
+        return std::max(flat[Ix], std::max(flat[Iy], flat[Iz]));
+    }
     template<int Ix, int Iy, int Iz>
     inline scalar swizzle3f<Ix, Iy, Iz>::length() const {
         const scalar (&flat)[4] = asFlat();

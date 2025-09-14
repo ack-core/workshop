@@ -38,3 +38,7 @@ namespace game {
     };
 };
 
+// Bugs:
+// + Name node as existing one
+// + Moving with keys isn't depended on camera distance
+// + Scroll affects camera and debug window

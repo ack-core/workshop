@@ -41,7 +41,10 @@ namespace game {
             }
         );
         
-        _emitter.refresh(_api.rendering);
+        _shapeStart = _api.scene->addLineSet();
+        _shapeEnd = _api.scene->addLineSet();
+
+        _emitter.refresh(_api.rendering, _shapeStart, _shapeEnd);
         
         _axis = _api.scene->addLineSet();
         _axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.5});

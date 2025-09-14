@@ -59,7 +59,7 @@ var eventSource = document.getElementById("editor") || document.getElementById("
 var targetWidth = window.devicePixelRatio * canvas.scrollWidth;
 var targetHeight = window.devicePixelRatio * canvas.scrollHeight;
 var activePointerIDs = {};
-var prevFrameTimeStamp = 0;
+var prevFrameTimeStamp = null;
 var glShaderIDCounter = 0x10000000;
 var glBufferIDCounter = 0x20000000;
 var glTextureIDCounter = 0x30000000;
@@ -529,17 +529,23 @@ worker.onmessage = (msg) => {
             return [x, y];
         }
         function onFrame(timestamp) {
-            const interval = 1000.0 / 60.0;
+            const interval = 1000.0 / 30.0;
+            
+            if (prevFrameTimeStamp == null) {
+                prevFrameTimeStamp = timestamp;
+            }
+
             const dt = timestamp - prevFrameTimeStamp;
             
             if (dt > interval) {
                 prevFrameTimeStamp = timestamp;
                 glcontext.viewport(0, 0, targetWidth, targetHeight);
-                instance.exports.updateFrame(dt);
+                instance.exports.updateFrame(dt / 1000.0);
 
                 glcontext.bindFramebuffer(glcontext.READ_FRAMEBUFFER, glframebuffers[0].fb);
                 glcontext.bindFramebuffer(glcontext.DRAW_FRAMEBUFFER, null);
                 glcontext.blitFramebuffer(0, targetHeight, targetWidth, 0, 0, 0, targetWidth, targetHeight, glcontext.COLOR_BUFFER_BIT, glcontext.NEAREST);
+                uniformInstanceCountLocation = null;
             }
 
             //throw "test";
@@ -548,22 +554,26 @@ worker.onmessage = (msg) => {
                 window.requestAnimationFrame(onFrame);
             }
             else {
-                if (refreshCounter > 0) {
+                if (keyCount > 0) {
+                    window.requestAnimationFrame(onFrame);
+                }
+                else if (refreshCounter > 0) {
                     refreshCounter--;
                     window.requestAnimationFrame(onFrame);
                 }
-                if (keyCount > 0) {
-                    window.requestAnimationFrame(onFrame);                    
+                else {
+                    prevFrameTimeStamp = null;
                 }
             }
-            uniformInstanceCountLocation = null;
         }
-        function refreshFrame(data) {
-            refreshCounter = 4;
-            window.requestAnimationFrame(timestamp => {
-                prevFrameTimeStamp = timestamp;
+        function refreshFrame(data = 4) {
+            if (refreshCounter > 0) {
+                refreshCounter = Number(data);
+            }
+            else {
+                refreshCounter = Number(data);
                 window.requestAnimationFrame(onFrame);
-            });
+            }
         }
 
         uiEditor.sendMsg = function(msg, data) {
@@ -580,10 +590,7 @@ worker.onmessage = (msg) => {
         uiEditor["engine.refresh"] = refreshFrame;
 
         // start loop
-        window.requestAnimationFrame(timestamp => {
-            prevFrameTimeStamp = timestamp;
-            window.requestAnimationFrame(onFrame);
-        });
+        refreshFrame();
 
         eventSource.addEventListener("pointerdown", (event) => {
             [x, y] = getCoord(event);
@@ -669,7 +676,7 @@ worker.onmessage = (msg) => {
         });        
         window.addEventListener('wheel', function(event) {
             instance.exports.wheelEvent(event.deltaY);
-            window.requestAnimationFrame(onFrame);
+            refreshFrame();
         });
     }
     if (msg.data.type == EventType.FTASK) {
