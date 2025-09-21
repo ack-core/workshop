@@ -41,9 +41,9 @@ def list_png(root: str, file: str, out: typing.BinaryIO) -> None:
             print("---- Error: '{}' caused '{}'".format(fullpath, e))
             pass
 
-def list_vox(root: str, file: str, out: typing.BinaryIO) -> None:
+def list_vxm(root: str, file: str, out: typing.BinaryIO) -> None:
     fullpath = os.path.join(root, file)
-    file = file.replace(".vox", "")
+    file = file.replace(".vxm", "")
 
     with open(fullpath, mode="rb") as f:
         header = f.read(VOX_READ_MAIN)
@@ -106,8 +106,8 @@ def list_grd(root: str, file: str, out: typing.BinaryIO) -> None:
 
 def main(root: str, dst: str) -> None:
     type_items: dict[str, tuple[callable, str, str, str]] = {
-        ".vox": (
-            list_vox,
+        ".vxm": (
+            list_vxm,
             "    const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {\r\n",
             "#include \"resource_provider.h\"\r\n\r\n",
             "meshes_list.h"

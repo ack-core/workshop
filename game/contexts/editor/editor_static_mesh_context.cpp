@@ -44,9 +44,9 @@ namespace game {
         if (node) {
             node->meshPath = data;
             
-            _api.resources->getOrLoadVoxelStatic(data.c_str(), [node, weak = weak_from_this()](const foundation::RenderDataPtr &data) {
+            _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, weak = weak_from_this()](const std::vector<foundation::RenderDataPtr> &data) {
                 if (std::shared_ptr<EditorStaticMeshContext> self = weak.lock()) {
-                    node->mesh = self->_api.scene->addStaticMesh(data);
+                    node->mesh = self->_api.scene->addVoxelMesh(data);
                     self->_api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                 }
             });

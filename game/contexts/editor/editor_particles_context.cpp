@@ -163,7 +163,7 @@ namespace game {
     
     Emitter::Emitter() {
         _ptcParams.additiveBlend = false;
-        _ptcParams.orientation = voxel::ParticlesOrientation::CAMERA;
+        _ptcParams.orientation = layouts::ParticlesParams::ParticlesOrientation::CAMERA;
         _ptcParams.minXYZ = {-10, 0, -10};
         _ptcParams.maxXYZ = {10, 10, 10};
         _ptcParams.minMaxWidth = 1.0f;
@@ -307,7 +307,7 @@ namespace game {
         return _mapTexture;
     }
     
-    const voxel::ParticlesParams &Emitter::getParams() const {
+    const layouts::ParticlesParams &Emitter::getParams() const {
         return _ptcParams;
     }
 

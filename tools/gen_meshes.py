@@ -136,6 +136,7 @@ def main(src: str, dst: str, opt: int):
             if file.endswith(".vox"):
                 relpath_to = os.path.join(os.path.relpath(path, src), file)
                 fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
+                fullpath_to = fullpath_to.replace(".vox", ".vxm")
                 fullpath_from = os.path.join(path, file)
                 convert_vox(fullpath_from, fullpath_to, opt)
 

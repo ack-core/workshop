@@ -2,6 +2,7 @@
 #pragma once
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
+#include "foundation/layouts.h"
 #include "foundation/math.h"
 
 #include <cstddef>
@@ -10,21 +11,6 @@
 
 namespace voxel {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 3;
-
-    enum class ParticlesOrientation {
-        CAMERA, AXIS, WORLD
-    };
-
-    struct ParticlesParams {
-        bool looped = false;
-        bool additiveBlend = false;
-        float bakingTimeSec = 0.0f;
-        ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
-        math::vector3f minXYZ = {0, 0, 0};
-        math::vector3f maxXYZ = {0, 0, 0};
-        math::vector2f minMaxWidth = {1, 1};
-        math::vector2f minMaxHeight = {1, 1};
-    };
 
     class SceneInterface {
     public:
@@ -44,14 +30,11 @@ namespace voxel {
             virtual void setColor(const math::color &rgba) = 0;
             virtual ~BoundingBox() = default;
         };
-        struct StaticMesh {
+        struct VoxelMesh {
             virtual void setPosition(const math::vector3f &position) = 0;
-            virtual ~StaticMesh() = default;
-        };
-        struct DynamicMesh {
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setFrame(std::uint32_t index) = 0;
-            virtual ~DynamicMesh() = default;
+            virtual ~VoxelMesh() = default;
         };
         struct TexturedMesh {
             virtual void setPosition(const math::vector3f &position) = 0;
@@ -69,8 +52,7 @@ namespace voxel {
         
         using LineSetPtr = std::shared_ptr<LineSet>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
-        using StaticMeshPtr = std::shared_ptr<StaticMesh>;
-        using DynamicMeshPtr = std::shared_ptr<DynamicMesh>;
+        using VoxelMeshPtr = std::shared_ptr<VoxelMesh>;
         using TexturedMeshPtr = std::shared_ptr<TexturedMesh>;
         using LightSourcePtr = std::shared_ptr<LightSource>;
         using ParticlesPtr = std::shared_ptr<Particles>;
@@ -81,10 +63,9 @@ namespace voxel {
         
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr = 0;
-        virtual auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr = 0;
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
-        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const voxel::ParticlesParams &params) -> ParticlesPtr = 0;
+        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual auto getCameraPosition() const -> math::vector3f = 0;

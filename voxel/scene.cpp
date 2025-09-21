@@ -89,27 +89,10 @@ namespace voxel {
         }
         ~BoundingBoxImpl() override {}
     };
-    
-    //---
-
-    class StaticMeshImpl : public SceneInterface::StaticMesh {
-    public:
-        foundation::RenderDataPtr mesh;
-        math::vector4f position = {0, 0, 0, 1};
         
-    public:
-        void setPosition(const math::vector3f &position) override {
-            this->position = position.atv4start(1.0f);
-        }
-        
-    public:
-        StaticMeshImpl(const foundation::RenderDataPtr &m) : mesh(m) {}
-        ~StaticMeshImpl() override {}
-    };
-    
     //---
     
-    class DynamicMeshImpl : public SceneInterface::DynamicMesh {
+    class VoxelMeshImpl : public SceneInterface::VoxelMesh {
     public:
         std::unique_ptr<foundation::RenderDataPtr[]> frames;
         std::uint32_t frameIndex;
@@ -117,7 +100,7 @@ namespace voxel {
         math::transform3f transform;
         
     public:
-        DynamicMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count) : transform(math::transform3f::identity()) {
+        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count) : transform(math::transform3f::identity()) {
             frameIndex = 0;
             frameCount = count;
             frames = std::make_unique<foundation::RenderDataPtr[]>(count);
@@ -126,8 +109,11 @@ namespace voxel {
                 frames[i] = std::move(frameArray[i]);
             }
         }
-        ~DynamicMeshImpl() override {}
-
+        ~VoxelMeshImpl() override {}
+        
+        void setPosition(const math::vector3f &position) override {
+            transform = math::transform3f::identity().translated(position);
+        }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
         }
@@ -179,7 +165,7 @@ namespace voxel {
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
                 
-        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const ParticlesParams &particlesParams)
+        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &particlesParams)
         : additiveBlend(particlesParams.additiveBlend)
         , particleCount(map->getHeight() / VERTICAL_PIXELS_PER_PARTICLE)
         , texture(texture)
@@ -187,14 +173,14 @@ namespace voxel {
         , _secondsPerTextureWidth(particlesParams.bakingTimeSec * float(map->getWidth()))
         , _bakingTimeSec(particlesParams.bakingTimeSec)
         {
-            if (particlesParams.orientation == ParticlesOrientation::AXIS) {
+            if (particlesParams.orientation == layouts::ParticlesParams::ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
                     self._constants.normal = camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
                 };
             }
-            else if (particlesParams.orientation == ParticlesOrientation::WORLD) {
+            else if (particlesParams.orientation == layouts::ParticlesParams::ParticlesOrientation::WORLD) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = math::vector3f(self._transform.m11, self._transform.m12, self._transform.m13);
@@ -278,10 +264,9 @@ namespace voxel {
         
         auto addLineSet() -> LineSetPtr override;
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
-        auto addStaticMesh(const foundation::RenderDataPtr &mesh) -> StaticMeshPtr override;
-        auto addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) -> DynamicMeshPtr override;
+        auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames) -> VoxelMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
-        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
+        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
         auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f override;
@@ -320,8 +305,7 @@ namespace voxel {
         
         foundation::RenderShaderPtr _lineShader;
         foundation::RenderShaderPtr _boundingBoxShader;
-        foundation::RenderShaderPtr _staticMeshShader;
-        foundation::RenderShaderPtr _dynamicMeshShader;
+        foundation::RenderShaderPtr _voxelMeshShader;
         foundation::RenderShaderPtr _texturedMeshShader;
         foundation::RenderShaderPtr _particlesShader;
         
@@ -330,8 +314,7 @@ namespace voxel {
         
         std::vector<std::shared_ptr<LineSetImpl>> _lineSets;
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
-        std::vector<std::shared_ptr<StaticMeshImpl>> _staticMeshes;
-        std::vector<std::shared_ptr<DynamicMeshImpl>> _dynamicMeshes;
+        std::vector<std::shared_ptr<VoxelMeshImpl>> _voxelMeshes;
         std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
     };
@@ -405,40 +388,7 @@ namespace {
             output_color[0] = const_color;
         }
     )";
-    const char *g_staticMeshShaderSrc = R"(
-        fixed {
-            cube[12] : float4 =
-                [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
-            normal[6] : float3 =
-                [0.5, 0.5, 0.0][0.0, 0.5, 0.5][0.5, 0.0, 0.5][0.5, 0.5, 1.0][1.0, 0.5, 0.5][0.5, 1.0, 0.5]
-        }
-        const {
-            globalPosition : float4
-        }
-        inout {
-            normalc : float4
-        }
-        vssrc {
-            float3 cubeCenter = float3(vertex_position_color_mask.xyz) + const_globalPosition.xyz;
-            float3 toCamSign = _sign(frame_cameraPosition.xyz - cubeCenter);
-            
-            uint faceIndex = uint(repeat_ID / 4) + uint((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
-            uint colorIndex = uint(vertex_position_color_mask.w & 0xff);
-            uint mask = uint((vertex_position_color_mask.w >> (uint(8) + faceIndex)) & 1);
-            
-            float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[repeat_ID], float(mask));
-            float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos + _step(0.0, relVertexPos) * float4(float3(vertex_scale_reserved.xyz), 0.0);
-            
-            output_normalc = float4(fixed_normal[faceIndex], float(colorIndex) / 255.0); //
-            output_position = _transform(absVertexPos, frame_plmVPMatrix);
-        }
-        fssrc {
-            output_color[0] = input_normalc;
-        }
-    )";
-    const char *g_dynamicMeshShaderSrc = R"(
+    const char *g_voxelMeshShaderSrc = R"(
         fixed {
             cube[12] : float4 =
                 [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
@@ -454,13 +404,13 @@ namespace {
             normalc : float4
         }
         vssrc {
-            float3 cubeCenter = float3(vertex_position.xyz);
+            float3 cubeCenter = float3(vertex_position_color_mask.xyz);
             float3 worldCubePos = _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
             float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - worldCubePos, 0.0)).xyz);
             
             uint faceIndex = uint(repeat_ID / 4) + uint((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
-            uint colorIndex = vertex_color_mask.r;
-            uint mask = (vertex_color_mask.g >> faceIndex) & uint(1);
+            uint colorIndex = uint(vertex_position_color_mask.w & 0xff);
+            uint mask = uint((vertex_position_color_mask.w >> (uint(8) + faceIndex)) & 1);
             
             float4 relVertexPos = float4(toCamSign, 1.0) * _lerp(float4(0.5, 0.5, 0.5, 1.0), fixed_cube[repeat_ID], float(mask));
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
@@ -605,8 +555,7 @@ namespace voxel {
         _boundingBoxShader = rendering->createShader("scene_static_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
             .repeat = 24
         });
-        _staticMeshShader = rendering->createShader("scene_static_voxel_mesh", g_staticMeshShaderSrc, layouts::VTXSVOX);
-        _dynamicMeshShader = rendering->createShader("scene_dynamic_voxel_mesh", g_dynamicMeshShaderSrc, layouts::VTXDVOX);
+        _voxelMeshShader = rendering->createShader("scene_dynamic_voxel_mesh", g_voxelMeshShaderSrc, layouts::VTXMVOX);
         _texturedMeshShader = rendering->createShader("scene_static_textured_mesh", g_texturedMeshShaderSrc, layouts::VTXNRMUV);
         _particlesShader = rendering->createShader("scene_particles", g_particlesShaderSrc, foundation::InputLayout {
             .repeat = 4
@@ -615,7 +564,6 @@ namespace voxel {
             .repeat = 4
         });
         
-        // TODO: memory test for wasm-backend
         _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
         _platform->setResizeHandler([&]() {
             _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
@@ -660,14 +608,9 @@ namespace voxel {
         return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox));
     }
     
-    SceneInterface::StaticMeshPtr SceneInterfaceImpl::addStaticMesh(const foundation::RenderDataPtr &mesh) {
-        std::shared_ptr<StaticMeshImpl> result = std::make_shared<StaticMeshImpl>(mesh);
-        return _staticMeshes.emplace_back(result);
-    }
-    
-    SceneInterface::DynamicMeshPtr SceneInterfaceImpl::addDynamicMesh(const std::vector<foundation::RenderDataPtr> &frames) {
-        std::shared_ptr<DynamicMeshImpl> result = std::make_shared<DynamicMeshImpl>(frames.data(), std::uint32_t(frames.size()));
-        return _dynamicMeshes.emplace_back(result);
+    SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames) {
+        std::shared_ptr<VoxelMeshImpl> result = std::make_shared<VoxelMeshImpl>(frames.data(), std::uint32_t(frames.size()));
+        return _voxelMeshes.emplace_back(result);
     }
     
     SceneInterface::TexturedMeshPtr SceneInterfaceImpl::addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) {
@@ -675,7 +618,7 @@ namespace voxel {
         return _texturedMeshes.emplace_back(result);
     }
     
-    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) {
+    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) {
         std::shared_ptr<ParticleEmitterImpl> result = std::make_shared<ParticleEmitterImpl>(tx, map, params);
         return _particleEmitters.emplace_back(result);
     }
@@ -726,23 +669,16 @@ namespace voxel {
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _cleanupUnused(_lineSets);
         _cleanupUnused(_boundingBoxes);
-        _cleanupUnused(_staticMeshes);
-        _cleanupUnused(_dynamicMeshes);
+        _cleanupUnused(_voxelMeshes);
         _cleanupUnused(_texturedMeshes);
         _cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
-            rendering.applyShader(_staticMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &staticMesh : _staticMeshes) {
-                rendering.applyShaderConstants(&staticMesh->position);
-                rendering.draw(staticMesh->mesh);
-            }
-            
-            rendering.applyShader(_dynamicMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &dynamicMesh : _dynamicMeshes) {
-                rendering.applyShaderConstants(&dynamicMesh->transform);
-                rendering.draw(dynamicMesh->frames[0]);
+            rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &voxelMesh : _voxelMeshes) {
+                rendering.applyShaderConstants(&voxelMesh->transform);
+                rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
             }
             
             rendering.applyShader(_texturedMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);

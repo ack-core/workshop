@@ -2,6 +2,9 @@
 #pragma once
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
+#include "foundation/layouts.h"
+
+// TODO: datahub scope instead of ParticlesParams, ParticlesParams -> back to scene
 
 namespace resource {
     struct TextureInfo {
@@ -51,23 +54,23 @@ namespace resource {
         //
         virtual void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) = 0;
         
-        // Asynchronously load voxels with VTXSVOX layout from file if they aren't loaded yet
-        // @voxPath - path to file without extension
-        // @return  - pointer to mesh or nullptr
-        //
-        virtual void getOrLoadVoxelStatic(const char *voxPath, util::callback<void(const foundation::RenderDataPtr &)> &&completion) = 0;
-
-        // Asynchronously load voxels with VTXDVOX layout from file if they aren't loaded yet
+        // Asynchronously load voxels with VTXMVOX layout from file if they aren't loaded yet
         // @voxPath - path to file without extension
         // @return  - mesh frames (zero size if not loaded)
         //
-        virtual void getOrLoadVoxelObject(const char *voxPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) = 0;
         
         // Asynchronously load ground from file if it isn't loaded yet
         // @groundPath - path to file without extension
         // @return  - primitives to construct ground object or nullptr's
         //
         virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
+
+        // Asynchronously Load emitter from cfg file and textures if it isn't loaded yet
+        // @cfgPath - path to file without extension
+        // @return  - primitives to construct emitter or nullptrs
+        //
+        virtual void getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) = 0;
         
         // Provider tracks resources life time and tries to free them
         //

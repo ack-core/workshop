@@ -78,10 +78,10 @@ get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_
 #file(REMOVE_RECURSE "${m_binary_root}")
 #file(MAKE_DIRECTORY "${m_binary_root}")
 
+message(STATUS "Copying files from resources...")
 file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.ttf")
-file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png")
-file(COPY "${m_resources_root}/objects" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
-file(COPY "${m_resources_root}/statics" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.vox")
+file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
+file(COPY "${m_resources_root}/emitters" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.cfg" PATTERN "*")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
 message(STATUS "Generating palette...")
@@ -96,11 +96,7 @@ execute_process(
 )
 message(STATUS "Generating optimized meshes...")
 execute_process(
-	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/statics -d ${m_binary_root}/data/statics -o 1
-	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
-execute_process(
-	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/objects -d ${m_binary_root}/data/objects -o 1
+	COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 message(STATUS "Generating resource lists...")

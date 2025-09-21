@@ -23,9 +23,9 @@ namespace game {
         voxel::SceneInterface::LineSetPtr _shapeStart;
         voxel::SceneInterface::LineSetPtr _shapeEnd;
         voxel::SceneInterface::BoundingBoxPtr _bbox;
-        voxel::SceneInterface::StaticMeshPtr _thing;
+        voxel::SceneInterface::VoxelMeshPtr _thing;
         voxel::SceneInterface::TexturedMeshPtr _ground;
-        voxel::SceneInterface::DynamicMeshPtr _actor;
+        voxel::SceneInterface::VoxelMeshPtr _actor;
         voxel::SceneInterface::ParticlesPtr _ptc;
         
         Emitter _emitter;

@@ -3,7 +3,6 @@
 #include "textures_list.h"
 #include "meshes_list.h"
 #include "grounds_list.h"
-#include "foundation/layouts.h"
 
 #include "thirdparty/upng/upng.h"
 
@@ -26,7 +25,7 @@ namespace {
         std::size_t maxVoxelCount = 0;
     };
     
-    bool readVox(MeshAsyncContext &ctx, const std::uint8_t *data) {
+    bool readVxm(MeshAsyncContext &ctx, const std::uint8_t *data) {
         if (memcmp(data, "VOX ", 4) == 0) {
             if (*(std::int32_t *)(data + 4) == 0x7f) { // vox made by gen_meshes.py
                 data += 32;
@@ -70,9 +69,9 @@ namespace resource {
         auto getGroundInfo(const char *groundPath) -> const GroundInfo * override;
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
-        void getOrLoadVoxelStatic(const char *voxPath, util::callback<void(const foundation::RenderDataPtr &)> &&completion) override;
-        void getOrLoadVoxelObject(const char *voxPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
+        void getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) override;
 
         void update(float dtSec) override;
         
@@ -80,41 +79,47 @@ namespace resource {
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         const std::shared_ptr<foundation::RenderingInterface> _rendering;
         
-        struct TextureData : public TextureInfo { // TODO: remove
+        struct TextureData : public TextureInfo { // TODO: remove parent
             foundation::RenderTexturePtr ptr;
         };
         struct GroundMesh {
             foundation::RenderDataPtr data;
             foundation::RenderTexturePtr texture;
         };
+        struct Emitter {
+            foundation::RenderTexturePtr map;
+            foundation::RenderTexturePtr texture;
+            layouts::ParticlesParams params;
+        };
         
         std::unordered_map<std::string, TextureData> _textures;
-        std::unordered_map<std::string, foundation::RenderDataPtr> _statics;
-        std::unordered_map<std::string, std::vector<foundation::RenderDataPtr>> _objects;
+        std::unordered_map<std::string, std::vector<foundation::RenderDataPtr>> _meshes;
         std::unordered_map<std::string, GroundMesh> _grounds;
+        std::unordered_map<std::string, Emitter> _emitters;
         
         struct QueueEntryTexture {
             std::string texPath;
             util::callback<void(const foundation::RenderTexturePtr &)> callbackPtr;
         };
-        struct QueueEntryStatic {
-            std::string voxPath;
-            util::callback<void(const foundation::RenderDataPtr &)> callback;
-        };
-        struct QueueEntryObject {
-            std::string voxPath;
+        struct QueueEntryMesh {
+            std::string meshPath;
             util::callback<void(const std::vector<foundation::RenderDataPtr> &)> callback;
         };
         struct QueueEntryGround {
             std::string groundPath;
             util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> callback;
         };
+        struct QueueEntryEmitter {
+            std::string cfgPath;
+            util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> callback;
+        };
+
         
         std::list<QueueEntryTexture> _callsQueueTexture;
-        std::list<QueueEntryStatic> _callsQueueStatic;
-        std::list<QueueEntryObject> _callsQueueObject;
+        std::list<QueueEntryMesh> _callsQueueMesh;
         std::list<QueueEntryGround> _callsQueueGround;
-        
+        std::list<QueueEntryEmitter> _callsQueueEmitter;
+
         bool _asyncInProgress;
     };
     
@@ -232,32 +237,32 @@ namespace resource {
             });
         }
     }
-    
-    void ResourceProviderImpl::getOrLoadVoxelStatic(const char *voxPath, util::callback<void(const foundation::RenderDataPtr &)> &&completion) {
+        
+    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) {
         if (_asyncInProgress) {
-            _callsQueueStatic.emplace_back(QueueEntryStatic {
-                .voxPath = voxPath,
+            _callsQueueMesh.emplace_back(QueueEntryMesh {
+                .meshPath = meshPath,
                 .callback = std::move(completion)
             });
             
             return;
         }
         
-        std::string path = std::string(voxPath);
+        std::string path = std::string(meshPath);
 
-        auto index = _statics.find(path);
-        if (index != _statics.end()) {
+        auto index = _meshes.find(path);
+        if (index != _meshes.end()) {
             completion(index->second);
         }
         else {
             _asyncInProgress = true;
-            _platform->loadFile((path + ".vox").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
+            _platform->loadFile((path + ".vxm").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                     if (len) {
                         self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<MeshAsyncContext>>([weak, path, bin = std::move(mem), len](MeshAsyncContext &ctx) {
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                if (readVox(ctx, bin.get()) == false) {
-                                    self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelStatic] '%s' is not a valid vox file", path.data());
+                                if (readVxm(ctx, bin.get()) == false) {
+                                    self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelObject] '%s' is not a valid vxm file", path.data());
                                 }
                             }
                         },
@@ -266,105 +271,29 @@ namespace resource {
                                 self->_asyncInProgress = false;
                                 
                                 if (ctx.frameCount) {
-                                    struct VTXSVOX {
+                                    struct VTXMVOX {
                                         std::int16_t positionX, positionY, positionZ;
                                         std::uint8_t colorIndex, mask;
-                                        std::uint8_t scaleX, scaleY, scaleZ, reserved;
-                                    };
-                                    
-                                    std::vector<VTXSVOX> voxels (ctx.frames[0].voxelCount);
-                                    
-                                    for (std::size_t i = 0; i < voxels.size(); i++) {
-                                        const MeshAsyncContext::Voxel &src = ctx.frames[0].voxels[i];
-                                        VTXSVOX &voxel = voxels[i];
-                                        voxel.positionX = src.positionX;
-                                        voxel.positionY = src.positionY;
-                                        voxel.positionZ = src.positionZ;
-                                        voxel.colorIndex = src.colorIndex;
-                                        voxel.mask = src.mask;
-                                        voxel.scaleX = src.scaleX;
-                                        voxel.scaleY = src.scaleY;
-                                        voxel.scaleZ = src.scaleZ;
-                                        voxel.reserved = 0;
-                                    }
-                                    
-                                    foundation::RenderDataPtr mesh = self->_rendering->createData(voxels.data(), layouts::VTXSVOX, ctx.frames[0].voxelCount);
-                                    self->_statics.emplace(path, mesh);
-                                    completion(mesh);
-                                }
-                                else {
-                                    completion(nullptr);
-                                }
-                            }
-                        }));
-                    }
-                    else {
-                        self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelStatic] Unable to find file '%s'", path.data());
-                        completion(nullptr);
-                    }
-                }
-            });
-        }
-    }
-    
-    void ResourceProviderImpl::getOrLoadVoxelObject(const char *voxPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) {
-        if (_asyncInProgress) {
-            _callsQueueObject.emplace_back(QueueEntryObject {
-                .voxPath = voxPath,
-                .callback = std::move(completion)
-            });
-            
-            return;
-        }
-        
-        std::string path = std::string(voxPath);
-
-        auto index = _objects.find(path);
-        if (index != _objects.end()) {
-            completion(index->second);
-        }
-        else {
-            _asyncInProgress = true;
-            _platform->loadFile((path + ".vox").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
-                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                    if (len) {
-                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<MeshAsyncContext>>([weak, path, bin = std::move(mem), len](MeshAsyncContext &ctx) {
-                            if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                if (readVox(ctx, bin.get()) == false) {
-                                    self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelObject] '%s' is not a valid vox file", path.data());
-                                }
-                            }
-                        },
-                        [weak, path, completion = std::move(completion)](MeshAsyncContext &ctx) {
-                            if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                self->_asyncInProgress = false;
-                                
-                                if (ctx.frameCount) {
-                                    struct VTXDVOX {
-                                        float positionX, positionY, positionZ;
-                                        std::uint8_t colorIndex, mask, r0, r1;
                                     };
                                     
                                     std::vector<foundation::RenderDataPtr> frames (ctx.frameCount);
-                                    std::vector<VTXDVOX> voxels (ctx.maxVoxelCount);
+                                    std::vector<VTXMVOX> voxels (ctx.maxVoxelCount);
                                     
                                     for (std::size_t f = 0; f < frames.size(); f++) {
                                         for (std::size_t i = 0; i < voxels.size(); i++) {
                                             const MeshAsyncContext::Voxel &src = ctx.frames[f].voxels[i];
-                                            VTXDVOX &voxel = voxels[i];
-                                            voxel.positionX = float(src.positionX);
-                                            voxel.positionY = float(src.positionY);
-                                            voxel.positionZ = float(src.positionZ);
+                                            VTXMVOX &voxel = voxels[i];
+                                            voxel.positionX = src.positionX;
+                                            voxel.positionY = src.positionY;
+                                            voxel.positionZ = src.positionZ;
                                             voxel.colorIndex = src.colorIndex;
                                             voxel.mask = src.mask;
-                                            voxel.r0 = 0;
-                                            voxel.r1 = 0;
                                         }
                                         
-                                        frames[f] = self->_rendering->createData(voxels.data(), layouts::VTXDVOX, ctx.frames[f].voxelCount);
+                                        frames[f] = self->_rendering->createData(voxels.data(), layouts::VTXMVOX, ctx.frames[f].voxelCount);
                                     }
                                     
-                                    const std::vector<foundation::RenderDataPtr> &result = self->_objects.emplace(path, std::move(frames)).first->second;
+                                    const std::vector<foundation::RenderDataPtr> &result = self->_meshes.emplace(path, std::move(frames)).first->second;
                                     completion(result);
                                 }
                                 else {
@@ -497,6 +426,10 @@ namespace resource {
             });
         }
     }
+
+    void ResourceProviderImpl::getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) {
+        
+    }
     
     void ResourceProviderImpl::update(float dtSec) {
         while (_asyncInProgress == false && _callsQueueTexture.size()) {
@@ -504,20 +437,20 @@ namespace resource {
             getOrLoadTexture(entry.texPath.data(), std::move(entry.callbackPtr));
             _callsQueueTexture.pop_front();
         }
-        while (_asyncInProgress == false && _callsQueueStatic.size()) {
-            QueueEntryStatic &entry = _callsQueueStatic.front();
-            getOrLoadVoxelStatic(entry.voxPath.data(), std::move(entry.callback));
-            _callsQueueStatic.pop_front();
-        }
-        while (_asyncInProgress == false && _callsQueueObject.size()) {
-            QueueEntryObject &entry = _callsQueueObject.front();
-            getOrLoadVoxelObject(entry.voxPath.data(), std::move(entry.callback));
-            _callsQueueObject.pop_front();
+        while (_asyncInProgress == false && _callsQueueMesh.size()) {
+            QueueEntryMesh &entry = _callsQueueMesh.front();
+            getOrLoadVoxelMesh(entry.meshPath.data(), std::move(entry.callback));
+            _callsQueueMesh.pop_front();
         }
         while (_asyncInProgress == false && _callsQueueGround.size()) {
             QueueEntryGround &entry = _callsQueueGround.front();
             getOrLoadGround(entry.groundPath.data(), std::move(entry.callback));
             _callsQueueGround.pop_front();
+        }
+        while (_asyncInProgress == false && _callsQueueEmitter.size()) {
+            QueueEntryEmitter &entry = _callsQueueEmitter.front();
+            getOrLoadEmitter(entry.cfgPath.data(), std::move(entry.callback));
+            _callsQueueEmitter.pop_front();
         }
     }
 }

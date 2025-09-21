@@ -56,7 +56,7 @@ namespace game {
         void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
         
         auto getMap() const -> foundation::RenderTexturePtr;
-        auto getParams() const -> const voxel::ParticlesParams &;
+        auto getParams() const -> const layouts::ParticlesParams &;
         
     private:
         struct ActiveParticle {
@@ -84,11 +84,11 @@ namespace game {
         Graph _emissionGraph;
         float _emissionTimeMs = 1000.0f;
         float _particleLifeTimeMs = 1000.0f; // real lifetime is less by '_bakingFrameTimeMs'
-        float _particleSpeed = 10.0f;
+        float _particleSpeed = 10.0f; // how much of real distance per particle lifetime (TODO: per sec)
         
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
-        voxel::ParticlesParams _ptcParams;
+        layouts::ParticlesParams _ptcParams;
         
     private:
         auto _getShapePoints(float cycleOffset, std::size_t random, const math::vector3f &shapeOffset) const -> std::pair<math::vector3f, math::vector3f>;

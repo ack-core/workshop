@@ -7,7 +7,7 @@
 namespace game {
     struct EditorNodeStaticMesh : public EditorNode {
         std::string meshPath = "<None>";
-        voxel::SceneInterface::StaticMeshPtr mesh;
+        voxel::SceneInterface::VoxelMeshPtr mesh;
         
         EditorNodeStaticMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeStaticMesh() override {}

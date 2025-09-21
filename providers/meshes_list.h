@@ -4,9 +4,9 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
-        {"statics/test/pillon", { 8, 20, 8 }},
-        {"statics/test/tree", { 8, 17, 8 }},
-        {"statics/test/ruins", { 40, 20, 40 }},
-        {"objects/stool", { 5, 6, 5 }},
+        {"meshes/stool", { 5, 6, 5 }},
+        {"meshes/test/ruins", { 40, 20, 40 }},
+        {"meshes/test/pillon", { 8, 20, 8 }},
+        {"meshes/test/tree", { 8, 17, 8 }},
     };
 }
