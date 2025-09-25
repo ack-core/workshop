@@ -28,6 +28,7 @@ onmessage = (msg) => {
                 },
                 js_task: (task) => { throw "can't start task in background" },
                 js_fetch: (block, pathLen) => { throw "can't read files in background" },
+                js_save: (block, pathLen, data, dataLen) => { throw "can't write files in background" },
                 js_editorMsg: (msg, msglen, data, datalen) => { throw "can't message to editor from background" },
                 js_canvas_width: () => { throw "can't access canvas from background" },
                 js_canvas_height: () => { throw "can't access canvas from background" },

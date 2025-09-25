@@ -5,18 +5,18 @@
 #include "node_access_interface.h"
 
 namespace game {
-    struct EditorNodeStaticMesh : public EditorNode {
+    struct EditorNodeVoxelMesh : public EditorNode {
         std::string meshPath = "<None>";
         voxel::SceneInterface::VoxelMeshPtr mesh;
         
-        EditorNodeStaticMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}
-        ~EditorNodeStaticMesh() override {}
+        EditorNodeVoxelMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}
+        ~EditorNodeVoxelMesh() override {}
     };
 
-    class EditorStaticMeshContext : public std::enable_shared_from_this<EditorStaticMeshContext>, public Context {
+    class EditorVoxelMeshContext : public std::enable_shared_from_this<EditorVoxelMeshContext>, public Context {
     public:
-        EditorStaticMeshContext(API &&api, NodeAccessInterface &nodeAccess);
-        ~EditorStaticMeshContext() override;
+        EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess);
+        ~EditorVoxelMeshContext() override;
         
         void update(float dtSec) override;
         
@@ -24,7 +24,7 @@ namespace game {
         const API _api;
         const NodeAccessInterface &_nodeAccess;
         foundation::EventHandlerToken _editorEventsToken;
-        std::unordered_map<std::string, bool (EditorStaticMeshContext::*)(const std::string &)> _handlers;
+        std::unordered_map<std::string, bool (EditorVoxelMeshContext::*)(const std::string &)> _handlers;
         
     private:
         bool _selectNode(const std::string &data);

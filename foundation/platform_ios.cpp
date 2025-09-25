@@ -343,10 +343,10 @@ namespace foundation {
         }
         g_io.notifier.notify_one();
     }
-    void IOSPlatform::peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
-        completion(nullptr, 0);
+    void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+        completion(false);
     }
-        
+    
     float IOSPlatform::getScreenWidth() const {
         return g_nativeScreenWidth;
     }

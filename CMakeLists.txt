@@ -139,7 +139,7 @@ elseif (PLATFORM STREQUAL "PLATFORM_WASM")
 		set_target_properties(workshop PROPERTIES OUTPUT_NAME "editor")
 	endif()
 	target_link_options(workshop PUBLIC --export=initialize --export=deinitialize --export=malloc --export=free)
-	target_link_options(workshop PUBLIC --export=updateFrame --export=fileLoaded --export=taskExecute --export=taskComplete)
+	target_link_options(workshop PUBLIC --export=updateFrame --export=fileLoaded --export=fileSaved --export=taskExecute --export=taskComplete)
 	target_link_options(workshop PUBLIC --export=pointerEvent --export=editorEvent --export=resized --export=keyboardEvent --export=wheelEvent)
 endif()
 

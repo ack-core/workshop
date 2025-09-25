@@ -30,6 +30,7 @@ extern "C" {
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
+    void js_save(const void *path, int pathLen, const void *data, int dataLen);
     void js_editorMsg(const char *msg, int msglen, const char *data, int datalen);
 }
 
@@ -164,9 +165,6 @@ namespace foundation {
         js_task(task.release());
     }
     
-    void WASMPlatform::peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
-        completion(nullptr, 0);
-    }
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
@@ -183,6 +181,25 @@ namespace foundation {
         new (cb) cbtype(std::move(completion));
         
         js_fetch(path, len);
+    }
+    void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+        using cbtype = util::callback<void(bool)>;
+        const std::size_t pathLen = std::strlen(filePath) + 1;
+        
+        std::uint8_t *fileData = reinterpret_cast<std::uint8_t *>(malloc(sizeof(std::uint16_t) * size));
+        std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * pathLen));
+        std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
+        
+        for (std::size_t i = 0; i < pathLen; i++) {
+            path[i] = filePath[i];
+        }
+        
+        std::memcpy(fileData, data, size);
+        
+        cbtype *cb = reinterpret_cast<cbtype *>(block);
+        new (cb) cbtype(std::move(completion));
+        
+        js_save(path, pathLen, fileData, size);
     }
     
     float WASMPlatform::getScreenWidth() const {
@@ -391,6 +408,13 @@ extern "C" {
         using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
         cbtype *cb = reinterpret_cast<cbtype *>(reinterpret_cast<std::uint8_t *>(block) - sizeof(cbtype));
         cb->operator()(std::unique_ptr<std::uint8_t[]>(data), length);
+        cb->~cbtype();
+        ::free(cb);
+    }
+    void fileSaved(std::uint16_t *block, std::size_t pathLen, int result) {
+        using cbtype = util::callback<void(bool)>;
+        cbtype *cb = reinterpret_cast<cbtype *>(reinterpret_cast<std::uint8_t *>(block) - sizeof(cbtype));
+        cb->operator()(bool(result));
         cb->~cbtype();
         ::free(cb);
     }

@@ -118,11 +118,11 @@ namespace foundation {
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
         
-        // Let user to peek file to memory. Usable in editors
-        // @return   - data != nullptr and size != 0 if file opened successfully.
+        // Let user to save file in resources directory. Usable in editors.
+        // @return   - true if file saved successfully.
         // @completion called from the main thread
         //
-        virtual void peekFile(util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
+        virtual void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) = 0;
         
         // Returns native screen size in pixels
         //

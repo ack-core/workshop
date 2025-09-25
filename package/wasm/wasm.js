@@ -184,6 +184,40 @@ const imports = {
                 }
             });
         },
+        js_save: function(block, pathLen, data, dataLen) {
+            const u16path = new Uint16Array(memory.buffer, block, pathLen);
+            const path = String.fromCharCode(...u16path);
+            
+            if (editorRootDirectory) {
+                editorRootDirectory.getDirectoryHandle("resources").then(async handle => {
+                    const pathParts = path.split('/');
+                    for (let i = 0; i < pathParts.length; i++) {
+                        if (i == pathParts.length - 1) {
+                            file = await handle.getFileHandle(pathParts[i], { create: true });
+                            writable = await file.createWritable();
+                            const u8sharedData = new Uint8Array(memory.buffer, data, dataLen);
+                            const u8data = new ArrayBuffer(u8sharedData.byteLength);
+                            new Uint8Array(u8data).set(new Uint8Array(u8sharedData));
+                            await writable.write(u8data);
+                            await writable.truncate(dataLen);
+                            await writable.close();
+                            instance.exports.fileSaved(block, pathLen, true);
+                            instance.exports.free(data);
+                        }
+                        else {
+                            handle = await handle.getDirectoryHandle(pathParts[i]);
+                        }
+                    }
+                })
+                .catch(error => {
+                    print("[WASM] " + path + " saving failed with " + error);
+                    instance.exports.fileSaved(block, pathLen, false);
+                });
+            }
+            else {
+                instance.exports.fileSaved(block, pathLen, false);
+            }
+        },
         js_editorMsg: function(msg, msglen, data, datalen) {
             const u8msg = new Uint8Array(memory.buffer, msg, msglen);
             const u8data = new Uint8Array(memory.buffer, data, datalen);

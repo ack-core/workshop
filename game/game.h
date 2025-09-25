@@ -7,7 +7,7 @@
 #include "contexts/debug_context.h"
 #include "contexts/editor/editor_main_context.h"
 #include "contexts/editor/editor_camera_context.h"
-#include "contexts/editor/editor_static_mesh_context.h"
+#include "contexts/editor/editor_voxel_mesh_context.h"
 #include "contexts/editor/editor_particles_context.h"
 
 // Rule of states:
@@ -26,15 +26,15 @@ namespace game {
         const std::initializer_list<MakeContextFunc> makers;
     }
     states[] = {
-//        {"default", {
-//            &makeContext<EditorCameraContext>,
-//            &makeContext<EditorMainContext, CameraAccessInterface>,
-//            &makeContext<EditorStaticMeshContext, NodeAccessInterface>,
-//            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
-//        }}
         {"default", {
-            &makeContext<DebugContext>
+            &makeContext<EditorCameraContext>,
+            &makeContext<EditorMainContext, CameraAccessInterface>,
+            &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
+            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
         }}
+//        {"default", {
+//            &makeContext<DebugContext>
+//        }}
     };
 };
 
