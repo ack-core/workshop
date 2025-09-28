@@ -13,7 +13,7 @@ namespace game {
         ~EditorNodeVoxelMesh() override {}
     };
 
-    class EditorVoxelMeshContext : public std::enable_shared_from_this<EditorVoxelMeshContext>, public Context {
+    class EditorVoxelMeshContext : public Context {
     public:
         EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess);
         ~EditorVoxelMeshContext() override;
@@ -22,12 +22,17 @@ namespace game {
         
     private:
         const API _api;
-        const NodeAccessInterface &_nodeAccess;
+        NodeAccessInterface &_nodeAccess;
         foundation::EventHandlerToken _editorEventsToken;
         std::unordered_map<std::string, bool (EditorVoxelMeshContext::*)(const std::string &)> _handlers;
         
     private:
         bool _selectNode(const std::string &data);
         bool _setMeshPath(const std::string &data);
+        bool _startEditing(const std::string &data);
+        bool _meshOffset(const std::string &data);
+        bool _stopEditing(const std::string &data);
+        bool _save(const std::string &data);
+        bool _reload(const std::string &data);
     };
 }

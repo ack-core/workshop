@@ -20,6 +20,7 @@ namespace {
             std::uint16_t voxelCount = 0;
         };
     
+        util::IntegerOffset3D originOffset = {0, 0, 0};
         std::unique_ptr<Frame[]> frames;
         std::uint16_t frameCount = 0;
         std::size_t maxVoxelCount = 0;
@@ -29,6 +30,10 @@ namespace {
         if (memcmp(data, "VOX ", 4) == 0) {
             if (*(std::int32_t *)(data + 4) == 0x7f) { // vox made by gen_meshes.py
                 data += 32;
+                ctx.originOffset.x = *(std::int8_t *)(data + 0);
+                ctx.originOffset.y = *(std::int8_t *)(data + 1);
+                ctx.originOffset.z = *(std::int8_t *)(data + 2);
+                data += 4;
                 ctx.frameCount = *(std::uint32_t *)data;
                 ctx.frames = std::make_unique<MeshAsyncContext::Frame[]>(ctx.frameCount);
                 data += sizeof(std::uint32_t);
@@ -69,9 +74,14 @@ namespace resource {
         auto getGroundInfo(const char *groundPath) -> const GroundInfo * override;
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
-        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) override;
+
+        void removeTexture(const char *texturePath) override;
+        void removeMesh(const char *meshPath) override;
+        void removeGround(const char *groundPath) override;
+        void removeEmitter(const char *configPath) override;
 
         void update(float dtSec) override;
         
@@ -81,6 +91,10 @@ namespace resource {
         
         struct TextureData : public TextureInfo { // TODO: remove parent
             foundation::RenderTexturePtr ptr;
+        };
+        struct VoxelMesh {
+            std::vector<foundation::RenderDataPtr> frames;
+            util::IntegerOffset3D originOffset;
         };
         struct GroundMesh {
             foundation::RenderDataPtr data;
@@ -93,7 +107,7 @@ namespace resource {
         };
         
         std::unordered_map<std::string, TextureData> _textures;
-        std::unordered_map<std::string, std::vector<foundation::RenderDataPtr>> _meshes;
+        std::unordered_map<std::string, VoxelMesh> _meshes;
         std::unordered_map<std::string, GroundMesh> _grounds;
         std::unordered_map<std::string, Emitter> _emitters;
         
@@ -103,7 +117,7 @@ namespace resource {
         };
         struct QueueEntryMesh {
             std::string meshPath;
-            util::callback<void(const std::vector<foundation::RenderDataPtr> &)> callback;
+            util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> callback;
         };
         struct QueueEntryGround {
             std::string groundPath;
@@ -238,7 +252,7 @@ namespace resource {
         }
     }
         
-    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) {
+    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueMesh.emplace_back(QueueEntryMesh {
                 .meshPath = meshPath,
@@ -252,7 +266,7 @@ namespace resource {
 
         auto index = _meshes.find(path);
         if (index != _meshes.end()) {
-            completion(index->second);
+            completion(index->second.frames, index->second.originOffset);
         }
         else {
             _asyncInProgress = true;
@@ -283,9 +297,9 @@ namespace resource {
                                         for (std::size_t i = 0; i < voxels.size(); i++) {
                                             const MeshAsyncContext::Voxel &src = ctx.frames[f].voxels[i];
                                             VTXMVOX &voxel = voxels[i];
-                                            voxel.positionX = src.positionX;
-                                            voxel.positionY = src.positionY;
-                                            voxel.positionZ = src.positionZ;
+                                            voxel.positionX = src.positionX - ctx.originOffset.x;
+                                            voxel.positionY = src.positionY - ctx.originOffset.y;
+                                            voxel.positionZ = src.positionZ - ctx.originOffset.z;
                                             voxel.colorIndex = src.colorIndex;
                                             voxel.mask = src.mask;
                                         }
@@ -293,18 +307,18 @@ namespace resource {
                                         frames[f] = self->_rendering->createData(voxels.data(), layouts::VTXMVOX, ctx.frames[f].voxelCount);
                                     }
                                     
-                                    const std::vector<foundation::RenderDataPtr> &result = self->_meshes.emplace(path, std::move(frames)).first->second;
-                                    completion(result);
+                                    const auto &result = self->_meshes.emplace(path, VoxelMesh{std::move(frames), ctx.originOffset}).first->second;
+                                    completion(result.frames, result.originOffset);
                                 }
                                 else {
-                                    completion({});
+                                    completion({}, {0, 0, 0});
                                 }
                             }
                         }));
                     }
                     else {
                         self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelObject] Unable to find file '%s'", path.data());
-                        completion({});
+                        completion({}, {0, 0, 0});
                     }
                 }
             });
@@ -429,6 +443,19 @@ namespace resource {
 
     void ResourceProviderImpl::getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) {
         
+    }
+
+    void ResourceProviderImpl::removeTexture(const char *texturePath) {
+        _textures.erase(texturePath);
+    }
+    void ResourceProviderImpl::removeMesh(const char *meshPath) {
+        _meshes.erase(meshPath);
+    }
+    void ResourceProviderImpl::removeGround(const char *groundPath) {
+        _grounds.erase(groundPath);
+    }
+    void ResourceProviderImpl::removeEmitter(const char *configPath) {
+        _emitters.erase(configPath);
     }
     
     void ResourceProviderImpl::update(float dtSec) {

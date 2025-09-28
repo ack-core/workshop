@@ -11,7 +11,7 @@
 
 namespace voxel {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 3;
-
+    
     class SceneInterface {
     public:
         static std::shared_ptr<SceneInterface> instance(
@@ -31,6 +31,9 @@ namespace voxel {
             virtual ~BoundingBox() = default;
         };
         struct VoxelMesh {
+            virtual void resetOffset() = 0;
+            virtual auto getCenterOffset() const -> util::IntegerOffset3D = 0;
+            virtual void setCenterOffset(const util::IntegerOffset3D& offset) = 0;
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setFrame(std::uint32_t index) = 0;
@@ -63,7 +66,7 @@ namespace voxel {
         
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames) -> VoxelMeshPtr = 0;
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D &originOffset) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;

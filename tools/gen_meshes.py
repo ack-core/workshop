@@ -8,6 +8,7 @@ Format:
 1 uint64 - flags (0x0)
 1 uint32 - reserved
 3 uint32 - size (x, y, z)
+4 uint16 - origin voxel offset (x, y, z) + reserved
 1 uint32 - frame count
 1 uint32 - voxel count in frame
 voxels
@@ -16,6 +17,8 @@ voxels
 import os
 import argparse
 import struct
+import re
+from pathlib import Path
 
 VOX_READ_MAIN = 20
 VOX_READ_CHUNK_HEADER = 4
@@ -75,8 +78,20 @@ def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) 
 
     return count, output
 
-def convert_vox(src: str, dst: str, opt: int):
+def convert_vox(src: str, cfg: str, dst: str, opt: int):
     print("---- ", src)
+    offsetX = 0
+    offsetY = 0
+    offsetZ = 0
+    try:
+        with open(cfg, "r", encoding="utf-8") as cfg_file:
+            cfgstring = cfg_file.read()
+            match = re.search(r'offset\s*:\s*vector3f\s*=\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)', cfgstring)
+            if match:
+                offsetX, offsetY, offsetZ = (int(round(float(v))) for v in match.groups())
+    except OSError as e:
+        pass
+
     with open(src, mode="rb") as src_file:
         with open(dst, mode="wb") as dst_file:
             src_file.read(VOX_READ_MAIN)
@@ -118,6 +133,7 @@ def convert_vox(src: str, dst: str, opt: int):
 
             dst_file.write(b'VOX \x7f\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0')
             dst_file.write(struct.pack("<iii", sx, sy, sz))
+            dst_file.write(struct.pack("<bbbb", offsetX, offsetY, offsetZ, 0))
             dst_file.write(struct.pack("<i", frame_count))
 
             for i in range(0, frame_count):
@@ -138,7 +154,8 @@ def main(src: str, dst: str, opt: int):
                 fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
                 fullpath_to = fullpath_to.replace(".vox", ".vxm")
                 fullpath_from = os.path.join(path, file)
-                convert_vox(fullpath_from, fullpath_to, opt)
+                fullpath_cfg = fullpath_from.replace(".vox", ".txt")
+                convert_vox(fullpath_from, fullpath_cfg, fullpath_to, opt)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tool to generate optimized meshes")

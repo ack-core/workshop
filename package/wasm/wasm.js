@@ -194,15 +194,21 @@ const imports = {
                     for (let i = 0; i < pathParts.length; i++) {
                         if (i == pathParts.length - 1) {
                             file = await handle.getFileHandle(pathParts[i], { create: true });
-                            writable = await file.createWritable();
-                            const u8sharedData = new Uint8Array(memory.buffer, data, dataLen);
-                            const u8data = new ArrayBuffer(u8sharedData.byteLength);
-                            new Uint8Array(u8data).set(new Uint8Array(u8sharedData));
-                            await writable.write(u8data);
-                            await writable.truncate(dataLen);
-                            await writable.close();
-                            instance.exports.fileSaved(block, pathLen, true);
-                            instance.exports.free(data);
+                            if (data) {
+                                writable = await file.createWritable();
+                                const u8sharedData = new Uint8Array(memory.buffer, data, dataLen);
+                                const u8data = new ArrayBuffer(u8sharedData.byteLength);
+                                new Uint8Array(u8data).set(new Uint8Array(u8sharedData));
+                                await writable.write(u8data);
+                                await writable.truncate(dataLen);
+                                await writable.close();
+                                instance.exports.fileSaved(block, pathLen, true);
+                                instance.exports.free(data);
+                            }
+                            else {
+                                await file.remove();
+                                instance.exports.fileSaved(block, pathLen, true);
+                            }
                         }
                         else {
                             handle = await handle.getDirectoryHandle(pathParts[i]);

@@ -41,7 +41,7 @@ namespace game {
         _axis->setLine(3, {-10, 0, -10}, {10, 0, -10}, {0.3, 0.3, 0.3, 0.5});
         _axis->setLine(4, {10, 0, -10}, {10, 0, 10}, {0.3, 0.3, 0.3, 0.5});
         _axis->setLine(5, {10, 0, 10}, {-10, 0, 10}, {0.3, 0.3, 0.3, 0.5});
-        _axis->setLine(6, {-10, 0, 10}, {-10, 0, -10}, {0.3, 0.3, 0.3, 0.5});        
+        _axis->setLine(6, {-10, 0, 10}, {-10, 0, -10}, {0.3, 0.3, 0.3, 0.5});
     }
     
     EditorMainContext::~EditorMainContext() {
@@ -50,6 +50,12 @@ namespace game {
     
     const std::weak_ptr<EditorNode> &EditorMainContext::getSelectedNode() const {
         return _currentNode;
+    }
+    
+    void EditorMainContext::forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) {
+        for (auto &item : _nodes) {
+            handler(item.second);
+        }
     }
     
     void EditorMainContext::update(float dtSec) {
@@ -68,7 +74,9 @@ namespace game {
         std::size_t typeIndex;
         if (args >> typeIndex) {
             if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
-                const auto &value = _nodes.emplace(getNextUnknownName(), EditorNode::makeByType[typeIndex](typeIndex)).first;
+                const std::string name = getNextUnknownName();
+                const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
+                value->second->name = name;
                 value->second->position = _cameraAccess.getTarget();
                 _movingTool = _makeMovingTool(value->second->position);
                 _api.platform->sendEditorMsg("engine.nodeCreated", value->first + " " + nodeTypeToPanelMapping[typeIndex]);
@@ -106,6 +114,7 @@ namespace game {
                 const auto &index = _nodes.find(old);
                 if (index != _nodes.end()) {
                     std::shared_ptr<EditorNode> tmp = index->second;
+                    tmp->name = nv;
                     _nodes.erase(index);
                     _nodes.emplace(nv, tmp);
                     _api.platform->sendEditorMsg("engine.nodeRenamed", data);

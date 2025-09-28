@@ -186,7 +186,6 @@ namespace foundation {
         using cbtype = util::callback<void(bool)>;
         const std::size_t pathLen = std::strlen(filePath) + 1;
         
-        std::uint8_t *fileData = reinterpret_cast<std::uint8_t *>(malloc(sizeof(std::uint16_t) * size));
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * pathLen));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
         
@@ -194,7 +193,12 @@ namespace foundation {
             path[i] = filePath[i];
         }
         
-        std::memcpy(fileData, data, size);
+        std::uint8_t *fileData = nullptr;
+        
+        if (data && size) {
+            fileData = reinterpret_cast<std::uint8_t *>(malloc(sizeof(std::uint16_t) * size));
+            std::memcpy(fileData, data, size);
+        }
         
         cbtype *cb = reinterpret_cast<cbtype *>(block);
         new (cb) cbtype(std::move(completion));

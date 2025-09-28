@@ -2,6 +2,21 @@ import http.server
 from http.server import SimpleHTTPRequestHandler
 import socketserver
 import ssl
+import os
+import sys
+
+binaryRoot = os.path.dirname(os.path.abspath(__file__))
+resourcesRoot = os.path.normpath(binaryRoot + "/../resources")
+toolsRoot = os.path.normpath(binaryRoot + "/../tools")
+
+print("Binary Root: ", binaryRoot)
+print("Resources Root: ", resourcesRoot)
+print("Tools Root: ", toolsRoot)
+
+sys.path.insert(1, toolsRoot)
+
+import gen_meshes
+import gen_grounds
 
 class CustomRequestHandler (SimpleHTTPRequestHandler):
     def end_headers (self):
@@ -20,7 +35,18 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
 
     def do_GET(self):
         print("get  >>> ", self.path)
-        SimpleHTTPRequestHandler.do_GET(self)
+        if self.path == "/host_cmd_update":
+            print("Updating engine resources...")
+            gen_meshes.main(resourcesRoot + "/meshes", binaryRoot + "/data/meshes", 1)
+            gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")
+            print("Finished")
+
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"done")
+        else: 
+            SimpleHTTPRequestHandler.do_GET(self)
 
 def main():
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

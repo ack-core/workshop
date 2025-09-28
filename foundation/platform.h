@@ -118,7 +118,7 @@ namespace foundation {
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
         
-        // Let user to save file in resources directory. Usable in editors.
+        // Save file in resources directory. Usable in editors. If data is nullptr and size is 0 then file is deleted
         // @return   - true if file saved successfully.
         // @completion called from the main thread
         //

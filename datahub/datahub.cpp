@@ -248,6 +248,7 @@ namespace dh {
                 
                 if (Array *array = std::get_if<Array>(&_elements[i].second.data)) {
                     ScopeId newId = getNextScopeId();
+                    // posibly error: _scopeTemplateIndex, should be index from array TODO: unittests
                     result = std::make_shared<ScopeImpl>(_logger, newId, _scopeTemplateIndex, _scopeTemplates, _queue);
                     initializer(*result);
                     array->items.emplace(newId, result);

@@ -13,6 +13,7 @@ namespace game {
     struct EditorNode {
         static std::shared_ptr<EditorNode> (*makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex);
         
+        std::string name;
         EditorNodeType type;
         math::vector3f position;
         voxel::SceneInterface::BoundingBoxPtr bbox;
@@ -24,6 +25,7 @@ namespace game {
     class NodeAccessInterface : public Interface {
     public:
         virtual const std::weak_ptr<EditorNode> &getSelectedNode() const = 0;
+        virtual void forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) = 0;
 
     public:
         ~NodeAccessInterface() override {}

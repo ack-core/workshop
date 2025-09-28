@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
+#include <any>
 
 /*
 TODO:
@@ -16,6 +18,14 @@ TODO:
             }) {}
 
  */
+
+namespace util {
+    struct IntegerOffset3D {
+        int x;
+        int y;
+        int z;
+    };
+}
 
 namespace util {
     template <typename M> class callback final {};
@@ -253,6 +263,11 @@ namespace util {
     inline auto word(std::string &output) {
         return details::word{output};
     }
+}
+
+namespace util {
+    using Config = std::vector<std::pair<std::string, std::any>>;
+    std::vector<std::pair<std::string, std::any>> parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name);
 }
 
 // TODO: move to dedicated shader generator

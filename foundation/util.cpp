@@ -1,5 +1,6 @@
 
 #include "util.h"
+#include "math.h"
 
 namespace util {
     std::int64_t strstream::atoi(const char *s, std::size_t &len) {
@@ -152,6 +153,75 @@ namespace util {
         result.resize(output - result.data());
         return result;
     }
-    
+}
 
+namespace util {
+    std::vector<std::pair<std::string, std::any>> parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name, std::string &error) {
+        strstream input(reinterpret_cast<const char *>(data), length);
+        std::vector<std::pair<std::string, std::any>> result;
+        std::string scopeName;
+        std::string scopeText;
+        error = {};
+        
+        struct fn {
+            static bool parseScope(const std::string &name, const std::string &src, std::vector<std::pair<std::string, std::any>>& result, std::string &error) {
+                strstream input(src.data(), src.length());
+                std::string elementName;
+                
+                while (input >> elementName) {
+                    std::string type;
+                    std::string valueString;
+                    float valueFloat[3] = {};
+                    int valueInt = 0;
+                    
+                    if (input >> sequence(":") >> type) {
+                        if (type == "string" && input >> sequence("=") >> braced(valueString, '"', '"')) {
+                            result.emplace_back(std::make_pair(elementName, std::make_any<std::string>(std::move(valueString))));
+                        }
+                        else if (type == "integer" && input >> sequence("=") >> valueInt) {
+                            result.emplace_back(std::make_pair(elementName, std::make_any<int>(valueInt)));
+                        }
+                        else if (type == "number" && input >> sequence("=") >> valueFloat[0]) {
+                            result.emplace_back(std::make_pair(elementName, std::make_any<float>(valueFloat[0])));
+                        }
+                        else if (type == "vector2f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1]) {
+                            result.emplace_back(std::make_pair(elementName, std::make_any<math::vector2f>(valueFloat[0], valueFloat[1])));
+                        }
+                        else if (type == "vector3f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1] >> valueFloat[2]) {
+                            result.emplace_back(std::make_pair(elementName, std::make_any<math::vector3f>(valueFloat[0], valueFloat[1], valueFloat[2])));
+                        }
+                        else if (type == "bool" && input >> sequence("=") >> valueString) {
+                            result.emplace_back(std::make_pair(elementName, std::make_any<bool>(valueString == "true")));
+                        }
+                        else {
+                            error = "Invalid initialisation for '" + elementName + "'";
+                            return false;
+                        }
+                    }
+                    else {
+                        error = "Expected ':' and type after name '" + elementName + "'";
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+        };
+        
+        while (input >> scopeName) {
+            if (scopeName == name) {
+                if (input >> braced(scopeText, '{', '}')) {
+                    if (fn::parseScope(name, scopeText, result, error) == false) {
+                        break;
+                    }
+                }
+                else {
+                    error = "Braces aren't match";
+                    break;
+                }
+            }
+        }
+        
+        return result;
+    }
 }

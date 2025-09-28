@@ -4,7 +4,7 @@
 #include "foundation/rendering.h"
 #include "foundation/layouts.h"
 
-// TODO: datahub scope instead of ParticlesParams, ParticlesParams -> back to scene
+// TODO: util::Config instead of ParticlesParams, ParticlesParams -> back to scene
 
 namespace resource {
     struct TextureInfo {
@@ -32,37 +32,37 @@ namespace resource {
     public:
         // Get texture info
         // @texPath - path to file without extension
-        // @return  - info or nullptr
+        // @return - info or nullptr
         //
         virtual const TextureInfo *getTextureInfo(const char *texPath) = 0;
         
         // Get mesh info
         // @voxPath - path to file without extension
-        // @return  - info or nullptr
+        // @return - info or nullptr
         //
         virtual const MeshInfo *getMeshInfo(const char *voxPath) = 0;
         
         // Get ground info
         // @groundPath - path to file without extension
-        // @return    - info or nullptr
+        // @return - info or nullptr
         //
         virtual const GroundInfo *getGroundInfo(const char *groundPath) = 0;
         
         // Asynchronously Load texture from file if it isn't loaded yet
-        // @texPath - path to file without extension
-        // @return  - texture object or nullptr
+        // @texturePath - path to file without extension
+        // @return - texture object or nullptr
         //
-        virtual void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) = 0;
+        virtual void getOrLoadTexture(const char *texturePath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) = 0;
         
         // Asynchronously load voxels with VTXMVOX layout from file if they aren't loaded yet
-        // @voxPath - path to file without extension
-        // @return  - mesh frames (zero size if not loaded)
+        // @meshPath - path to file without extension
+        // @return - mesh frames (zero size if not loaded)
         //
-        virtual void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) = 0;
         
         // Asynchronously load ground from file if it isn't loaded yet
         // @groundPath - path to file without extension
-        // @return  - primitives to construct ground object or nullptr's
+        // @return - primitives to construct ground object or nullptr's
         //
         virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
 
@@ -70,8 +70,15 @@ namespace resource {
         // @cfgPath - path to file without extension
         // @return  - primitives to construct emitter or nullptrs
         //
-        virtual void getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) = 0;
+        virtual void getOrLoadEmitter(const char *configPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) = 0;
         
+        // Force removing resources from internal storages
+        //
+        virtual void removeTexture(const char *texturePath) = 0;
+        virtual void removeMesh(const char *meshPath) = 0;
+        virtual void removeGround(const char *groundPath) = 0;
+        virtual void removeEmitter(const char *configPath) = 0;
+
         // Provider tracks resources life time and tries to free them
         //
         virtual void update(float dtSec) = 0;

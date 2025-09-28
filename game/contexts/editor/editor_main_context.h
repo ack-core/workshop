@@ -13,6 +13,7 @@ namespace game {
         ~EditorMainContext() override;
         
         const std::weak_ptr<EditorNode> &getSelectedNode() const override;
+        void forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) override;
         
         void update(float dtSec) override;
         
