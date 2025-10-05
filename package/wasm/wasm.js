@@ -174,8 +174,8 @@ const imports = {
                 const data = instance.exports.malloc(buffer.byteLength);
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
-                instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
                 print("[WASM] " + path + " loaded successfully");
+                instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
             })
             .catch(error => {
                 print("[WASM] " + path + " loading failed with " + error);

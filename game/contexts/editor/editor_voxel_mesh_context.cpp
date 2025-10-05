@@ -8,13 +8,13 @@ namespace game {
         };
         
         _handlers["editor.selectNode"] = &EditorVoxelMeshContext::_selectNode;
-        _handlers["editor.mesh.setPath"] = &EditorVoxelMeshContext::_setMeshPath;
+        _handlers["editor.setPath"] = &EditorVoxelMeshContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorVoxelMeshContext::_startEditing;
         _handlers["editor.stopEditing"] = &EditorVoxelMeshContext::_stopEditing;
+        _handlers["editor.reload"] = &EditorVoxelMeshContext::_reload;
         _handlers["editor.mesh.offset"] = &EditorVoxelMeshContext::_meshOffset;
         _handlers["editor.mesh.save"] = &EditorVoxelMeshContext::_save;
-        _handlers["editor.reload"] = &EditorVoxelMeshContext::_reload;
-        
+
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
             if (handler) {
@@ -44,21 +44,22 @@ namespace game {
         return false;
     }
     
-    bool EditorVoxelMeshContext::_setMeshPath(const std::string &data) {
-        std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
-        if (node) {
+    bool EditorVoxelMeshContext::_setResourcePath(const std::string &data) {
+        if (std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock())) {
             node->meshPath = data;
             
             _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
                 node->mesh = _api.scene->addVoxelMesh(data, offset);
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             });
+            
+            return true;
         }
-        return true;
+        return false;
     }
-    
+        
     bool EditorVoxelMeshContext::_startEditing(const std::string &data) {
-        std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
+        std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             util::IntegerOffset3D offset = node->mesh->getCenterOffset();
             _api.platform->sendEditorMsg("engine.mesh.editing", std::to_string(offset.x) + " " + std::to_string(offset.y) + " " + std::to_string(offset.z));
@@ -67,7 +68,38 @@ namespace game {
         
         return false;
     }
-
+    
+    bool EditorVoxelMeshContext::_stopEditing(const std::string &data) {
+        std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
+        if (node && node->mesh) {
+            node->mesh->resetOffset();
+            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            return true;
+        }
+        return false;
+    }
+        
+    bool EditorVoxelMeshContext::_reload(const std::string &data) {
+        std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
+        if (node && node->mesh) {
+            _api.resources->removeMesh(node->meshPath.data());
+            
+            // updating all mesh nodes
+            _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
+                std::shared_ptr<EditorNodeVoxelMesh> meshNode = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(node);
+                if (meshNode && meshNode->mesh) {
+                    _api.resources->getOrLoadVoxelMesh(meshNode->meshPath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+                        meshNode->mesh = _api.scene->addVoxelMesh(data, offset);
+                        meshNode->mesh->setPosition(meshNode->position);
+                        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                    });
+                }
+            });
+            return true;
+        }
+        return false;
+    }
+    
     bool EditorVoxelMeshContext::_meshOffset(const std::string &data) {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
@@ -82,17 +114,7 @@ namespace game {
         
         return true;
     }
-    
-    bool EditorVoxelMeshContext::_stopEditing(const std::string &data) {
-        std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
-        if (node && node->mesh) {
-            node->mesh->resetOffset();
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-            return true;
-        }
-        return false;
-    }
-    
+
     bool EditorVoxelMeshContext::_save(const std::string &data) {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
@@ -114,27 +136,6 @@ namespace game {
 
         }
         return true;
-    }
-    
-    bool EditorVoxelMeshContext::_reload(const std::string &data) {
-        std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
-        if (node && node->mesh) {
-            _api.resources->removeMesh(node->meshPath.data());
-            
-            // updating all mesh nodes
-            _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
-                std::shared_ptr<EditorNodeVoxelMesh> meshNode = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(node);
-                if (meshNode && meshNode->mesh) {
-                    _api.resources->getOrLoadVoxelMesh(meshNode->meshPath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
-                        meshNode->mesh = _api.scene->addVoxelMesh(data, offset);
-                        meshNode->mesh->setPosition(meshNode->position);
-                        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-                    });
-                }
-            });
-            return true;
-        }
-        return false;
     }
 
 }

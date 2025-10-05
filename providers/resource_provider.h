@@ -2,9 +2,6 @@
 #pragma once
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
-#include "foundation/layouts.h"
-
-// TODO: util::Config instead of ParticlesParams, ParticlesParams -> back to scene
 
 namespace resource {
     struct TextureInfo {
@@ -24,6 +21,36 @@ namespace resource {
         std::uint32_t sizeY;
         std::uint32_t sizeZ;
     };
+
+    struct EmitterDescription {
+        bool looped = false;
+        bool additiveBlend = false;
+        bool startShapeFill = false;
+        bool endShapeFill = false;
+        
+        std::uint32_t particlesToEmit = 0;
+        std::uint32_t emissionTimeMs = 0;
+        std::uint32_t particleLifeTimeMs = 0;
+        std::uint32_t randomSeed = 0;
+        float particleStartSpeed = 0;
+        
+        std::uint32_t bakingFrameTimeMs = 0;
+        std::uint32_t particleOrientation = 0;
+        std::uint32_t shapeDistributionType = 0;
+        std::uint32_t startShapeType = 0;
+        std::uint32_t endShapeType = 0;
+        
+        math::vector3f startShapeArgs = {0};
+        math::vector3f endShapeArgs = {0};
+        math::vector3f endShapeOffset = {0};
+        math::vector3f minXYZ = {0};
+        math::vector3f maxXYZ = {0};
+        math::vector2f maxSize = {0};
+
+        std::string texturePath;
+    };
+    
+    using EmitterDescriptionPtr = std::unique_ptr<EmitterDescription>;
     
     class ResourceProvider {
     public:
@@ -66,11 +93,11 @@ namespace resource {
         //
         virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
 
-        // Asynchronously Load emitter from cfg file and textures if it isn't loaded yet
-        // @cfgPath - path to file without extension
-        // @return  - primitives to construct emitter or nullptrs
+        // Asynchronously Load emitter from txt file and textures if it isn't loaded yet
+        // @configPath - path to file without extension
+        // @return - description to construct emitter or nullptrs. It's ok to return map and texture == nullptr - usable for editors
         //
-        virtual void getOrLoadEmitter(const char *configPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) = 0;
+        virtual void getOrLoadEmitter(const char *configPath, util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
         
         // Force removing resources from internal storages
         //

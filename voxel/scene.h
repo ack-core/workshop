@@ -12,6 +12,19 @@
 namespace voxel {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 3;
     
+    struct ParticlesParams {
+        enum class ParticlesOrientation {
+            CAMERA, AXIS, WORLD
+        };
+        bool looped = false;
+        bool additiveBlend = false;
+        float bakingTimeSec = 0.0f;
+        ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
+        math::vector3f minXYZ = {0, 0, 0};
+        math::vector3f maxXYZ = {0, 0, 0};
+        math::vector2f maxSize = {0, 0};
+    };
+
     class SceneInterface {
     public:
         static std::shared_ptr<SceneInterface> instance(
@@ -68,7 +81,7 @@ namespace voxel {
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
         virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D &originOffset) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
-        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) -> ParticlesPtr = 0;
+        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual auto getCameraPosition() const -> math::vector3f = 0;

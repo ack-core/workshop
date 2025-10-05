@@ -315,7 +315,6 @@ namespace foundation {
         va_start(arglist, fmt);
         _output(true, fmt, arglist);
         va_end(arglist);
-        fatal();
     }
     
     void WASMPlatform::_output(bool error, const char *fmt, va_list arglist) {

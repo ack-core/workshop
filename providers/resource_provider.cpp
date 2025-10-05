@@ -3,6 +3,7 @@
 #include "textures_list.h"
 #include "meshes_list.h"
 #include "grounds_list.h"
+#include "foundation/layouts.h"
 
 #include "thirdparty/upng/upng.h"
 
@@ -10,23 +11,67 @@
 #include <memory>
 
 namespace {
+    struct TextureAsyncContext {
+        std::unique_ptr<std::uint8_t[]> data;
+        std::uint32_t w, h;
+        foundation::RenderTextureFormat format;
+    };
     struct MeshAsyncContext {
         struct Voxel {
             std::int16_t positionX, positionY, positionZ;
             std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
         };
-        struct Frame {
-            std::unique_ptr<Voxel[]> voxels;
-            std::uint16_t voxelCount = 0;
+        struct VTXMVOX {
+            std::int16_t positionX, positionY, positionZ;
+            std::uint8_t colorIndex, mask;
         };
-    
         util::IntegerOffset3D originOffset = {0, 0, 0};
-        std::unique_ptr<Frame[]> frames;
-        std::uint16_t frameCount = 0;
-        std::size_t maxVoxelCount = 0;
+        std::vector<std::vector<VTXMVOX>> voxels;
     };
     
-    bool readVxm(MeshAsyncContext &ctx, const std::uint8_t *data) {
+    bool readEmitter(resource::EmitterDescription &desc, const std::uint8_t *data) {
+        if (memcmp(data, "EMTR", 4) == 0) {
+            std::uint64_t flags = *(std::int64_t *)(data + 4);
+            desc.looped = (flags & 0x1) != 0;
+            desc.additiveBlend = (flags & 0x2) != 0;
+            desc.startShapeFill = (flags & 0x4) != 0;
+            desc.endShapeFill = (flags & 0x8) != 0;
+            data += 12;
+            desc.randomSeed = *(std::int32_t *)(data + 0);
+            desc.particlesToEmit = *(std::int16_t *)(data + 4);
+            desc.emissionTimeMs = *(std::int16_t *)(data + 6);
+            desc.particleLifeTimeMs = *(std::int16_t *)(data + 8);
+            desc.bakingFrameTimeMs = *(std::int16_t *)(data + 10);
+            data += 12;
+            desc.particleStartSpeed = *(float *)(data + 0);
+            data += 4;
+            desc.particleOrientation = *(std::uint8_t *)(data + 0);
+            desc.startShapeType = *(std::uint8_t *)(data + 1);
+            desc.endShapeType = *(std::uint8_t *)(data + 2);
+            desc.shapeDistributionType = *(std::uint8_t *)(data + 3);
+            data += 4;
+            desc.startShapeArgs = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
+            data += 12;
+            desc.endShapeArgs = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
+            data += 12;
+            desc.endShapeOffset = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
+            data += 12;
+            desc.minXYZ = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
+            data += 12;
+            desc.maxXYZ = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
+            data += 12;
+            desc.maxSize = math::vector2f(*(float *)(data + 0), *(float *)(data + 4));
+            data += 8;
+            desc.texturePath = (const char *)(data + 1);
+            data += *(std::uint8_t *)(data + 0);
+            return true;
+        }
+        return false;
+    }
+
+    void readMesh(MeshAsyncContext &ctx, const std::uint8_t *data) {
+        ctx.voxels.clear();
+        
         if (memcmp(data, "VOX ", 4) == 0) {
             if (*(std::int32_t *)(data + 4) == 0x7f) { // vox made by gen_meshes.py
                 data += 32;
@@ -34,32 +79,29 @@ namespace {
                 ctx.originOffset.y = *(std::int8_t *)(data + 1);
                 ctx.originOffset.z = *(std::int8_t *)(data + 2);
                 data += 4;
-                ctx.frameCount = *(std::uint32_t *)data;
-                ctx.frames = std::make_unique<MeshAsyncContext::Frame[]>(ctx.frameCount);
+                std::uint32_t frameCount = *(std::uint32_t *)data;
+                ctx.voxels.resize(frameCount);
                 data += sizeof(std::uint32_t);
                 
-                for (std::uint32_t f = 0; f < ctx.frameCount; f++) {
-                    MeshAsyncContext::Frame &frame = ctx.frames[f];
-                    frame.voxelCount = *(std::uint32_t *)data;
-                    frame.voxels = std::make_unique<MeshAsyncContext::Voxel[]>(frame.voxelCount);
-                    
-                    if (frame.voxelCount > ctx.maxVoxelCount) {
-                        ctx.maxVoxelCount = frame.voxelCount;
-                    }
-                    
+                for (std::uint32_t f = 0; f < frameCount; f++) {
+                    std::uint32_t voxelCount = *(std::uint32_t *)data;
                     data += sizeof(std::uint32_t);
+                    ctx.voxels[f].resize(voxelCount);
                     
-                    for (std::uint32_t i = 0; i < frame.voxelCount; i++) {
-                        frame.voxels[i] = *(MeshAsyncContext::Voxel *)data;
+                    for (std::uint32_t i = 0; i < voxelCount; i++) {
+                        const MeshAsyncContext::Voxel &src = *(MeshAsyncContext::Voxel *)data;
+                        MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][i];
+                        voxel.positionX = src.positionX - ctx.originOffset.x;
+                        voxel.positionY = src.positionY - ctx.originOffset.y;
+                        voxel.positionZ = src.positionZ - ctx.originOffset.z;
+                        voxel.colorIndex = src.colorIndex;
+                        voxel.mask = src.mask;
+
                         data += sizeof(MeshAsyncContext::Voxel);
                     }
                 }
-                
-                return true;
             }
         }
-        
-        return false;
     }
 }
 
@@ -76,7 +118,7 @@ namespace resource {
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
-        void getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) override;
+        void getOrLoadEmitter(const char *cfgPath, util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
 
         void removeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
@@ -91,19 +133,23 @@ namespace resource {
         
         struct TextureData : public TextureInfo { // TODO: remove parent
             foundation::RenderTexturePtr ptr;
+            bool outdated = false;
         };
         struct VoxelMesh {
             std::vector<foundation::RenderDataPtr> frames;
             util::IntegerOffset3D originOffset;
+            bool outdated = false;
         };
         struct GroundMesh {
             foundation::RenderDataPtr data;
             foundation::RenderTexturePtr texture;
+            bool outdated = false;
         };
         struct Emitter {
+            EmitterDescriptionPtr params;
             foundation::RenderTexturePtr map;
             foundation::RenderTexturePtr texture;
-            layouts::ParticlesParams params;
+            bool outdated = false;
         };
         
         std::unordered_map<std::string, TextureData> _textures;
@@ -124,10 +170,9 @@ namespace resource {
             util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> callback;
         };
         struct QueueEntryEmitter {
-            std::string cfgPath;
-            util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> callback;
+            std::string configPath;
+            util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> callback;
         };
-
         
         std::list<QueueEntryTexture> _callsQueueTexture;
         std::list<QueueEntryMesh> _callsQueueMesh;
@@ -179,7 +224,7 @@ namespace resource {
         std::string path = std::string(texPath);
         
         auto index = _textures.find(path);
-        if (index != _textures.end() && index->second.ptr) {
+        if (index != _textures.end() && index->second.outdated == false) {
             completion(index->second.ptr);
         }
         else {
@@ -187,13 +232,8 @@ namespace resource {
             _platform->loadFile((path + ".png").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<std::uint8_t[]> &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                     if (len) {
-                        struct TextureAsyncContext {
-                            std::unique_ptr<std::uint8_t[]> data;
-                            std::uint32_t w, h;
-                            foundation::RenderTextureFormat format;
-                        };
-                        
                         self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<TextureAsyncContext>>([weak, path, mem = std::move(mem), len](TextureAsyncContext &ctx) {
+                            //--- worker thread ---
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                                 upng_t *upng = upng_new_from_bytes(mem.get(), (unsigned long)(len));
                                 if (upng != nullptr && *reinterpret_cast<const unsigned *>(mem.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
@@ -226,12 +266,14 @@ namespace resource {
                                     self->_platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' is not a valid png file", path.data());
                                 }
                             }
+                            //--- worker thread ---
                         },
                         [weak, path, completion = std::move(completion)](TextureAsyncContext &ctx) {
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                                 self->_asyncInProgress = false;
                                 
                                 if (ctx.data) {
+                                    self->_textures.erase(path);
                                     TextureData &texture = self->_textures.emplace(path, TextureData{ctx.w, ctx.h, ctx.format}).first->second;
                                     texture.ptr = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, ctx.w, ctx.h, {ctx.data.get()});
                                     completion(texture.ptr);
@@ -244,6 +286,7 @@ namespace resource {
                         }));
                     }
                     else {
+                        self->_asyncInProgress = false;
                         self->_platform->logError("[TextureProviderImpl::getOrLoadTexture] Unable to find file '%s'", path.data());
                         completion(nullptr);
                     }
@@ -265,7 +308,7 @@ namespace resource {
         std::string path = std::string(meshPath);
 
         auto index = _meshes.find(path);
-        if (index != _meshes.end()) {
+        if (index != _meshes.end() && index->second.outdated == false) {
             completion(index->second.frames, index->second.originOffset);
         }
         else {
@@ -273,51 +316,36 @@ namespace resource {
             _platform->loadFile((path + ".vxm").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                     if (len) {
-                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<MeshAsyncContext>>([weak, path, bin = std::move(mem), len](MeshAsyncContext &ctx) {
+                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<MeshAsyncContext>>([weak, path, mem = std::move(mem), len](MeshAsyncContext &ctx) {
+                            //--- worker thread ---
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                if (readVxm(ctx, bin.get()) == false) {
-                                    self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelObject] '%s' is not a valid vxm file", path.data());
-                                }
+                                readMesh(ctx, mem.get());
                             }
+                            //--- worker thread ---
                         },
                         [weak, path, completion = std::move(completion)](MeshAsyncContext &ctx) {
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                                 self->_asyncInProgress = false;
                                 
-                                if (ctx.frameCount) {
-                                    struct VTXMVOX {
-                                        std::int16_t positionX, positionY, positionZ;
-                                        std::uint8_t colorIndex, mask;
-                                    };
-                                    
-                                    std::vector<foundation::RenderDataPtr> frames (ctx.frameCount);
-                                    std::vector<VTXMVOX> voxels (ctx.maxVoxelCount);
-                                    
-                                    for (std::size_t f = 0; f < frames.size(); f++) {
-                                        for (std::size_t i = 0; i < voxels.size(); i++) {
-                                            const MeshAsyncContext::Voxel &src = ctx.frames[f].voxels[i];
-                                            VTXMVOX &voxel = voxels[i];
-                                            voxel.positionX = src.positionX - ctx.originOffset.x;
-                                            voxel.positionY = src.positionY - ctx.originOffset.y;
-                                            voxel.positionZ = src.positionZ - ctx.originOffset.z;
-                                            voxel.colorIndex = src.colorIndex;
-                                            voxel.mask = src.mask;
-                                        }
-                                        
-                                        frames[f] = self->_rendering->createData(voxels.data(), layouts::VTXMVOX, ctx.frames[f].voxelCount);
+                                if (ctx.voxels.size()) {
+                                    std::vector<foundation::RenderDataPtr> frames (ctx.voxels.size());
+                                    for (std::size_t f = 0; f < ctx.voxels.size(); f++) {
+                                        frames[f] = self->_rendering->createData(ctx.voxels[f].data(), layouts::VTXMVOX, std::uint32_t(ctx.voxels[f].size()));
                                     }
                                     
-                                    const auto &result = self->_meshes.emplace(path, VoxelMesh{std::move(frames), ctx.originOffset}).first->second;
+                                    self->_meshes.erase(path);
+                                    const VoxelMesh &result = self->_meshes.emplace(path, VoxelMesh{std::move(frames), ctx.originOffset}).first->second;
                                     completion(result.frames, result.originOffset);
                                 }
                                 else {
-                                    completion({}, {0, 0, 0});
+                                    self->_platform->logError("[ResourceProviderImpl::getOrLoadVoxelMesh] '%s' is not a valid vxm file", path.data());
                                 }
                             }
                         }));
                     }
                     else {
-                        self->_platform->logError("[MeshProviderImpl::getOrLoadVoxelObject] Unable to find file '%s'", path.data());
+                        self->_asyncInProgress = false;
+                        self->_platform->logError("[ResourceProviderImpl::getOrLoadVoxelMesh] Unable to find file '%s'", path.data());
                         completion({}, {0, 0, 0});
                     }
                 }
@@ -325,6 +353,7 @@ namespace resource {
         }
     }
     
+    // TODO: separate ground and its texture, make it like emitters
     void ResourceProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueGround.emplace_back(QueueEntryGround {
@@ -338,7 +367,7 @@ namespace resource {
         std::string path = std::string(groundPath);
         
         auto index = _grounds.find(path);
-        if (index != _grounds.end()) {
+        if (index != _grounds.end() && index->second.outdated == false) {
             completion(index->second.data, index->second.texture);
         }
         else {
@@ -417,6 +446,7 @@ namespace resource {
                                         std::uint32_t vcnt = std::uint32_t(gd->vertexes.size());
                                         std::uint32_t icnt = std::uint32_t(gd->indexes.size());
                                         
+                                        self->_grounds.erase(path);
                                         GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
                                         groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
                                         groundMesh.data = self->_rendering->createData(gd->vertexes.data(), layouts::VTXNRMUV, vcnt, gd->indexes.data(), icnt);
@@ -441,21 +471,87 @@ namespace resource {
         }
     }
 
-    void ResourceProviderImpl::getOrLoadEmitter(const char *cfgPath, util::callback<void(const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &, const layouts::ParticlesParams *)> &&completion) {
+    void ResourceProviderImpl::getOrLoadEmitter(const char *configPath, util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) {
+        if (_asyncInProgress) {
+            _callsQueueEmitter.emplace_back(QueueEntryEmitter {
+                .configPath = configPath,
+                .callback = std::move(completion)
+            });
+            
+            return;
+        }
         
+        std::string path = std::string(configPath);
+
+        auto index = _emitters.find(path);
+        if (index != _emitters.end() && index->second.outdated == false) {
+            completion(index->second.params, index->second.map, index->second.texture);
+        }
+        else {
+            _asyncInProgress = true;
+            _platform->loadFile((path + ".bin").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
+                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                    if (len) {
+                        EmitterDescriptionPtr desc = std::make_unique<EmitterDescription>();
+                        if (readEmitter(*desc, mem.get())) {
+                            self->_emitters.erase(path);
+                            Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;
+                            emitter.params = std::move(desc);
+                            
+                            self->_asyncInProgress = false;
+                            self->getOrLoadTexture((path + ".map").data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &mapTexture) mutable {
+                                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                    emitter.map = mapTexture;
+                                    
+                                    self->getOrLoadTexture(emitter.params->texturePath.data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
+                                        if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                            emitter.texture = texture;
+                                            completion(emitter.params, emitter.map, emitter.texture);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                        else {
+                            self->_asyncInProgress = false;
+                            self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] '%s' is not a valid emitter binary file", path.data());
+                            completion(nullptr, nullptr, nullptr);
+                        }
+                    }
+                    else {
+                        self->_asyncInProgress = false;
+                        self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] Unable to find file '%s'", path.data());
+                        completion(nullptr, nullptr, nullptr);
+                    }
+                }
+            });
+        }
+
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {
-        _textures.erase(texturePath);
+        auto index = _textures.find(texturePath);
+        if (index != _textures.end()) {
+            index->second.outdated = true;
+        }
     }
     void ResourceProviderImpl::removeMesh(const char *meshPath) {
-        _meshes.erase(meshPath);
+        auto index = _meshes.find(meshPath);
+        if (index != _meshes.end()) {
+            index->second.outdated = true;
+        }
     }
     void ResourceProviderImpl::removeGround(const char *groundPath) {
-        _grounds.erase(groundPath);
+        auto index = _grounds.find(groundPath);
+        if (index != _grounds.end()) {
+            index->second.outdated = true;
+        }
     }
     void ResourceProviderImpl::removeEmitter(const char *configPath) {
-        _emitters.erase(configPath);
+        auto index = _emitters.find(configPath);
+        if (index != _emitters.end()) {
+            index->second.outdated = true;
+        }
     }
     
     void ResourceProviderImpl::update(float dtSec) {
@@ -476,7 +572,7 @@ namespace resource {
         }
         while (_asyncInProgress == false && _callsQueueEmitter.size()) {
             QueueEntryEmitter &entry = _callsQueueEmitter.front();
-            getOrLoadEmitter(entry.cfgPath.data(), std::move(entry.callback));
+            getOrLoadEmitter(entry.configPath.data(), std::move(entry.callback));
             _callsQueueEmitter.pop_front();
         }
     }

@@ -156,15 +156,15 @@ namespace util {
 }
 
 namespace util {
-    std::vector<std::pair<std::string, std::any>> parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name, std::string &error) {
+    Config parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name, std::string &error) {
         strstream input(reinterpret_cast<const char *>(data), length);
-        std::vector<std::pair<std::string, std::any>> result;
+        Config result;
         std::string scopeName;
         std::string scopeText;
         error = {};
         
         struct fn {
-            static bool parseScope(const std::string &name, const std::string &src, std::vector<std::pair<std::string, std::any>>& result, std::string &error) {
+            static bool parseScope(const std::string &name, const std::string &src, Config& result, std::string &error) {
                 strstream input(src.data(), src.length());
                 std::string elementName;
                 
@@ -176,22 +176,22 @@ namespace util {
                     
                     if (input >> sequence(":") >> type) {
                         if (type == "string" && input >> sequence("=") >> braced(valueString, '"', '"')) {
-                            result.emplace_back(std::make_pair(elementName, std::make_any<std::string>(std::move(valueString))));
+                            result.emplace(std::make_pair(elementName, std::make_any<std::string>(std::move(valueString))));
                         }
                         else if (type == "integer" && input >> sequence("=") >> valueInt) {
-                            result.emplace_back(std::make_pair(elementName, std::make_any<int>(valueInt)));
+                            result.emplace(std::make_pair(elementName, std::make_any<int>(valueInt)));
                         }
                         else if (type == "number" && input >> sequence("=") >> valueFloat[0]) {
-                            result.emplace_back(std::make_pair(elementName, std::make_any<float>(valueFloat[0])));
+                            result.emplace(std::make_pair(elementName, std::make_any<float>(valueFloat[0])));
                         }
                         else if (type == "vector2f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1]) {
-                            result.emplace_back(std::make_pair(elementName, std::make_any<math::vector2f>(valueFloat[0], valueFloat[1])));
+                            result.emplace(std::make_pair(elementName, std::make_any<math::vector2f>(valueFloat[0], valueFloat[1])));
                         }
                         else if (type == "vector3f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1] >> valueFloat[2]) {
-                            result.emplace_back(std::make_pair(elementName, std::make_any<math::vector3f>(valueFloat[0], valueFloat[1], valueFloat[2])));
+                            result.emplace(std::make_pair(elementName, std::make_any<math::vector3f>(valueFloat[0], valueFloat[1], valueFloat[2])));
                         }
                         else if (type == "bool" && input >> sequence("=") >> valueString) {
-                            result.emplace_back(std::make_pair(elementName, std::make_any<bool>(valueString == "true")));
+                            result.emplace(std::make_pair(elementName, std::make_any<bool>(valueString == "true")));
                         }
                         else {
                             error = "Invalid initialisation for '" + elementName + "'";

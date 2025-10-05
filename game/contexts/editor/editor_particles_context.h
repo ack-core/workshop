@@ -16,7 +16,6 @@
 // v smooth stopping (using vertical cap)
 // + editor integration
 // + setters
-// + sphere & box shapes instead disk
 // + curves
 
 // Bugs:
@@ -56,7 +55,7 @@ namespace game {
         void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
         
         auto getMap() const -> foundation::RenderTexturePtr;
-        auto getParams() const -> const layouts::ParticlesParams &;
+        auto getParams() const -> const voxel::ParticlesParams &;
         
     private:
         struct ActiveParticle {
@@ -72,8 +71,8 @@ namespace game {
         std::size_t _randomSeed = 0;
 
         ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
-        Shape _startShape = {Shape::Type::BOX, false, {25.0f, 0.0f, 25.0f}};
-        Shape _endShape = {Shape::Type::BOX, false, {35.0f, 0.0f, 35.0f}};
+        Shape _startShape = {Shape::Type::DISK, false, {0.0f, 0.0f, 0.0f}};
+        Shape _endShape = {Shape::Type::DISK, false, {5.0f, 0.0f, 0.0f}};
         math::vector3f _endShapeOffset = {0, 10.0f, 0};
 
         foundation::RenderTexturePtr _texture;
@@ -88,7 +87,7 @@ namespace game {
         
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
-        layouts::ParticlesParams _ptcParams;
+        voxel::ParticlesParams _ptcParams;
         
     private:
         auto _getShapePoints(float cycleOffset, std::size_t random, const math::vector3f &shapeOffset) const -> std::pair<math::vector3f, math::vector3f>;
@@ -97,7 +96,8 @@ namespace game {
 
 namespace game {
     struct EditorNodeParticles : public EditorNode {
-        std::string texturePath = "<None>";
+        std::string emitterPath = "<None>";
+        std::optional<resource::EmitterDescription> desc;
         foundation::RenderTexturePtr texture;
         Emitter emitter;
         voxel::SceneInterface::ParticlesPtr particles;
@@ -121,19 +121,20 @@ namespace game {
         foundation::EventHandlerToken _editorEventsToken;
         std::unordered_map<std::string, bool (EditorParticlesContext::*)(const std::string &)> _handlers;
         
-        std::unique_ptr<MovingTool> _movingTool;
+        std::unique_ptr<MovingTool> _endShapeTool; // not null when editing is in progress
         voxel::SceneInterface::LineSetPtr _shapeConnectLineset;
         voxel::SceneInterface::LineSetPtr _shapeStartLineset;
         voxel::SceneInterface::LineSetPtr _shapeEndLineset;
         float currentTime = 0.0f;
 
-        foundation::RenderTexturePtr _texture;
-        
     private:
+        void _clearEditingTools();
         void _endShapeDragFinished();
         bool _selectNode(const std::string &data);
-        bool _setTexturePath(const std::string &data);
         bool _clearNodeSelection(const std::string &data);
+        bool _setResourcePath(const std::string &data);
+        bool _startEditing(const std::string &data);
+        bool _stopEditing(const std::string &data);
     };
 }
 

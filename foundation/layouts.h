@@ -17,18 +17,4 @@ namespace layouts {
             }
         };
     }
-
-    struct ParticlesParams {
-        enum class ParticlesOrientation {
-            CAMERA, AXIS, WORLD
-        };
-        bool looped = false;
-        bool additiveBlend = false;
-        float bakingTimeSec = 0.0f;
-        ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
-        math::vector3f minXYZ = {0, 0, 0};
-        math::vector3f maxXYZ = {0, 0, 0};
-        math::vector2f minMaxWidth = {1, 1};
-        math::vector2f minMaxHeight = {1, 1};
-    };
 }

@@ -163,11 +163,10 @@ namespace game {
     
     Emitter::Emitter() {
         _ptcParams.additiveBlend = false;
-        _ptcParams.orientation = layouts::ParticlesParams::ParticlesOrientation::CAMERA;
+        _ptcParams.orientation = voxel::ParticlesParams::ParticlesOrientation::CAMERA;
         _ptcParams.minXYZ = {-10, 0, -10};
         _ptcParams.maxXYZ = {10, 10, 10};
-        _ptcParams.minMaxWidth = 1.0f;
-        _ptcParams.minMaxHeight = 1.0f;
+        _ptcParams.maxSize = {1.0f, 1.0f};
         _randomSeed = 0;
     }
     Emitter::~Emitter() {
@@ -272,11 +271,11 @@ namespace game {
                     m0[3] = std::uint8_t(255.0f * fract(positionKoeff.y));  // Y low
                     m1[0] = std::uint8_t(positionKoeff.z);                  // X hi
                     m1[1] = std::uint8_t(255.0f * fract(positionKoeff.z));  // X low
-                    m1[2] = 0.0f;                                           // Angle hi
-                    m1[3] = 0.0f;                                           // Angle low
+                    m1[2] = 0;                                              // Alpha
+                    m1[3] = 0;                                              //
                     
-                    m2[0] = 0;                                      // Width
-                    m2[1] = 0;                                      // Height
+                    m2[0] = 255;                                      // Width
+                    m2[1] = 255;                                      // Height
                     m2[3] = loop + 1;                               // Mask: 1 - newborn, 2 - old
                     
                     m2[2] = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (f.e. 0 - just born, 255 - 255 * BakingTimeSec)
@@ -300,14 +299,14 @@ namespace game {
         
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
         _ptcParams.looped = _isLooped;
-        _ptcParams.bakingTimeSec = _bakingFrameTimeMs / 1000.0f;
+        _ptcParams.bakingTimeSec = float(_bakingFrameTimeMs) / 1000.0f;
     }
     
     foundation::RenderTexturePtr Emitter::getMap() const {
         return _mapTexture;
     }
     
-    const layouts::ParticlesParams &Emitter::getParams() const {
+    const voxel::ParticlesParams &Emitter::getParams() const {
         return _ptcParams;
     }
 
@@ -348,8 +347,9 @@ namespace game {
         };
         
         _handlers["editor.selectNode"] = &EditorParticlesContext::_selectNode;
-        _handlers["editor.static.set_texture_path"] = &EditorParticlesContext::_setTexturePath;
         _handlers["editor.clearNodeSelection"] = &EditorParticlesContext::_clearNodeSelection;
+        _handlers["editor.setPath"] = &EditorParticlesContext::_setResourcePath;
+        _handlers["editor.startEditing"] = &EditorParticlesContext::_startEditing;
         
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
@@ -359,10 +359,6 @@ namespace game {
             }
             return false;
         });
-        
-        _api.resources->getOrLoadTexture("textures/particles/test", [this](const foundation::RenderTexturePtr &texture) {
-            _texture = texture;
-        });
     }
     
     EditorParticlesContext::~EditorParticlesContext() {
@@ -371,63 +367,167 @@ namespace game {
     
     void EditorParticlesContext::update(float dtSec) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            currentTime += dtSec;
-            node->particles->setTransform(math::transform3f::identity().translated(node->position));
-            node->particles->setTime(currentTime, 0.0f);
-            _movingTool->setBase(node->position);
-            _shapeStartLineset->setPosition(node->position);
-            _shapeEndLineset->setPosition(node->position + _movingTool->getPosition());
-            _shapeConnectLineset->setPosition(node->position);
-            _shapeConnectLineset->setLine(0, {0, 0, 0}, _movingTool->getPosition(), {0.4f, 0.4f, 0.0f, 0.1f}, false);
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            if (_endShapeTool) {
+                _endShapeTool->setBase(node->position);
+                _shapeStartLineset->setPosition(node->position);
+                _shapeEndLineset->setPosition(node->position + _endShapeTool->getPosition());
+                _shapeConnectLineset->setPosition(node->position);
+                _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.4f, 0.4f, 0.0f, 0.1f}, false);
+                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            }
+            if (node->particles) {
+                currentTime += dtSec;
+                node->particles->setTransform(math::transform3f::identity().translated(node->position));
+                node->particles->setTime(currentTime, 0.0f);
+                
+                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            }
         }
     }
-
+    
+    void EditorParticlesContext::_clearEditingTools() {
+        _endShapeTool = nullptr;
+        _shapeConnectLineset = nullptr;
+        _shapeStartLineset = nullptr;
+        _shapeEndLineset = nullptr;
+    }
+    
     void EditorParticlesContext::_endShapeDragFinished() {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            node->emitter.setEndShapeOffset(_movingTool->getPosition());
-            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-            node->particles = _api.scene->addParticles(_texture, node->emitter.getMap(), node->emitter.getParams());
-            node->particles->setTime(10.0f, 0.0f);
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            node->emitter.setEndShapeOffset(_endShapeTool->getPosition());
+//            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+//            node->particles = _api.scene->addParticles(_texture, node->emitter.getMap(), node->emitter.getParams());
+//            node->particles->setTime(10.0f, 0.0f);
+//            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         }
     }
 
     bool EditorParticlesContext::_selectNode(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            _movingTool = std::make_unique<MovingTool>(_api, _cameraAccess, node->endShapeOffset, 0.4f);
-            _movingTool->setEditorMsg("engine.endShapeOffset");
-            _movingTool->setOnDragEnd([this] {
-                this->_endShapeDragFinished();
-            });
-            _shapeConnectLineset = _api.scene->addLineSet();
-            _shapeStartLineset = _api.scene->addLineSet();
-            _shapeEndLineset = _api.scene->addLineSet();
-            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_particles " + node->texturePath);
+            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_particles " + node->emitterPath);
 
-            node->emitter.setEndShapeOffset(_movingTool->getPosition());
-            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-            node->particles = _api.scene->addParticles(_texture, node->emitter.getMap(), node->emitter.getParams());
-            node->particles->setTime(10.0f, 0.0f);
+//            node->emitter.setEndShapeOffset(_movingTool->getPosition());
+//            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+//
+//            node->particles = _api.scene->addParticles(_texture, node->emitter.getMap(), node->emitter.getParams());
+//            node->particles->setTime(10.0f, 0.0f);
         }
         else {
-            _movingTool = nullptr;
-            _shapeConnectLineset = nullptr;
-            _shapeStartLineset = nullptr;
-            _shapeEndLineset = nullptr;
+            _clearEditingTools();
         }
         return false;
     }
     
-    bool EditorParticlesContext::_setTexturePath(const std::string &data) {
-        return true;
+    bool EditorParticlesContext::_clearNodeSelection(const std::string &data) {
+        _clearEditingTools();
+        return false;
+    }
+
+    bool EditorParticlesContext::_setResourcePath(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            node->emitterPath = data;
+            
+            _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+                if (desc) {
+                    node->desc = *desc;
+                    if (m && t) {
+                        voxel::ParticlesParams parameters;
+                        parameters.looped = desc->looped;
+                        parameters.additiveBlend = desc->additiveBlend;
+                        parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc->particleOrientation);
+                        parameters.bakingTimeSec = float(desc->bakingFrameTimeMs) / 1000.0f;
+                        parameters.minXYZ = desc->minXYZ;
+                        parameters.maxXYZ = desc->maxXYZ;
+                        parameters.maxSize = desc->maxSize;
+                        node->particles = _api.scene->addParticles(t, m, parameters);
+                        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                    }
+                }
+            });
+            return true;
+        }
+        return false;
     }
     
-    bool EditorParticlesContext::_clearNodeSelection(const std::string &data) {
-        _movingTool = nullptr;
-        _shapeConnectLineset = nullptr;
-        _shapeStartLineset = nullptr;
-        _shapeEndLineset = nullptr;
+    bool EditorParticlesContext::_startEditing(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            if (node->desc.has_value()) {
+                _endShapeTool = std::make_unique<MovingTool>(_api, _cameraAccess, node->endShapeOffset, 0.4f);
+                _endShapeTool->setEditorMsg("engine.endShapeOffset");
+                _endShapeTool->setOnDragEnd([this] {
+                    this->_endShapeDragFinished();
+                });
+                _shapeConnectLineset = _api.scene->addLineSet();
+                _shapeStartLineset = _api.scene->addLineSet();
+                _shapeEndLineset = _api.scene->addLineSet();
+
+                node->emitter.setEndShapeOffset(_endShapeTool->getPosition());
+                //node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+
+                
+                const char *shapeTypes[] = {"Disk", "Box", "Model"};
+                const char *distrTypes[] = {"Random", "Shuffled", "Linear"};
+                const char *orientTypes[] = {"Camera", "Axis", "World"};
+                
+                std::string args;
+                args += std::to_string(node->desc->emissionTimeMs);
+                args += " ";
+                args += std::to_string(node->desc->particleLifeTimeMs);
+                args += " ";
+                args += std::to_string(node->desc->bakingFrameTimeMs);
+                args += " ";
+                args += std::to_string(node->desc->particlesToEmit);
+                args += " ";
+                args += std::to_string(int(node->desc->looped));
+                args += " ";
+                args += std::to_string(node->desc->randomSeed);
+                args += " ";
+
+                args += shapeTypes[node->desc->startShapeType];
+                args += " ";
+                args += std::to_string(int(node->desc->startShapeFill));
+                args += " ";
+                args += util::strstream::ftos(node->desc->startShapeArgs.x);
+                args += " ";
+                args += util::strstream::ftos(node->desc->startShapeArgs.y);
+                args += " ";
+                args += util::strstream::ftos(node->desc->startShapeArgs.z);
+                args += " ";
+
+                args += shapeTypes[node->desc->endShapeType];
+                args += " ";
+                args += std::to_string(int(node->desc->endShapeFill));
+                args += " ";
+                args += util::strstream::ftos(node->desc->endShapeArgs.x);
+                args += " ";
+                args += util::strstream::ftos(node->desc->endShapeArgs.y);
+                args += " ";
+                args += util::strstream::ftos(node->desc->endShapeArgs.z);
+                args += " ";
+                args += util::strstream::ftos(node->desc->endShapeOffset.x);
+                args += " ";
+                args += util::strstream::ftos(node->desc->endShapeOffset.y);
+                args += " ";
+                args += util::strstream::ftos(node->desc->endShapeOffset.z);
+                args += " ";
+
+                args += distrTypes[node->desc->shapeDistributionType];
+                args += " ";
+                args += orientTypes[node->desc->particleOrientation];
+                args += " ";
+
+                args += node->desc->texturePath;
+
+                _api.platform->sendEditorMsg("engine.particles.editing", args);
+                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    bool EditorParticlesContext::_stopEditing(const std::string &data) {
+        _clearEditingTools();
         return false;
     }
 }

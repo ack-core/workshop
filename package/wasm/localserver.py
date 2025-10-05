@@ -36,6 +36,7 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
     def do_GET(self):
         print("get  >>> ", self.path)
         if self.path == "/host_cmd_update":
+            # when it becomes critical make update for specific resources
             print("Updating engine resources...")
             gen_meshes.main(resourcesRoot + "/meshes", binaryRoot + "/data/meshes", 1)
             gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")

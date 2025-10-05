@@ -28,11 +28,11 @@ namespace game {
         
     private:
         bool _selectNode(const std::string &data);
-        bool _setMeshPath(const std::string &data);
+        bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);
-        bool _meshOffset(const std::string &data);
         bool _stopEditing(const std::string &data);
-        bool _save(const std::string &data);
         bool _reload(const std::string &data);
+        bool _meshOffset(const std::string &data);
+        bool _save(const std::string &data);
     };
 }

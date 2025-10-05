@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <any>
 
 /*
@@ -266,8 +267,8 @@ namespace util {
 }
 
 namespace util {
-    using Config = std::vector<std::pair<std::string, std::any>>;
-    std::vector<std::pair<std::string, std::any>> parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name);
+    using Config = std::unordered_map<std::string, std::any>;
+    Config parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name);
 }
 
 // TODO: move to dedicated shader generator

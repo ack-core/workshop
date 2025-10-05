@@ -197,7 +197,7 @@ namespace voxel {
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
                 
-        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &particlesParams)
+        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const ParticlesParams &particlesParams)
         : additiveBlend(particlesParams.additiveBlend)
         , particleCount(map->getHeight() / VERTICAL_PIXELS_PER_PARTICLE)
         , texture(texture)
@@ -205,14 +205,14 @@ namespace voxel {
         , _secondsPerTextureWidth(particlesParams.bakingTimeSec * float(map->getWidth()))
         , _bakingTimeSec(particlesParams.bakingTimeSec)
         {
-            if (particlesParams.orientation == layouts::ParticlesParams::ParticlesOrientation::AXIS) {
+            if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
                     self._constants.normal = camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
                 };
             }
-            else if (particlesParams.orientation == layouts::ParticlesParams::ParticlesOrientation::WORLD) {
+            else if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::WORLD) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = math::vector3f(self._transform.m11, self._transform.m12, self._transform.m13);
@@ -233,8 +233,8 @@ namespace voxel {
             _constants.vpix = 1.0f / float(map->getHeight());
             _constants.minXYZ = particlesParams.minXYZ;
             _constants.maxXYZ = particlesParams.maxXYZ;
-            _constants.minMaxW = particlesParams.minMaxWidth;
-            _constants.minMaxH = particlesParams.minMaxHeight;
+            _constants.maxW = particlesParams.maxSize.x;
+            _constants.maxH = particlesParams.maxSize.y;
         }
         ~ParticleEmitterImpl() override {}
         
@@ -270,9 +270,8 @@ namespace voxel {
         struct Constants {
             math::vector4f t0_t1_mask_cap;
             math::vector3f position; float alpha;
-            math::vector3f normal; float r0;
-            math::vector3f right; float r1;
-            math::vector2f minMaxW, minMaxH;
+            math::vector3f normal; float maxW;
+            math::vector3f right; float maxH;
             math::vector3f minXYZ; float hpix;
             math::vector3f maxXYZ; float vpix;
         }
@@ -298,7 +297,7 @@ namespace voxel {
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D &originOffset) -> VoxelMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
-        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) -> ParticlesPtr override;
+        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
         auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f override;
@@ -479,9 +478,8 @@ namespace {
         const {
             t0_t1_mask_cap : float4
             position_alpha : float4
-            normal_r0 : float4
-            right_r1 : float4
-            width_height : float4
+            normal_msw : float4
+            right_msh : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
         }
@@ -510,10 +508,9 @@ namespace {
             float3 posKoeff = float3(map0.x + map0.y / 255.0f, map0.z + map0.w / 255.0f, map1.x + map1.y / 255.0f);
             float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeff;
 
-            float2 wh = (const_width_height.xz + (const_width_height.yw - const_width_height.xz) * map2.xy) * isAlive;
-            
-            float3 up = _cross(const_normal_r0.xyz, const_right_r1.xyz);
-            float3 relVertexPos = const_right_r1.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            float2 wh = float2(const_normal_msw.w, const_right_msh.w) * map2.xy * isAlive;
+            float3 up = _cross(const_normal_msw.xyz, const_right_msh.xyz);
+            float3 relVertexPos = const_right_msh.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
             output_position = _transform(float4(const_position_alpha.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv = fixed_quad[repeat_ID].zw;
         }
@@ -650,7 +647,7 @@ namespace voxel {
         return _texturedMeshes.emplace_back(result);
     }
     
-    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const layouts::ParticlesParams &params) {
+    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) {
         std::shared_ptr<ParticleEmitterImpl> result = std::make_shared<ParticleEmitterImpl>(tx, map, params);
         return _particleEmitters.emplace_back(result);
     }
