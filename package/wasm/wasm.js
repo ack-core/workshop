@@ -202,6 +202,7 @@ const imports = {
                                 await writable.write(u8data);
                                 await writable.truncate(dataLen);
                                 await writable.close();
+                                print("[WASM] " + path + " saved successfully");
                                 instance.exports.fileSaved(block, pathLen, true);
                                 instance.exports.free(data);
                             }

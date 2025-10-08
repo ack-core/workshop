@@ -14,16 +14,18 @@
 // v t0_t1_mask_cap
 // v edge interpolation
 // v smooth stopping (using vertical cap)
-// + editor integration
-// + setters
+// v editor integration
 // + curves
 
 // Bugs:
+// + particle: axis doesnt work
+// + particle: box in box -> incorrect calculation of coords range
+// + particle: disk and box linear distr isn't good
 // + rename node as existing one -> previous node isn't deleted
 
 namespace game {
     enum class ShapeDistribution {
-        RANDOM = 0,   // a random point from start shape to a random point of the end shape
+        RANDOM = 1,   // a random point from start shape to a random point of the end shape
         SHUFFLED,     // a random point from start shape to the corresponding point of the end shape
         LINEAR,       // the i-th point from start shape to the corresponding point of the end shape
     };
@@ -32,7 +34,7 @@ namespace game {
     };
     struct Shape {
         enum class Type {
-            DISK = 0, // args: radius
+            DISK = 1, // args: radius
             BOX,      // args: x-size, y-size, z-size
             MESH      // args: unused
         };
@@ -51,6 +53,7 @@ namespace game {
         Emitter();
         ~Emitter();
         
+        void setParameters(const resource::EmitterDescription &desc);
         void setEndShapeOffset(const math::vector3f &offset);
         void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
         
@@ -97,8 +100,10 @@ namespace game {
 namespace game {
     struct EditorNodeParticles : public EditorNode {
         std::string emitterPath = "<None>";
-        std::optional<resource::EmitterDescription> desc;
+        std::optional<resource::EmitterDescription> currentDesc;
+        std::optional<resource::EmitterDescription> originDesc;
         foundation::RenderTexturePtr texture;
+        foundation::RenderTexturePtr map;
         Emitter emitter;
         voxel::SceneInterface::ParticlesPtr particles;
         math::vector3f endShapeOffset = {0, 10, 0};
@@ -130,11 +135,17 @@ namespace game {
     private:
         void _clearEditingTools();
         void _endShapeDragFinished();
+        void _recreateParticles(EditorNodeParticles &node, bool editing);
         bool _selectNode(const std::string &data);
         bool _clearNodeSelection(const std::string &data);
         bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);
         bool _stopEditing(const std::string &data);
+        
+        bool _emissionSet(const std::string &data);
+        bool _startShapeSet(const std::string &data);
+        bool _endShapeSet(const std::string &data);
+        bool _optionsSet(const std::string &data);
     };
 }
 

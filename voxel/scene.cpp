@@ -46,6 +46,9 @@ namespace voxel {
             lines[index].rgba = rgba;
             lines[index].arrowHead = isArrow;
         }
+        void capLineCount(std::uint32_t limit) override {
+            lines.resize(limit);
+        }
         void fillShaderConstants(const Line &line) {
             shaderConstants.rgba = line.rgba;
             shaderConstants.positions[0].xyz = line.start + position;

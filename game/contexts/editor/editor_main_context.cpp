@@ -20,9 +20,7 @@ namespace game {
         _handlers["editor.createNode"] = &EditorMainContext::_createNode;
         _handlers["editor.selectNode"] = &EditorMainContext::_selectNode;
         _handlers["editor.renameNode"] = &EditorMainContext::_renameNode;
-        _handlers["editor.moveNodeX"] = &EditorMainContext::_moveNodeX;
-        _handlers["editor.moveNodeY"] = &EditorMainContext::_moveNodeY;
-        _handlers["editor.moveNodeZ"] = &EditorMainContext::_moveNodeZ;
+        _handlers["editor.moveNode"] = &EditorMainContext::_moveNode;
         _handlers["editor.clearNodeSelection"] = &EditorMainContext::_clearNodeSelection;
         
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
@@ -132,29 +130,17 @@ namespace game {
         }
         return true;
     }
-    
-    bool EditorMainContext::_moveNodeX(const std::string &data) {
-        std::size_t len = 0;
-        const float newPos = float(util::strstream::atof(data.c_str(), len));
-        const math::vector3f currentPosition = _movingTool->getPosition();
-        _movingTool->setPosition(math::vector3f(newPos, currentPosition.y, currentPosition.z));
-        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-        return true;
-    }
-    bool EditorMainContext::_moveNodeY(const std::string &data) {
-        std::size_t len = 0;
-        const float newPos = float(util::strstream::atof(data.c_str(), len));
-        const math::vector3f currentPosition = _movingTool->getPosition();
-        _movingTool->setPosition(math::vector3f(currentPosition.x, newPos, currentPosition.z));
-        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-        return true;
-    }
-    bool EditorMainContext::_moveNodeZ(const std::string &data) {
-        std::size_t len = 0;
-        const float newPos = float(util::strstream::atof(data.c_str(), len));
-        const math::vector3f currentPosition = _movingTool->getPosition();
-        _movingTool->setPosition(math::vector3f(currentPosition.x, currentPosition.y, newPos));
-        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+
+    bool EditorMainContext::_moveNode(const std::string &data) {
+        util::strstream input(data.c_str(), data.length());
+        math::vector3f newPos;
+        
+        if (input >> newPos.x >> newPos.y >> newPos.z) {
+            const math::vector3f currentPosition = _movingTool->getPosition();
+            _movingTool->setPosition(newPos);
+            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+        }
+
         return true;
     }
     

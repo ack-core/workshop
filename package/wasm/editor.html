@@ -85,7 +85,8 @@
             padding-top: 0;
         }
         .webix_button {
-            padding: 0.5px 2px 0px 2px
+            padding: 0.5px 2px 0px 2px;
+            color: #8888a3 !important;
         }
         .webix_secondary .webix_button {
             background: #d8d8d8;
@@ -104,10 +105,7 @@
         }
         .webix_custom_checkbox {
             margin-top: -2px;
-            color: #8888a3;
-        }
-        .webix_custom_checkbox:focus {
-            color: #8888a3;
+            color: #8888a3 !important;
         }
         .webix_segment_0.webix_selected, .webix_segment_1.webix_selected, .webix_segment_N.webix_selected {
             background-color: #cfcfef;
@@ -190,6 +188,20 @@
             "inspect_mesh" : ["voxel_mesh_edit_0"],
             "inspect_particles" : ["particles_edit_0", "particles_edit_1"]
         };
+        const uiPtcShapeTypes = [
+            { id: 1, value: "Disk"}, 
+            { id: 2, value: "Box"}
+        ];
+        const uiPtcShapeDistribution = [
+            { id: 1, value: "Random"}, 
+            { id: 2, value: "Shuffled"},
+            { id: 3, value: "Linear"}
+        ];
+        const uiPtcOrientation = [
+            { id: 1, value: "Camera"}, 
+            { id: 2, value: "Axis"},
+            { id: 3, value: "World"}
+        ];
 
         var uiNodeTree = null;
         var uiNodeName = null;
@@ -279,7 +291,7 @@
                 }
 
                 uiInspectType = panel;
-            }            
+            }
         }
 
         let elements = {
@@ -461,6 +473,58 @@
                 }
             }
         });
+
+        uiInspectBindings = {
+            nodeName: function(e, nv, old) {
+                if (/^[A-Za-z0-9_\.]*$/.test(nv) && !uiNodeTree.exists(nv)) {
+                    uiEditor.sendMsg("editor.renameNode", old + " " + nv);
+                }
+                else {
+                    e.blockEvent();
+                    e.setValue(old);
+                    e.unblockEvent();
+                }
+            },
+            nodeMove: function(e, nv, old) {
+                let args = $$("inspect_node_x").getValue() + " " + $$("inspect_node_y").getValue() + " " + $$("inspect_node_z").getValue()
+                uiEditor.sendMsg("editor.moveNode", args);
+            },
+            nodeStartEdit: function(e) {
+                uiEditor.sendMsg("editor.startEditing", "");
+            },
+            meshOffset: function(e, nv, old) {
+                let args = $$("inspect_mesh_cx").getValue() + " " + $$("inspect_mesh_cy").getValue() + " " + $$("inspect_mesh_cz").getValue()
+                uiEditor.sendMsg("editor.mesh.offset", args);
+            },
+            meshSaveAndExit: function(e) {
+                $$("processing_popup").show();
+                uiEditor.sendMsg("editor.mesh.save", "");
+            },
+            meshDiscardAndExit: function(e) {
+                uiEditor.sendMsg("editor.stopEditing", "");
+                $$("voxel_mesh_edit_0").hide();
+                $$("node_1_resource_list").show();
+            },
+            particlesEmission: function(e, nv, old) {
+                let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
+                args = args + $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
+                uiEditor.sendMsg("editor.particles.emission", args);
+            },
+            particlesStartShape: function(e, nv, old) {
+                const size = $$("inspect_ptc_sshape_arg0").getValue() + " " + $$("inspect_ptc_sshape_arg1").getValue() + " " + $$("inspect_ptc_sshape_arg2").getValue();
+                const args = $$("inspect_ptc_sshape_type").getValue() + " " + $$("inspect_ptc_sshape_fill").getValue() + " " + size;
+                uiEditor.sendMsg("editor.particles.startshape", args);
+            },
+            particlesEndShape: function(e, nv, old) {
+                const size = $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue();
+                const offset = $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue();
+                const args = $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " " + size + " " + offset;
+                uiEditor.sendMsg("editor.particles.endshape", args);
+            },
+            particlesOptions: function(e, nv, old) {
+                uiEditor.sendMsg("editor.particles.options", $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue());
+            }
+        }
         webix.ui({
             id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true,
             rows: [
@@ -472,29 +536,14 @@
                         rows: [
                             {cols: [
                                 elements.label("Name:"),
-                                elements.text("inspect_node_name", "", 183, false, (e, nv, old) => {
-                                    if (/^[A-Za-z0-9_\.]*$/.test(nv) && !uiNodeTree.exists(nv)) {
-                                        uiEditor.sendMsg("editor.renameNode", old + " " + nv);
-                                    }
-                                    else {
-                                        e.blockEvent();
-                                        e.setValue(old);
-                                        e.unblockEvent();
-                                    }
-                                }),
+                                elements.text("inspect_node_name", "", 183, false, uiInspectBindings.nodeName),
                             ]},
                             {cols: [
                                 elements.label("Position:"),
                                 {},
-                                elements.number("inspect_node_x", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, (e, nv, old) => {
-                                    uiEditor.sendMsg("editor.moveNodeX", nv.toString());
-                                }),
-                                elements.number("inspect_node_y", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, (e, nv, old) => {
-                                    uiEditor.sendMsg("editor.moveNodeY", nv.toString());
-                                }),
-                                elements.number("inspect_node_z", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, (e, nv, old) => {
-                                    uiEditor.sendMsg("editor.moveNodeZ", nv.toString());
-                                }),
+                                elements.number("inspect_node_x", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiInspectBindings.nodeMove),
+                                elements.number("inspect_node_y", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiInspectBindings.nodeMove),
+                                elements.number("inspect_node_z", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiInspectBindings.nodeMove),
                             ]},
                             { height: 16 }
                         ]
@@ -527,13 +576,10 @@
                                 width: 28,
                                 css: {"margin-left": "3px !important"},
                                 rows: [
-                                elements.button("\uD83D\uDEE0", "Edit resource", (e) => {
-                                    uiEditor.sendMsg("editor.startEditing", "");
-                                }),
-                                elements.button(" ", "???", (e) => {
-
-                                })
-                            ]}
+                                    elements.button("\uD83D\uDEE0", "Edit resource", uiInspectBindings.nodeStartEdit),
+                                    elements.button(" ", "???")
+                                ]
+                            }
                         ]
                     }
                 },
@@ -546,27 +592,14 @@
                             {cols: [
                                 elements.label("Center point:"),
                                 {},
-                                elements.number("inspect_mesh_cx", null, 44, "11111", 0, 1, -99, 99, (e, nv, old) => {
-                                    uiEditor.sendMsg("editor.mesh.offset", (nv - old).toString() + " 0 0");
-                                }),
-                                elements.number("inspect_mesh_cy", null, 44, "11111", 0, 1, -99, 99, (e, nv, old) => {
-                                    uiEditor.sendMsg("editor.mesh.offset", "0 " + (nv - old).toString() + " 0");
-                                }),
-                                elements.number("inspect_mesh_cz", null, 44, "11111", 0, 1, -99, 99, (e, nv, old) => {
-                                    uiEditor.sendMsg("editor.mesh.offset", "0 0 " + (nv - old).toString());
-                                })
+                                elements.number("inspect_mesh_cx", null, 44, "11111", 0, 1, -99, 99, uiInspectBindings.meshOffset),
+                                elements.number("inspect_mesh_cy", null, 44, "11111", 0, 1, -99, 99, uiInspectBindings.meshOffset),
+                                elements.number("inspect_mesh_cz", null, 44, "11111", 0, 1, -99, 99, uiInspectBindings.meshOffset)
                             ]},
                             {cols: [
                                 {},
-                                elements.button("\uD83D\uDCBE", "Save & Exit", (e) => {
-                                    $$("processing_popup").show();
-                                    uiEditor.sendMsg("editor.mesh.save", "");
-                                }),
-                                elements.button("\uD83D\uDEAB", "Discard & Exit", (e) => {
-                                    uiEditor.sendMsg("editor.stopEditing", "");
-                                    $$("voxel_mesh_edit_0").hide();
-                                    $$("node_1_resource_list").show();
-                                })
+                                elements.button("\uD83D\uDCBE", "Save & Exit", uiInspectBindings.meshSaveAndExit),
+                                elements.button("\uD83D\uDEAB", "Discard & Exit", uiInspectBindings.meshDiscardAndExit)
                             ]},
                             { height: 16 }
                         ]
@@ -580,33 +613,24 @@
                         rows: [
                             {cols: [
                                 elements.label("Particles emission time (ms):"), {},
-                                elements.number("inspect_ptc_emission_time", "Emission time in milliseconds", 60, "11111", 1000, 1, 1, 4000, (e, nv, old) => {
-
-                                }),
+                                elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 1, 1, 4000, uiInspectBindings.particlesEmission),
                             ]},
                             {cols: [
                                 elements.label("Particles life time (ms):"), {},
-                                elements.number("inspect_ptc_lifetime", "Particle count to be emitted", 60, "11111", 1000, 1, 1, 4000, (e, nv, old) => {
-
-                                }),
+                                elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 1, 1, 4000, uiInspectBindings.particlesEmission),
                             ]},
                             {cols: [
                                 elements.label("Baking frame time (ms):"), {},
-                                elements.number("inspect_ptc_baking_time", "Length of one animation frame in milliseconds", 60, "11111", 33, 1, 10, 100, (e, nv, old) => {
-
-                                })
+                                elements.number("inspect_ptc_baking_time", "", 60, "11111", 33, 1, 10, 100, uiInspectBindings.particlesEmission)
                             ]},
                             {cols: [
                                 elements.label("Amount of particles to emit:"), {},
-                                elements.number("inspect_ptc_count", "Particle count to be emitted", 60, "11111", 10, 1, 1, 1000, (e, nv, old) => {
-
-                                }),
+                                elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiInspectBindings.particlesEmission),
                             ]},
                             {cols: [
+                                elements.button("\u25b6", "Restart"), 
                                 elements.label("Looped:"),
-                                elements.checkbox("inspect_ptc_looped", false, (e, nv, old) => {
-
-                                }), {  },
+                                elements.checkbox("inspect_ptc_looped", false, uiInspectBindings.particlesEmission), { width: 10 },
                                 elements.label("Seed:"),
                                 elements.text("inspect_ptc_rnd_seed", "0", 70, true),
                                 elements.button("\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
@@ -623,71 +647,41 @@
                         rows: [
                             {cols: [
                                 elements.label("Start shape type:"), { width: 2 },
-                                elements.combo("inspect_ptc_sshape_type", "Disk", ["Disk", "Box"], 88, (e, nv, old) => {
-
-                                }),
+                                elements.combo("inspect_ptc_sshape_type", 0, uiPtcShapeTypes, 88, uiInspectBindings.particlesStartShape),
                                 elements.label("Fill:"),
-                                elements.checkbox("inspect_ptc_sshape_fill", false, (e, nv, old) => {
-                                	
-                                })
+                                elements.checkbox("inspect_ptc_sshape_fill", false, uiInspectBindings.particlesStartShape)
                             ]},
                             {cols: [
                                 elements.label("Start shape args:"), {},
-                                elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
-                                elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
-                                elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
+                                elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesStartShape),
+                                elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesStartShape),
+                                elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesStartShape),
                             ]},
                             {cols: [
                                 elements.label("End shape type:"), { width: 8 },
-                                elements.combo("inspect_ptc_eshape_type", "Disk", ["Disk", "Box"], 88, (e, nv, old) => {
-
-                                }),
+                                elements.combo("inspect_ptc_eshape_type", 0, uiPtcShapeTypes, 88, uiInspectBindings.particlesEndShape),
                                 elements.label("Fill:"),
-                                elements.checkbox("inspect_ptc_eshape_fill", false, (e, nv, old) => {
-                                	
-                                })
+                                elements.checkbox("inspect_ptc_eshape_fill", false, uiInspectBindings.particlesEndShape)
                             ]},
                             {cols: [
                                 elements.label("End shape args:"), {},
-                                elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
-                                elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
-                                elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                })
+                                elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesEndShape),
+                                elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesEndShape),
+                                elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesEndShape)
                             ]},
                             {cols: [
                                 elements.label("End shape offset:"), {},
-                                elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
-                                elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                }),
-                                elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, (e, nv, old) => {
-
-                                })
+                                elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiInspectBindings.particlesEndShape),
+                                elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiInspectBindings.particlesEndShape),
+                                elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiInspectBindings.particlesEndShape)
                             ]},
                             {cols: [
                                 elements.label("Start-to-End Mapping:"),
-                                elements.combo("inspect_ptc_shape_to_shape", "Random", ["Random", "Shuffled", "Linear"], 106, (e, nv, old) => {
-
-                                }),
+                                elements.combo("inspect_ptc_shape_distr", 0, uiPtcShapeDistribution, 106, uiInspectBindings.particlesOptions),
                             ]},
                             {cols: [
                                 elements.label("Particle orientation:"), {},
-                                elements.combo("inspect_ptc_orientation", "Camera", ["Camera", "Axis", "World"], 106, (e, nv, old) => {
-
-                                }),
+                                elements.combo("inspect_ptc_orientation", 0, uiPtcOrientation, 106, uiInspectBindings.particlesOptions),
                             ]},
                             {cols: [
                                 elements.label("Texture:"),
@@ -731,7 +725,6 @@
                 utility.addItemToNodeTree(nv);
             }
             uiEditor["engine.nodeCoordinates"] = function(data) {
-                //console.log("[JS] engine.nodeCoordinates ", data);
                 const [x, y, z] = data.split(' ');
                 Object.entries({inspect_node_x: x, inspect_node_y: y, inspect_node_z: z}).forEach(([k, v]) => {
                     utility.setElementValue(k, v);
@@ -761,11 +754,17 @@
                     'inspect_ptc_sshape_type', 'inspect_ptc_sshape_fill', 'inspect_ptc_sshape_arg0', 'inspect_ptc_sshape_arg1', 'inspect_ptc_sshape_arg2',
                     'inspect_ptc_eshape_type', 'inspect_ptc_eshape_fill', 'inspect_ptc_eshape_arg0', 'inspect_ptc_eshape_arg1', 'inspect_ptc_eshape_arg2',
                     'inspect_ptc_end_offset_x', 'inspect_ptc_end_offset_y', 'inspect_ptc_end_offset_z',
-                    'inspect_ptc_shape_to_shape', 'inspect_ptc_orientation', 'inspect_ptc_texture'
+                    'inspect_ptc_shape_distr', 'inspect_ptc_orientation', 'inspect_ptc_texture'
                 ];
                 const values = data.split(' ');
                 keys.forEach((key, i) => {
                     utility.setElementValue(key, values[i]);
+                });
+            }
+            uiEditor["engine.ptcEndOffset"] = function(data) {
+                const [x, y, z] = data.split(' ');
+                Object.entries({inspect_ptc_end_offset_x: x, inspect_ptc_end_offset_y: y, inspect_ptc_end_offset_z: z}).forEach(([k, v]) => {
+                    utility.setElementValue(k, v);
                 });
             }
             uiEditor["engine.saved"] = async function(data) {

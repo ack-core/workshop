@@ -59,6 +59,7 @@ namespace game {
                 const math::vector3f p1 = math::vector3f(args.x * std::cosf(koeff1), 0.0f, args.x * std::sinf(koeff1)).transformed(rotation);
                 lineSet->setLine(i, p0, p1, {0.4f, 0.4f, 0.0f, 0.1f});
             }
+            lineSet->capLineCount(36);
         }
         else if (type == Type::BOX) {
             points.clear();
@@ -140,9 +141,10 @@ namespace game {
                         random = getNextRandom(random);
                         koeff.z = float(random % 10001) / float(10000) - 0.5f;
                         
-                        int dimToAlign = dimIndexes[i % dimCount];
-                        random = getNextRandom(random);
-                        koeff.flat[dimToAlign] = random % 1000 >= 500 ? 0.5f : -0.5f;
+                        if (dimCount) {
+                            random = getNextRandom(random);
+                            koeff.flat[dimIndexes[i % dimCount]] = random % 1000 >= 500 ? 0.5f : -0.5f;
+                        }
                         
                         points.emplace_back(args * koeff);
                     }
@@ -158,6 +160,11 @@ namespace game {
             lineSet->setLine(1, math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
             lineSet->setLine(2, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
             lineSet->setLine(3, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
+            lineSet->setLine(4, math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
+            lineSet->setLine(5, math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
+            lineSet->setLine(6, math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
+            lineSet->setLine(7, math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
+            lineSet->capLineCount(8);
         }
     }
     
@@ -171,6 +178,25 @@ namespace game {
     }
     Emitter::~Emitter() {
     
+    }
+    
+    void Emitter::setParameters(const resource::EmitterDescription &desc) {
+        _emissionTimeMs = desc.emissionTimeMs;
+        _particleLifeTimeMs = desc.particleLifeTimeMs;
+        _bakingFrameTimeMs = desc.bakingFrameTimeMs;
+        _particlesToEmit = desc.particlesToEmit;
+        _isLooped = desc.looped;
+        _randomSeed = desc.randomSeed;
+        _startShape.type = Shape::Type(desc.startShapeType);
+        _startShape.fill = desc.startShapeFill;
+        _startShape.args = desc.startShapeArgs;
+        _endShape.type = Shape::Type(desc.endShapeType);
+        _endShape.fill = desc.endShapeFill;
+        _endShape.args = desc.endShapeArgs;
+        _endShapeOffset = desc.endShapeOffset;
+        _shapeDistribution = ShapeDistribution(desc.shapeDistributionType);
+        _ptcParams.orientation = voxel::ParticlesParams::ParticlesOrientation(desc.particleOrientation);
+        _ptcParams.additiveBlend = desc.additiveBlend;
     }
     
     void Emitter::setEndShapeOffset(const math::vector3f &offset) {
@@ -298,7 +324,6 @@ namespace game {
 //        printf("\n!!!\n");
         
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
-        _ptcParams.looped = _isLooped;
         _ptcParams.bakingTimeSec = float(_bakingFrameTimeMs) / 1000.0f;
     }
     
@@ -350,7 +375,11 @@ namespace game {
         _handlers["editor.clearNodeSelection"] = &EditorParticlesContext::_clearNodeSelection;
         _handlers["editor.setPath"] = &EditorParticlesContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorParticlesContext::_startEditing;
-        
+        _handlers["editor.particles.emission"] = &EditorParticlesContext::_emissionSet;
+        _handlers["editor.particles.startshape"] = &EditorParticlesContext::_startShapeSet;
+        _handlers["editor.particles.endshape"] = &EditorParticlesContext::_endShapeSet;
+        _handlers["editor.particles.options"] = &EditorParticlesContext::_optionsSet;
+
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
             if (handler) {
@@ -367,19 +396,16 @@ namespace game {
     
     void EditorParticlesContext::update(float dtSec) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            if (_endShapeTool) {
+            if (_endShapeTool && node->particles) {
                 _endShapeTool->setBase(node->position);
                 _shapeStartLineset->setPosition(node->position);
                 _shapeEndLineset->setPosition(node->position + _endShapeTool->getPosition());
                 _shapeConnectLineset->setPosition(node->position);
                 _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.4f, 0.4f, 0.0f, 0.1f}, false);
-                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-            }
-            if (node->particles) {
+                
                 currentTime += dtSec;
                 node->particles->setTransform(math::transform3f::identity().translated(node->position));
                 node->particles->setTime(currentTime, 0.0f);
-                
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             }
         }
@@ -394,23 +420,35 @@ namespace game {
     
     void EditorParticlesContext::_endShapeDragFinished() {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            node->emitter.setEndShapeOffset(_endShapeTool->getPosition());
-//            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-//            node->particles = _api.scene->addParticles(_texture, node->emitter.getMap(), node->emitter.getParams());
-//            node->particles->setTime(10.0f, 0.0f);
-//            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            math::vector3f off = _endShapeTool->getPosition();
+            node->emitter.setEndShapeOffset(off);
+            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+            _recreateParticles(*node, true);
+            _api.platform->sendEditorMsg("engine.ptcEndOffset", util::strstream::ftos(off.x) + " " + util::strstream::ftos(off.y) + " " + util::strstream::ftos(off.z));
         }
+    }
+
+    void EditorParticlesContext::_recreateParticles(EditorNodeParticles &node, bool editing) {
+        if (editing) {
+            node.particles = _api.scene->addParticles(node.texture, node.emitter.getMap(), node.emitter.getParams());
+        }
+        else {
+            voxel::ParticlesParams parameters;
+            resource::EmitterDescription &desc = *node.originDesc;
+            parameters.additiveBlend = desc.additiveBlend;
+            parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc.particleOrientation);
+            parameters.bakingTimeSec = float(desc.bakingFrameTimeMs) / 1000.0f;
+            parameters.minXYZ = desc.minXYZ;
+            parameters.maxXYZ = desc.maxXYZ;
+            parameters.maxSize = desc.maxSize;
+            node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
+        }
+        node.particles->setTime(10.0f, 0.0f);
     }
 
     bool EditorParticlesContext::_selectNode(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_particles " + node->emitterPath);
-
-//            node->emitter.setEndShapeOffset(_movingTool->getPosition());
-//            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-//
-//            node->particles = _api.scene->addParticles(_texture, node->emitter.getMap(), node->emitter.getParams());
-//            node->particles->setTime(10.0f, 0.0f);
         }
         else {
             _clearEditingTools();
@@ -429,17 +467,12 @@ namespace game {
             
             _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
                 if (desc) {
-                    node->desc = *desc;
-                    if (m && t) {
-                        voxel::ParticlesParams parameters;
-                        parameters.looped = desc->looped;
-                        parameters.additiveBlend = desc->additiveBlend;
-                        parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc->particleOrientation);
-                        parameters.bakingTimeSec = float(desc->bakingFrameTimeMs) / 1000.0f;
-                        parameters.minXYZ = desc->minXYZ;
-                        parameters.maxXYZ = desc->maxXYZ;
-                        parameters.maxSize = desc->maxSize;
-                        node->particles = _api.scene->addParticles(t, m, parameters);
+                    node->originDesc = *desc;
+                    node->texture = t;
+                    node->map = m;
+                    
+                    if (node->map) {
+                        _recreateParticles(*node, false);
                         _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     }
                 }
@@ -451,7 +484,9 @@ namespace game {
     
     bool EditorParticlesContext::_startEditing(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            if (node->desc.has_value()) {
+            if (node->originDesc.has_value()) {
+                node->currentDesc = node->originDesc;
+                
                 _endShapeTool = std::make_unique<MovingTool>(_api, _cameraAccess, node->endShapeOffset, 0.4f);
                 _endShapeTool->setEditorMsg("engine.endShapeOffset");
                 _endShapeTool->setOnDragEnd([this] {
@@ -461,62 +496,59 @@ namespace game {
                 _shapeStartLineset = _api.scene->addLineSet();
                 _shapeEndLineset = _api.scene->addLineSet();
 
+                node->emitter.setParameters(node->currentDesc.value());
                 node->emitter.setEndShapeOffset(_endShapeTool->getPosition());
-                //node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-
-                
-                const char *shapeTypes[] = {"Disk", "Box", "Model"};
-                const char *distrTypes[] = {"Random", "Shuffled", "Linear"};
-                const char *orientTypes[] = {"Camera", "Axis", "World"};
+                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                _recreateParticles(*node, true);
                 
                 std::string args;
-                args += std::to_string(node->desc->emissionTimeMs);
+                args += std::to_string(node->currentDesc->emissionTimeMs);
                 args += " ";
-                args += std::to_string(node->desc->particleLifeTimeMs);
+                args += std::to_string(node->currentDesc->particleLifeTimeMs);
                 args += " ";
-                args += std::to_string(node->desc->bakingFrameTimeMs);
+                args += std::to_string(node->currentDesc->bakingFrameTimeMs);
                 args += " ";
-                args += std::to_string(node->desc->particlesToEmit);
+                args += std::to_string(node->currentDesc->particlesToEmit);
                 args += " ";
-                args += std::to_string(int(node->desc->looped));
+                args += std::to_string(int(node->currentDesc->looped));
                 args += " ";
-                args += std::to_string(node->desc->randomSeed);
-                args += " ";
-
-                args += shapeTypes[node->desc->startShapeType];
-                args += " ";
-                args += std::to_string(int(node->desc->startShapeFill));
-                args += " ";
-                args += util::strstream::ftos(node->desc->startShapeArgs.x);
-                args += " ";
-                args += util::strstream::ftos(node->desc->startShapeArgs.y);
-                args += " ";
-                args += util::strstream::ftos(node->desc->startShapeArgs.z);
+                args += std::to_string(node->currentDesc->randomSeed);
                 args += " ";
 
-                args += shapeTypes[node->desc->endShapeType];
+                args += std::to_string(int(node->currentDesc->startShapeType));
                 args += " ";
-                args += std::to_string(int(node->desc->endShapeFill));
+                args += std::to_string(int(node->currentDesc->startShapeFill));
                 args += " ";
-                args += util::strstream::ftos(node->desc->endShapeArgs.x);
+                args += util::strstream::ftos(node->currentDesc->startShapeArgs.x);
                 args += " ";
-                args += util::strstream::ftos(node->desc->endShapeArgs.y);
+                args += util::strstream::ftos(node->currentDesc->startShapeArgs.y);
                 args += " ";
-                args += util::strstream::ftos(node->desc->endShapeArgs.z);
-                args += " ";
-                args += util::strstream::ftos(node->desc->endShapeOffset.x);
-                args += " ";
-                args += util::strstream::ftos(node->desc->endShapeOffset.y);
-                args += " ";
-                args += util::strstream::ftos(node->desc->endShapeOffset.z);
+                args += util::strstream::ftos(node->currentDesc->startShapeArgs.z);
                 args += " ";
 
-                args += distrTypes[node->desc->shapeDistributionType];
+                args += std::to_string(int(node->currentDesc->endShapeType));
                 args += " ";
-                args += orientTypes[node->desc->particleOrientation];
+                args += std::to_string(int(node->currentDesc->endShapeFill));
+                args += " ";
+                args += util::strstream::ftos(node->currentDesc->endShapeArgs.x);
+                args += " ";
+                args += util::strstream::ftos(node->currentDesc->endShapeArgs.y);
+                args += " ";
+                args += util::strstream::ftos(node->currentDesc->endShapeArgs.z);
+                args += " ";
+                args += util::strstream::ftos(node->currentDesc->endShapeOffset.x);
+                args += " ";
+                args += util::strstream::ftos(node->currentDesc->endShapeOffset.y);
+                args += " ";
+                args += util::strstream::ftos(node->currentDesc->endShapeOffset.z);
                 args += " ";
 
-                args += node->desc->texturePath;
+                args += std::to_string(int(node->currentDesc->shapeDistributionType));
+                args += " ";
+                args += std::to_string(int(node->currentDesc->particleOrientation));
+                args += " ";
+
+                args += node->currentDesc->texturePath;
 
                 _api.platform->sendEditorMsg("engine.particles.editing", args);
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
@@ -527,7 +559,71 @@ namespace game {
     }
     
     bool EditorParticlesContext::_stopEditing(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            if (node->currentDesc) {
+                node->currentDesc.reset();
+                _recreateParticles(*node, false);
+            }
+        }
         _clearEditingTools();
+        return false;
+    }
+
+    bool EditorParticlesContext::_emissionSet(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            util::strstream input(data.c_str(), data.length());
+            if (input >> node->currentDesc->emissionTimeMs >> node->currentDesc->particleLifeTimeMs >> node->currentDesc->bakingFrameTimeMs) {
+                if (input >> node->currentDesc->particlesToEmit >> node->currentDesc->looped) {
+                    node->emitter.setParameters(*node->currentDesc);
+                    node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                    _recreateParticles(*node, true);
+                }
+            }
+            return true;
+        }
+        return false;
+
+    }
+    bool EditorParticlesContext::_startShapeSet(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            util::strstream input(data.c_str(), data.length());
+            if (input >> node->currentDesc->startShapeType >> node->currentDesc->startShapeFill) {
+                if (input >> node->currentDesc->startShapeArgs.x >> node->currentDesc->startShapeArgs.y >> node->currentDesc->startShapeArgs.z) {
+                    node->emitter.setParameters(*node->currentDesc);
+                    node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                    _recreateParticles(*node, true);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+    bool EditorParticlesContext::_endShapeSet(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            util::strstream input(data.c_str(), data.length());
+            if (input >> node->currentDesc->endShapeType >> node->currentDesc->endShapeFill) {
+                if (input >> node->currentDesc->endShapeArgs.x >> node->currentDesc->endShapeArgs.y >> node->currentDesc->endShapeArgs.z) {
+                    if (input >> node->currentDesc->endShapeOffset.x >> node->currentDesc->endShapeOffset.y >> node->currentDesc->endShapeOffset.z) {
+                        node->emitter.setParameters(*node->currentDesc);
+                        node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                        _recreateParticles(*node, true);
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+    bool EditorParticlesContext::_optionsSet(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            util::strstream input(data.c_str(), data.length());
+            if (input >> node->currentDesc->shapeDistributionType >> node->currentDesc->particleOrientation) {
+                node->emitter.setParameters(*node->currentDesc);
+                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                _recreateParticles(*node, true);
+            }
+            return true;
+        }
         return false;
     }
 }

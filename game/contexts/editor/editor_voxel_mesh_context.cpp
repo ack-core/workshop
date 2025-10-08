@@ -101,13 +101,12 @@ namespace game {
     }
     
     bool EditorVoxelMeshContext::_meshOffset(const std::string &data) {
-        std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
+        std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             util::strstream input(data.c_str(), data.length());
             int x = 0, y = 0, z = 0;
             if (input >> x >> y >> z) {
-                const util::IntegerOffset3D offset = node->mesh->getCenterOffset();
-                node->mesh->setCenterOffset(util::IntegerOffset3D { offset.x + x, offset.y + y, offset.z + z });
+                node->mesh->setCenterOffset(util::IntegerOffset3D { x, y, z });
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             }
         }
@@ -116,7 +115,7 @@ namespace game {
     }
 
     bool EditorVoxelMeshContext::_save(const std::string &data) {
-        std::shared_ptr<EditorNodeVoxelMesh> node = std::static_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
+        std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             util::IntegerOffset3D off = node->mesh->getCenterOffset();
             

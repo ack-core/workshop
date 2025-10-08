@@ -14,9 +14,8 @@ namespace voxel {
     
     struct ParticlesParams {
         enum class ParticlesOrientation {
-            CAMERA, AXIS, WORLD
+            CAMERA = 1, AXIS, WORLD
         };
-        bool looped = false;
         bool additiveBlend = false;
         float bakingTimeSec = 0.0f;
         ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
@@ -36,6 +35,7 @@ namespace voxel {
         struct LineSet {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow = false) = 0;
+            virtual void capLineCount(std::uint32_t limit) = 0;
             virtual ~LineSet() = default;
         };
         struct BoundingBox {

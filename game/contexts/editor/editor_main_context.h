@@ -36,9 +36,7 @@ namespace game {
         bool _createNode(const std::string &data);
         bool _selectNode(const std::string &data);
         bool _renameNode(const std::string &data);
-        bool _moveNodeX(const std::string &data);
-        bool _moveNodeY(const std::string &data);
-        bool _moveNodeZ(const std::string &data);
+        bool _moveNode(const std::string &data);
         bool _clearNodeSelection(const std::string &data);
     };
 }
