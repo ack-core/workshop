@@ -18,6 +18,7 @@ onmessage = (msg) => {
                 sinf: Math.sin,
                 cosf: Math.cos,
                 acosf: Math.acos,
+                pow: Math.pow,
                 abort: function() {
                     throw "aborted";
                 },

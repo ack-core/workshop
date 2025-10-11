@@ -141,11 +141,9 @@ namespace game {
         bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);
         bool _stopEditing(const std::string &data);
-        
+        bool _save(const std::string &data);
         bool _emissionSet(const std::string &data);
-        bool _startShapeSet(const std::string &data);
-        bool _endShapeSet(const std::string &data);
-        bool _optionsSet(const std::string &data);
+        bool _visualSet(const std::string &data);
     };
 }
 

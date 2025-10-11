@@ -335,7 +335,13 @@
                     id: id, view: "text", type:"number", format: format, value: value, height: 24, width: width, 
                     tooltip: { template: tooltip, delay: 800 },
                     on: {
-                        onEnter: function() { this.blur(); },
+                        onEnter: function(e) {
+                            let element = $$(id);
+                            const currentValue = element.getText(); 
+                            const v = Math.max(min, Math.min(max, currentValue));
+                            element.setValue(v.toString());
+                            this.blur(); 
+                        },
                         onChange: function(nv, old) {
                             if (action) action($$(id), nv, old);
                         }
@@ -370,111 +376,35 @@
                 }
             }
         }
-        
-        webix.ui({
-            container: "top",
-            margin: 0,
-            rows: [
-                {cols: [
-                    elements.button("\uD83D\uDDC4", "Set working directory", async e => {
-                        await utility.setWorkingDirectory();
-                        document.getElementById("nodes").style.visibility = "visible";
-                        $$("top_buttons").show();
-                        e.hide();
-                    }),
-                    {
-                        id: "top_buttons",
-                        hidden: true,
-                        cols: [
-                            elements.button("\uD83D\uDCE4", "Load scene"),
-                            elements.button("\uD83D\uDCBE", "Save scene"),
-                            elements.toggle('<img src="editor/arrows.svg"></img>', '<img src="editor/arrows.svg"></img>', true, "Hide/show moving tool", (e, nv) => {
 
-                            })
-                        ]
-                    }
-
-                ], autoheight: true}
-            ]
-        });
-        webix.ui({
-            container: "nodes",
-            cols: [
-                {
-                    rows: [
-                        elements.button("\u2795", "New node", (e) => {
-                            $$("add_node_menu").show(e.getNode(), {pos: "right"});
-                        }),
-                        elements.button("\u274C", "Delete node", (e) => {
-
-                        }),
-                        {}
-                    ]
-                },
-                {
-                    rows: [
-                        {
-                            id: "node_tree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, data: [],
-                            template: "{common.icon()}&nbsp;#value#",
-                            css: { "background" : "transparent", "color" : "lightGray" },
-                            on: {
-                                onAfterOpen: utility.adjustTree,
-                                onAfterClose: utility.adjustTree,
-                                onAfterAdd: utility.adjustTree,
-                                onBeforeSelect: function(id, selection) {
-                                    return selection == false || uiNodeTree.isBranch(id) == false;
-                                },
-                                onAfterSelect: function(id) {
-                                    uiEditor.sendMsg("editor.selectNode", id);
-                                }
-                            }
-                        },
-                        { id: "space"}
-                    ]
-                }
-            ]
-        });
-        webix.event($$("space").getNode(), "click", function(e) {
-            uiEditor.sendMsg("editor.stopEditing", "");
-            uiNodeTree.unselectAll();
-            uiEditor.sendMsg("editor.clearNodeSelection", "");
-            utility.showInspectPanel("null", "");
-        });
-        webix.ui({
-            view: "popup",
-            id: "processing_popup",
-            height: 50,
-            width: 150,
-            modal: true,
-            position: "center",
-            body: {
-                padding:{
-                    left: 20, right: 20
-                },
-                rows: [
-                    elements.label("Processing...")
-                ]
-            }
-        });
-        webix.ui({
-            id: "add_node_menu", container: "editor", view: "contextmenu", master: "nodes",
-            data: [
-                { id: "0", value: "Add Voxel Mesh" },
-                { id: "1", value: "Add Particles" }
-            ],
-            submenuConfig: {
-                type: {
-                    height: 22
-                },
+        uiBindings = {
+            setWorkingDirectory: async function(e) {
+                await utility.setWorkingDirectory();
+                document.getElementById("nodes").style.visibility = "visible";
+                $$("top_buttons").show();
+                e.hide();
             },
-            on: {
-                onMenuItemClick: function(id, e, node) {
-                    uiEditor.sendMsg("editor.createNode", id);
-                }
-            }
-        });
-
-        uiInspectBindings = {
+            resourceSaveAndExit: function(e) {
+                $$("processing_popup").show();
+                uiEditor.sendMsg("editor.resource.save", "");
+            },
+            resourceDiscardAndExit: function(e) {
+                uiEditor.sendMsg("editor.stopEditing", "");
+                uiInspectMappingEdit[uiInspectType].forEach(item => {
+                    $$(item).hide();
+                });
+                $$("edit_resource_buttons").hide();
+                $$("node_1_resource_list").show();
+            },
+            treeNewNode: function(e) {
+                $$("add_node_menu").show(e.getNode(), {pos: "right"});
+            },
+            spaceClick: function(e) {
+                uiEditor.sendMsg("editor.stopEditing", "");
+                uiNodeTree.unselectAll();
+                uiEditor.sendMsg("editor.clearNodeSelection", "");
+                utility.showInspectPanel("null", "");
+            },
             nodeName: function(e, nv, old) {
                 if (/^[A-Za-z0-9_\.]*$/.test(nv) && !uiNodeTree.exists(nv)) {
                     uiEditor.sendMsg("editor.renameNode", old + " " + nv);
@@ -496,35 +426,104 @@
                 let args = $$("inspect_mesh_cx").getValue() + " " + $$("inspect_mesh_cy").getValue() + " " + $$("inspect_mesh_cz").getValue()
                 uiEditor.sendMsg("editor.mesh.offset", args);
             },
-            meshSaveAndExit: function(e) {
-                $$("processing_popup").show();
-                uiEditor.sendMsg("editor.mesh.save", "");
-            },
-            meshDiscardAndExit: function(e) {
-                uiEditor.sendMsg("editor.stopEditing", "");
-                $$("voxel_mesh_edit_0").hide();
-                $$("node_1_resource_list").show();
-            },
             particlesEmission: function(e, nv, old) {
+                if (e.data.id == "inspect_ptc_lifetime") {
+                    let isLooped = parseInt($$("inspect_ptc_looped").getValue());
+                    if (isLooped && parseInt(nv) > parseInt($$("inspect_ptc_emission_time").getValue())) {
+                        e.blockEvent();
+                        e.setValue(old);
+                        e.unblockEvent();
+                    }
+                }
                 let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
-                args = args + $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
+                args += $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
                 uiEditor.sendMsg("editor.particles.emission", args);
             },
-            particlesStartShape: function(e, nv, old) {
-                const size = $$("inspect_ptc_sshape_arg0").getValue() + " " + $$("inspect_ptc_sshape_arg1").getValue() + " " + $$("inspect_ptc_sshape_arg2").getValue();
-                const args = $$("inspect_ptc_sshape_type").getValue() + " " + $$("inspect_ptc_sshape_fill").getValue() + " " + size;
-                uiEditor.sendMsg("editor.particles.startshape", args);
-            },
-            particlesEndShape: function(e, nv, old) {
-                const size = $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue();
-                const offset = $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue();
-                const args = $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " " + size + " " + offset;
-                uiEditor.sendMsg("editor.particles.endshape", args);
-            },
-            particlesOptions: function(e, nv, old) {
-                uiEditor.sendMsg("editor.particles.options", $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue());
+            particlesVisual: function(e, nv, old) {
+                let args = $$("inspect_ptc_sshape_type").getValue() + " " + $$("inspect_ptc_sshape_fill").getValue() + " ";
+                args += $$("inspect_ptc_sshape_arg0").getValue() + " " + $$("inspect_ptc_sshape_arg1").getValue() + " " + $$("inspect_ptc_sshape_arg2").getValue() + " ";
+                args += $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " ";
+                args += $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue() + " ";
+                args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
+                args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue();
+                uiEditor.sendMsg("editor.particles.visual", args);
             }
         }
+        
+        webix.ui({
+            container: "top",
+            margin: 0,
+            rows: [
+                {cols: [
+                    elements.button("\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
+                    {
+                        id: "top_buttons",
+                        hidden: true,
+                        cols: [
+                            elements.button("\uD83D\uDCE4", "Load scene"),
+                            elements.button("\uD83D\uDCBE", "Save scene"),
+                            elements.toggle('<img src="editor/arrows.svg"></img>', '<img src="editor/arrows.svg"></img>', true, "Hide/show moving tool", (e, nv) => {})
+                        ]
+                    },
+                    {},
+                    {
+                        id: "edit_resource_buttons",
+                        hidden: true,
+                        cols: [
+                            elements.button("\uD83D\uDCBE", "Save & Exit", uiBindings.resourceSaveAndExit),
+                            elements.button("\uD83D\uDEAB", "Discard & Exit", uiBindings.resourceDiscardAndExit)
+                        ]
+                    },
+
+                ], autoheight: true}
+            ]
+        });
+        webix.ui({
+            container: "nodes",
+            cols: [
+                {rows: [
+                        elements.button("\u2795", "New node", uiBindings.treeNewNode),
+                        elements.button("\u274C", "Delete node", (e) => {}),
+                        {}
+                ]},
+                {rows: [
+                        {
+                            id: "node_tree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, data: [],
+                            template: "{common.icon()}&nbsp;#value#",
+                            css: { "background" : "transparent", "color" : "lightGray" },
+                            on: {
+                                onAfterOpen: utility.adjustTree,
+                                onAfterClose: utility.adjustTree,
+                                onAfterAdd: utility.adjustTree,
+                                onBeforeSelect: function(id, selection) {
+                                    return selection == false || uiNodeTree.isBranch(id) == false;
+                                },
+                                onAfterSelect: function(id) {
+                                    uiEditor.sendMsg("editor.selectNode", id);
+                                }
+                            }
+                        },
+                        { id: "space"}
+                ]}
+            ]
+        });
+        webix.ui({
+            id: "add_node_menu", container: "editor", view: "contextmenu", master: "nodes",
+            data: [
+                { id: "0", value: "Add Voxel Mesh" },
+                { id: "1", value: "Add Particles" }
+            ],
+            submenuConfig: {
+                type: {
+                    height: 22
+                },
+            },
+            on: {
+                onMenuItemClick: function(id, e, node) {
+                    uiEditor.sendMsg("editor.createNode", id);
+                }
+            }
+        });
         webix.ui({
             id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true,
             rows: [
@@ -536,14 +535,14 @@
                         rows: [
                             {cols: [
                                 elements.label("Name:"),
-                                elements.text("inspect_node_name", "", 183, false, uiInspectBindings.nodeName),
+                                elements.text("inspect_node_name", "", 183, false, uiBindings.nodeName),
                             ]},
                             {cols: [
                                 elements.label("Position:"),
                                 {},
-                                elements.number("inspect_node_x", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiInspectBindings.nodeMove),
-                                elements.number("inspect_node_y", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiInspectBindings.nodeMove),
-                                elements.number("inspect_node_z", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiInspectBindings.nodeMove),
+                                elements.number("inspect_node_x", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiBindings.nodeMove),
+                                elements.number("inspect_node_y", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiBindings.nodeMove),
+                                elements.number("inspect_node_z", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiBindings.nodeMove),
                             ]},
                             { height: 16 }
                         ]
@@ -576,7 +575,7 @@
                                 width: 28,
                                 css: {"margin-left": "3px !important"},
                                 rows: [
-                                    elements.button("\uD83D\uDEE0", "Edit resource", uiInspectBindings.nodeStartEdit),
+                                    elements.button("\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
                                     elements.button(" ", "???")
                                 ]
                             }
@@ -592,14 +591,9 @@
                             {cols: [
                                 elements.label("Center point:"),
                                 {},
-                                elements.number("inspect_mesh_cx", null, 44, "11111", 0, 1, -99, 99, uiInspectBindings.meshOffset),
-                                elements.number("inspect_mesh_cy", null, 44, "11111", 0, 1, -99, 99, uiInspectBindings.meshOffset),
-                                elements.number("inspect_mesh_cz", null, 44, "11111", 0, 1, -99, 99, uiInspectBindings.meshOffset)
-                            ]},
-                            {cols: [
-                                {},
-                                elements.button("\uD83D\uDCBE", "Save & Exit", uiInspectBindings.meshSaveAndExit),
-                                elements.button("\uD83D\uDEAB", "Discard & Exit", uiInspectBindings.meshDiscardAndExit)
+                                elements.number("inspect_mesh_cx", null, 44, "11111", 0, 1, -99, 99, uiBindings.meshOffset),
+                                elements.number("inspect_mesh_cy", null, 44, "11111", 0, 1, -99, 99, uiBindings.meshOffset),
+                                elements.number("inspect_mesh_cz", null, 44, "11111", 0, 1, -99, 99, uiBindings.meshOffset)
                             ]},
                             { height: 16 }
                         ]
@@ -613,24 +607,24 @@
                         rows: [
                             {cols: [
                                 elements.label("Particles emission time (ms):"), {},
-                                elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 1, 1, 4000, uiInspectBindings.particlesEmission),
+                                elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 1, 1, 4000, uiBindings.particlesEmission),
                             ]},
                             {cols: [
                                 elements.label("Particles life time (ms):"), {},
-                                elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 1, 1, 4000, uiInspectBindings.particlesEmission),
+                                elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 1, 1, 4000, uiBindings.particlesEmission),
                             ]},
                             {cols: [
                                 elements.label("Baking frame time (ms):"), {},
-                                elements.number("inspect_ptc_baking_time", "", 60, "11111", 33, 1, 10, 100, uiInspectBindings.particlesEmission)
+                                elements.number("inspect_ptc_baking_time", "", 60, "11111", 33, 1, 10, 100, uiBindings.particlesEmission)
                             ]},
                             {cols: [
                                 elements.label("Amount of particles to emit:"), {},
-                                elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiInspectBindings.particlesEmission),
+                                elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiBindings.particlesEmission),
                             ]},
                             {cols: [
                                 elements.button("\u25b6", "Restart"), 
                                 elements.label("Looped:"),
-                                elements.checkbox("inspect_ptc_looped", false, uiInspectBindings.particlesEmission), { width: 10 },
+                                elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), { width: 10 },
                                 elements.label("Seed:"),
                                 elements.text("inspect_ptc_rnd_seed", "0", 70, true),
                                 elements.button("\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
@@ -647,41 +641,41 @@
                         rows: [
                             {cols: [
                                 elements.label("Start shape type:"), { width: 2 },
-                                elements.combo("inspect_ptc_sshape_type", 0, uiPtcShapeTypes, 88, uiInspectBindings.particlesStartShape),
+                                elements.combo("inspect_ptc_sshape_type", 0, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
                                 elements.label("Fill:"),
-                                elements.checkbox("inspect_ptc_sshape_fill", false, uiInspectBindings.particlesStartShape)
+                                elements.checkbox("inspect_ptc_sshape_fill", false, uiBindings.particlesVisual)
                             ]},
                             {cols: [
                                 elements.label("Start shape args:"), {},
-                                elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesStartShape),
-                                elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesStartShape),
-                                elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesStartShape),
+                                elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                                elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                                elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
                             ]},
                             {cols: [
                                 elements.label("End shape type:"), { width: 8 },
-                                elements.combo("inspect_ptc_eshape_type", 0, uiPtcShapeTypes, 88, uiInspectBindings.particlesEndShape),
+                                elements.combo("inspect_ptc_eshape_type", 0, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
                                 elements.label("Fill:"),
-                                elements.checkbox("inspect_ptc_eshape_fill", false, uiInspectBindings.particlesEndShape)
+                                elements.checkbox("inspect_ptc_eshape_fill", false, uiBindings.particlesVisual)
                             ]},
                             {cols: [
                                 elements.label("End shape args:"), {},
-                                elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesEndShape),
-                                elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesEndShape),
-                                elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiInspectBindings.particlesEndShape)
+                                elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                                elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                                elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual)
                             ]},
                             {cols: [
                                 elements.label("End shape offset:"), {},
-                                elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiInspectBindings.particlesEndShape),
-                                elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiInspectBindings.particlesEndShape),
-                                elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiInspectBindings.particlesEndShape)
+                                elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
+                                elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
+                                elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual)
                             ]},
                             {cols: [
                                 elements.label("Start-to-End Mapping:"),
-                                elements.combo("inspect_ptc_shape_distr", 0, uiPtcShapeDistribution, 106, uiInspectBindings.particlesOptions),
+                                elements.combo("inspect_ptc_shape_distr", 0, uiPtcShapeDistribution, 106, uiBindings.particlesVisual),
                             ]},
                             {cols: [
                                 elements.label("Particle orientation:"), {},
-                                elements.combo("inspect_ptc_orientation", 0, uiPtcOrientation, 106, uiInspectBindings.particlesOptions),
+                                elements.combo("inspect_ptc_orientation", 0, uiPtcOrientation, 106, uiBindings.particlesVisual),
                             ]},
                             {cols: [
                                 elements.label("Texture:"),
@@ -695,6 +689,23 @@
                 }
             ]
         });
+        webix.ui({
+            view: "popup",
+            id: "processing_popup",
+            height: 50,
+            width: 150,
+            modal: true,
+            position: "center",
+            body: {
+                padding:{
+                    left: 20, right: 20
+                },
+                rows: [
+                    elements.label("Processing...")
+                ]
+            }
+        });
+        webix.event($$("space").getNode(), "click", uiBindings.spaceClick);
 
         uiNodeTree = $$("node_tree");
         uiInspectPanel = $$("inspect_panel");
@@ -732,6 +743,7 @@
             }
             uiEditor["engine.mesh.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
+                $$("edit_resource_buttons").show();
                 uiInspectMappingEdit["inspect_mesh"].forEach(item => {
                     $$(item).show();
                 });
@@ -742,6 +754,7 @@
             }
             uiEditor["engine.particles.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
+                $$("edit_resource_buttons").show();
                 uiInspectMappingEdit["inspect_particles"].forEach(item => {
                     $$(item).show();
                 });
@@ -789,6 +802,7 @@
                     $$(item).show();
                 });
 
+                $$("edit_resource_buttons").hide();
                 $$("processing_popup").hide();
             }
         }

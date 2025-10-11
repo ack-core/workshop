@@ -13,7 +13,7 @@ namespace game {
         _handlers["editor.stopEditing"] = &EditorVoxelMeshContext::_stopEditing;
         _handlers["editor.reload"] = &EditorVoxelMeshContext::_reload;
         _handlers["editor.mesh.offset"] = &EditorVoxelMeshContext::_meshOffset;
-        _handlers["editor.mesh.save"] = &EditorVoxelMeshContext::_save;
+        _handlers["editor.resource.save"] = &EditorVoxelMeshContext::_save;
 
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
@@ -132,9 +132,9 @@ namespace game {
                     _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
                 });
             }
-
+            return true;
         }
-        return true;
+        return false;
     }
 
 }

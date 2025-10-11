@@ -153,6 +153,7 @@ const imports = {
         sinf: Math.sin,
         cosf: Math.cos,
         acosf: Math.acos,
+        pow: Math.pow,
         js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
         js_log: function(str, len) {
             const u16str = new Uint16Array(memory.buffer, str, len);

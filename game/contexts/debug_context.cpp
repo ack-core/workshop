@@ -99,7 +99,9 @@ namespace game {
         _bbox = _api.scene->addBoundingBox(bb1);
         _bbox->setColor({0.5f, 0.5f, 0.5f, 0.5f});
         
+        std::string t0 = util::strstream::ftos(0.299999999999);
         
+        printf("!\n");
     }
     
     DebugContext::~DebugContext() {

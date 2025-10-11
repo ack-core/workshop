@@ -124,12 +124,15 @@ namespace util {
 
         return result;
     }
-    std::string strstream::ftos(double f) {
+    std::string strstream::ftos(double f, int precision) {
         std::string result = std::string(48, 0);
         char *output = result.data();
+        
         const double af = std::abs(f);
         std::int64_t ipart = std::int64_t(af);
-        double remainder = 10000000.0 * (af - double(ipart));
+        
+        double scale = std::pow(10.0, precision);
+        double remainder = scale * (af - double(ipart));
         std::int64_t fpart = std::int64_t(remainder);
         
         if ((remainder - double(fpart)) > 0.5) {
@@ -142,14 +145,20 @@ namespace util {
         
         if (f < 0.0) *output++ = '-';
         output += ltoa(output, ipart);
-        
-        int width = 10;
-        while (fpart % 10 == 0 && width-- > 0) {
-            fpart /= 10;
+  
+        if (precision > 0) {
+            *output++ = '.';
+
+            std::int64_t power = 1;
+            for (int i = 1; i < precision; ++i) power *= 10;
+            while (fpart < power && power > 1) {
+                *output++ = '0';
+                power /= 10;
+            }
+
+            output += ltoa(output, fpart);
         }
-        *output++ = '.';
         
-        output += ltoa(output, fpart);
         result.resize(output - result.data());
         return result;
     }
