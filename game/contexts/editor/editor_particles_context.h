@@ -6,21 +6,9 @@
 #include "camera_access_interface.h"
 #include "editor_moving_tool.h"
 
-// Plan
-// v Shape refactor
-// v bbox calculation
-// v 16bit coords
-// v is looped
-// v t0_t1_mask_cap
-// v edge interpolation
-// v smooth stopping (using vertical cap)
-// v editor integration
-// + curves
-
 // Bugs:
 // + particle: axis doesnt work
 // + particle: box in box -> incorrect calculation of coords range
-// + particle: disk and box linear distr isn't good
 // + rename node as existing one -> previous node isn't deleted
 
 namespace game {
@@ -57,7 +45,8 @@ namespace game {
         void setEndShapeOffset(const math::vector3f &offset);
         void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
         
-        auto getMap() const -> foundation::RenderTexturePtr;
+        auto getMap() const -> const foundation::RenderTexturePtr &;
+        auto getMapRaw() const -> const std::uint8_t *;
         auto getParams() const -> const voxel::ParticlesParams &;
         
     private:
@@ -121,8 +110,8 @@ namespace game {
         
     private:
         const API _api;
-        const NodeAccessInterface &_nodeAccess;
         const CameraAccessInterface &_cameraAccess;
+        NodeAccessInterface &_nodeAccess;
         foundation::EventHandlerToken _editorEventsToken;
         std::unordered_map<std::string, bool (EditorParticlesContext::*)(const std::string &)> _handlers;
         
@@ -131,6 +120,9 @@ namespace game {
         voxel::SceneInterface::LineSetPtr _shapeStartLineset;
         voxel::SceneInterface::LineSetPtr _shapeEndLineset;
         float currentTime = 0.0f;
+        
+        std::string _savingCfg;
+        std::unique_ptr<std::uint8_t[]> _savingMap;
 
     private:
         void _clearEditingTools();
@@ -141,6 +133,7 @@ namespace game {
         bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);
         bool _stopEditing(const std::string &data);
+        bool _reload(const std::string &data);
         bool _save(const std::string &data);
         bool _emissionSet(const std::string &data);
         bool _visualSet(const std::string &data);

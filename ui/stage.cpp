@@ -24,7 +24,6 @@ namespace ui {
 //---
 
 namespace ui {
-    // TODO: make it working without rtti
     class ElementImpl : public virtual StageInterface::Element {
     public:
         ElementImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : _facility(facility), _parent(std::dynamic_pointer_cast<ElementImpl>(parent)) {}

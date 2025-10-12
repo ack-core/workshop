@@ -26,6 +26,8 @@ namespace game {
         foundation::EventHandlerToken _editorEventsToken;
         std::unordered_map<std::string, bool (EditorVoxelMeshContext::*)(const std::string &)> _handlers;
         
+        std::string _savingCfg;
+        
     private:
         bool _selectNode(const std::string &data);
         bool _setResourcePath(const std::string &data);

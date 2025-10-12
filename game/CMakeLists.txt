@@ -22,6 +22,8 @@ endif()
 if (APPTYPE STREQUAL "IS_CLIENT" OR APPTYPE STREQUAL "IS_EDITOR")
 	set(
 		m_editor_contexts_list
+		"${m_source_root}/contexts/editor/utils.h"
+		"${m_source_root}/contexts/editor/utils.cpp"
 		"${m_source_root}/contexts/editor/camera_access_interface.h"
 		"${m_source_root}/contexts/editor/node_access_interface.h"
 		"${m_source_root}/contexts/editor/editor_moving_tool.h"

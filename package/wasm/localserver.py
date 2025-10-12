@@ -16,6 +16,7 @@ print("Tools Root: ", toolsRoot)
 sys.path.insert(1, toolsRoot)
 
 import gen_meshes
+import gen_emitters
 import gen_grounds
 
 class CustomRequestHandler (SimpleHTTPRequestHandler):
@@ -39,6 +40,7 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
             # when it becomes critical make update for specific resources
             print("Updating engine resources...")
             gen_meshes.main(resourcesRoot + "/meshes", binaryRoot + "/data/meshes", 1)
+            gen_emitters.main(resourcesRoot + "/emitters", binaryRoot + "/data/emitters")
             gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")
             print("Finished")
 

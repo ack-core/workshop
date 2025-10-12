@@ -67,8 +67,19 @@ namespace game {
                 _ground = _api.scene->addTexturedMesh(data, texture);
             }
         });
-        _api.resources->getOrLoadEmitter("emitters/basic", [](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-            
+        _api.resources->getOrLoadEmitter("emitters/basic", [this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+            voxel::ParticlesParams parameters;
+            parameters.additiveBlend = desc->additiveBlend;
+            parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc->particleOrientation);
+            parameters.bakingTimeSec = float(desc->bakingFrameTimeMs) / 1000.0f;
+            parameters.minXYZ = desc->minXYZ;
+            parameters.maxXYZ = desc->maxXYZ;
+            parameters.maxSize = desc->maxSize;
+
+            if (m && t) {
+                _ptc = _api.scene->addParticles(t, m, parameters);
+                _ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
+            }
         });
         _api.resources->getOrLoadTexture("textures/particles/test", [this](const foundation::RenderTexturePtr &texture){
             if (texture) {
@@ -87,11 +98,11 @@ namespace game {
 //                    .minMaxWidth = {2.0f, 2.0f},
 //                    .minMaxHeight = {2.0f, 2.0f},
 //                });
-                _api.platform->logMsg("0--->>> %f %f %f", _emitter.getParams().minXYZ.x, _emitter.getParams().minXYZ.y, _emitter.getParams().minXYZ.z);
-                _api.platform->logMsg("1--->>> %f %f %f", _emitter.getParams().maxXYZ.x, _emitter.getParams().maxXYZ.y, _emitter.getParams().maxXYZ.z);
-
-                _ptc = _api.scene->addParticles(texture, _emitter.getMap(), _emitter.getParams());
-                _ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
+//                _api.platform->logMsg("0--->>> %f %f %f", _emitter.getParams().minXYZ.x, _emitter.getParams().minXYZ.y, _emitter.getParams().minXYZ.z);
+//                _api.platform->logMsg("1--->>> %f %f %f", _emitter.getParams().maxXYZ.x, _emitter.getParams().maxXYZ.y, _emitter.getParams().maxXYZ.z);
+//
+//                _ptc = _api.scene->addParticles(texture, _emitter.getMap(), _emitter.getParams());
+//                _ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
             }
         });
 

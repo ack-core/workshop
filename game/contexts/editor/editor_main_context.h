@@ -6,6 +6,11 @@
 #include "camera_access_interface.h"
 #include "editor_moving_tool.h"
 
+// Ideas for the buttons at the top:
+// + center camera pivot to selected object
+// + activate all particles and animations
+//
+
 namespace game {
     class EditorMainContext : public Context, public NodeAccessInterface {
     public:

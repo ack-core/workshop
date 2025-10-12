@@ -29,7 +29,8 @@ namespace {
         std::vector<std::vector<VTXMVOX>> voxels;
     };
     
-    bool readEmitter(resource::EmitterDescription &desc, const std::uint8_t *data) {
+    bool readEmitter(resource::EmitterDescription &desc, const std::uint8_t *data, size_t &read) {
+        const std::uint8_t *origin = data;
         if (memcmp(data, "EMTR", 4) == 0) {
             std::uint64_t flags = *(std::int64_t *)(data + 4);
             desc.looped = (flags & 0x1) != 0;
@@ -64,6 +65,7 @@ namespace {
             data += 8;
             desc.texturePath = (const char *)(data + 1);
             data += *(std::uint8_t *)(data + 0);
+            read = data - origin;
             return true;
         }
         return false;
@@ -353,7 +355,6 @@ namespace resource {
         }
     }
     
-    // TODO: separate ground and its texture, make it like emitters
     void ResourceProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueGround.emplace_back(QueueEntryGround {
@@ -493,22 +494,25 @@ namespace resource {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                     if (len) {
                         EmitterDescriptionPtr desc = std::make_unique<EmitterDescription>();
-                        if (readEmitter(*desc, mem.get())) {
+                        std::size_t imgoff = 0;
+                        if (readEmitter(*desc, mem.get(), imgoff)) {
                             self->_emitters.erase(path);
                             Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;
                             emitter.params = std::move(desc);
                             
+                            std::uint32_t mapWidth = *(std::int32_t *)(mem.get() + imgoff + 0);
+                            std::uint32_t mapHeight = *(std::int32_t *)(mem.get() + imgoff + 4);
+                            const std::uint8_t *rgba = mem.get() + imgoff + 8;
+                            
+                            if (mapWidth && mapHeight) {
+                                emitter.map = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapWidth, mapHeight, { rgba });
+                            }
+                            
                             self->_asyncInProgress = false;
-                            self->getOrLoadTexture((path + ".map").data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &mapTexture) mutable {
+                            self->getOrLoadTexture(emitter.params->texturePath.data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
                                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                    emitter.map = mapTexture;
-                                    
-                                    self->getOrLoadTexture(emitter.params->texturePath.data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
-                                        if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                            emitter.texture = texture;
-                                            completion(emitter.params, emitter.map, emitter.texture);
-                                        }
-                                    });
+                                    emitter.texture = texture;
+                                    completion(emitter.params, emitter.map, emitter.texture);
                                 }
                             });
                         }

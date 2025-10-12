@@ -176,6 +176,18 @@
                 event.stopPropagation();
                 return false;
             });
+            document.getElementById(name).addEventListener("keydown", (event) => {
+                event.stopPropagation();
+                return false;
+            });
+            document.getElementById(name).addEventListener("keyup", (event) => {
+                event.stopPropagation();
+                return false;
+            });
+            document.getElementById(name).addEventListener("wheel", (event) => {
+                event.stopPropagation();
+                return false;
+            });
         })
 
         const uiInspectMappingBasic = {
@@ -410,9 +422,7 @@
                     uiEditor.sendMsg("editor.renameNode", old + " " + nv);
                 }
                 else {
-                    e.blockEvent();
-                    e.setValue(old);
-                    e.unblockEvent();
+                    utility.setElementValue(e.data.id, old);
                 }
             },
             nodeMove: function(e, nv, old) {
@@ -430,9 +440,14 @@
                 if (e.data.id == "inspect_ptc_lifetime") {
                     let isLooped = parseInt($$("inspect_ptc_looped").getValue());
                     if (isLooped && parseInt(nv) > parseInt($$("inspect_ptc_emission_time").getValue())) {
-                        e.blockEvent();
-                        e.setValue(old);
-                        e.unblockEvent();
+                        utility.setElementValue(e.data.id, old);
+                    }
+                }
+                if (e.data.id == "inspect_ptc_looped") {
+                    let lifeTime = parseInt($$("inspect_ptc_lifetime").getValue());
+                    let emissionTime = parseInt($$("inspect_ptc_emission_time").getValue())
+                    if (nv && lifeTime > emissionTime) {
+                        utility.setElementValue("inspect_ptc_lifetime", emissionTime);
                     }
                 }
                 let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
@@ -495,9 +510,9 @@
                                 onAfterOpen: utility.adjustTree,
                                 onAfterClose: utility.adjustTree,
                                 onAfterAdd: utility.adjustTree,
-                                onBeforeSelect: function(id, selection) {
-                                    return selection == false || uiNodeTree.isBranch(id) == false;
-                                },
+                                // onBeforeSelect: function(id, selection) {
+                                //     return selection == false; // || uiNodeTree.isBranch(id) == false;
+                                // },
                                 onAfterSelect: function(id) {
                                     uiEditor.sendMsg("editor.selectNode", id);
                                 }

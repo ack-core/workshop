@@ -1,5 +1,6 @@
 
 #include "editor_particles_context.h"
+#include "utils.h"
 #include <list>
 
 namespace game {
@@ -40,7 +41,7 @@ namespace game {
             // points
             for (std::size_t i = 0; i < amount; i++) {
                 const float koeff = 2.0f * M_PI * float(i) / float(amount);
-                float r = args.x;
+                float r = 0.5f * args.x;
                 
                 if (fill) { // spread in [0..radius]
                     random = getNextRandom(random);
@@ -55,8 +56,8 @@ namespace game {
             for (std::uint32_t i = 0; i < 36; i++) {
                 const float koeff0 = 2.0f * M_PI * float(i) / 36.0f;
                 const float koeff1 = 2.0f * M_PI * float(i + 1) / 36.0f;
-                const math::vector3f p0 = math::vector3f(args.x * std::cosf(koeff0), 0.0f, args.x * std::sinf(koeff0)).transformed(rotation);
-                const math::vector3f p1 = math::vector3f(args.x * std::cosf(koeff1), 0.0f, args.x * std::sinf(koeff1)).transformed(rotation);
+                const math::vector3f p0 = math::vector3f(0.5f * args.x * std::cosf(koeff0), 0.0f, 0.5f * args.x * std::sinf(koeff0)).transformed(rotation);
+                const math::vector3f p1 = math::vector3f(0.5f * args.x * std::cosf(koeff1), 0.0f, 0.5f * args.x * std::sinf(koeff1)).transformed(rotation);
                 lineSet->setLine(i, p0, p1, {0.4f, 0.4f, 0.0f, 0.1f});
             }
             lineSet->capLineCount(36);
@@ -143,7 +144,7 @@ namespace game {
                         
                         if (dimCount) {
                             random = getNextRandom(random);
-                            koeff.flat[dimIndexes[i % dimCount]] = random % 1000 >= 500 ? 0.5f : -0.5f;
+                            koeff.flat[dimIndexes[i % dimCount]] = random % 2000 >= 1000 ? 0.5f : -0.5f;
                         }
                         
                         points.emplace_back(args * koeff);
@@ -156,18 +157,18 @@ namespace game {
             const math::vector3f bbmin = -0.5f * args;
             const math::vector3f bbmax = 0.5f * args;
             
-            lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(3,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(4,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(5,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(6,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(7,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(8,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
-            lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.1f});
+            lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(3,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(4,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(5,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(6,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(7,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(8,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
 
             lineSet->capLineCount(12);
         }
@@ -331,11 +332,13 @@ namespace game {
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
         _ptcParams.bakingTimeSec = float(_bakingFrameTimeMs) / 1000.0f;
     }
-    
-    foundation::RenderTexturePtr Emitter::getMap() const {
+
+    const foundation::RenderTexturePtr &Emitter::getMap() const {
         return _mapTexture;
     }
-    
+    const std::uint8_t * Emitter::getMapRaw() const {
+        return _mapData.data();
+    }
     const voxel::ParticlesParams &Emitter::getParams() const {
         return _ptcParams;
     }
@@ -381,6 +384,7 @@ namespace game {
         _handlers["editor.setPath"] = &EditorParticlesContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorParticlesContext::_startEditing;
         _handlers["editor.stopEditing"] = &EditorParticlesContext::_stopEditing;
+        _handlers["editor.reload"] = &EditorParticlesContext::_reload;
         _handlers["editor.particles.emission"] = &EditorParticlesContext::_emissionSet;
         _handlers["editor.particles.visual"] = &EditorParticlesContext::_visualSet;
         _handlers["editor.resource.save"] = &EditorParticlesContext::_save;
@@ -450,8 +454,8 @@ namespace game {
             parameters.maxXYZ = desc.maxXYZ;
             parameters.maxSize = desc.maxSize;
             node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
+            node.particles->setTime((desc.emissionTimeMs / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
         }
-        node.particles->setTime(10.0f, 0.0f);
     }
 
     bool EditorParticlesContext::_selectNode(const std::string &data) {
@@ -554,11 +558,41 @@ namespace game {
                     _recreateParticles(*node, false);
                 }
             }
+            if (node->originDesc) {
+                node->endShapeOffset = node->originDesc->endShapeOffset;
+            }
         }
         _clearEditingTools();
         return false;
     }
+    
+    bool EditorParticlesContext::_reload(const std::string &data) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            _api.resources->removeEmitter(node->emitterPath.data());
+            
+            // updating all emitter nodes
+            _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
+                std::shared_ptr<EditorNodeParticles> emitterNode = std::dynamic_pointer_cast<EditorNodeParticles>(node);
+                if (emitterNode && emitterNode->particles) {
+                    const char *path = emitterNode->emitterPath.c_str();
+                    _api.resources->getOrLoadEmitter(path, [emitterNode, this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+                        if (desc) {
+                            emitterNode->originDesc = *desc;
+                            emitterNode->texture = t;
+                            emitterNode->map = m;
 
+                            if (m && t) {
+                                _recreateParticles(*emitterNode, false);
+                                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        return false;
+    }
+    
     bool EditorParticlesContext::_save(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             const math::vector3f &sargs = node->currentDesc->startShapeArgs;
@@ -568,42 +602,52 @@ namespace game {
             const math::vector3f &bmax = node->currentDesc->maxXYZ;
             const math::vector2f &sz = node->currentDesc->maxSize;
 
-            std::string cfg = "emitter {\r\n";
-            cfg += std::string("    looped : bool = ") + (node->currentDesc->looped ? "true" : "false") + "\r\n";
-            cfg += std::string("    emissionTimeMs : integer = ") + std::to_string(node->currentDesc->emissionTimeMs) + "\r\n";
-            cfg += std::string("    particleLifeTimeMs : integer = ") + std::to_string(node->currentDesc->particleLifeTimeMs) + "\r\n";
-            cfg += std::string("    bakingFrameTimeMs : integer = ") + std::to_string(node->currentDesc->bakingFrameTimeMs) + "\r\n";
-            cfg += std::string("    particlesToEmit : integer = ") + std::to_string(node->currentDesc->particlesToEmit) + "\r\n";
-            cfg += std::string("    randomSeed : integer = ") + std::to_string(node->currentDesc->randomSeed) + "\r\n";
+            _savingCfg = "emitter {\r\n";
+            _savingCfg += std::string("    looped : bool = ") + (node->currentDesc->looped ? "true" : "false") + "\r\n";
+            _savingCfg += std::string("    emissionTimeMs : integer = ") + std::to_string(node->currentDesc->emissionTimeMs) + "\r\n";
+            _savingCfg += std::string("    particleLifeTimeMs : integer = ") + std::to_string(node->currentDesc->particleLifeTimeMs) + "\r\n";
+            _savingCfg += std::string("    bakingFrameTimeMs : integer = ") + std::to_string(node->currentDesc->bakingFrameTimeMs) + "\r\n";
+            _savingCfg += std::string("    particlesToEmit : integer = ") + std::to_string(node->currentDesc->particlesToEmit) + "\r\n";
+            _savingCfg += std::string("    randomSeed : integer = ") + std::to_string(node->currentDesc->randomSeed) + "\r\n";
             
-            cfg += std::string("    particleStartSpeed : number = 10.0\r\n"); // TODO: speed!
+            _savingCfg += std::string("    particleStartSpeed : number = 10.0\r\n"); // TODO: speed!
             
-            cfg += std::string("    texture : string = \"") + node->currentDesc->texturePath + "\"\r\n";
-            cfg += std::string("    startShapeType : integer = ") + std::to_string(node->currentDesc->startShapeType) + "\r\n";
-            cfg += std::string("    startShapeFill : bool = ") + std::to_string(int(node->currentDesc->startShapeFill)) + "\r\n";
-            cfg += std::string("    startShapeArgs : vector3f = ");
-            cfg += util::strstream::ftos(sargs.x) + " " + util::strstream::ftos(sargs.y) + " " + util::strstream::ftos(sargs.z) + "\r\n";
-            cfg += std::string("    endShapeType : integer = ") + std::to_string(node->currentDesc->endShapeType) + "\r\n";
-            cfg += std::string("    endShapeFill : bool = ") + std::to_string(int(node->currentDesc->endShapeFill)) + "\r\n";
-            cfg += std::string("    endShapeArgs : vector3f = ");
-            cfg += util::strstream::ftos(eargs.x) + " " + util::strstream::ftos(eargs.y) + " " + util::strstream::ftos(eargs.z) + "\r\n";
-            cfg += std::string("    endShapeOffset : vector3f = ");
-            cfg += util::strstream::ftos(eoff.x) + " " + util::strstream::ftos(eoff.y) + " " + util::strstream::ftos(eoff.z) + "\r\n";
-            cfg += std::string("    shapeDistributionType : integer = ") + std::to_string(node->currentDesc->shapeDistributionType) + "\r\n";
-            cfg += std::string("    particleOrientation : integer = ") + std::to_string(node->currentDesc->particleOrientation) + "\r\n";
-            cfg += std::string("    additiveBlend : bool = ") + (node->currentDesc->additiveBlend ? "true" : "false") + "\r\n";
-            cfg += std::string("    minXYZ : vector3f = ");
-            cfg += util::strstream::ftos(bmin.x) + " " + util::strstream::ftos(bmin.y) + " " + util::strstream::ftos(bmin.z) + "\r\n";
-            cfg += std::string("    maxXYZ : vector3f = ");
-            cfg += util::strstream::ftos(bmax.x) + " " + util::strstream::ftos(bmax.y) + " " + util::strstream::ftos(bmax.z) + "\r\n";
-            cfg += std::string("    maxSize : vector2f = ");
-            cfg += util::strstream::ftos(sz.x) + " " + util::strstream::ftos(sz.y) + "\r\n";
-            cfg += "}\r\n";
+            _savingCfg += std::string("    texture : string = \"") + node->currentDesc->texturePath + "\"\r\n";
+            _savingCfg += std::string("    startShapeType : integer = ") + std::to_string(node->currentDesc->startShapeType) + "\r\n";
+            _savingCfg += std::string("    startShapeFill : bool = ") + std::to_string(int(node->currentDesc->startShapeFill)) + "\r\n";
+            _savingCfg += std::string("    startShapeArgs : vector3f = ");
+            _savingCfg += util::strstream::ftos(sargs.x) + " " + util::strstream::ftos(sargs.y) + " " + util::strstream::ftos(sargs.z) + "\r\n";
+            _savingCfg += std::string("    endShapeType : integer = ") + std::to_string(node->currentDesc->endShapeType) + "\r\n";
+            _savingCfg += std::string("    endShapeFill : bool = ") + std::to_string(int(node->currentDesc->endShapeFill)) + "\r\n";
+            _savingCfg += std::string("    endShapeArgs : vector3f = ");
+            _savingCfg += util::strstream::ftos(eargs.x) + " " + util::strstream::ftos(eargs.y) + " " + util::strstream::ftos(eargs.z) + "\r\n";
+            _savingCfg += std::string("    endShapeOffset : vector3f = ");
+            _savingCfg += util::strstream::ftos(eoff.x) + " " + util::strstream::ftos(eoff.y) + " " + util::strstream::ftos(eoff.z) + "\r\n";
+            _savingCfg += std::string("    shapeDistributionType : integer = ") + std::to_string(node->currentDesc->shapeDistributionType) + "\r\n";
+            _savingCfg += std::string("    particleOrientation : integer = ") + std::to_string(node->currentDesc->particleOrientation) + "\r\n";
+            _savingCfg += std::string("    additiveBlend : bool = ") + (node->currentDesc->additiveBlend ? "true" : "false") + "\r\n";
+            _savingCfg += std::string("    minXYZ : vector3f = ");
+            _savingCfg += util::strstream::ftos(bmin.x) + " " + util::strstream::ftos(bmin.y) + " " + util::strstream::ftos(bmin.z) + "\r\n";
+            _savingCfg += std::string("    maxXYZ : vector3f = ");
+            _savingCfg += util::strstream::ftos(bmax.x) + " " + util::strstream::ftos(bmax.y) + " " + util::strstream::ftos(bmax.z) + "\r\n";
+            _savingCfg += std::string("    maxSize : vector2f = ");
+            _savingCfg += util::strstream::ftos(sz.x) + " " + util::strstream::ftos(sz.y) + "\r\n";
+            _savingCfg += "}\r\n";
             
-            _api.platform->saveFile((node->emitterPath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(cfg.data()), cfg.length(), [this](bool result) {
-                _api.platform->logMsg("[wip]");
-                //_api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
+            _api.platform->saveFile((node->emitterPath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, node](bool result) {
+                const std::size_t width = node->emitter.getMap()->getWidth();
+                const std::size_t height = node->emitter.getMap()->getHeight();
+                auto tgaResult = editor::writeTGA(node->emitter.getMapRaw(), width, height);
+                _savingMap = std::move(tgaResult.first);
+            
+                _api.platform->saveFile((node->emitterPath + ".tga").c_str(), _savingMap.get(), tgaResult.second, [this, node](bool result) {
+                    _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
+                    _savingMap = nullptr;
+                });
             });
+
+            _clearEditingTools();
+            node->currentDesc.reset();
 
             return true;
         }
@@ -637,6 +681,7 @@ namespace game {
             success |= input >> node->currentDesc->shapeDistributionType >> node->currentDesc->particleOrientation;
 
             if (success) {
+                node->endShapeOffset = node->currentDesc->endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
                 _recreateParticles(*node, true);
