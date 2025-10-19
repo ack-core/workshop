@@ -74,6 +74,12 @@
             background-color: transparent;
             background-position: top 0px right 0.5px;
         }
+        .webix_tree .webix_tree_item.webix_selected {
+            background-color: #A4A4A4;
+        }
+        .webix_tree_item.highlight {
+            color: gold;
+        }
         .webix_el_text input {
             padding: 2px;
         }
@@ -106,15 +112,6 @@
         .webix_custom_checkbox {
             margin-top: -2px;
             color: #8888a3 !important;
-        }
-        .webix_segment_0.webix_selected, .webix_segment_1.webix_selected, .webix_segment_N.webix_selected {
-            background-color: #cfcfef;
-        }
-        .webix_segment_0.webix_selected:focus, .webix_segment_1.webix_selected:focus, .webix_segment_N.webix_selected:focus {
-            background-color: #cfcfef;
-        }
-        .webix_segment_0.webix_selected:hover, .webix_segment_1.webix_selected:hover, .webix_segment_N.webix_selected:hover {
-            background-color: #cfcfef;
         }
         .webix_accordionitem_button {
             font-size: 10px !important;
@@ -276,11 +273,23 @@
                     if (uiNodeTree.exists(current) == false) {
                         uiNodeTree.data.add({id: current, value: node, open: true}, -1, lastParent );
                     }
-
+                    if (lastParent) {
+                        uiNodeTree.open(lastParent);                        
+                    }
                     lastParent = current;
                 });
 
                 uiNodeTree.select(name);
+            },
+            markSubTreeColor: function() {
+                const selected = uiNodeTree.getSelectedId();
+                uiNodeTree.addCss(selected, "highlight");
+
+
+                uiNodeTree.data.eachSubItem(selected, function(child) {
+                    uiNodeTree.addCss(child.id, "highlight");
+                });
+                uiNodeTree.refresh(selected);
             },
             showInspectPanel: function(panel, arg0) {
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
@@ -312,11 +321,11 @@
                     view: "label", label: value, height: 24, autowidth: true, align: align
                 };
             },
-            button: function(value, tooltip, action = null) {
-                const id = webix.uid().toString();
+            button: function(id, value, tooltip, action = null) {
+                const bid = id != null ? id : webix.uid().toString();
                 return { 
-                    id: id, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: 800 },
-                    click: () => { if (action) action($$(id)); }
+                    id: bid, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: 800 },
+                    click: () => { if (action) action($$(bid)); }
                 };
             },
             toggle: function(on, off, value, tooltip, action = null) {
@@ -411,14 +420,26 @@
             treeNewNode: function(e) {
                 $$("add_node_menu").show(e.getNode(), {pos: "right"});
             },
+            treeNodeSelected: function(id) {
+                $$("edit_resource_buttons").hide();
+                uiEditor.sendMsg("editor.stopEditing", "");
+                uiEditor.sendMsg("editor.selectNode", id);
+                if ($$("node_tree").getParentId(id)) {
+                    $$("save_prefab_button").hide();
+                }
+                else {
+                    $$("save_prefab_button").show();
+                }
+            },
             spaceClick: function(e) {
+                $$("edit_resource_buttons").hide();
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiNodeTree.unselectAll();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
                 utility.showInspectPanel("null", "");
             },
             nodeName: function(e, nv, old) {
-                if (/^[A-Za-z0-9_\.]*$/.test(nv) && !uiNodeTree.exists(nv)) {
+                if (/^(?!\.)[A-Za-z0-9_.]+(?<!\.)$/.test(nv) && !uiNodeTree.exists(nv)) {
                     uiEditor.sendMsg("editor.renameNode", old + " " + nv);
                 }
                 else {
@@ -470,13 +491,13 @@
             margin: 0,
             rows: [
                 {cols: [
-                    elements.button("\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
+                    elements.button(null, "\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
                     {
                         id: "top_buttons",
                         hidden: true,
                         cols: [
-                            elements.button("\uD83D\uDCE4", "Load scene"),
-                            elements.button("\uD83D\uDCBE", "Save scene"),
+                            elements.button(null, "\uD83D\uDCE4", "Load scene"),
+                            elements.button(null, "\uD83D\uDCBE", "Save scene"),
                             elements.toggle('<img src="editor/arrows.svg"></img>', '<img src="editor/arrows.svg"></img>', true, "Hide/show moving tool", (e, nv) => {})
                         ]
                     },
@@ -485,8 +506,8 @@
                         id: "edit_resource_buttons",
                         hidden: true,
                         cols: [
-                            elements.button("\uD83D\uDCBE", "Save & Exit", uiBindings.resourceSaveAndExit),
-                            elements.button("\uD83D\uDEAB", "Discard & Exit", uiBindings.resourceDiscardAndExit)
+                            elements.button(null, "\uD83D\uDCBE", "Save resource & Exit", uiBindings.resourceSaveAndExit),
+                            elements.button(null, "\uD83D\uDEAB", "Discard changes in the resource & Exit", uiBindings.resourceDiscardAndExit)
                         ]
                     },
 
@@ -497,8 +518,9 @@
             container: "nodes",
             cols: [
                 {rows: [
-                        elements.button("\u2795", "New node", uiBindings.treeNewNode),
-                        elements.button("\u274C", "Delete node", (e) => {}),
+                        elements.button(null, "\u2795", "New node", uiBindings.treeNewNode),
+                        elements.button(null, "\u274C", "Delete node", (e) => {}),
+                        elements.button("save_prefab_button", "\uD83D\uDCBE", "Save prefab", utility.markSubTreeColor),
                         {}
                 ]},
                 {rows: [
@@ -510,12 +532,7 @@
                                 onAfterOpen: utility.adjustTree,
                                 onAfterClose: utility.adjustTree,
                                 onAfterAdd: utility.adjustTree,
-                                // onBeforeSelect: function(id, selection) {
-                                //     return selection == false; // || uiNodeTree.isBranch(id) == false;
-                                // },
-                                onAfterSelect: function(id) {
-                                    uiEditor.sendMsg("editor.selectNode", id);
-                                }
+                                onAfterSelect: uiBindings.treeNodeSelected
                             }
                         },
                         { id: "space"}
@@ -590,8 +607,8 @@
                                 width: 28,
                                 css: {"margin-left": "3px !important"},
                                 rows: [
-                                    elements.button("\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
-                                    elements.button(" ", "???")
+                                    elements.button(null, "\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
+                                    elements.button(null, " ", "???")
                                 ]
                             }
                         ]
@@ -637,12 +654,12 @@
                                 elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiBindings.particlesEmission),
                             ]},
                             {cols: [
-                                elements.button("\u25b6", "Restart"), 
+                                elements.button(null, "\u25b6", "Restart"), 
                                 elements.label("Looped:"),
                                 elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), { width: 10 },
                                 elements.label("Seed:"),
                                 elements.text("inspect_ptc_rnd_seed", "0", 70, true),
-                                elements.button("\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
+                                elements.button(null, "\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
                             ]},
                             { height: 16 }
                         ]
@@ -726,6 +743,8 @@
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
 
+        $$("save_prefab_button").hide();
+
         if (typeof uiEditor != 'undefined') {
             uiEditor["engine.nodeCreated"] = function(data) {
                 console.log("[JS] engine.nodeCreated ", data);
@@ -741,14 +760,14 @@
             }
             uiEditor["engine.nodeRenamed"] = function(data) {
                 console.log("[JS] engine.nodeRenamed ", data);
-                var [old, nv] = data.split(' ');
-                do {
-                    parentId = uiNodeTree.getParentId(old);
+                var [success, old, nv] = data.split(' ');
+                if (success == "ok") {
                     uiNodeTree.remove(old);
-                    old = parentId;
+                    utility.addItemToNodeTree(nv);                    
                 }
-                while (uiNodeTree.isBranch(old) == false);
-                utility.addItemToNodeTree(nv);
+                else {
+                    utility.setElementValue($$("inspect_node_name"), old);
+                }
             }
             uiEditor["engine.nodeCoordinates"] = function(data) {
                 const [x, y, z] = data.split(' ');

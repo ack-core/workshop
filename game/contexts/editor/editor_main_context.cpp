@@ -7,7 +7,14 @@ namespace game {
     namespace {
         std::size_t g_unknownNodeIndex = 0;
         std::string getNextUnknownName() {
-            return "Unnamed_" + std::to_string(g_unknownNodeIndex++);
+            return "new" + std::to_string(g_unknownNodeIndex++);
+        }
+        std::string getParentName(const std::string &nodeName) {
+            std::size_t pos = nodeName.rfind('.');
+            if (pos == std::string::npos)
+                return "";
+
+            return nodeName.substr(0, pos);
         }
         
         std::string nodeTypeToPanelMapping[std::size_t(EditorNodeType::_count)] = {
@@ -57,7 +64,9 @@ namespace game {
     }
     
     void EditorMainContext::update(float dtSec) {
-
+        for (auto &item : _nodes) {
+            item.second->update(dtSec);
+        }
     }
     
     std::unique_ptr<MovingTool> EditorMainContext::_makeMovingTool(math::vector3f &target) {
@@ -72,7 +81,11 @@ namespace game {
         std::size_t typeIndex;
         if (args >> typeIndex) {
             if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
-                const std::string name = getNextUnknownName();
+                std::string name = getNextUnknownName();
+                while (_nodes.find(name) != _nodes.end()) {
+                    name = getNextUnknownName();
+                }
+                
                 const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
                 value->second->name = name;
                 value->second->position = _cameraAccess.getTarget();
@@ -94,6 +107,7 @@ namespace game {
         if (index != _nodes.end()) {
             _currentNode = index->second;
             _movingTool = _makeMovingTool(index->second->position);
+            _movingTool->setBase(index->second->parent ? index->second->parent->position : math::vector3f(0, 0, 0));
             _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             return false; // A typed context must handle this
         }
@@ -109,20 +123,41 @@ namespace game {
         std::string old, nv;
         if (args >> old >> nv) {
             if (_nodes.find(nv) == _nodes.end()) {
-                const auto &index = _nodes.find(old);
-                if (index != _nodes.end()) {
-                    std::shared_ptr<EditorNode> tmp = index->second;
-                    tmp->name = nv;
-                    _nodes.erase(index);
-                    _nodes.emplace(nv, tmp);
-                    _api.platform->sendEditorMsg("engine.nodeRenamed", data);
+                const auto &nodeIndex = _nodes.find(old);
+                if (nodeIndex != _nodes.end()) {
+                    std::shared_ptr<EditorNode> tmp = nodeIndex->second;
+                    if (tmp->children.empty()) {
+                        tmp->parent->children.erase(tmp->name);
+                        tmp->parent = nullptr;
+                        tmp->name = nv;
+
+                        auto parentName = getParentName(nv);
+                        auto parentIndex = _nodes.find(parentName);
+                        if (parentName.length()) {
+                            if (parentIndex != _nodes.end() && parentName != old) {
+                                parentIndex->second->children.emplace(nv, tmp);
+                                tmp->parent = parentIndex->second;
+                            }
+                            else {
+                                _api.platform->sendEditorMsg("engine.nodeRenamed", "error " + old + " " + nv);
+                                return true;
+                            }
+                        }
+
+                        _nodes.erase(nodeIndex);
+                        _nodes.emplace(nv, tmp);
+                        _api.platform->sendEditorMsg("engine.nodeRenamed", "ok " + data);
+                    }
+                    else {
+                        _api.platform->sendEditorMsg("engine.nodeRenamed", "error " + old + " " + nv);
+                    }
                 }
                 else {
                     _api.platform->logError("[EditorMainContext::_renameNode] Node '%s' not found", old.data());
                 }
             }
             else {
-                _api.platform->logError("[EditorMainContext::_renameNode] Node '%s' already in collection", old.data());
+                _api.platform->sendEditorMsg("engine.nodeRenamed", "error " + old + " " + nv);
             }
         }
         else {

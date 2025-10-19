@@ -11,6 +11,8 @@ namespace game {
         
         EditorNodeVoxelMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeVoxelMesh() override {}
+        
+        void update(float dtSec) override;
     };
 
     class EditorVoxelMeshContext : public Context {

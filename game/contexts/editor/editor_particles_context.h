@@ -99,6 +99,8 @@ namespace game {
         
         EditorNodeParticles(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeParticles() override {}
+        
+        void update(float dtSec) override;
     };
     
     class EditorParticlesContext : public Context {

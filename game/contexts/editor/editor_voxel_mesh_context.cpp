@@ -2,6 +2,12 @@
 #include "editor_voxel_mesh_context.h"
 
 namespace game {
+    void EditorNodeVoxelMesh::update(float dtSec) {
+        if (mesh) {
+            mesh->setPosition(position + (parent ? parent->position : math::vector3f(0, 0, 0)));
+        }
+    }
+
     EditorVoxelMeshContext::EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess) : _api(std::move(api)), _nodeAccess(nodeAccess) {
         EditorNode::makeByType[std::size_t(EditorNodeType::MESH)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodeVoxelMesh>(typeIndex));
@@ -30,11 +36,7 @@ namespace game {
     }
     
     void EditorVoxelMeshContext::update(float dtSec) {
-        if (std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock())) {
-            if (node->mesh) {
-                node->mesh->setPosition(node->position);
-            }
-        }
+
     }
     
     bool EditorVoxelMeshContext::_selectNode(const std::string &data) {

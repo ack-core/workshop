@@ -370,6 +370,12 @@ namespace game {
 
 
 namespace game {
+    void EditorNodeParticles::update(float dtSec) {
+        if (particles) {
+            particles->setTransform(math::transform3f::identity().translated(position + (parent ? parent->position : math::vector3f(0, 0, 0))));
+        }
+    }
+
     EditorParticlesContext::EditorParticlesContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess)
     : _api(std::move(api))
     , _nodeAccess(nodeAccess)
@@ -406,17 +412,18 @@ namespace game {
     void EditorParticlesContext::update(float dtSec) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             if (node->particles) {
+                math::vector3f position = node->position + (node->parent ? node->parent->position : math::vector3f(0, 0, 0));
+                
                 if (_endShapeTool && node->currentDesc.has_value()) {
-                    _endShapeTool->setBase(node->position);
-                    _shapeStartLineset->setPosition(node->position);
-                    _shapeEndLineset->setPosition(node->position + _endShapeTool->getPosition());
-                    _shapeConnectLineset->setPosition(node->position);
+                    _endShapeTool->setBase(position);
+                    _shapeStartLineset->setPosition(position);
+                    _shapeEndLineset->setPosition(position + _endShapeTool->getPosition());
+                    _shapeConnectLineset->setPosition(position);
                     _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.4f, 0.4f, 0.0f, 0.1f}, false);
                     currentTime += dtSec;
                     node->particles->setTime(currentTime, 0.0f);
                 }
                 
-                node->particles->setTransform(math::transform3f::identity().translated(node->position));
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             }
         }

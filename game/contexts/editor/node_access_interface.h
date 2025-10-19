@@ -1,5 +1,6 @@
 
 #pragma once
+#include <map>
 
 namespace game {
     static const char EDITOR_REFRESH_PARAM[] = "4";
@@ -7,6 +8,7 @@ namespace game {
     enum class EditorNodeType : std::size_t {
         MESH,
         PARTICLES,
+        // PREFAB, HELPER, ANIMATION, RAYCAST_SHAPE, COLLISION_SHAPE
         _count
     };
     
@@ -18,8 +20,13 @@ namespace game {
         math::vector3f position;
         voxel::SceneInterface::BoundingBoxPtr bbox;
         
+        std::shared_ptr<EditorNode> parent;
+        std::map<std::string, std::shared_ptr<EditorNode>> children;
+        
         EditorNode(std::size_t typeIndex) : type(EditorNodeType(typeIndex)), position(0, 0, 0) {}
         virtual ~EditorNode() {}
+        
+        virtual void update(float dtSec) {}
     };
     
     class NodeAccessInterface : public Interface {
