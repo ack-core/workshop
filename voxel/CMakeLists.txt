@@ -6,8 +6,8 @@ set(
 	"${m_source_root}/palette.h"
 	"${m_source_root}/scene.h"
 	"${m_source_root}/scene.cpp"
-	"${m_source_root}/simulation.h"
-	"${m_source_root}/simulation.cpp"
+	"${m_source_root}/world.h"
+	"${m_source_root}/world.cpp"
 	"${m_source_root}/raycast.h"
 	"${m_source_root}/raycast.cpp"
 

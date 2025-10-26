@@ -4,6 +4,8 @@
 #include "foundation/rendering.h"
 
 namespace resource {
+    inline const char *PREFAB_BIN = "prefabs.bin";
+
     struct TextureInfo {
         std::uint32_t width;
         std::uint32_t height;
@@ -22,39 +24,45 @@ namespace resource {
         std::uint32_t sizeZ;
     };
 
-    struct EmitterDescription {
-        bool looped = false;
-        bool additiveBlend = false;
-        bool startShapeFill = false;
-        bool endShapeFill = false;
-        
-        std::uint32_t particlesToEmit = 0;
-        std::uint32_t emissionTimeMs = 0;
-        std::uint32_t particleLifeTimeMs = 0;
-        std::uint32_t randomSeed = 0;
-        float particleStartSpeed = 0;
-        
-        std::uint32_t bakingFrameTimeMs = 0;
-        std::uint32_t particleOrientation = 0;
-        std::uint32_t shapeDistributionType = 0;
-        std::uint32_t startShapeType = 0;
-        std::uint32_t endShapeType = 0;
-        
-        math::vector3f startShapeArgs = {0};
-        math::vector3f endShapeArgs = {0};
-        math::vector3f endShapeOffset = {0};
-        math::vector3f minXYZ = {0};
-        math::vector3f maxXYZ = {0};
-        math::vector2f maxSize = {0};
-
-        std::string texturePath;
-    };
+//    struct EmitterDescription {
+//        bool looped = false;
+//        bool additiveBlend = false;
+//        bool startShapeFill = false;
+//        bool endShapeFill = false;
+//
+//        std::uint32_t particlesToEmit = 0;
+//        std::uint32_t emissionTimeMs = 0;
+//        std::uint32_t particleLifeTimeMs = 0;
+//        std::uint32_t randomSeed = 0;
+//        float particleStartSpeed = 0;
+//
+//        std::uint32_t bakingFrameTimeMs = 0;
+//        std::uint32_t particleOrientation = 0;
+//        std::uint32_t shapeDistributionType = 0;
+//        std::uint32_t startShapeType = 0;
+//        std::uint32_t endShapeType = 0;
+//
+//        math::vector3f startShapeArgs = {0};
+//        math::vector3f endShapeArgs = {0};
+//        math::vector3f endShapeOffset = {0};
+//        math::vector3f minXYZ = {0};
+//        math::vector3f maxXYZ = {0};
+//        math::vector2f maxSize = {0};
+//
+//        std::string texturePath;
+//        util::Description makeDescription();
+//    };
     
-    using EmitterDescriptionPtr = std::unique_ptr<EmitterDescription>;
+//    using EmitterDescriptionPtr = std::unique_ptr<EmitterDescription>;
     
     class ResourceProvider {
     public:
-        static std::shared_ptr<ResourceProvider> instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
+        static std::shared_ptr<ResourceProvider> instance(
+            const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
+            const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+            std::size_t prefabSrcLength
+        );
         
     public:
         // Get texture info
@@ -94,10 +102,15 @@ namespace resource {
         virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
 
         // Asynchronously Load emitter from txt file and textures if it isn't loaded yet
-        // @configPath - path to file without extension
+        // @descPath - path to file without extension
         // @return - description to construct emitter or nullptrs. It's ok to return map and texture == nullptr - usable for editors
         //
-        virtual void getOrLoadEmitter(const char *configPath, util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
+        virtual void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
+        
+        // Get prefab description. All prefabs are loaded synchronously at start
+        // @prefabPath - path without extension
+        //
+        virtual auto getPrefab(const char *prefabPath) -> util::Description = 0;
         
         // Force removing resources from internal storages
         //
@@ -105,6 +118,7 @@ namespace resource {
         virtual void removeMesh(const char *meshPath) = 0;
         virtual void removeGround(const char *groundPath) = 0;
         virtual void removeEmitter(const char *configPath) = 0;
+        virtual void reloadPrefabs() = 0;
 
         // Provider tracks resources life time and tries to free them
         //

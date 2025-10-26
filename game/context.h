@@ -4,7 +4,7 @@
 
 #include "providers/resource_provider.h"
 #include "voxel/scene.h"
-#include "voxel/simulation.h"
+#include "voxel/world.h"
 #include "voxel/raycast.h"
 #include "ui/stage.h"
 #include "game/state_manager.h"
@@ -16,7 +16,7 @@ namespace game {
         const foundation::RenderingInterfacePtr &rendering;
         const resource::ResourceProviderPtr &resources;
         const voxel::SceneInterfacePtr &scene;
-        const voxel::SimulationInterfacePtr &simulation;
+        const voxel::WorldInterfacePtr &world;
         const voxel::RaycastInterfacePtr &raycast;
         const ui::StageInterfacePtr &ui;
         const dh::DataHubPtr &dh;

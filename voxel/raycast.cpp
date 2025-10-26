@@ -4,11 +4,22 @@
 namespace voxel {
     class RaycastInterfaceImpl : public RaycastInterface {
     public:
-        RaycastInterfaceImpl() {}
+        RaycastInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const voxel::SceneInterfacePtr &scene) {}
         ~RaycastInterfaceImpl() override {}
         
     public:
-        void updateAndDraw(float dtSec) override {}
+        auto addSphereMesh(const std::vector<math::vector4f> &data) -> MeshPtr override {
+            return nullptr;
+        }
+        auto addTriangleMesh(const std::vector<math::vector3f> &vtx, const std::vector<std::uint16_t> &idx) -> MeshPtr override {
+            return nullptr;
+        }
+        bool sphereCast(const math::vector3f &start, const math::vector3f &target, float radius, float length) const override {
+            return false;
+        }
+        void update(float dtSec) override {
+            
+        }
 
     public:
 
@@ -16,8 +27,8 @@ namespace voxel {
 }
 
 namespace voxel {
-    std::shared_ptr<RaycastInterface> RaycastInterface::instance() {
-        return std::make_shared<RaycastInterfaceImpl>();
+    std::shared_ptr<RaycastInterface> RaycastInterface::instance(const foundation::PlatformInterfacePtr &platform, const voxel::SceneInterfacePtr &scene) {
+        return std::make_shared<RaycastInterfaceImpl>(platform, scene);
     }
 }
 

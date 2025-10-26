@@ -32,6 +32,8 @@ if (APPTYPE STREQUAL "IS_CLIENT" OR APPTYPE STREQUAL "IS_EDITOR")
 		"${m_source_root}/contexts/editor/editor_main_context.cpp"
 		"${m_source_root}/contexts/editor/editor_camera_context.h"
 		"${m_source_root}/contexts/editor/editor_camera_context.cpp"
+		"${m_source_root}/contexts/editor/editor_prefab_context.h"
+		"${m_source_root}/contexts/editor/editor_prefab_context.cpp"
 		"${m_source_root}/contexts/editor/editor_voxel_mesh_context.h"
 		"${m_source_root}/contexts/editor/editor_voxel_mesh_context.cpp"
 		"${m_source_root}/contexts/editor/editor_particles_context.h"

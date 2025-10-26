@@ -26,19 +26,15 @@ namespace game {
         const std::initializer_list<MakeContextFunc> makers;
     }
     states[] = {
-        {"default", {
-            &makeContext<EditorCameraContext>,
-            &makeContext<EditorMainContext, CameraAccessInterface>,
-            &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
-            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
-        }}
 //        {"default", {
-//            &makeContext<DebugContext>
+//            &makeContext<EditorCameraContext>,
+//            &makeContext<EditorMainContext, CameraAccessInterface>,
+//            &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
+//            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
 //        }}
+        {"default", {
+            &makeContext<DebugContext>
+        }}
     };
 };
 
-// Bugs:
-// + Name node as existing one
-// + Moving with keys isn't depended on camera distance
-// + Scroll affects camera and debug window

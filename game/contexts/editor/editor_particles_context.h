@@ -41,7 +41,7 @@ namespace game {
         Emitter();
         ~Emitter();
         
-        void setParameters(const resource::EmitterDescription &desc);
+        void setParameters(const util::Description &desc);
         void setEndShapeOffset(const math::vector3f &offset);
         void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
         
@@ -89,8 +89,8 @@ namespace game {
 namespace game {
     struct EditorNodeParticles : public EditorNode {
         std::string emitterPath = "<None>";
-        std::optional<resource::EmitterDescription> currentDesc;
-        std::optional<resource::EmitterDescription> originDesc;
+        std::optional<util::Description> currentDesc;
+        std::optional<util::Description> originDesc;
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
         Emitter emitter;

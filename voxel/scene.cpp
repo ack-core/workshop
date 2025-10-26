@@ -12,6 +12,18 @@
 #include <list>
 
 namespace voxel {
+    ParticlesParams::ParticlesParams(const util::Description &emitterDesc) {
+        const util::Description &desc = *emitterDesc.getSubDesc("emitter");
+        additiveBlend = *desc.get<bool>("additiveBlend");
+        orientation = *desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
+        bakingTimeSec = float(*desc.get<std::uint32_t>("bakingFrameTimeMs")) / 1000.0f;
+        minXYZ = *desc.get<math::vector3f>("minXYZ");
+        maxXYZ = *desc.get<math::vector3f>("maxXYZ");
+        maxSize = *desc.get<math::vector2f>("maxSize");
+    }
+}
+
+namespace voxel {
     class LineSetImpl : public SceneInterface::LineSet {
     public:
         struct Line {
@@ -145,15 +157,11 @@ namespace voxel {
             frameIndex = std::min(index, frameCount - 1);
         }
         auto getFinalTransform() const -> math::transform3f {
-#if IS_EDITOR
-                math::vector3f offset;
-                offset.x = -float(currentVoxelOffset.x);
-                offset.y = -float(currentVoxelOffset.y);
-                offset.z = -float(currentVoxelOffset.z);
-                return math::transform3f::identity().translated(offset) * transform;
-#else
-                return transform;
-#endif
+            math::vector3f offset;
+            offset.x = -float(currentVoxelOffset.x);
+            offset.y = -float(currentVoxelOffset.y);
+            offset.z = -float(currentVoxelOffset.z);
+            return math::transform3f::identity().translated(offset) * transform;
         }
     };
     

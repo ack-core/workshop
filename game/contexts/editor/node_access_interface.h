@@ -6,9 +6,10 @@ namespace game {
     static const char EDITOR_REFRESH_PARAM[] = "4";
     
     enum class EditorNodeType : std::size_t {
+        PREFAB,
         MESH,
         PARTICLES,
-        // PREFAB, HELPER, ANIMATION, RAYCAST_SHAPE, COLLISION_SHAPE
+        // DATA, ANIMATION, RAYCAST_SHAPE, COLLISION_SHAPE
         _count
     };
     

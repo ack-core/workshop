@@ -165,51 +165,110 @@ namespace util {
 }
 
 namespace util {
-    Config parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name, std::string &error) {
-        strstream input(reinterpret_cast<const char *>(data), length);
-        Config result;
-        std::string scopeName;
-        std::string scopeText;
-        error = {};
-        
+    Description parseDescription(const std::uint8_t *data, std::size_t length) {
         struct fn {
-            static bool parseScope(const std::string &name, const std::string &src, Config& result, std::string &error) {
+            static bool parseScope(const std::string &src, Description& result) {
                 strstream input(src.data(), src.length());
                 std::string elementName;
                 
                 while (input >> elementName) {
-                    std::string type;
-                    std::string valueString;
-                    float valueFloat[3] = {};
-                    int valueInt = 0;
+                    input.skipws();
                     
-                    if (input >> sequence(":") >> type) {
-                        if (type == "string" && input >> sequence("=") >> braced(valueString, '"', '"')) {
-                            result.emplace(std::make_pair(elementName, std::make_any<std::string>(std::move(valueString))));
+                    if (input.peekChar() == '{') {
+                        std::string scopeText;
+                        
+                        if (input >> braced(scopeText, '{', '}')) {
+                            Description block = {};
+                            if (fn::parseScope(scopeText, block)) {
+                                result.emplace(elementName, std::move(block));
+                            }
+                            else return {};
                         }
-                        else if (type == "integer" && input >> sequence("=") >> valueInt) {
-                            result.emplace(std::make_pair(elementName, std::make_any<int>(valueInt)));
+                        else return {};
+                    }
+                    else if (input.getChar() == ':') {
+                        std::string type;
+                        std::string valueString;
+                        float valueFloat[4] = {};
+                        int valueInt = 0;
+
+                        if (input >> type) {
+                            if (type == "string" && input >> sequence("=") >> braced(valueString, '"', '"')) {
+                                auto r = result.emplace(std::make_pair(elementName, std::make_any<std::string>(std::move(valueString))));                                
+                            }
+                            else if (type == "integer" && input >> sequence("=") >> valueInt) {
+                                result.emplace(std::make_pair(elementName, std::make_any<std::int64_t>(valueInt)));
+                            }
+                            else if (type == "number" && input >> sequence("=") >> valueFloat[0]) {
+                                result.emplace(std::make_pair(elementName, std::make_any<double>(valueFloat[0])));
+                            }
+                            else if (type == "bool" && input >> sequence("=") >> valueString) {
+                                result.emplace(std::make_pair(elementName, std::make_any<bool>(valueString == "true")));
+                            }
+                            else if (type == "vector2f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1]) {
+                                result.emplace(std::make_pair(elementName, std::make_any<math::vector2f>(valueFloat[0], valueFloat[1])));
+                            }
+                            else if (type == "vector3f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1] >> valueFloat[2]) {
+                                result.emplace(std::make_pair(elementName, std::make_any<math::vector3f>(valueFloat[0], valueFloat[1], valueFloat[2])));
+                            }
+                            else if (type == "vector4f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1] >> valueFloat[2] >> valueFloat[3]) {
+                                result.emplace(std::make_pair(elementName, std::make_any<math::vector4f>(valueFloat[0], valueFloat[1], valueFloat[2], valueFloat[3])));
+                            }
+                            else return false;
                         }
-                        else if (type == "number" && input >> sequence("=") >> valueFloat[0]) {
-                            result.emplace(std::make_pair(elementName, std::make_any<float>(valueFloat[0])));
+                        else return false;
+                    }
+                    else return false;
+                }
+                
+                return true;
+            }
+        };
+        
+        Description result = {};
+        if (fn::parseScope(std::string((const char *)data, length), result)) {
+            return result;
+        }
+        else return {};
+    }
+
+    std::string serializeDescription(const Description &cfg) {
+        struct fn {
+            static bool serializeScope(int ident, const Description &cfg, std::string &result) {
+                for (auto &item : cfg) {
+                    if (const Description *block = std::any_cast<Description>(&item.second)) {
+                        result += std::string(ident, ' ') + item.first + " {\r\n";
+                        if (fn::serializeScope(ident + 4, *block, result)) {
+                            result += std::string(ident, ' ') + "}\r\n\r\n";
                         }
-                        else if (type == "vector2f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1]) {
-                            result.emplace(std::make_pair(elementName, std::make_any<math::vector2f>(valueFloat[0], valueFloat[1])));
-                        }
-                        else if (type == "vector3f" && input >> sequence("=") >> valueFloat[0] >> valueFloat[1] >> valueFloat[2]) {
-                            result.emplace(std::make_pair(elementName, std::make_any<math::vector3f>(valueFloat[0], valueFloat[1], valueFloat[2])));
-                        }
-                        else if (type == "bool" && input >> sequence("=") >> valueString) {
-                            result.emplace(std::make_pair(elementName, std::make_any<bool>(valueString == "true")));
-                        }
-                        else {
-                            error = "Invalid initialisation for '" + elementName + "'";
-                            return false;
-                        }
+                        else return false;
                     }
                     else {
-                        error = "Expected ':' and type after name '" + elementName + "'";
-                        return false;
+                        if (const std::string *v = std::any_cast<std::string>(&item.second)) {
+                            result += std::string(ident, ' ') + item.first + " : string = " + *v + "\r\n";
+                        }
+                        else if (const std::int64_t *v = std::any_cast<std::int64_t>(&item.second)) {
+                            result += std::string(ident, ' ') + item.first + " : integer = " + std::to_string(*v) + "\r\n";
+                        }
+                        else if (const double *v = std::any_cast<double>(&item.second)) {
+                            result += std::string(ident, ' ') + item.first + " : number = " + strstream::ftos(*v) + "\r\n";
+                        }
+                        else if (const bool *v = std::any_cast<bool>(&item.second)) {
+                            result += std::string(ident, ' ') + item.first + " : bool = " + ((*v) ? "true\r\n" : "false\r\n");
+                        }
+                        else if (const math::vector2f *v = std::any_cast<math::vector2f>(&item.second)) {
+                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y);
+                            result += std::string(ident, ' ') + item.first + " : vector2f = " + stringValue + "\r\n";
+                        }
+                        else if (const math::vector3f *v = std::any_cast<math::vector3f>(&item.second)) {
+                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y) + " " + strstream::ftos(v->z);
+                            result += std::string(ident, ' ') + item.first + " : vector3f = " + stringValue + "\r\n";
+                        }
+                        else if (const math::vector4f *v = std::any_cast<math::vector4f>(&item.second)) {
+                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y) + " " + strstream::ftos(v->z) + " " + strstream::ftos(v->w);
+                            result += std::string(ident, ' ') + item.first + " : vector4f = " + stringValue + "\r\n";
+                        }
+                        else return false;
                     }
                 }
                 
@@ -217,20 +276,10 @@ namespace util {
             }
         };
         
-        while (input >> scopeName) {
-            if (scopeName == name) {
-                if (input >> braced(scopeText, '{', '}')) {
-                    if (fn::parseScope(name, scopeText, result, error) == false) {
-                        break;
-                    }
-                }
-                else {
-                    error = "Braces aren't match";
-                    break;
-                }
-            }
+        std::string result;
+        if (fn::serializeScope(0, cfg, result)) {
+            return result;
         }
-        
-        return result;
+        else return {};
     }
 }

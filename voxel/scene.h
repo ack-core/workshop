@@ -4,6 +4,7 @@
 #include "foundation/rendering.h"
 #include "foundation/layouts.h"
 #include "foundation/math.h"
+#include "foundation/util.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +14,9 @@ namespace voxel {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 3;
     
     struct ParticlesParams {
+        ParticlesParams() = default;
+        ParticlesParams(const util::Description &emitterDesc);
+        
         enum class ParticlesOrientation {
             CAMERA = 1, AXIS, WORLD
         };

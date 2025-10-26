@@ -12,7 +12,7 @@ Two Contexts:
 #include "foundation/rendering.h"
 #include "providers/resource_provider.h"
 #include "voxel/scene.h"
-#include "voxel/simulation.h"
+#include "voxel/world.h"
 #include "voxel/raycast.h"
 #include "ui/stage.h"
 
@@ -24,7 +24,7 @@ foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 resource::ResourceProviderPtr resourceProvider;
 voxel::SceneInterfacePtr scene;
-voxel::SimulationInterfacePtr simulation;
+voxel::WorldInterfacePtr simulation;
 voxel::RaycastInterfacePtr raycast;
 ui::StageInterfacePtr stage;
 game::StateManagerPtr stateManager;
@@ -32,25 +32,27 @@ dh::DataHubPtr datahub;
 
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
-    rendering = foundation::RenderingInterface::instance(platform);
-    resourceProvider = resource::ResourceProvider::instance(platform, rendering);
-    scene = voxel::SceneInterface::instance(platform, rendering);
-    simulation = voxel::SimulationInterface::instance();
-    raycast = voxel::RaycastInterface::instance();
-    stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
-    datahub = dh::DataHub::instance(platform, game::datahub);
-    stateManager = game::StateManager::instance(platform, rendering, resourceProvider, scene, simulation, raycast, stage, datahub);
-    stateManager->switchToState("default");
-    
-    platform->setLoop([](float dtSec) {
-        datahub->update(dtSec);
-        stateManager->update(dtSec);
-        simulation->update(dtSec);
-        scene->updateAndDraw(dtSec);
-        stage->updateAndDraw(dtSec);
-        rendering->presentFrame();
+    platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&data, std::size_t size) {
+        rendering = foundation::RenderingInterface::instance(platform);
+        resourceProvider = resource::ResourceProvider::instance(platform, rendering, data, size);
+        scene = voxel::SceneInterface::instance(platform, rendering);
+        simulation = voxel::WorldInterface::instance(platform, resourceProvider, scene);
+        raycast = voxel::RaycastInterface::instance(platform, scene);
+        stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
+        datahub = dh::DataHub::instance(platform, game::datahub);
+        stateManager = game::StateManager::instance(platform, rendering, resourceProvider, scene, simulation, raycast, stage, datahub);
+        stateManager->switchToState("default");
         
-        resourceProvider->update(dtSec);
+        platform->setLoop([](float dtSec) {
+            datahub->update(dtSec);
+            stateManager->update(dtSec);
+            simulation->update(dtSec);
+            scene->updateAndDraw(dtSec);
+            stage->updateAndDraw(dtSec);
+            rendering->presentFrame();
+            
+            resourceProvider->update(dtSec);
+        });
     });
 }
 

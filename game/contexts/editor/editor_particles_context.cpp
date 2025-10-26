@@ -186,23 +186,24 @@ namespace game {
     
     }
     
-    void Emitter::setParameters(const resource::EmitterDescription &desc) {
-        _emissionTimeMs = desc.emissionTimeMs;
-        _particleLifeTimeMs = desc.particleLifeTimeMs;
-        _bakingFrameTimeMs = desc.bakingFrameTimeMs;
-        _particlesToEmit = desc.particlesToEmit;
-        _isLooped = desc.looped;
-        _randomSeed = desc.randomSeed;
-        _startShape.type = Shape::Type(desc.startShapeType);
-        _startShape.fill = desc.startShapeFill;
-        _startShape.args = desc.startShapeArgs;
-        _endShape.type = Shape::Type(desc.endShapeType);
-        _endShape.fill = desc.endShapeFill;
-        _endShape.args = desc.endShapeArgs;
-        _endShapeOffset = desc.endShapeOffset;
-        _shapeDistribution = ShapeDistribution(desc.shapeDistributionType);
-        _ptcParams.orientation = voxel::ParticlesParams::ParticlesOrientation(desc.particleOrientation);
-        _ptcParams.additiveBlend = desc.additiveBlend;
+    void Emitter::setParameters(const util::Description &params) {
+        const util::Description &desc = *params.getSubDesc("emitter");
+        _emissionTimeMs = *desc.get<std::uint32_t>("emissionTimeMs");
+        _particleLifeTimeMs = *desc.get<std::uint32_t>("particleLifeTimeMs");
+        _bakingFrameTimeMs = *desc.get<std::uint32_t>("bakingFrameTimeMs");
+        _particlesToEmit = *desc.get<std::uint32_t>("particlesToEmit");
+        _isLooped = *desc.get<bool>("looped");
+        _randomSeed = *desc.get<std::uint32_t>("randomSeed");
+        _startShape.type = *desc.get<Shape::Type>("startShapeType");
+        _startShape.fill = *desc.get<bool>("startShapeFill");
+        _startShape.args = *desc.get<math::vector3f>("startShapeArgs");
+        _endShape.type = *desc.get<Shape::Type>("endShapeType");
+        _endShape.fill = *desc.get<bool>("endShapeFill");
+        _endShape.args = *desc.get<math::vector3f>("endShapeArgs");
+        _endShapeOffset = *desc.get<math::vector3f>("endShapeOffset");
+        _shapeDistribution = *desc.get<ShapeDistribution>("shapeDistributionType");
+        _ptcParams.orientation = *desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
+        _ptcParams.additiveBlend = *desc.get<bool>("additiveBlend");
     }
     
     void Emitter::setEndShapeOffset(const math::vector3f &offset) {
@@ -439,7 +440,9 @@ namespace game {
     void EditorParticlesContext::_endShapeDragFinished() {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             math::vector3f off = _endShapeTool->getPosition();
-            node->currentDesc->endShapeOffset = off;
+            util::Description &desc = *node->currentDesc->getSubDesc("emitter");
+            desc.set("endShapeOffset", off);
+            //node->currentDesc->endShapeOffset = off;
             node->emitter.setEndShapeOffset(off);
             node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
             _recreateParticles(*node, true);
@@ -452,16 +455,16 @@ namespace game {
             node.particles = _api.scene->addParticles(node.texture, node.emitter.getMap(), node.emitter.getParams());
         }
         else {
-            voxel::ParticlesParams parameters;
-            resource::EmitterDescription &desc = *node.originDesc;
-            parameters.additiveBlend = desc.additiveBlend;
-            parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc.particleOrientation);
-            parameters.bakingTimeSec = float(desc.bakingFrameTimeMs) / 1000.0f;
-            parameters.minXYZ = desc.minXYZ;
-            parameters.maxXYZ = desc.maxXYZ;
-            parameters.maxSize = desc.maxSize;
+            voxel::ParticlesParams parameters (*node.originDesc);
+            const util::Description &desc = *node.originDesc->getSubDesc("emitter");
+//            parameters.additiveBlend = *desc.get<bool>("additiveBlend");
+//            parameters.orientation = *desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
+//            parameters.bakingTimeSec = float(*desc.get<std::uint32_t>("bakingFrameTimeMs")) / 1000.0f;
+//            parameters.minXYZ = *desc.get<math::vector3f>("minXYZ");
+//            parameters.maxXYZ = *desc.get<math::vector3f>("maxXYZ");
+//            parameters.maxSize = *desc.get<math::vector2f>("maxSize");
             node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
-            node.particles->setTime((desc.emissionTimeMs / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
+            node.particles->setTime((*desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
         }
     }
 
@@ -484,9 +487,9 @@ namespace game {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             node->emitterPath = data;
             
-            _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-                if (desc) {
-                    node->originDesc = *desc;
+            _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+                if (desc.empty() == false) {
+                    node->originDesc = desc;
                     node->texture = t;
                     node->map = m;
                     
@@ -520,33 +523,33 @@ namespace game {
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
                 _recreateParticles(*node, true);
                 
-                std::string args;
-                args += std::to_string(node->currentDesc->emissionTimeMs) + " ";
-                args += std::to_string(node->currentDesc->particleLifeTimeMs) + " ";
-                args += std::to_string(node->currentDesc->bakingFrameTimeMs) + " ";
-                args += std::to_string(node->currentDesc->particlesToEmit) + " ";
-                args += std::to_string(int(node->currentDesc->looped)) + " ";
-                args += std::to_string(node->currentDesc->randomSeed) + " ";
-
-                args += std::to_string(int(node->currentDesc->startShapeType)) + " ";
-                args += std::to_string(int(node->currentDesc->startShapeFill)) + " ";
-                args += util::strstream::ftos(node->currentDesc->startShapeArgs.x) + " ";
-                args += util::strstream::ftos(node->currentDesc->startShapeArgs.y) + " ";
-                args += util::strstream::ftos(node->currentDesc->startShapeArgs.z) + " ";
-
-                args += std::to_string(int(node->currentDesc->endShapeType)) + " ";
-                args += std::to_string(int(node->currentDesc->endShapeFill)) + " ";
-                args += util::strstream::ftos(node->currentDesc->endShapeArgs.x) + " ";
-                args += util::strstream::ftos(node->currentDesc->endShapeArgs.y) + " ";
-                args += util::strstream::ftos(node->currentDesc->endShapeArgs.z) + " ";
-                args += util::strstream::ftos(node->currentDesc->endShapeOffset.x) + " ";
-                args += util::strstream::ftos(node->currentDesc->endShapeOffset.y) + " ";
-                args += util::strstream::ftos(node->currentDesc->endShapeOffset.z) + " ";
-
-                args += std::to_string(int(node->currentDesc->shapeDistributionType)) + " ";
-                args += std::to_string(int(node->currentDesc->particleOrientation)) + " ";
-
-                args += node->currentDesc->texturePath;
+                std::string args = util::serializeDescription(*node->currentDesc);
+//                args += std::to_string(node->currentDesc->emissionTimeMs) + " ";
+//                args += std::to_string(node->currentDesc->particleLifeTimeMs) + " ";
+//                args += std::to_string(node->currentDesc->bakingFrameTimeMs) + " ";
+//                args += std::to_string(node->currentDesc->particlesToEmit) + " ";
+//                args += std::to_string(int(node->currentDesc->looped)) + " ";
+//                args += std::to_string(node->currentDesc->randomSeed) + " ";
+//
+//                args += std::to_string(int(node->currentDesc->startShapeType)) + " ";
+//                args += std::to_string(int(node->currentDesc->startShapeFill)) + " ";
+//                args += util::strstream::ftos(node->currentDesc->startShapeArgs.x) + " ";
+//                args += util::strstream::ftos(node->currentDesc->startShapeArgs.y) + " ";
+//                args += util::strstream::ftos(node->currentDesc->startShapeArgs.z) + " ";
+//
+//                args += std::to_string(int(node->currentDesc->endShapeType)) + " ";
+//                args += std::to_string(int(node->currentDesc->endShapeFill)) + " ";
+//                args += util::strstream::ftos(node->currentDesc->endShapeArgs.x) + " ";
+//                args += util::strstream::ftos(node->currentDesc->endShapeArgs.y) + " ";
+//                args += util::strstream::ftos(node->currentDesc->endShapeArgs.z) + " ";
+//                args += util::strstream::ftos(node->currentDesc->endShapeOffset.x) + " ";
+//                args += util::strstream::ftos(node->currentDesc->endShapeOffset.y) + " ";
+//                args += util::strstream::ftos(node->currentDesc->endShapeOffset.z) + " ";
+//
+//                args += std::to_string(int(node->currentDesc->shapeDistributionType)) + " ";
+//                args += std::to_string(int(node->currentDesc->particleOrientation)) + " ";
+//
+//                args += node->currentDesc->texturePath;
 
                 _api.platform->sendEditorMsg("engine.particles.editing", args);
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
@@ -566,7 +569,8 @@ namespace game {
                 }
             }
             if (node->originDesc) {
-                node->endShapeOffset = node->originDesc->endShapeOffset;
+                const util::Description &desc = *node->originDesc->getSubDesc("emitter");
+                node->endShapeOffset = *desc.get<math::vector3f>("endShapeOffset");
             }
         }
         _clearEditingTools();
@@ -582,9 +586,9 @@ namespace game {
                 std::shared_ptr<EditorNodeParticles> emitterNode = std::dynamic_pointer_cast<EditorNodeParticles>(node);
                 if (emitterNode && emitterNode->particles) {
                     const char *path = emitterNode->emitterPath.c_str();
-                    _api.resources->getOrLoadEmitter(path, [emitterNode, this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-                        if (desc) {
-                            emitterNode->originDesc = *desc;
+                    _api.resources->getOrLoadEmitter(path, [emitterNode, this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+                        if (desc.empty() == false) {
+                            emitterNode->originDesc = desc;
                             emitterNode->texture = t;
                             emitterNode->map = m;
 
@@ -602,44 +606,48 @@ namespace game {
     
     bool EditorParticlesContext::_save(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            const math::vector3f &sargs = node->currentDesc->startShapeArgs;
-            const math::vector3f &eargs = node->currentDesc->endShapeArgs;
-            const math::vector3f &eoff = node->currentDesc->endShapeOffset;
-            const math::vector3f &bmin = node->currentDesc->minXYZ;
-            const math::vector3f &bmax = node->currentDesc->maxXYZ;
-            const math::vector2f &sz = node->currentDesc->maxSize;
-
-            _savingCfg = "emitter {\r\n";
-            _savingCfg += std::string("    looped : bool = ") + (node->currentDesc->looped ? "true" : "false") + "\r\n";
-            _savingCfg += std::string("    emissionTimeMs : integer = ") + std::to_string(node->currentDesc->emissionTimeMs) + "\r\n";
-            _savingCfg += std::string("    particleLifeTimeMs : integer = ") + std::to_string(node->currentDesc->particleLifeTimeMs) + "\r\n";
-            _savingCfg += std::string("    bakingFrameTimeMs : integer = ") + std::to_string(node->currentDesc->bakingFrameTimeMs) + "\r\n";
-            _savingCfg += std::string("    particlesToEmit : integer = ") + std::to_string(node->currentDesc->particlesToEmit) + "\r\n";
-            _savingCfg += std::string("    randomSeed : integer = ") + std::to_string(node->currentDesc->randomSeed) + "\r\n";
+            _savingCfg = util::serializeDescription(*node->currentDesc);
             
-            _savingCfg += std::string("    particleStartSpeed : number = 10.0\r\n"); // TODO: speed!
-            
-            _savingCfg += std::string("    texture : string = \"") + node->currentDesc->texturePath + "\"\r\n";
-            _savingCfg += std::string("    startShapeType : integer = ") + std::to_string(node->currentDesc->startShapeType) + "\r\n";
-            _savingCfg += std::string("    startShapeFill : bool = ") + std::to_string(int(node->currentDesc->startShapeFill)) + "\r\n";
-            _savingCfg += std::string("    startShapeArgs : vector3f = ");
-            _savingCfg += util::strstream::ftos(sargs.x) + " " + util::strstream::ftos(sargs.y) + " " + util::strstream::ftos(sargs.z) + "\r\n";
-            _savingCfg += std::string("    endShapeType : integer = ") + std::to_string(node->currentDesc->endShapeType) + "\r\n";
-            _savingCfg += std::string("    endShapeFill : bool = ") + std::to_string(int(node->currentDesc->endShapeFill)) + "\r\n";
-            _savingCfg += std::string("    endShapeArgs : vector3f = ");
-            _savingCfg += util::strstream::ftos(eargs.x) + " " + util::strstream::ftos(eargs.y) + " " + util::strstream::ftos(eargs.z) + "\r\n";
-            _savingCfg += std::string("    endShapeOffset : vector3f = ");
-            _savingCfg += util::strstream::ftos(eoff.x) + " " + util::strstream::ftos(eoff.y) + " " + util::strstream::ftos(eoff.z) + "\r\n";
-            _savingCfg += std::string("    shapeDistributionType : integer = ") + std::to_string(node->currentDesc->shapeDistributionType) + "\r\n";
-            _savingCfg += std::string("    particleOrientation : integer = ") + std::to_string(node->currentDesc->particleOrientation) + "\r\n";
-            _savingCfg += std::string("    additiveBlend : bool = ") + (node->currentDesc->additiveBlend ? "true" : "false") + "\r\n";
-            _savingCfg += std::string("    minXYZ : vector3f = ");
-            _savingCfg += util::strstream::ftos(bmin.x) + " " + util::strstream::ftos(bmin.y) + " " + util::strstream::ftos(bmin.z) + "\r\n";
-            _savingCfg += std::string("    maxXYZ : vector3f = ");
-            _savingCfg += util::strstream::ftos(bmax.x) + " " + util::strstream::ftos(bmax.y) + " " + util::strstream::ftos(bmax.z) + "\r\n";
-            _savingCfg += std::string("    maxSize : vector2f = ");
-            _savingCfg += util::strstream::ftos(sz.x) + " " + util::strstream::ftos(sz.y) + "\r\n";
-            _savingCfg += "}\r\n";
+//            const math::vector3f &sargs = node->currentDesc->startShapeArgs;
+//            const math::vector3f &eargs = node->currentDesc->endShapeArgs;
+//            const math::vector3f &eoff = node->currentDesc->endShapeOffset;
+//            const math::vector3f &bmin = node->currentDesc->minXYZ;
+//            const math::vector3f &bmax = node->currentDesc->maxXYZ;
+//            const math::vector2f &sz = node->currentDesc->maxSize;
+//
+//            // TODO: desc
+//
+//            _savingCfg = "emitter {\r\n";
+//            _savingCfg += std::string("    looped : bool = ") + (node->currentDesc->looped ? "true" : "false") + "\r\n";
+//            _savingCfg += std::string("    emissionTimeMs : integer = ") + std::to_string(node->currentDesc->emissionTimeMs) + "\r\n";
+//            _savingCfg += std::string("    particleLifeTimeMs : integer = ") + std::to_string(node->currentDesc->particleLifeTimeMs) + "\r\n";
+//            _savingCfg += std::string("    bakingFrameTimeMs : integer = ") + std::to_string(node->currentDesc->bakingFrameTimeMs) + "\r\n";
+//            _savingCfg += std::string("    particlesToEmit : integer = ") + std::to_string(node->currentDesc->particlesToEmit) + "\r\n";
+//            _savingCfg += std::string("    randomSeed : integer = ") + std::to_string(node->currentDesc->randomSeed) + "\r\n";
+//
+//            _savingCfg += std::string("    particleStartSpeed : number = 10.0\r\n"); // TODO: speed!
+//
+//            _savingCfg += std::string("    texture : string = \"") + node->currentDesc->texturePath + "\"\r\n";
+//            _savingCfg += std::string("    startShapeType : integer = ") + std::to_string(node->currentDesc->startShapeType) + "\r\n";
+//            _savingCfg += std::string("    startShapeFill : bool = ") + std::to_string(int(node->currentDesc->startShapeFill)) + "\r\n";
+//            _savingCfg += std::string("    startShapeArgs : vector3f = ");
+//            _savingCfg += util::strstream::ftos(sargs.x) + " " + util::strstream::ftos(sargs.y) + " " + util::strstream::ftos(sargs.z) + "\r\n";
+//            _savingCfg += std::string("    endShapeType : integer = ") + std::to_string(node->currentDesc->endShapeType) + "\r\n";
+//            _savingCfg += std::string("    endShapeFill : bool = ") + std::to_string(int(node->currentDesc->endShapeFill)) + "\r\n";
+//            _savingCfg += std::string("    endShapeArgs : vector3f = ");
+//            _savingCfg += util::strstream::ftos(eargs.x) + " " + util::strstream::ftos(eargs.y) + " " + util::strstream::ftos(eargs.z) + "\r\n";
+//            _savingCfg += std::string("    endShapeOffset : vector3f = ");
+//            _savingCfg += util::strstream::ftos(eoff.x) + " " + util::strstream::ftos(eoff.y) + " " + util::strstream::ftos(eoff.z) + "\r\n";
+//            _savingCfg += std::string("    shapeDistributionType : integer = ") + std::to_string(node->currentDesc->shapeDistributionType) + "\r\n";
+//            _savingCfg += std::string("    particleOrientation : integer = ") + std::to_string(node->currentDesc->particleOrientation) + "\r\n";
+//            _savingCfg += std::string("    additiveBlend : bool = ") + (node->currentDesc->additiveBlend ? "true" : "false") + "\r\n";
+//            _savingCfg += std::string("    minXYZ : vector3f = ");
+//            _savingCfg += util::strstream::ftos(bmin.x) + " " + util::strstream::ftos(bmin.y) + " " + util::strstream::ftos(bmin.z) + "\r\n";
+//            _savingCfg += std::string("    maxXYZ : vector3f = ");
+//            _savingCfg += util::strstream::ftos(bmax.x) + " " + util::strstream::ftos(bmax.y) + " " + util::strstream::ftos(bmax.z) + "\r\n";
+//            _savingCfg += std::string("    maxSize : vector2f = ");
+//            _savingCfg += util::strstream::ftos(sz.x) + " " + util::strstream::ftos(sz.y) + "\r\n";
+//            _savingCfg += "}\r\n";
             
             _api.platform->saveFile((node->emitterPath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, node](bool result) {
                 const std::size_t width = node->emitter.getMap()->getWidth();
@@ -663,36 +671,36 @@ namespace game {
 
     bool EditorParticlesContext::_emissionSet(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            util::strstream input(data.c_str(), data.length());
-            if (input >> node->currentDesc->emissionTimeMs >> node->currentDesc->particleLifeTimeMs >> node->currentDesc->bakingFrameTimeMs) {
-                if (input >> node->currentDesc->particlesToEmit >> node->currentDesc->looped) {
-                    node->emitter.setParameters(*node->currentDesc);
-                    node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-                    _recreateParticles(*node, true);
-                }
-            }
+//            util::strstream input(data.c_str(), data.length());
+//            if (input >> node->currentDesc->emissionTimeMs >> node->currentDesc->particleLifeTimeMs >> node->currentDesc->bakingFrameTimeMs) {
+//                if (input >> node->currentDesc->particlesToEmit >> node->currentDesc->looped) {
+//                    node->emitter.setParameters(*node->currentDesc);
+//                    node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+//                    _recreateParticles(*node, true);
+//                }
+//            }
             return true;
         }
         return false;
     }
     bool EditorParticlesContext::_visualSet(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            util::strstream input(data.c_str(), data.length());
-            bool success = false;
-            
-            success |= input >> node->currentDesc->startShapeType >> node->currentDesc->startShapeFill;
-            success |= input >> node->currentDesc->startShapeArgs.x >> node->currentDesc->startShapeArgs.y >> node->currentDesc->startShapeArgs.z;
-            success |= input >> node->currentDesc->endShapeType >> node->currentDesc->endShapeFill;
-            success |= input >> node->currentDesc->endShapeArgs.x >> node->currentDesc->endShapeArgs.y >> node->currentDesc->endShapeArgs.z;
-            success |= input >> node->currentDesc->endShapeOffset.x >> node->currentDesc->endShapeOffset.y >> node->currentDesc->endShapeOffset.z;
-            success |= input >> node->currentDesc->shapeDistributionType >> node->currentDesc->particleOrientation;
-
-            if (success) {
-                node->endShapeOffset = node->currentDesc->endShapeOffset;
-                node->emitter.setParameters(*node->currentDesc);
-                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-                _recreateParticles(*node, true);
-            }
+//            util::strstream input(data.c_str(), data.length());
+//            bool success = false;
+//
+//            success |= input >> node->currentDesc->startShapeType >> node->currentDesc->startShapeFill;
+//            success |= input >> node->currentDesc->startShapeArgs.x >> node->currentDesc->startShapeArgs.y >> node->currentDesc->startShapeArgs.z;
+//            success |= input >> node->currentDesc->endShapeType >> node->currentDesc->endShapeFill;
+//            success |= input >> node->currentDesc->endShapeArgs.x >> node->currentDesc->endShapeArgs.y >> node->currentDesc->endShapeArgs.z;
+//            success |= input >> node->currentDesc->endShapeOffset.x >> node->currentDesc->endShapeOffset.y >> node->currentDesc->endShapeOffset.z;
+//            success |= input >> node->currentDesc->shapeDistributionType >> node->currentDesc->particleOrientation;
+//
+//            if (success) {
+//                node->endShapeOffset = node->currentDesc->endShapeOffset;
+//                node->emitter.setParameters(*node->currentDesc);
+//                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+//                _recreateParticles(*node, true);
+//            }
             return true;
         }
         return false;

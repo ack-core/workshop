@@ -18,7 +18,8 @@ namespace game {
         }
         
         std::string nodeTypeToPanelMapping[std::size_t(EditorNodeType::_count)] = {
-            "inspect_static_mesh",
+            "inspect_prefab",
+            "inspect_mesh",
             "inspect_particles",
         };
     }

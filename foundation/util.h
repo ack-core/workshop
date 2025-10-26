@@ -5,8 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <any>
+#include "math.h"
 
 /*
 TODO:
@@ -20,6 +21,7 @@ TODO:
 
  */
 
+// TODO: where to place it?
 namespace util {
     struct IntegerOffset3D {
         int x;
@@ -215,7 +217,6 @@ namespace util {
                 stream.peekChar() == target._opening ? (void)stream.getChar() : stream.setError();
                 
                 while (stream.isError() == false) {
-                    (void)stream.peekChar();
                     if (stream.peekChar() == target._closing) {
                         if (--counter == 0) {
                             stream.getChar();
@@ -267,8 +268,121 @@ namespace util {
 }
 
 namespace util {
-    using Config = std::unordered_map<std::string, std::any>;
-    Config parseConfig(const std::uint8_t *data, std::size_t length, const std::string &name);
+    struct Description : public std::multimap<std::string, std::any> {
+        using std::multimap<std::string, std::any>::multimap;
+        template <typename T> const typename std::enable_if<std::is_integral<T>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return (const T *)(std::any_cast<std::int64_t>(&index->second));
+            }
+            
+            return nullptr;
+        }
+        template <typename T> const typename std::enable_if<std::is_floating_point<T>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return (const T *)(std::any_cast<double>(&index->second));
+            }
+            
+            return nullptr;
+        }
+        template <typename T> const typename std::enable_if<std::is_enum<T>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return (const T *)(std::any_cast<std::int64_t>(&index->second));
+            }
+            
+            return nullptr;
+        }
+        template <> const bool *get<bool>(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<bool>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        template <typename T> const typename std::enable_if<std::is_same<T, math::vector2f>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<math::vector2f>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        template <typename T> const typename std::enable_if<std::is_same<T, math::vector3f>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<math::vector3f>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        template <typename T> const typename std::enable_if<std::is_same<T, math::vector4f>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<math::vector4f>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        template <typename T> const typename std::enable_if<std::is_same<T, std::string>::value, T>::type *get(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<std::string>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        const util::Description *getSubDesc(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<util::Description>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        util::Description *getSubDesc(const std::string &key) {
+            auto index = find(key);
+            if (index != end()) {
+                return std::any_cast<util::Description>(&index->second);
+            }
+            
+            return nullptr;
+        }
+        void set(const std::string &key, const std::int64_t &value) {
+            _setValue(key, value);
+        }
+        void set(const std::string &key, const double &value) {
+            _setValue(key, value);
+        }
+        void set(const std::string &key, const bool &value) {
+            _setValue(key, value);
+        }
+        void set(const std::string &key, const math::vector2f &value) {
+            _setValue(key, value);
+        }
+        void set(const std::string &key, const math::vector3f &value) {
+            _setValue(key, value);
+        }
+        void set(const std::string &key, const math::vector4f &value) {
+            _setValue(key, value);
+        }
+
+    private:
+        template <typename T> void _setValue(const std::string &key, const T &value) {
+            auto index = find(key);
+            if (index != end()) {
+                T *target = std::any_cast<T>(&index->second);
+                if (target) {
+                    *target = value;
+                }
+            }
+        }
+
+    };
+    Description parseDescription(const std::uint8_t *data, std::size_t length);
+    std::string serializeDescription(const Description &cfg);
 }
 
 // TODO: move to dedicated shader generator

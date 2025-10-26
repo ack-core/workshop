@@ -121,26 +121,25 @@ namespace {
 }
 
 - (void)drawInMTKView:(nonnull MTKView *)view {
+    static std::vector<std::unique_ptr<foundation::AsyncTask>> foregroundQueue;
     static std::chrono::time_point<std::chrono::high_resolution_clock> prevFrameTime = std::chrono::high_resolution_clock::now();
     auto curFrameTime = std::chrono::high_resolution_clock::now();
     float dt = float(std::chrono::duration_cast<std::chrono::milliseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
     
+    {
+        std::unique_lock<std::mutex> guard(g_foregroundMutex);
+        for (auto &task : g_foregroundQueue) {
+            foregroundQueue.emplace_back(std::move(task));
+        }
+        g_foregroundQueue.clear();
+    }
+    
+    for (auto &task : foregroundQueue) {
+        task->executeInMainThread();
+    }
+    foregroundQueue.clear();
+    
     if (g_updateAndDraw) {
-        static std::vector<std::unique_ptr<foundation::AsyncTask>> foregroundQueue;
-        
-        {
-            std::unique_lock<std::mutex> guard(g_foregroundMutex);
-            for (auto &task : g_foregroundQueue) {
-                foregroundQueue.emplace_back(std::move(task));
-            }
-            g_foregroundQueue.clear();
-        }
-        
-        for (auto &task : foregroundQueue) {
-            task->executeInMainThread();
-        }
-        foregroundQueue.clear();
-        
         @autoreleasepool {
             g_updateAndDraw(dt);
         }

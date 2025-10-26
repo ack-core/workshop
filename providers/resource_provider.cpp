@@ -29,43 +29,13 @@ namespace {
         std::vector<std::vector<VTXMVOX>> voxels;
     };
     
-    bool readEmitter(resource::EmitterDescription &desc, const std::uint8_t *data, size_t &read) {
+    bool readEmitter(const std::uint8_t *data, util::Description &desc, size_t &read) {
         const std::uint8_t *origin = data;
         if (memcmp(data, "EMTR", 4) == 0) {
-            std::uint64_t flags = *(std::int64_t *)(data + 4);
-            desc.looped = (flags & 0x1) != 0;
-            desc.additiveBlend = (flags & 0x2) != 0;
-            desc.startShapeFill = (flags & 0x4) != 0;
-            desc.endShapeFill = (flags & 0x8) != 0;
-            data += 12;
-            desc.randomSeed = *(std::int32_t *)(data + 0);
-            desc.particlesToEmit = *(std::int16_t *)(data + 4);
-            desc.emissionTimeMs = *(std::int16_t *)(data + 6);
-            desc.particleLifeTimeMs = *(std::int16_t *)(data + 8);
-            desc.bakingFrameTimeMs = *(std::int16_t *)(data + 10);
-            data += 12;
-            desc.particleStartSpeed = *(float *)(data + 0);
-            data += 4;
-            desc.particleOrientation = *(std::uint8_t *)(data + 0);
-            desc.startShapeType = *(std::uint8_t *)(data + 1);
-            desc.endShapeType = *(std::uint8_t *)(data + 2);
-            desc.shapeDistributionType = *(std::uint8_t *)(data + 3);
-            data += 4;
-            desc.startShapeArgs = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
-            data += 12;
-            desc.endShapeArgs = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
-            data += 12;
-            desc.endShapeOffset = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
-            data += 12;
-            desc.minXYZ = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
-            data += 12;
-            desc.maxXYZ = math::vector3f(*(float *)(data + 0), *(float *)(data + 4), *(float *)(data + 8));
-            data += 12;
-            desc.maxSize = math::vector2f(*(float *)(data + 0), *(float *)(data + 4));
-            data += 8;
-            desc.texturePath = (const char *)(data + 1);
-            data += *(std::uint8_t *)(data + 0);
-            read = data - origin;
+            const std::size_t descLen = *(std::uint32_t *)(data + 4) - 4;
+            const std::uint8_t *src = data + 8;
+            desc = util::parseDescription(src, descLen);
+            read = 8 + descLen;
             return true;
         }
         return false;
@@ -105,12 +75,35 @@ namespace {
             }
         }
     }
+
+    bool readPrefabs(std::unordered_map<std::string, util::Description> &prefabs, const std::uint8_t *data) {
+        if (memcmp(data, "PREFABS!", 4) == 0) {
+            std::uint32_t prefabsCount = *(std::uint32_t *)(data + 8);
+            data += 12;
+            
+            for (std::uint32_t i = 0; i < prefabsCount; i++) {
+                std::string prefabPath = reinterpret_cast<const char *>(data + 4);
+                data += *(std::uint32_t *)(data + 0);
+                const std::size_t descLen = *(std::uint32_t *)(data + 0) - 4;
+                prefabs.emplace(std::move(prefabPath), util::parseDescription(data + 4, descLen));
+            }
+            
+            return true;
+        }
+
+        return false;
+    }
 }
 
 namespace resource {
     class ResourceProviderImpl : public std::enable_shared_from_this<ResourceProviderImpl>, public ResourceProvider {
     public:
-        ResourceProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
+        ResourceProviderImpl(
+            const foundation::PlatformInterfacePtr &platform,
+            const foundation::RenderingInterfacePtr &rendering,
+            const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+            std::size_t prefabSrcLength
+        );
         ~ResourceProviderImpl() override;
         
         auto getTextureInfo(const char *texPath) -> const TextureInfo * override;
@@ -120,12 +113,15 @@ namespace resource {
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
-        void getOrLoadEmitter(const char *cfgPath, util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
+        void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
 
+        auto getPrefab(const char *prefabPath) -> util::Description override;
+        
         void removeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
         void removeGround(const char *groundPath) override;
         void removeEmitter(const char *configPath) override;
+        void reloadPrefabs() override;
 
         void update(float dtSec) override;
         
@@ -148,7 +144,7 @@ namespace resource {
             bool outdated = false;
         };
         struct Emitter {
-            EmitterDescriptionPtr params;
+            util::Description params;
             foundation::RenderTexturePtr map;
             foundation::RenderTexturePtr texture;
             bool outdated = false;
@@ -158,6 +154,8 @@ namespace resource {
         std::unordered_map<std::string, VoxelMesh> _meshes;
         std::unordered_map<std::string, GroundMesh> _grounds;
         std::unordered_map<std::string, Emitter> _emitters;
+        
+        std::unordered_map<std::string, util::Description> _prefabs;
         
         struct QueueEntryTexture {
             std::string texPath;
@@ -172,8 +170,8 @@ namespace resource {
             util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> callback;
         };
         struct QueueEntryEmitter {
-            std::string configPath;
-            util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> callback;
+            std::string descPath;
+            util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> callback;
         };
         
         std::list<QueueEntryTexture> _callsQueueTexture;
@@ -185,13 +183,18 @@ namespace resource {
     };
     
     ResourceProviderImpl::ResourceProviderImpl(
-        const std::shared_ptr<foundation::PlatformInterface> &platform,
-        const foundation::RenderingInterfacePtr &rendering
+        const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+        std::size_t prefabSrcLength
     )
     : _platform(platform)
     , _rendering(rendering)
     , _asyncInProgress(false)
     {
+        if (readPrefabs(_prefabs, prefabSrcData.get()) == false) {
+            _platform->logError("[ResourceProviderImpl::ResourceProviderImpl] Invalid prefabs.bin");
+        }
     }
     
     ResourceProviderImpl::~ResourceProviderImpl() {
@@ -472,17 +475,17 @@ namespace resource {
         }
     }
 
-    void ResourceProviderImpl::getOrLoadEmitter(const char *configPath, util::callback<void(const resource::EmitterDescriptionPtr &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) {
+    void ResourceProviderImpl::getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueEmitter.emplace_back(QueueEntryEmitter {
-                .configPath = configPath,
+                .descPath = descPath,
                 .callback = std::move(completion)
             });
             
             return;
         }
         
-        std::string path = std::string(configPath);
+        std::string path = std::string(descPath);
 
         auto index = _emitters.find(path);
         if (index != _emitters.end() && index->second.outdated == false) {
@@ -493,44 +496,65 @@ namespace resource {
             _platform->loadFile((path + ".bin").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                     if (len) {
-                        EmitterDescriptionPtr desc = std::make_unique<EmitterDescription>();
                         std::size_t imgoff = 0;
-                        if (readEmitter(*desc, mem.get(), imgoff)) {
-                            self->_emitters.erase(path);
-                            Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;
-                            emitter.params = std::move(desc);
+                        util::Description desc;
+                        
+                        if (readEmitter(mem.get(), desc, imgoff)) {
+                            const util::Description &emitterDesc = *desc.getSubDesc("emitter");
+                            const std::string *texture = emitterDesc.get<std::string>("texture");
                             
-                            std::uint32_t mapWidth = *(std::int32_t *)(mem.get() + imgoff + 0);
-                            std::uint32_t mapHeight = *(std::int32_t *)(mem.get() + imgoff + 4);
-                            const std::uint8_t *rgba = mem.get() + imgoff + 8;
-                            
-                            if (mapWidth && mapHeight) {
-                                emitter.map = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapWidth, mapHeight, { rgba });
-                            }
-                            
-                            self->_asyncInProgress = false;
-                            self->getOrLoadTexture(emitter.params->texturePath.data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
-                                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                    emitter.texture = texture;
-                                    completion(emitter.params, emitter.map, emitter.texture);
+                            if (texture) {
+                                self->_emitters.erase(path);
+                                Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;
+                                emitter.params = std::move(desc);
+                                
+                                const std::uint32_t mapWidth = *(std::int32_t *)(mem.get() + imgoff + 0);
+                                const std::uint32_t mapHeight = *(std::int32_t *)(mem.get() + imgoff + 4);
+                                const std::uint8_t *rgba = mem.get() + imgoff + 8;
+                                
+                                if (mapWidth && mapHeight) {
+                                    emitter.map = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapWidth, mapHeight, { rgba });
                                 }
-                            });
+                                
+                                self->_asyncInProgress = false;
+                                self->getOrLoadTexture(texture->data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
+                                    if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                        emitter.texture = texture;
+                                        completion(emitter.params, emitter.map, emitter.texture);
+                                    }
+                                });
+                            }
+                            else {
+                                self->_asyncInProgress = false;
+                                self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] emitter has no texture parameter", path.data());
+                                completion({}, nullptr, nullptr);
+                            }
                         }
                         else {
                             self->_asyncInProgress = false;
                             self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] '%s' is not a valid emitter binary file", path.data());
-                            completion(nullptr, nullptr, nullptr);
+                            completion({}, nullptr, nullptr);
                         }
                     }
                     else {
                         self->_asyncInProgress = false;
                         self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] Unable to find file '%s'", path.data());
-                        completion(nullptr, nullptr, nullptr);
+                        completion({}, nullptr, nullptr);
                     }
                 }
             });
         }
 
+    }
+
+    util::Description ResourceProviderImpl::getPrefab(const char *prefabPath) {
+        auto index = _prefabs.find(prefabPath);
+        if (index != _prefabs.end()) {
+            return index->second;
+        }
+        else {
+            _platform->logError("[ResourceProviderImpl::getPrefab] Unable to find prefab '%s'", prefabPath);
+        }
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {
@@ -557,6 +581,9 @@ namespace resource {
             index->second.outdated = true;
         }
     }
+    void ResourceProviderImpl::reloadPrefabs() {
+        
+    }
     
     void ResourceProviderImpl::update(float dtSec) {
         while (_asyncInProgress == false && _callsQueueTexture.size()) {
@@ -576,14 +603,20 @@ namespace resource {
         }
         while (_asyncInProgress == false && _callsQueueEmitter.size()) {
             QueueEntryEmitter &entry = _callsQueueEmitter.front();
-            getOrLoadEmitter(entry.configPath.data(), std::move(entry.callback));
+            getOrLoadEmitter(entry.descPath.data(), std::move(entry.callback));
             _callsQueueEmitter.pop_front();
         }
     }
 }
 
 namespace resource {
-    std::shared_ptr<ResourceProvider> ResourceProvider::instance(const std::shared_ptr<foundation::PlatformInterface> &platform, const foundation::RenderingInterfacePtr &rendering) {
-        return std::make_shared<ResourceProviderImpl>(platform, rendering);
+    std::shared_ptr<ResourceProvider> ResourceProvider::instance(
+        const foundation::PlatformInterfacePtr &platform,
+        const foundation::RenderingInterfacePtr &rendering,
+        const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+        std::size_t prefabSrcLength
+    )
+    {
+        return std::make_shared<ResourceProviderImpl>(platform, rendering, prefabSrcData, prefabSrcLength);
     }
 }

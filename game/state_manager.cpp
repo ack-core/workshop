@@ -13,7 +13,7 @@ namespace game {
             const foundation::RenderingInterfacePtr &rendering,
             const resource::ResourceProviderPtr &resourceProvider,
             const voxel::SceneInterfacePtr &scene,
-            const voxel::SimulationInterfacePtr &simulation,
+            const voxel::WorldInterfacePtr &world,
             const voxel::RaycastInterfacePtr &raycast,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
@@ -22,7 +22,7 @@ namespace game {
         , _rendering(rendering)
         , _resourceProvider(resourceProvider)
         , _scene(scene)
-        , _simulation(simulation)
+        , _world(world)
         , _ui(ui)
         , _dh(dh)
         {
@@ -37,7 +37,7 @@ namespace game {
         const foundation::RenderingInterfacePtr _rendering;
         const resource::ResourceProviderPtr _resourceProvider;
         const voxel::SceneInterfacePtr _scene;
-        const voxel::SimulationInterfacePtr _simulation;
+        const voxel::WorldInterfacePtr _world;
         const voxel::RaycastInterfacePtr _raycast;
         const ui::StageInterfacePtr _ui;
         const dh::DataHubPtr _dh;
@@ -51,12 +51,13 @@ namespace game {
         const foundation::RenderingInterfacePtr &rendering,
         const resource::ResourceProviderPtr &resourceProvider,
         const voxel::SceneInterfacePtr &scene,
-        const voxel::SimulationInterfacePtr &simulation,
+        const voxel::WorldInterfacePtr &world,
         const voxel::RaycastInterfacePtr &raycast,
         const ui::StageInterfacePtr &ui,
         const dh::DataHubPtr &dh
-    ) {
-        return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, simulation, raycast, ui, dh);
+    )
+    {
+        return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, world, raycast, ui, dh);
     }
     
     void StateManagerImpl::switchToState(const char *name) {
@@ -70,7 +71,7 @@ namespace game {
                     
                     auto index = _currentContextList.find(makeContextFunction);
                     if (index == _currentContextList.end()) {
-                        ctx = makeContextFunction(API { _platform, _rendering, _resourceProvider, _scene, _simulation, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
+                        ctx = makeContextFunction(API { _platform, _rendering, _resourceProvider, _scene, _world, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
                     }
                     else {
                         ctx = index->second;

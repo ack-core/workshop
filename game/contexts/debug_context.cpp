@@ -2,6 +2,20 @@
 #include "debug_context.h"
 #include <list>
 
+const char *dbgCfg = R"(
+mesh {
+    name : string = "aaa"
+    position : vector3f = 0.000000 0.000000 0.000000
+    texture : string = "meshes/test/pillon"
+}
+
+mesh {
+    name : string = "aaa.bbb"
+    position : vector3f = 0.000000 10.000000 0.000000
+    texture : string = "meshes/stool"
+}
+)";
+
 namespace game {
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
         _token = _api.platform->addPointerEventHandler(
@@ -67,14 +81,14 @@ namespace game {
                 _ground = _api.scene->addTexturedMesh(data, texture);
             }
         });
-        _api.resources->getOrLoadEmitter("emitters/basic", [this](const resource::EmitterDescriptionPtr &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-            voxel::ParticlesParams parameters;
-            parameters.additiveBlend = desc->additiveBlend;
-            parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc->particleOrientation);
-            parameters.bakingTimeSec = float(desc->bakingFrameTimeMs) / 1000.0f;
-            parameters.minXYZ = desc->minXYZ;
-            parameters.maxXYZ = desc->maxXYZ;
-            parameters.maxSize = desc->maxSize;
+        _api.resources->getOrLoadEmitter("emitters/basic", [this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+            voxel::ParticlesParams parameters (desc);
+//            parameters.additiveBlend = desc->additiveBlend;
+//            parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc->particleOrientation);
+//            parameters.bakingTimeSec = float(desc->bakingFrameTimeMs) / 1000.0f;
+//            parameters.minXYZ = desc->minXYZ;
+//            parameters.maxXYZ = desc->maxXYZ;
+//            parameters.maxSize = desc->maxSize;
 
             if (m && t) {
                 _ptc = _api.scene->addParticles(t, m, parameters);
@@ -106,11 +120,16 @@ namespace game {
             }
         });
 
-        math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
-        _bbox = _api.scene->addBoundingBox(bb1);
-        _bbox->setColor({0.5f, 0.5f, 0.5f, 0.5f});
+//        math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
+//        _bbox = _api.scene->addBoundingBox(bb1);
+//        _bbox->setColor({0.5f, 0.5f, 0.5f, 0.5f});
+//
+//        std::string t0 = util::strstream::ftos(0.299999999999);
         
-        std::string t0 = util::strstream::ftos(0.299999999999);
+//        util::Config cfg = util::parseConfig((const std::uint8_t *)dbgCfg, strlen(dbgCfg));
+//        printf("--->>> %d\n", int(cfg.size()));
+//        std::string ooo = util::serializeConfig(cfg);
+        
         
         printf("!\n");
     }

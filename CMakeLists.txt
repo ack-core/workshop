@@ -79,13 +79,20 @@ get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_
 #file(MAKE_DIRECTORY "${m_binary_root}")
 
 message(STATUS "Copying files from resources...")
-file(COPY "${m_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.ttf")
+file(COPY "${m_resources_root}/meshes" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
+file(COPY "${m_resources_root}/emitters" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
+file(COPY "${m_resources_root}/grounds" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 
 message(STATUS "Generating palette...")
 execute_process(
 	COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/voxel/palette.h
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+message(STATUS "Generating prefabs...")
+execute_process(
+	COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 message(STATUS "Generating grounds...")
