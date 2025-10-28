@@ -270,69 +270,29 @@ namespace util {
 namespace util {
     struct Description : public std::multimap<std::string, std::any> {
         using std::multimap<std::string, std::any>::multimap;
-        template <typename T> const typename std::enable_if<std::is_integral<T>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return (const T *)(std::any_cast<std::int64_t>(&index->second));
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_integral<T>::value, T>::type get(const std::string &key) const {
+            return T(_getValue<std::int64_t>(key));
         }
-        template <typename T> const typename std::enable_if<std::is_floating_point<T>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return (const T *)(std::any_cast<double>(&index->second));
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_floating_point<T>::value, T>::type get(const std::string &key) const {
+            return T(_getValue<double>(key));
         }
-        template <typename T> const typename std::enable_if<std::is_enum<T>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return (const T *)(std::any_cast<std::int64_t>(&index->second));
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_enum<T>::value, T>::type get(const std::string &key) const {
+            return T(_getValue<std::int64_t>(key));
         }
-        template <> const bool *get<bool>(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<bool>(&index->second);
-            }
-            
-            return nullptr;
+        template <> const bool get<bool>(const std::string &key) const {
+            return _getValue<bool>(key);
         }
-        template <typename T> const typename std::enable_if<std::is_same<T, math::vector2f>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<math::vector2f>(&index->second);
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_same<T, math::vector2f>::value, T>::type get(const std::string &key) const {
+            return _getValue<math::vector2f>(key);
         }
-        template <typename T> const typename std::enable_if<std::is_same<T, math::vector3f>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<math::vector3f>(&index->second);
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_same<T, math::vector3f>::value, T>::type get(const std::string &key) const {
+            return _getValue<math::vector3f>(key);
         }
-        template <typename T> const typename std::enable_if<std::is_same<T, math::vector4f>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<math::vector4f>(&index->second);
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_same<T, math::vector4f>::value, T>::type get(const std::string &key) const {
+            return _getValue<math::vector4f>(key);
         }
-        template <typename T> const typename std::enable_if<std::is_same<T, std::string>::value, T>::type *get(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<std::string>(&index->second);
-            }
-            
-            return nullptr;
+        template <typename T> const typename std::enable_if<std::is_same<T, std::string>::value, T>::type get(const std::string &key) const {
+            return _getValue<std::string>(key);
         }
         const util::Description *getSubDesc(const std::string &key) const {
             auto index = find(key);
@@ -349,6 +309,12 @@ namespace util {
             }
             
             return nullptr;
+        }
+        util::Description &addSubDesc(const std::string &key) {
+            return *std::any_cast<util::Description>(&emplace(key, std::make_any<util::Description>())->second);
+        }
+        void set(const std::string &key, const int &value) {
+            _setValue(key, std::int64_t(value));
         }
         void set(const std::string &key, const std::int64_t &value) {
             _setValue(key, value);
@@ -370,6 +336,14 @@ namespace util {
         }
 
     private:
+        template <typename T> T _getValue(const std::string &key) const {
+            auto index = find(key);
+            if (index != end()) {
+                return *std::any_cast<T>(&index->second);
+            }
+            
+            return {};
+        }
         template <typename T> void _setValue(const std::string &key, const T &value) {
             auto index = find(key);
             if (index != end()) {
@@ -377,6 +351,9 @@ namespace util {
                 if (target) {
                     *target = value;
                 }
+            }
+            else {
+                emplace(key, std::make_any<T>(value));
             }
         }
 

@@ -14,12 +14,12 @@
 namespace voxel {
     ParticlesParams::ParticlesParams(const util::Description &emitterDesc) {
         const util::Description &desc = *emitterDesc.getSubDesc("emitter");
-        additiveBlend = *desc.get<bool>("additiveBlend");
-        orientation = *desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
-        bakingTimeSec = float(*desc.get<std::uint32_t>("bakingFrameTimeMs")) / 1000.0f;
-        minXYZ = *desc.get<math::vector3f>("minXYZ");
-        maxXYZ = *desc.get<math::vector3f>("maxXYZ");
-        maxSize = *desc.get<math::vector2f>("maxSize");
+        additiveBlend = desc.get<bool>("additiveBlend");
+        orientation = desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
+        bakingTimeSec = float(desc.get<std::uint32_t>("bakingFrameTimeMs")) / 1000.0f;
+        minXYZ = desc.get<math::vector3f>("minXYZ");
+        maxXYZ = desc.get<math::vector3f>("maxXYZ");
+        maxSize = desc.get<math::vector2f>("maxSize");
     }
 }
 

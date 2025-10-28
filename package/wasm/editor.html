@@ -224,6 +224,36 @@
         var dirResources = null;
 
         let utility = {
+            parseConfig: function(text) {
+                convertValue = (type, raw) => {
+                    raw = raw.trim();
+                    if (type == "bool") return raw == "true";
+                    if (type == "string") return raw.replace(/"(.*)"/, "$1");
+                    if (type == "integer") return parseInt(raw, 10);
+                    if (type && /^vector\d+f$/i.test(type)) return raw.split(/\s+/).map(Number);
+                    if (type == "number") return parseFloat(raw);
+                    return null;
+                }
+                parseBlock = (body) => {
+                    const obj = {};
+                    const blockRe = /(\w+)\s*\{([^{}]*\{[^}]*\}[^{}]*|[^{}]*)\}/gs;
+                    let match;
+                    while ((match = blockRe.exec(body)) != null) {
+                        const [, name, inner] = match;
+                        obj[name] = parseBlock(inner);
+                        body = body.replace(match[0], "");
+                    }
+
+                    const lineRe = /(\w+)\s*:\s*(\w+)?\s*=?\s*([^\n{}]+)/g;
+                    while ((match = lineRe.exec(body)) != null) {
+                        const [, key, type, raw] = match;
+                        obj[key] = convertValue(type, raw);
+                    }
+
+                    return obj;
+                }
+                return parseBlock(text);
+            },
             listFilesInDirectory: async function(baseDirName, dirHandle, ext) {
                 var result = [];
                 for await (const value of dirHandle.values()) {                    
@@ -472,7 +502,7 @@
                     }
                 }
                 let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
-                args += $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
+                args += $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue();
                 uiEditor.sendMsg("editor.particles.emission", args);
             },
             particlesVisual: function(e, nv, old) {
@@ -542,8 +572,9 @@
         webix.ui({
             id: "add_node_menu", container: "editor", view: "contextmenu", master: "nodes",
             data: [
-                { id: "0", value: "Add Voxel Mesh" },
-                { id: "1", value: "Add Particles" }
+                { id: "0", value: "Add Prefab" },
+                { id: "1", value: "Add Voxel Mesh" },
+                { id: "2", value: "Add Particles" }
             ],
             submenuConfig: {
                 type: {
@@ -796,17 +827,29 @@
                 $$("inspect_ptc_texture").getList().clearAll();
                 $$("inspect_ptc_texture").getList().parse(listParticleTextures);
 
-                const keys = [
-                    'inspect_ptc_emission_time', 'inspect_ptc_lifetime', 'inspect_ptc_baking_time', 'inspect_ptc_count', 'inspect_ptc_looped', 'inspect_ptc_rnd_seed',
-                    'inspect_ptc_sshape_type', 'inspect_ptc_sshape_fill', 'inspect_ptc_sshape_arg0', 'inspect_ptc_sshape_arg1', 'inspect_ptc_sshape_arg2',
-                    'inspect_ptc_eshape_type', 'inspect_ptc_eshape_fill', 'inspect_ptc_eshape_arg0', 'inspect_ptc_eshape_arg1', 'inspect_ptc_eshape_arg2',
-                    'inspect_ptc_end_offset_x', 'inspect_ptc_end_offset_y', 'inspect_ptc_end_offset_z',
-                    'inspect_ptc_shape_distr', 'inspect_ptc_orientation', 'inspect_ptc_texture'
-                ];
-                const values = data.split(' ');
-                keys.forEach((key, i) => {
-                    utility.setElementValue(key, values[i]);
-                });
+                let desc = utility.parseConfig(data);
+                utility.setElementValue("inspect_ptc_emission_time", desc.emitter.emissionTimeMs);
+                utility.setElementValue("inspect_ptc_lifetime", desc.emitter.particleLifeTimeMs);
+                utility.setElementValue("inspect_ptc_baking_time", desc.emitter.bakingFrameTimeMs);
+                utility.setElementValue("inspect_ptc_count", desc.emitter.particlesToEmit);
+                utility.setElementValue("inspect_ptc_looped", desc.emitter.looped);
+                utility.setElementValue("inspect_ptc_rnd_seed", desc.emitter.randomSeed);
+                utility.setElementValue("inspect_ptc_sshape_type", desc.emitter.startShapeType);
+                utility.setElementValue("inspect_ptc_sshape_fill", desc.emitter.startShapeFill);
+                utility.setElementValue("inspect_ptc_sshape_arg0", desc.emitter.startShapeArgs[0]);
+                utility.setElementValue("inspect_ptc_sshape_arg1", desc.emitter.startShapeArgs[1]);
+                utility.setElementValue("inspect_ptc_sshape_arg2", desc.emitter.startShapeArgs[2]);
+                utility.setElementValue("inspect_ptc_eshape_type", desc.emitter.endShapeType);
+                utility.setElementValue("inspect_ptc_eshape_fill", desc.emitter.endShapeFill);
+                utility.setElementValue("inspect_ptc_eshape_arg0", desc.emitter.endShapeArgs[0]);
+                utility.setElementValue("inspect_ptc_eshape_arg1", desc.emitter.endShapeArgs[1]);
+                utility.setElementValue("inspect_ptc_eshape_arg2", desc.emitter.endShapeArgs[2]);
+                utility.setElementValue("inspect_ptc_end_offset_x", desc.emitter.endShapeOffset[0]);
+                utility.setElementValue("inspect_ptc_end_offset_y", desc.emitter.endShapeOffset[1]);
+                utility.setElementValue("inspect_ptc_end_offset_z", desc.emitter.endShapeOffset[2]);
+                utility.setElementValue("inspect_ptc_shape_distr", desc.emitter.shapeDistributionType);
+                utility.setElementValue("inspect_ptc_orientation", desc.emitter.particleOrientation);
+                utility.setElementValue("inspect_ptc_texture", desc.emitter.texture);
             }
             uiEditor["engine.ptcEndOffset"] = function(data) {
                 const [x, y, z] = data.split(' ');

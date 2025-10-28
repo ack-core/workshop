@@ -122,7 +122,10 @@ namespace game {
             util::IntegerOffset3D off = node->mesh->getCenterOffset();
             
             if (off.x || off.y || off.z) {
-                _savingCfg = "parameters {\r\n    offset : vector3f = " + std::to_string(off.x) + " " + std::to_string(off.y) + " " + std::to_string(off.z) + "\r\n}\r\n";
+                util::Description desc;
+                util::Description &parameters = desc.addSubDesc("parameters");
+                parameters.set("offset", math::vector3f(off.x, off.y, off.z));
+                _savingCfg = util::serializeDescription(desc);
                 _api.platform->saveFile((node->meshPath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this](bool result) {
                     _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
                 });

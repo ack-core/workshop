@@ -501,34 +501,27 @@ namespace resource {
                         
                         if (readEmitter(mem.get(), desc, imgoff)) {
                             const util::Description &emitterDesc = *desc.getSubDesc("emitter");
-                            const std::string *texture = emitterDesc.get<std::string>("texture");
+                            const std::string &texture = emitterDesc.get<std::string>("texture");
                             
-                            if (texture) {
-                                self->_emitters.erase(path);
-                                Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;
-                                emitter.params = std::move(desc);
-                                
-                                const std::uint32_t mapWidth = *(std::int32_t *)(mem.get() + imgoff + 0);
-                                const std::uint32_t mapHeight = *(std::int32_t *)(mem.get() + imgoff + 4);
-                                const std::uint8_t *rgba = mem.get() + imgoff + 8;
-                                
-                                if (mapWidth && mapHeight) {
-                                    emitter.map = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapWidth, mapHeight, { rgba });
+                            self->_emitters.erase(path);
+                            Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;
+                            emitter.params = std::move(desc);
+                            
+                            const std::uint32_t mapWidth = *(std::int32_t *)(mem.get() + imgoff + 0);
+                            const std::uint32_t mapHeight = *(std::int32_t *)(mem.get() + imgoff + 4);
+                            const std::uint8_t *rgba = mem.get() + imgoff + 8;
+                            
+                            if (mapWidth && mapHeight) {
+                                emitter.map = self->_rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapWidth, mapHeight, { rgba });
+                            }
+                            
+                            self->_asyncInProgress = false;
+                            self->getOrLoadTexture(texture.data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
+                                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                    emitter.texture = texture;
+                                    completion(emitter.params, emitter.map, emitter.texture);
                                 }
-                                
-                                self->_asyncInProgress = false;
-                                self->getOrLoadTexture(texture->data(), [weak, &emitter, completion = std::move(completion)](const foundation::RenderTexturePtr &texture) mutable {
-                                    if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                        emitter.texture = texture;
-                                        completion(emitter.params, emitter.map, emitter.texture);
-                                    }
-                                });
-                            }
-                            else {
-                                self->_asyncInProgress = false;
-                                self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] emitter has no texture parameter", path.data());
-                                completion({}, nullptr, nullptr);
-                            }
+                            });
                         }
                         else {
                             self->_asyncInProgress = false;
@@ -555,6 +548,8 @@ namespace resource {
         else {
             _platform->logError("[ResourceProviderImpl::getPrefab] Unable to find prefab '%s'", prefabPath);
         }
+        
+        return {};
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {

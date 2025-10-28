@@ -245,7 +245,7 @@ namespace util {
                     }
                     else {
                         if (const std::string *v = std::any_cast<std::string>(&item.second)) {
-                            result += std::string(ident, ' ') + item.first + " : string = " + *v + "\r\n";
+                            result += std::string(ident, ' ') + item.first + " : string = \"" + *v + "\"\r\n";
                         }
                         else if (const std::int64_t *v = std::any_cast<std::int64_t>(&item.second)) {
                             result += std::string(ident, ' ') + item.first + " : integer = " + std::to_string(*v) + "\r\n";

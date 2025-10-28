@@ -23,37 +23,6 @@ namespace resource {
         std::uint32_t sizeY;
         std::uint32_t sizeZ;
     };
-
-//    struct EmitterDescription {
-//        bool looped = false;
-//        bool additiveBlend = false;
-//        bool startShapeFill = false;
-//        bool endShapeFill = false;
-//
-//        std::uint32_t particlesToEmit = 0;
-//        std::uint32_t emissionTimeMs = 0;
-//        std::uint32_t particleLifeTimeMs = 0;
-//        std::uint32_t randomSeed = 0;
-//        float particleStartSpeed = 0;
-//
-//        std::uint32_t bakingFrameTimeMs = 0;
-//        std::uint32_t particleOrientation = 0;
-//        std::uint32_t shapeDistributionType = 0;
-//        std::uint32_t startShapeType = 0;
-//        std::uint32_t endShapeType = 0;
-//
-//        math::vector3f startShapeArgs = {0};
-//        math::vector3f endShapeArgs = {0};
-//        math::vector3f endShapeOffset = {0};
-//        math::vector3f minXYZ = {0};
-//        math::vector3f maxXYZ = {0};
-//        math::vector2f maxSize = {0};
-//
-//        std::string texturePath;
-//        util::Description makeDescription();
-//    };
-    
-//    using EmitterDescriptionPtr = std::unique_ptr<EmitterDescription>;
     
     class ResourceProvider {
     public:
