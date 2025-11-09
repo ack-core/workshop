@@ -334,7 +334,10 @@ namespace util {
         void set(const std::string &key, const math::vector4f &value) {
             _setValue(key, value);
         }
-
+        void set(const std::string &key, const std::string &value) {
+            _setValue(key, value);
+        }
+        
     private:
         template <typename T> T _getValue(const std::string &key) const {
             auto index = find(key);

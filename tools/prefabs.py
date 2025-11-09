@@ -30,7 +30,7 @@ def collect_prefabs(src: str, dst: str):
                 relpath_from = os.path.normpath(os.path.join(os.path.basename(src), os.path.join(os.path.relpath(path, src), file)))
                 print("---- ", fullpath_from)
                 with open(fullpath_from, mode="r", encoding="utf-8") as src_file:
-                   prefabs[relpath_from] = src_file.read()
+                   prefabs[relpath_from.replace(".txt", "")] = src_file.read()
 
     with open(dst, mode="wb") as dst_file:
         dst_file.write(b'PREFABS!')

@@ -7,6 +7,7 @@
 #include "contexts/debug_context.h"
 #include "contexts/editor/editor_main_context.h"
 #include "contexts/editor/editor_camera_context.h"
+#include "contexts/editor/editor_prefab_context.h"
 #include "contexts/editor/editor_voxel_mesh_context.h"
 #include "contexts/editor/editor_particles_context.h"
 
@@ -29,6 +30,7 @@ namespace game {
         {"default", {
             &makeContext<EditorCameraContext>,
             &makeContext<EditorMainContext, CameraAccessInterface>,
+            &makeContext<EditorPrefabContext, NodeAccessInterface>,
             &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
             &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
         }}

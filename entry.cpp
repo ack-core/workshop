@@ -32,9 +32,9 @@ dh::DataHubPtr datahub;
 
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
-    platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&data, std::size_t size) {
+    platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
         rendering = foundation::RenderingInterface::instance(platform);
-        resourceProvider = resource::ResourceProvider::instance(platform, rendering, data, size);
+        resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
         scene = voxel::SceneInterface::instance(platform, rendering);
         simulation = voxel::WorldInterface::instance(platform, resourceProvider, scene);
         raycast = voxel::RaycastInterface::instance(platform, scene);

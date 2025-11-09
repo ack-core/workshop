@@ -88,7 +88,6 @@ namespace game {
 
 namespace game {
     struct EditorNodeParticles : public EditorNode {
-        std::string emitterPath = "<None>";
         std::optional<util::Description> currentDesc;
         std::optional<util::Description> originDesc;
         foundation::RenderTexturePtr texture;
@@ -101,6 +100,7 @@ namespace game {
         ~EditorNodeParticles() override {}
         
         void update(float dtSec) override;
+        void setResourcePath(const API &api, const std::string &path) override;
     };
     
     class EditorParticlesContext : public Context {

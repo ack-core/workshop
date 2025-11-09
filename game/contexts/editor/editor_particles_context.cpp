@@ -376,6 +376,24 @@ namespace game {
             particles->setTransform(math::transform3f::identity().translated(position + (parent ? parent->position : math::vector3f(0, 0, 0))));
         }
     }
+    void EditorNodeParticles::setResourcePath(const API &api, const std::string &path) {
+        resourcePath = path;
+        api.resources->getOrLoadEmitter(path.c_str(), [this, &api](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+            if (desc.empty() == false) {
+                originDesc = desc;
+                texture = t;
+                map = m;
+                
+                if (map) {
+                    voxel::ParticlesParams parameters (*originDesc);
+                    const util::Description &desc = *originDesc->getSubDesc("emitter");
+                    particles = api.scene->addParticles(texture, map, parameters);
+                    particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
+                    api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                }
+            }
+        });
+    }
 
     EditorParticlesContext::EditorParticlesContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess)
     : _api(std::move(api))
@@ -391,7 +409,7 @@ namespace game {
         _handlers["editor.setPath"] = &EditorParticlesContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorParticlesContext::_startEditing;
         _handlers["editor.stopEditing"] = &EditorParticlesContext::_stopEditing;
-        _handlers["editor.reload"] = &EditorParticlesContext::_reload;
+        _handlers["editor.reloadResources"] = &EditorParticlesContext::_reload;
         _handlers["editor.particles.emission"] = &EditorParticlesContext::_emissionSet;
         _handlers["editor.particles.visual"] = &EditorParticlesContext::_visualSet;
         _handlers["editor.resource.save"] = &EditorParticlesContext::_save;
@@ -463,7 +481,7 @@ namespace game {
 
     bool EditorParticlesContext::_selectNode(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_particles " + node->emitterPath);
+            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_particles " + node->resourcePath);
         }
         else {
             _clearEditingTools();
@@ -478,20 +496,21 @@ namespace game {
 
     bool EditorParticlesContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            node->emitterPath = data;
-            
-            _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-                if (desc.empty() == false) {
-                    node->originDesc = desc;
-                    node->texture = t;
-                    node->map = m;
-                    
-                    if (node->map) {
-                        _recreateParticles(*node, false);
-                        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-                    }
-                }
-            });
+            node->setResourcePath(_api, data);
+//            node->resourcePath = data;
+//            
+//            _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+//                if (desc.empty() == false) {
+//                    node->originDesc = desc;
+//                    node->texture = t;
+//                    node->map = m;
+//                    
+//                    if (node->map) {
+//                        _recreateParticles(*node, false);
+//                        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+//                    }
+//                }
+//            });
             return true;
         }
         return false;
@@ -545,13 +564,13 @@ namespace game {
     
     bool EditorParticlesContext::_reload(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            _api.resources->removeEmitter(node->emitterPath.data());
+            _api.resources->removeEmitter(node->resourcePath.data());
             
             // updating all emitter nodes
             _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
                 std::shared_ptr<EditorNodeParticles> emitterNode = std::dynamic_pointer_cast<EditorNodeParticles>(node);
                 if (emitterNode && emitterNode->particles) {
-                    const char *path = emitterNode->emitterPath.c_str();
+                    const char *path = emitterNode->resourcePath.c_str();
                     _api.resources->getOrLoadEmitter(path, [emitterNode, this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
                         if (desc.empty() == false) {
                             emitterNode->originDesc = desc;
@@ -573,13 +592,13 @@ namespace game {
     bool EditorParticlesContext::_save(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             _savingCfg = util::serializeDescription(*node->currentDesc);
-            _api.platform->saveFile((node->emitterPath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, node](bool result) {
+            _api.platform->saveFile((node->resourcePath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, node](bool result) {
                 const std::size_t width = node->emitter.getMap()->getWidth();
                 const std::size_t height = node->emitter.getMap()->getHeight();
                 auto tgaResult = editor::writeTGA(node->emitter.getMapRaw(), width, height);
                 _savingMap = std::move(tgaResult.first);
             
-                _api.platform->saveFile((node->emitterPath + ".tga").c_str(), _savingMap.get(), tgaResult.second, [this, node](bool result) {
+                _api.platform->saveFile((node->resourcePath + ".tga").c_str(), _savingMap.get(), tgaResult.second, [this, node](bool result) {
                     _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
                     _savingMap = nullptr;
                 });

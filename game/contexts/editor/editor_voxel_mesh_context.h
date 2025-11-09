@@ -6,13 +6,13 @@
 
 namespace game {
     struct EditorNodeVoxelMesh : public EditorNode {
-        std::string meshPath = "<None>";
         voxel::SceneInterface::VoxelMeshPtr mesh;
         
         EditorNodeVoxelMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeVoxelMesh() override {}
         
         void update(float dtSec) override;
+        void setResourcePath(const API &api, const std::string &path) override;
     };
 
     class EditorVoxelMeshContext : public Context {

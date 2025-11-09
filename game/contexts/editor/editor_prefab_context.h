@@ -6,7 +6,7 @@
 
 namespace game {
     struct EditorNodePrefab : public EditorNode {
-        std::string prefabPath = "<None>";
+        util::Description prefabDesc;
         
         EditorNodePrefab(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodePrefab() override {}
@@ -32,5 +32,7 @@ namespace game {
         bool _selectNode(const std::string &data);
         bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);
+        bool _savePrefab(const std::string &data);
+        bool _reloadPrefabs(const std::string &data);
     };
 }

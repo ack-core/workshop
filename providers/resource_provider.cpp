@@ -86,6 +86,7 @@ namespace {
                 data += *(std::uint32_t *)(data + 0);
                 const std::size_t descLen = *(std::uint32_t *)(data + 0) - 4;
                 prefabs.emplace(std::move(prefabPath), util::parseDescription(data + 4, descLen));
+                data += *(std::uint32_t *)(data + 0);
             }
             
             return true;
@@ -577,7 +578,11 @@ namespace resource {
         }
     }
     void ResourceProviderImpl::reloadPrefabs() {
-        
+        _platform->loadFile(resource::PREFAB_BIN, [this](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
+            if (readPrefabs(_prefabs, prefabsData.get()) == false) {
+                _platform->logError("[ResourceProviderImpl::ResourceProviderImpl] Invalid prefabs.bin");
+            }
+        });
     }
     
     void ResourceProviderImpl::update(float dtSec) {

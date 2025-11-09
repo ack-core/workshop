@@ -14,6 +14,7 @@ namespace game {
         _handlers["editor.selectNode"] = &EditorPrefabContext::_selectNode;
         _handlers["editor.setPath"] = &EditorPrefabContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorPrefabContext::_startEditing;
+        _handlers["editor.savePrefab"] = &EditorPrefabContext::_savePrefab;
 
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
@@ -35,14 +36,15 @@ namespace game {
     
     bool EditorPrefabContext::_selectNode(const std::string &data) {
         if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
-            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_prefab " + node->prefabPath);
+            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_prefab " + node->resourcePath);
         }
         return false;
     }
     
     bool EditorPrefabContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
-            node->prefabPath = data;
+            node->resourcePath = data;
+            node->prefabDesc = _api.resources->getPrefab(data.c_str());
             
 //            _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
 //                node->mesh = _api.scene->addVoxelMesh(data, offset);
@@ -53,12 +55,61 @@ namespace game {
         }
         return false;
     }
-        
+    
     bool EditorPrefabContext::_startEditing(const std::string &data) {
+        if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
+            if (node->prefabDesc.empty() == false) {
+                for (auto &index : node->prefabDesc) {
+                    const util::Description *desc = std::any_cast<util::Description>(&index.second);
+                    if (desc) {
+                        math::vector3f position = desc->get<math::vector3f>("position");
+                        
+                        if (index.first.find('.') == std::string::npos) { // root node comes first
+                            if (_nodeAccess.hasNodeWithName(index.first)) {
+                                _api.platform->sendEditorMsg("engine.prefab.editFail", index.first);
+                                break;
+                            }
+                            position = node->position; // place tree where the prefab is
+                        }
 
+                        const EditorNodeType type = desc->get<EditorNodeType>("type");
+                        const std::string resourcePath = desc->get<std::string>("resourcePath");
+                        _nodeAccess.createNode(type, index.first, position, resourcePath);
+                        _api.platform->sendEditorMsg("engine.insertNode", index.first);
+                    }
+                }
+            }
+            return true;
+        }
         return false;
     }
     
+    bool EditorPrefabContext::_savePrefab(const std::string &data) {
+        struct fn {
+            static void addNode(util::Description &out, EditorNode &node, bool isRoot) {
+                const math::vector3f position = isRoot ? math::vector3f(0, 0, 0) : node.position;
+                util::Description &nodeDesc = out.addSubDesc(node.name);
+                nodeDesc.set("type", int(node.type));
+                nodeDesc.set("position", position);
+                nodeDesc.set("resourcePath", node.resourcePath);
+                
+                for (auto &item : node.children) {
+                    addNode(out, *item.second, false);
+                }
+            }
+        };
+        if (std::shared_ptr<EditorNode> node = _nodeAccess.getSelectedNode().lock()) {
+            util::Description prefabDesc;
+            fn::addNode(prefabDesc, *node, true);
+            _api.platform->sendEditorMsg("engine.savePrefab", util::serializeDescription(prefabDesc));
+        }
+        
+        return true;
+    }
 
+    bool EditorPrefabContext::_reloadPrefabs(const std::string &data) {
+        _api.resources->reloadPrefabs();
+        return true;
+    }
 }
 

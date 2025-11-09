@@ -7,6 +7,13 @@ namespace game {
             mesh->setPosition(position + (parent ? parent->position : math::vector3f(0, 0, 0)));
         }
     }
+    void EditorNodeVoxelMesh::setResourcePath(const API &api, const std::string &path) {
+        resourcePath = path;
+        api.resources->getOrLoadVoxelMesh(path.c_str(), [this, &api](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+            mesh = api.scene->addVoxelMesh(data, offset);
+            api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+        });
+    }
 
     EditorVoxelMeshContext::EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess) : _api(std::move(api)), _nodeAccess(nodeAccess) {
         EditorNode::makeByType[std::size_t(EditorNodeType::MESH)] = [](std::size_t typeIndex) {
@@ -17,7 +24,7 @@ namespace game {
         _handlers["editor.setPath"] = &EditorVoxelMeshContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorVoxelMeshContext::_startEditing;
         _handlers["editor.stopEditing"] = &EditorVoxelMeshContext::_stopEditing;
-        _handlers["editor.reload"] = &EditorVoxelMeshContext::_reload;
+        _handlers["editor.reloadResources"] = &EditorVoxelMeshContext::_reload;
         _handlers["editor.mesh.offset"] = &EditorVoxelMeshContext::_meshOffset;
         _handlers["editor.resource.save"] = &EditorVoxelMeshContext::_save;
 
@@ -41,19 +48,20 @@ namespace game {
     
     bool EditorVoxelMeshContext::_selectNode(const std::string &data) {
         if (std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock())) {
-            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_mesh " + node->meshPath);
+            _api.platform->sendEditorMsg("engine.nodeSelected", data + " inspect_mesh " + node->resourcePath);
         }
         return false;
     }
     
     bool EditorVoxelMeshContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock())) {
-            node->meshPath = data;
-            
-            _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
-                node->mesh = _api.scene->addVoxelMesh(data, offset);
-                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-            });
+            node->setResourcePath(_api, data);
+//            node->resourcePath = data;
+//
+//            _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+//                node->mesh = _api.scene->addVoxelMesh(data, offset);
+//                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+//            });
             
             return true;
         }
@@ -84,13 +92,13 @@ namespace game {
     bool EditorVoxelMeshContext::_reload(const std::string &data) {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
-            _api.resources->removeMesh(node->meshPath.data());
+            _api.resources->removeMesh(node->resourcePath.data());
             
             // updating all mesh nodes
             _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
                 std::shared_ptr<EditorNodeVoxelMesh> meshNode = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(node);
                 if (meshNode && meshNode->mesh) {
-                    _api.resources->getOrLoadVoxelMesh(meshNode->meshPath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+                    _api.resources->getOrLoadVoxelMesh(meshNode->resourcePath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
                         meshNode->mesh = _api.scene->addVoxelMesh(data, offset);
                         meshNode->mesh->setPosition(meshNode->position);
                         _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
@@ -126,13 +134,13 @@ namespace game {
                 util::Description &parameters = desc.addSubDesc("parameters");
                 parameters.set("offset", math::vector3f(off.x, off.y, off.z));
                 _savingCfg = util::serializeDescription(desc);
-                _api.platform->saveFile((node->meshPath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this](bool result) {
+                _api.platform->saveFile((node->resourcePath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this](bool result) {
                     _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
                 });
             }
             else {
                 // deleting
-                _api.platform->saveFile((node->meshPath + ".txt").c_str(), nullptr, 0, [this](bool result) {
+                _api.platform->saveFile((node->resourcePath + ".txt").c_str(), nullptr, 0, [this](bool result) {
                     _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
                 });
             }

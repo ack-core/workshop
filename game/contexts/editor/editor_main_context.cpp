@@ -57,11 +57,29 @@ namespace game {
     const std::weak_ptr<EditorNode> &EditorMainContext::getSelectedNode() const {
         return _currentNode;
     }
+
+    bool EditorMainContext::hasNodeWithName(const std::string &name) const {
+        return _nodes.find(name) != _nodes.end();
+    }
     
     void EditorMainContext::forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) {
         for (auto &item : _nodes) {
             handler(item.second);
         }
+    }
+    
+    void EditorMainContext::createNode(EditorNodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) {
+        std::size_t typeIndex = std::size_t(type);
+        const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
+        const std::string parentName = getParentName(name);
+        if (parentName.length()) {
+            auto parentIndex = _nodes.find(parentName);
+            value->second->parent = parentIndex->second;
+            parentIndex->second->children.emplace(name, value->second);
+        }
+        value->second->name = name;
+        value->second->position = position;
+        value->second->setResourcePath(_api, resourcePath);
     }
     
     void EditorMainContext::update(float dtSec) {
@@ -91,7 +109,8 @@ namespace game {
                 value->second->name = name;
                 value->second->position = _cameraAccess.getTarget();
                 _movingTool = _makeMovingTool(value->second->position);
-                _api.platform->sendEditorMsg("engine.nodeCreated", value->first + " " + nodeTypeToPanelMapping[typeIndex]);
+                const char *isPrefab = value->second->type == EditorNodeType::PREFAB ? " 1" : " 0";
+                _api.platform->sendEditorMsg("engine.nodeCreated", value->first + isPrefab);
             }
             else {
                 _api.platform->logError("[EditorMainContext::_createNode] Unknown node type");
@@ -128,29 +147,27 @@ namespace game {
                 if (nodeIndex != _nodes.end()) {
                     std::shared_ptr<EditorNode> tmp = nodeIndex->second;
                     if (tmp->children.empty()) {
-                        tmp->parent->children.erase(tmp->name);
-                        tmp->parent = nullptr;
-                        tmp->name = nv;
-
-                        auto parentName = getParentName(nv);
-                        auto parentIndex = _nodes.find(parentName);
-                        if (parentName.length()) {
-                            if (parentIndex != _nodes.end() && parentName != old) {
-                                parentIndex->second->children.emplace(nv, tmp);
-                                tmp->parent = parentIndex->second;
+                        const std::string newParentName = getParentName(nv);
+                        if (newParentName.length()) {
+                            auto newParentIndex = _nodes.find(newParentName);
+                            if (newParentIndex != _nodes.end() && newParentName != old && tmp->type != EditorNodeType::PREFAB && newParentIndex->second->type != EditorNodeType::PREFAB) {
+                                newParentIndex->second->children.emplace(nv, tmp);
+                                tmp->parent->children.erase(tmp->name);
+                                tmp->parent = newParentIndex->second;
                             }
                             else {
-                                _api.platform->sendEditorMsg("engine.nodeRenamed", "error " + old + " " + nv);
+                                _api.platform->sendEditorMsg("engine.nodeRenamed", "declined " + old + " " + nv);
                                 return true;
                             }
                         }
 
+                        tmp->name = nv;
                         _nodes.erase(nodeIndex);
                         _nodes.emplace(nv, tmp);
                         _api.platform->sendEditorMsg("engine.nodeRenamed", "ok " + data);
                     }
                     else {
-                        _api.platform->sendEditorMsg("engine.nodeRenamed", "error " + old + " " + nv);
+                        _api.platform->sendEditorMsg("engine.nodeRenamed", "declined " + old + " " + nv);
                     }
                 }
                 else {
@@ -158,7 +175,7 @@ namespace game {
                 }
             }
             else {
-                _api.platform->sendEditorMsg("engine.nodeRenamed", "error " + old + " " + nv);
+                _api.platform->sendEditorMsg("engine.nodeRenamed", "declined " + old + " " + nv);
             }
         }
         else {

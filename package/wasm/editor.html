@@ -94,6 +94,12 @@
             padding: 0.5px 2px 0px 2px;
             color: #8888a3 !important;
         }
+        .webix_popup_button.confirm {
+            background: #c8c8c8;
+        }
+        .webix_popup_button:hover {
+            background: #d8d8d8 !important;
+        }
         .webix_secondary .webix_button {
             background: #d8d8d8;
         }
@@ -189,11 +195,13 @@
 
         const uiInspectMappingBasic = {
             "null" : [],
+            "inspect_prefab" : ["node_0", "node_1_resource_list"],
             "inspect_mesh" : ["node_0", "node_1_resource_list"],
             "inspect_particles" : ["node_0", "node_1_resource_list"]
         };
         const uiInspectMappingEdit = {
             "null" : [],
+            "inspect_prefab" : [],
             "inspect_mesh" : ["voxel_mesh_edit_0"],
             "inspect_particles" : ["particles_edit_0", "particles_edit_1"]
         };
@@ -281,6 +289,8 @@
                 listResources["inspect_mesh"].sort();
                 listResources["inspect_particles"] = await dirBinaryData.getDirectoryHandle("emitters").then(r => utility.listFilesInDirectory("emitters", r, "bin"));
                 listResources["inspect_particles"].sort();
+                listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
+                listResources["inspect_prefab"].sort();
             },
             setElementValue: function(name, value) {
                 const e = $$(name);
@@ -296,7 +306,7 @@
                 uiNodeTree.define("height", leaves.clientHeight);
                 uiNodeTree.resize();
             },
-            addItemToNodeTree: function(name) {
+            insertItemToNodeTree: function(name) {
                 var lastParent = null;
                 name.split('.').forEach(node => {
                     const current = lastParent ? lastParent + "." + node : node;
@@ -308,18 +318,22 @@
                     }
                     lastParent = current;
                 });
+            },
+            addItemToNodeTree: function(name, isPrefab) {
+                utility.insertItemToNodeTree(name);
 
+                if (isPrefab) {
+                    uiNodeTree.getItem(name).isPrefab = isPrefab;
+                    utility.highlightSubTree(name);
+                }
                 uiNodeTree.select(name);
             },
-            markSubTreeColor: function() {
-                const selected = uiNodeTree.getSelectedId();
-                uiNodeTree.addCss(selected, "highlight");
-
-
-                uiNodeTree.data.eachSubItem(selected, function(child) {
+            highlightSubTree: function(id) {
+                uiNodeTree.addCss(id, "highlight");
+                uiNodeTree.data.eachSubItem(id, function(child) {
                     uiNodeTree.addCss(child.id, "highlight");
                 });
-                uiNodeTree.refresh(selected);
+                uiNodeTree.refresh(id);
             },
             showInspectPanel: function(panel, arg0) {
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
@@ -342,6 +356,19 @@
                 }
 
                 uiInspectType = panel;
+            },
+            hostUpdateResources: async function(handler) {
+                try {
+                    const response = await fetch("host_cmd_update");
+                    if (!response.ok) {
+                        throw new Error("Response status: ${response.status}");
+                    }
+
+                    handler();
+                } 
+                catch (error) {
+                    console.error(error.message);
+                }
             }
         }
 
@@ -454,7 +481,8 @@
                 $$("edit_resource_buttons").hide();
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiEditor.sendMsg("editor.selectNode", id);
-                if ($$("node_tree").getParentId(id)) {
+
+                if (uiNodeTree.getParentId(id) || uiNodeTree.getItem(id).isPrefab) {
                     $$("save_prefab_button").hide();
                 }
                 else {
@@ -513,6 +541,9 @@
                 args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
                 args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue();
                 uiEditor.sendMsg("editor.particles.visual", args);
+            },
+            prefabSave: function(e) {
+                uiEditor.sendMsg("editor.savePrefab", "");
             }
         }
         
@@ -550,7 +581,7 @@
                 {rows: [
                         elements.button(null, "\u2795", "New node", uiBindings.treeNewNode),
                         elements.button(null, "\u274C", "Delete node", (e) => {}),
-                        elements.button("save_prefab_button", "\uD83D\uDCBE", "Save prefab", utility.markSubTreeColor),
+                        elements.button("save_prefab_button", "\uD83D\uDCBE", "Save prefab", uiBindings.prefabSave),
                         {}
                 ]},
                 {rows: [
@@ -778,23 +809,25 @@
 
         if (typeof uiEditor != 'undefined') {
             uiEditor["engine.nodeCreated"] = function(data) {
-                console.log("[JS] engine.nodeCreated ", data);
-                const [name, panel] = data.split(' ');
-                utility.addItemToNodeTree(name);
+                console.log("[JS] engine.nodeCreated", data);
+                const [name, isPrefabStr] = data.split(' ');
+                const isPrefab = parseInt(isPrefabStr);
+                utility.addItemToNodeTree(name, isPrefab);
                 utility.setElementValue("inspect_node_name", name);
             }
             uiEditor["engine.nodeSelected"] = function(data) {
-                console.log("[JS] engine.nodeSelected ", data);
+                console.log("[JS] engine.nodeSelected", data);
                 const [name, panel, arg0] = data.split(' ');
                 utility.showInspectPanel(panel, arg0);
                 utility.setElementValue("inspect_node_name", name);
             }
             uiEditor["engine.nodeRenamed"] = function(data) {
-                console.log("[JS] engine.nodeRenamed ", data);
+                console.log("[JS] engine.nodeRenamed", data);
                 var [success, old, nv] = data.split(' ');
                 if (success == "ok") {
+                    let isPrefab = uiNodeTree.getItem(old).isPrefab;
                     uiNodeTree.remove(old);
-                    utility.addItemToNodeTree(nv);                    
+                    utility.addItemToNodeTree(nv, isPrefab);                    
                 }
                 else {
                     utility.setElementValue($$("inspect_node_name"), old);
@@ -805,6 +838,13 @@
                 Object.entries({inspect_node_x: x, inspect_node_y: y, inspect_node_z: z}).forEach(([k, v]) => {
                     utility.setElementValue(k, v);
                 });
+            }
+            uiEditor["engine.insertNode"] = function(data) {
+                console.log("[JS] engine.insertNode", data);
+                utility.insertItemToNodeTree(data);
+            }
+            uiEditor["engine.prefab.editFail"] = function(data) {
+                webix.alert("Attempt to edit a prefab with the root node '" + data + "'. But the tree already has a node with that name");
             }
             uiEditor["engine.mesh.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
@@ -859,17 +899,9 @@
             }
             uiEditor["engine.saved"] = async function(data) {
                 if (parseInt(data)) {
-                    try {
-                        const response = await fetch("host_cmd_update");
-                        if (!response.ok) {
-                            throw new Error("Response status: ${response.status}");
-                        }
-
-                        uiEditor.sendMsg("editor.reload", "");
-                    } 
-                    catch (error) {
-                        console.error(error.message);
-                    }
+                    utility.hostUpdateResources(() => {
+                        uiEditor.sendMsg("editor.reloadResources", "");
+                    });
                 }
 
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
@@ -881,6 +913,42 @@
 
                 $$("edit_resource_buttons").hide();
                 $$("processing_popup").hide();
+            }
+            uiEditor["engine.savePrefab"] = async function(data) {
+                try {
+                    let prefabDir = await dirResources.getDirectoryHandle("prefabs");
+                    const fileHandle = await window.showSaveFilePicker({
+                        suggestedName: "prefab",
+                        startIn: prefabDir,
+                        types: [
+                            {
+                                description: "Prefab Descriptions",
+                                accept: { "text/plain": [".txt"] },
+                            },
+                        ],
+                    });
+
+                    $$("processing_popup").show();
+
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(data);
+                    await writable.close();
+
+                    console.log("[JS] Prefab saved as", fileHandle.name);
+
+                    listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
+                    listResources["inspect_prefab"].sort();
+
+                    await utility.hostUpdateResources(() => {
+                        uiEditor.sendMsg("editor.reloadPrefabs", "");
+                        $$("processing_popup").hide();
+                    });
+                }
+                catch (err) {
+                    if (err.name != "AbortError") {
+                        console.error("[JS] Error saving prefab:", err);
+                    }
+                }
             }
         }
 

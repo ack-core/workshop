@@ -17,9 +17,9 @@ namespace game {
         static std::shared_ptr<EditorNode> (*makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex);
         
         std::string name;
+        std::string resourcePath = "<None>";
         EditorNodeType type;
         math::vector3f position;
-        voxel::SceneInterface::BoundingBoxPtr bbox;
         
         std::shared_ptr<EditorNode> parent;
         std::map<std::string, std::shared_ptr<EditorNode>> children;
@@ -28,12 +28,15 @@ namespace game {
         virtual ~EditorNode() {}
         
         virtual void update(float dtSec) {}
+        virtual void setResourcePath(const API &api, const std::string &path) {}
     };
     
     class NodeAccessInterface : public Interface {
     public:
         virtual const std::weak_ptr<EditorNode> &getSelectedNode() const = 0;
+        virtual bool hasNodeWithName(const std::string &name) const = 0;
         virtual void forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) = 0;
+        virtual void createNode(EditorNodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) = 0;
 
     public:
         ~NodeAccessInterface() override {}
