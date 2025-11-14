@@ -1,0 +1,24 @@
+emitter {
+    additiveBlend : bool = true
+    bakingFrameTimeMs : integer = 10
+    emissionTimeMs : integer = 1000
+    endShapeArgs : vector3f = 10.000000 0.000000 0.000000
+    endShapeFill : bool = false
+    endShapeOffset : vector3f = 0.000000 10.000000 0.000000
+    endShapeType : integer = 1
+    looped : bool = true
+    maxSize : vector2f = 1.000000 1.000000
+    maxXYZ : vector3f = 10.000000 20.000000 10.000000
+    minXYZ : vector3f = -10.000000 -10.000000 -10.000000
+    particleLifeTimeMs : integer = 1000
+    particleOrientation : integer = 1
+    particleStartSpeed : number = 10.000000
+    particlesToEmit : integer = 10
+    randomSeed : integer = 0
+    shapeDistributionType : integer = 3
+    startShapeArgs : vector3f = 0.000000 0.000000 0.000000
+    startShapeFill : bool = false
+    startShapeType : integer = 1
+    texture : string = "textures/particles/test"
+}
+

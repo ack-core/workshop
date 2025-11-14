@@ -32,6 +32,7 @@ namespace game {
         bool _selectNode(const std::string &data);
         bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);
+        bool _validatePrefab(const EditorNode &rootNode);
         bool _savePrefab(const std::string &data);
         bool _reloadPrefabs(const std::string &data);
     };

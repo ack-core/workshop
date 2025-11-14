@@ -4,6 +4,7 @@
 
 namespace game {
     static const char EDITOR_REFRESH_PARAM[] = "4";
+    static const char EDITOR_EMPTY_RESOURCE_PATH[] = "<None>";
     
     enum class EditorNodeType : std::size_t {
         PREFAB = 0,
@@ -17,7 +18,7 @@ namespace game {
         static std::shared_ptr<EditorNode> (*makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex);
         
         std::string name;
-        std::string resourcePath = "<None>";
+        std::string resourcePath = EDITOR_EMPTY_RESOURCE_PATH;
         EditorNodeType type;
         math::vector3f position;
         

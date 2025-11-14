@@ -87,7 +87,7 @@ namespace resource {
         virtual void removeMesh(const char *meshPath) = 0;
         virtual void removeGround(const char *groundPath) = 0;
         virtual void removeEmitter(const char *configPath) = 0;
-        virtual void reloadPrefabs() = 0;
+        virtual void reloadPrefabs(util::callback<void()> &&completion) = 0;
 
         // Provider tracks resources life time and tries to free them
         //

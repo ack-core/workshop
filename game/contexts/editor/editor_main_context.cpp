@@ -1,13 +1,21 @@
 
 #include "editor_main_context.h"
+#include <list>
 
 namespace game {
     std::shared_ptr<EditorNode> (*EditorNode::makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex) = {nullptr};
     
     namespace {
+        std::size_t g_unknownPrefabIndex = 0;
         std::size_t g_unknownNodeIndex = 0;
-        std::string getNextUnknownName() {
-            return "new" + std::to_string(g_unknownNodeIndex++);
+    
+        std::string getNextUnknownName(EditorNodeType type) {
+            if (type == EditorNodeType::PREFAB) {
+                return "p" + std::to_string(g_unknownPrefabIndex++);
+            }
+            else {
+                return "new" + std::to_string(g_unknownNodeIndex++);
+            }
         }
         std::string getParentName(const std::string &nodeName) {
             std::size_t pos = nodeName.rfind('.');
@@ -26,6 +34,7 @@ namespace game {
     
     EditorMainContext::EditorMainContext(API &&api, CameraAccessInterface &cameraAccess) : _api(std::move(api)), _cameraAccess(cameraAccess) {
         _handlers["editor.createNode"] = &EditorMainContext::_createNode;
+        _handlers["editor.deleteNode"] = &EditorMainContext::_deleteNode;
         _handlers["editor.selectNode"] = &EditorMainContext::_selectNode;
         _handlers["editor.renameNode"] = &EditorMainContext::_renameNode;
         _handlers["editor.moveNode"] = &EditorMainContext::_moveNode;
@@ -100,9 +109,9 @@ namespace game {
         std::size_t typeIndex;
         if (args >> typeIndex) {
             if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
-                std::string name = getNextUnknownName();
+                std::string name = getNextUnknownName(EditorNodeType(typeIndex));
                 while (_nodes.find(name) != _nodes.end()) {
-                    name = getNextUnknownName();
+                    name = getNextUnknownName(EditorNodeType(typeIndex));
                 }
                 
                 const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
@@ -119,6 +128,32 @@ namespace game {
         else {
             _api.platform->logError("[EditorMainContext::_createNode] Invalid arguments");
         }
+        return true;
+    }
+    
+    bool EditorMainContext::_deleteNode(const std::string &data) {
+        std::list<std::string> toDeleteList;
+        toDeleteList.emplace_back(data);
+        
+        while (toDeleteList.empty() == false) {
+            auto index = _nodes.find(toDeleteList.front());
+            if (index != _nodes.end()) {
+                if (index->second->parent) {
+                    index->second->parent->children.erase(index->second->name);
+                    index->second->parent = nullptr;
+                }
+
+                for (auto &item : index->second->children) {
+                    toDeleteList.emplace_back(item.first);
+                }
+
+                _nodes.erase(index->first);
+            }
+            toDeleteList.pop_front();
+        }
+        
+        _api.platform->sendEditorMsg("engine.nodeDeleted", data);
+        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return true;
     }
     
@@ -150,7 +185,8 @@ namespace game {
                         const std::string newParentName = getParentName(nv);
                         if (newParentName.length()) {
                             auto newParentIndex = _nodes.find(newParentName);
-                            if (newParentIndex != _nodes.end() && newParentName != old && tmp->type != EditorNodeType::PREFAB && newParentIndex->second->type != EditorNodeType::PREFAB) {
+                            bool prefabLimited = tmp->type != EditorNodeType::PREFAB && newParentIndex->second->type != EditorNodeType::PREFAB;
+                            if (newParentIndex != _nodes.end() && newParentName != old && prefabLimited) {
                                 newParentIndex->second->children.emplace(nv, tmp);
                                 tmp->parent->children.erase(tmp->name);
                                 tmp->parent = newParentIndex->second;
@@ -189,7 +225,7 @@ namespace game {
         math::vector3f newPos;
         
         if (input >> newPos.x >> newPos.y >> newPos.z) {
-            const math::vector3f currentPosition = _movingTool->getPosition();
+            //const math::vector3f currentPosition = _movingTool->getPosition();
             _movingTool->setPosition(newPos);
             _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         }

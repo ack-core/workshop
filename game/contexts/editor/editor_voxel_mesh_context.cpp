@@ -55,14 +55,7 @@ namespace game {
     
     bool EditorVoxelMeshContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock())) {
-            node->setResourcePath(_api, data);
-//            node->resourcePath = data;
-//
-//            _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
-//                node->mesh = _api.scene->addVoxelMesh(data, offset);
-//                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-//            });
-            
+            node->setResourcePath(_api, data);            
             return true;
         }
         return false;

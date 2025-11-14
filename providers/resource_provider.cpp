@@ -80,6 +80,7 @@ namespace {
         if (memcmp(data, "PREFABS!", 4) == 0) {
             std::uint32_t prefabsCount = *(std::uint32_t *)(data + 8);
             data += 12;
+            prefabs.clear();
             
             for (std::uint32_t i = 0; i < prefabsCount; i++) {
                 std::string prefabPath = reinterpret_cast<const char *>(data + 4);
@@ -122,7 +123,7 @@ namespace resource {
         void removeMesh(const char *meshPath) override;
         void removeGround(const char *groundPath) override;
         void removeEmitter(const char *configPath) override;
-        void reloadPrefabs() override;
+        void reloadPrefabs(util::callback<void()> &&completion) override;
 
         void update(float dtSec) override;
         
@@ -577,10 +578,14 @@ namespace resource {
             index->second.outdated = true;
         }
     }
-    void ResourceProviderImpl::reloadPrefabs() {
-        _platform->loadFile(resource::PREFAB_BIN, [this](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
-            if (readPrefabs(_prefabs, prefabsData.get()) == false) {
-                _platform->logError("[ResourceProviderImpl::ResourceProviderImpl] Invalid prefabs.bin");
+    void ResourceProviderImpl::reloadPrefabs(util::callback<void()> &&completion) {
+        _platform->loadFile(resource::PREFAB_BIN, [this, cb = std::move(completion)](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
+            if (prefabsSize && readPrefabs(_prefabs, prefabsData.get())) {
+                cb();
+                _platform->logMsg("[ResourceProviderImpl::reloadPrefabs] prefabs.bin reloaded");
+            }
+            else {
+                _platform->logError("[ResourceProviderImpl::reloadPrefabs] Invalid prefabs.bin");
             }
         });
     }

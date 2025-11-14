@@ -27,6 +27,7 @@ namespace game {
         const std::initializer_list<MakeContextFunc> makers;
     }
     states[] = {
+#ifdef IS_EDITOR
         {"default", {
             &makeContext<EditorCameraContext>,
             &makeContext<EditorMainContext, CameraAccessInterface>,
@@ -34,9 +35,12 @@ namespace game {
             &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
             &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
         }}
-//        {"default", {
-//            &makeContext<DebugContext>
-//        }}
+#endif
+#ifdef IS_CLIENT
+        {"default", {
+            &makeContext<DebugContext>
+        }}
+#endif
     };
 };
 

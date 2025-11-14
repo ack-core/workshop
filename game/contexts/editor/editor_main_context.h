@@ -41,6 +41,7 @@ namespace game {
         
     private:
         bool _createNode(const std::string &data);
+        bool _deleteNode(const std::string &data);
         bool _selectNode(const std::string &data);
         bool _renameNode(const std::string &data);
         bool _moveNode(const std::string &data);

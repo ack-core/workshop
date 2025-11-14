@@ -131,7 +131,9 @@ namespace game {
 //        std::string ooo = util::serializeConfig(cfg);
         
         
-        printf("!\n");
+        printf("--->> %s\n", util::serializeDescription(_api.resources->getPrefab("prefabs/prefab")).c_str());
+        printf("--->> %s\n", util::serializeDescription(_api.resources->getPrefab("prefabs/new_prefab_name")).c_str());
+        printf("--->> %s\n", util::serializeDescription(_api.resources->getPrefab("prefabs/test1")).c_str());
     }
     
     DebugContext::~DebugContext() {

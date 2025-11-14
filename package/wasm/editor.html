@@ -74,11 +74,28 @@
             background-color: transparent;
             background-position: top 0px right 0.5px;
         }
-        .webix_tree .webix_tree_item.webix_selected {
+        .webix_tree .webix_tree_item.webix_selected,
+        .webix_tree .webix_tree_item.webix_selected:active,
+        .webix_tree .webix_tree_item.webix_selected:focus {
             background-color: #A4A4A4;
         }
         .webix_tree_item.highlight {
             color: gold;
+        }
+        .webix_tree .webix_tree_checkbox {
+            -webkit-appearance: none;
+            appearance: none;
+            display: inline-block;
+            width: 8px; height: 8px;
+            border: 1px solid #DADEE0;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-left: 7px; margin-right: 9px;
+            position: relative;
+            outline: none;
+        }
+        .webix_tree .webix_tree_checkbox:checked{
+            background: #DADEE0;
         }
         .webix_el_text input {
             padding: 2px;
@@ -92,7 +109,8 @@
         }
         .webix_button {
             padding: 0.5px 2px 0px 2px;
-            color: #8888a3 !important;
+            color: #000000 !important;
+            font-size: 12px;
         }
         .webix_popup_button.confirm {
             background: #c8c8c8;
@@ -477,20 +495,24 @@
             treeNewNode: function(e) {
                 $$("add_node_menu").show(e.getNode(), {pos: "right"});
             },
+            treeDeleteNode: function(e) {
+                uiEditor.sendMsg("editor.deleteNode", uiNodeTree.getSelectedId());
+            },
             treeNodeSelected: function(id) {
                 $$("edit_resource_buttons").hide();
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiEditor.sendMsg("editor.selectNode", id);
 
                 if (uiNodeTree.getParentId(id) || uiNodeTree.getItem(id).isPrefab) {
-                    $$("save_prefab_button").hide();
+                    $$("root_nodes_only").hide();
                 }
                 else {
-                    $$("save_prefab_button").show();
+                    $$("root_nodes_only").show();
                 }
             },
             spaceClick: function(e) {
                 $$("edit_resource_buttons").hide();
+                $$("root_nodes_only").hide();
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiNodeTree.unselectAll();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
@@ -580,14 +602,19 @@
             cols: [
                 {rows: [
                         elements.button(null, "\u2795", "New node", uiBindings.treeNewNode),
-                        elements.button(null, "\u274C", "Delete node", (e) => {}),
-                        elements.button("save_prefab_button", "\uD83D\uDCBE", "Save prefab", uiBindings.prefabSave),
+                        elements.button(null, "\u274C", "Delete node", uiBindings.treeDeleteNode),
+                        {
+                            id: "root_nodes_only",
+                            rows: [
+                                elements.button(null, "\uD83D\uDCBE", "Save prefab", uiBindings.prefabSave),
+                            ]
+                        },                        
                         {}
                 ]},
                 {rows: [
                         {
-                            id: "node_tree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, data: [],
-                            template: "{common.icon()}&nbsp;#value#",
+                            id: "node_tree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, checkbox: true, data: [],
+                            template: "{common.icon()}{common.checkbox()}&nbsp;#value#",
                             css: { "background" : "transparent", "color" : "lightGray" },
                             on: {
                                 onAfterOpen: utility.adjustTree,
@@ -670,7 +697,8 @@
                                 css: {"margin-left": "3px !important"},
                                 rows: [
                                     elements.button(null, "\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
-                                    elements.button(null, " ", "???")
+                                    elements.button(null, "\u2FFB", "Clone resource"),
+                                    elements.button(null, "\u274C", "Delete resource")
                                 ]
                             }
                         ]
@@ -805,7 +833,7 @@
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
 
-        $$("save_prefab_button").hide();
+        $$("root_nodes_only").hide();
 
         if (typeof uiEditor != 'undefined') {
             uiEditor["engine.nodeCreated"] = function(data) {
@@ -814,6 +842,13 @@
                 const isPrefab = parseInt(isPrefabStr);
                 utility.addItemToNodeTree(name, isPrefab);
                 utility.setElementValue("inspect_node_name", name);
+            }
+            uiEditor["engine.nodeDeleted"] = function(data) {
+                console.log("[JS] engine.nodeDeleted", data);
+                uiNodeTree.remove(uiNodeTree.getSelectedId());
+                utility.adjustTree();
+                uiNodeTree.refresh();
+                uiBindings.spaceClick(null);
             }
             uiEditor["engine.nodeSelected"] = function(data) {
                 console.log("[JS] engine.nodeSelected", data);
@@ -913,6 +948,9 @@
 
                 $$("edit_resource_buttons").hide();
                 $$("processing_popup").hide();
+            }
+            uiEditor["engine.prefab.saveFail"] = function(data) {
+                webix.alert(data);
             }
             uiEditor["engine.savePrefab"] = async function(data) {
                 try {

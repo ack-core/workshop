@@ -15,6 +15,7 @@ namespace game {
         _handlers["editor.setPath"] = &EditorPrefabContext::_setResourcePath;
         _handlers["editor.startEditing"] = &EditorPrefabContext::_startEditing;
         _handlers["editor.savePrefab"] = &EditorPrefabContext::_savePrefab;
+        _handlers["editor.reloadPrefabs"] = &EditorPrefabContext::_reloadPrefabs;
 
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
@@ -45,11 +46,6 @@ namespace game {
         if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
             node->resourcePath = data;
             node->prefabDesc = _api.resources->getPrefab(data.c_str());
-            
-//            _api.resources->getOrLoadVoxelMesh(data.c_str(), [node, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
-//                node->mesh = _api.scene->addVoxelMesh(data, offset);
-//                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-//            });
             
             return true;
         }
@@ -83,6 +79,23 @@ namespace game {
         }
         return false;
     }
+
+    bool EditorPrefabContext::_validatePrefab(const EditorNode &rootNode) {
+        struct fn {
+            static bool validateNode(const EditorNode &node) {
+                bool error = false;
+                
+                error |= node.resourcePath == EDITOR_EMPTY_RESOURCE_PATH;
+                
+                for (auto &item : node.children) {
+                    error |= validateNode(*item.second);
+                }
+                
+                return error;
+            }
+        };
+        return fn::validateNode(rootNode);
+    }
     
     bool EditorPrefabContext::_savePrefab(const std::string &data) {
         struct fn {
@@ -99,16 +112,23 @@ namespace game {
             }
         };
         if (std::shared_ptr<EditorNode> node = _nodeAccess.getSelectedNode().lock()) {
-            util::Description prefabDesc;
-            fn::addNode(prefabDesc, *node, true);
-            _api.platform->sendEditorMsg("engine.savePrefab", util::serializeDescription(prefabDesc));
+            if (_validatePrefab(*node) == false) { // no errors
+                util::Description prefabDesc;
+                fn::addNode(prefabDesc, *node, true);
+                _api.platform->sendEditorMsg("engine.savePrefab", util::serializeDescription(prefabDesc));
+            }
+            else {
+                _api.platform->sendEditorMsg("engine.prefab.saveFail", "Subtree is not valid for saving");
+            }
         }
         
         return true;
     }
 
     bool EditorPrefabContext::_reloadPrefabs(const std::string &data) {
-        _api.resources->reloadPrefabs();
+        _api.resources->reloadPrefabs([]() {
+            
+        });
         return true;
     }
 }
