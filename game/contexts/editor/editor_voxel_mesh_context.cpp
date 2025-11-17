@@ -4,15 +4,22 @@
 namespace game {
     void EditorNodeVoxelMesh::update(float dtSec) {
         if (mesh) {
-            mesh->setPosition(position + (parent ? parent->position : math::vector3f(0, 0, 0)));
+            globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
+            mesh->setPosition(globalPosition);
         }
     }
     void EditorNodeVoxelMesh::setResourcePath(const API &api, const std::string &path) {
-        resourcePath = path;
-        api.resources->getOrLoadVoxelMesh(path.c_str(), [this, &api](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
-            mesh = api.scene->addVoxelMesh(data, offset);
-            api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-        });
+        if (path.empty()) {
+            resourcePath = EDITOR_EMPTY_RESOURCE_PATH;
+            mesh = nullptr;
+        }
+        else {
+            resourcePath = path;
+            api.resources->getOrLoadVoxelMesh(path.c_str(), [this, &api](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+                mesh = api.scene->addVoxelMesh(data, offset);
+                api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            });
+        }
     }
 
     EditorVoxelMeshContext::EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess) : _api(std::move(api)), _nodeAccess(nodeAccess) {
@@ -55,7 +62,7 @@ namespace game {
     
     bool EditorVoxelMeshContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock())) {
-            node->setResourcePath(_api, data);            
+            node->setResourcePath(_api, data);
             return true;
         }
         return false;
@@ -86,6 +93,7 @@ namespace game {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             _api.resources->removeMesh(node->resourcePath.data());
+            _api.resources->removeMesh(data.c_str());
             
             // updating all mesh nodes
             _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
@@ -93,11 +101,13 @@ namespace game {
                 if (meshNode && meshNode->mesh) {
                     _api.resources->getOrLoadVoxelMesh(meshNode->resourcePath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
                         meshNode->mesh = _api.scene->addVoxelMesh(data, offset);
-                        meshNode->mesh->setPosition(meshNode->position);
+                        meshNode->mesh->setPosition(meshNode->globalPosition);
                         _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     });
                 }
             });
+            
+            _api.platform->sendEditorMsg("engine.resourcesReloaded", "");
             return true;
         }
         return false;
@@ -121,20 +131,21 @@ namespace game {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             util::IntegerOffset3D off = node->mesh->getCenterOffset();
+            const std::string extPath = node->resourcePath + ".txt";
             
             if (off.x || off.y || off.z) {
                 util::Description desc;
                 util::Description &parameters = desc.addSubDesc("parameters");
                 parameters.set("offset", math::vector3f(off.x, off.y, off.z));
                 _savingCfg = util::serializeDescription(desc);
-                _api.platform->saveFile((node->resourcePath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this](bool result) {
-                    _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
+                _api.platform->saveFile(extPath.c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, path = node->resourcePath](bool result) {
+                    _api.platform->sendEditorMsg("engine.saved", path);
                 });
             }
             else {
                 // deleting
-                _api.platform->saveFile((node->resourcePath + ".txt").c_str(), nullptr, 0, [this](bool result) {
-                    _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
+                _api.platform->saveFile(extPath.c_str(), nullptr, 0, [this, path = node->resourcePath](bool result) {
+                    _api.platform->sendEditorMsg("engine.saved", path);
                 });
             }
             return true;

@@ -8,8 +8,17 @@
 
 // Ideas for the buttons at the top:
 // + center camera pivot to selected object
-// + activate all particles and animations
+// + enable/disable 30fps update
 //
+
+// Editor TODO:
+// + changing prefab (coordinates) -> resave doesnt work
+// + reload prefabs on resources change
+// + graph widget
+// + split html/js
+// BUGS:
+// + save prefab works for non-top nodes
+// + transform in 3+ hierarchy
 
 namespace game {
     class EditorMainContext : public Context, public NodeAccessInterface {

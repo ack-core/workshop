@@ -87,7 +87,7 @@ namespace game {
             parentIndex->second->children.emplace(name, value->second);
         }
         value->second->name = name;
-        value->second->position = position;
+        value->second->localPosition = position;
         value->second->setResourcePath(_api, resourcePath);
     }
     
@@ -116,8 +116,8 @@ namespace game {
                 
                 const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
                 value->second->name = name;
-                value->second->position = _cameraAccess.getTarget();
-                _movingTool = _makeMovingTool(value->second->position);
+                value->second->localPosition = _cameraAccess.getTarget();
+                _movingTool = _makeMovingTool(value->second->localPosition);
                 const char *isPrefab = value->second->type == EditorNodeType::PREFAB ? " 1" : " 0";
                 _api.platform->sendEditorMsg("engine.nodeCreated", value->first + isPrefab);
             }
@@ -132,28 +132,30 @@ namespace game {
     }
     
     bool EditorMainContext::_deleteNode(const std::string &data) {
-        std::list<std::string> toDeleteList;
-        toDeleteList.emplace_back(data);
-        
-        while (toDeleteList.empty() == false) {
-            auto index = _nodes.find(toDeleteList.front());
-            if (index != _nodes.end()) {
-                if (index->second->parent) {
-                    index->second->parent->children.erase(index->second->name);
-                    index->second->parent = nullptr;
-                }
+        if (_currentNode.lock()) {
+            std::list<std::string> toDeleteList;
+            toDeleteList.emplace_back(data);
+            
+            while (toDeleteList.empty() == false) {
+                auto index = _nodes.find(toDeleteList.front());
+                if (index != _nodes.end()) {
+                    if (index->second->parent) {
+                        index->second->parent->children.erase(index->second->name);
+                        index->second->parent = nullptr;
+                    }
 
-                for (auto &item : index->second->children) {
-                    toDeleteList.emplace_back(item.first);
-                }
+                    for (auto &item : index->second->children) {
+                        toDeleteList.emplace_back(item.first);
+                    }
 
-                _nodes.erase(index->first);
+                    _nodes.erase(index->first);
+                }
+                toDeleteList.pop_front();
             }
-            toDeleteList.pop_front();
+            
+            _api.platform->sendEditorMsg("engine.nodeDeleted", data);
+            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         }
-        
-        _api.platform->sendEditorMsg("engine.nodeDeleted", data);
-        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return true;
     }
     
@@ -161,8 +163,8 @@ namespace game {
         const auto &index = _nodes.find(data);
         if (index != _nodes.end()) {
             _currentNode = index->second;
-            _movingTool = _makeMovingTool(index->second->position);
-            _movingTool->setBase(index->second->parent ? index->second->parent->position : math::vector3f(0, 0, 0));
+            _movingTool = _makeMovingTool(index->second->localPosition);
+            _movingTool->setBase(index->second->parent ? index->second->parent->globalPosition : math::vector3f(0, 0, 0));
             _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             return false; // A typed context must handle this
         }
@@ -225,7 +227,6 @@ namespace game {
         math::vector3f newPos;
         
         if (input >> newPos.x >> newPos.y >> newPos.z) {
-            //const math::vector3f currentPosition = _movingTool->getPosition();
             _movingTool->setPosition(newPos);
             _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         }

@@ -373,26 +373,36 @@ namespace game {
 namespace game {
     void EditorNodeParticles::update(float dtSec) {
         if (particles) {
-            particles->setTransform(math::transform3f::identity().translated(position + (parent ? parent->position : math::vector3f(0, 0, 0))));
+            globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
+            particles->setTransform(math::transform3f::identity().translated(globalPosition));
         }
     }
     void EditorNodeParticles::setResourcePath(const API &api, const std::string &path) {
-        resourcePath = path;
-        api.resources->getOrLoadEmitter(path.c_str(), [this, &api](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-            if (desc.empty() == false) {
-                originDesc = desc;
-                texture = t;
-                map = m;
-                
-                if (map) {
-                    voxel::ParticlesParams parameters (*originDesc);
-                    const util::Description &desc = *originDesc->getSubDesc("emitter");
-                    particles = api.scene->addParticles(texture, map, parameters);
-                    particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
-                    api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+        if (path.empty()) {
+            resourcePath = EDITOR_EMPTY_RESOURCE_PATH;
+            particles = nullptr;
+            texture = nullptr;
+            map = nullptr;
+            originDesc = {};
+        }
+        else {
+            resourcePath = path;
+            api.resources->getOrLoadEmitter(path.c_str(), [this, &api](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+                if (desc.empty() == false) {
+                    originDesc = desc;
+                    texture = t;
+                    map = m;
+                    
+                    if (map) {
+                        voxel::ParticlesParams parameters (*originDesc);
+                        const util::Description &desc = *originDesc->getSubDesc("emitter");
+                        particles = api.scene->addParticles(texture, map, parameters);
+                        particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
+                        api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     EditorParticlesContext::EditorParticlesContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess)
@@ -431,7 +441,7 @@ namespace game {
     void EditorParticlesContext::update(float dtSec) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             if (node->particles) {
-                math::vector3f position = node->position + (node->parent ? node->parent->position : math::vector3f(0, 0, 0));
+                math::vector3f position = node->globalPosition;
                 
                 if (_endShapeTool && node->currentDesc.has_value()) {
                     _endShapeTool->setBase(position);
@@ -497,20 +507,6 @@ namespace game {
     bool EditorParticlesContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             node->setResourcePath(_api, data);
-//            node->resourcePath = data;
-//            
-//            _api.resources->getOrLoadEmitter(data.c_str(), [node, this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-//                if (desc.empty() == false) {
-//                    node->originDesc = desc;
-//                    node->texture = t;
-//                    node->map = m;
-//                    
-//                    if (node->map) {
-//                        _recreateParticles(*node, false);
-//                        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
-//                    }
-//                }
-//            });
             return true;
         }
         return false;
@@ -565,7 +561,8 @@ namespace game {
     bool EditorParticlesContext::_reload(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             _api.resources->removeEmitter(node->resourcePath.data());
-            
+            _api.resources->removeEmitter(data.c_str());
+
             // updating all emitter nodes
             _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
                 std::shared_ptr<EditorNodeParticles> emitterNode = std::dynamic_pointer_cast<EditorNodeParticles>(node);
@@ -585,6 +582,9 @@ namespace game {
                     });
                 }
             });
+            
+            _api.platform->sendEditorMsg("engine.resourcesReloaded", "");
+            return true;
         }
         return false;
     }
@@ -598,8 +598,8 @@ namespace game {
                 auto tgaResult = editor::writeTGA(node->emitter.getMapRaw(), width, height);
                 _savingMap = std::move(tgaResult.first);
             
-                _api.platform->saveFile((node->resourcePath + ".tga").c_str(), _savingMap.get(), tgaResult.second, [this, node](bool result) {
-                    _api.platform->sendEditorMsg("engine.saved", std::to_string(int(result)));
+                _api.platform->saveFile((node->resourcePath + ".tga").c_str(), _savingMap.get(), tgaResult.second, [this, path = node->resourcePath](bool result) {
+                    _api.platform->sendEditorMsg("engine.saved", path);
                     _savingMap = nullptr;
                 });
             });

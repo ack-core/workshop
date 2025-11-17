@@ -91,6 +91,8 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
                 offsetX, offsetY, offsetZ = (int(round(float(v))) for v in match.groups())
     except OSError as e:
         pass
+    
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
 
     with open(src, mode="rb") as src_file:
         with open(dst, mode="wb") as dst_file:

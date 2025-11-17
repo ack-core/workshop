@@ -84,6 +84,8 @@ def convert_emitter(src: str, map: str, dst: str):
         map_width, map_height = map_image.size
     except OSError as e:
         pass
+    
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
 
     with open(src, mode="r") as src_file:
         with open(dst, mode="wb") as dst_file:

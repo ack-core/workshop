@@ -194,7 +194,7 @@ const imports = {
                     const pathParts = path.split('/');
                     for (let i = 0; i < pathParts.length; i++) {
                         if (i == pathParts.length - 1) {
-                            file = await handle.getFileHandle(pathParts[i], { create: true });
+                            let file = await handle.getFileHandle(pathParts[i], { create: true });
                             if (data) {
                                 writable = await file.createWritable();
                                 const u8sharedData = new Uint8Array(memory.buffer, data, dataLen);

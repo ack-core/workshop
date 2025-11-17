@@ -12,6 +12,7 @@ namespace game {
         ~EditorNodePrefab() override {}
         
         void update(float dtSec) override;
+        void setResourcePath(const API &api, const std::string &path) override;
     };
 
     class EditorPrefabContext : public Context {

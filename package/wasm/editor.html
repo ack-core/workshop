@@ -152,6 +152,9 @@
         .webix_accordionitem.collapsed .webix_accordionitem_header {
             background-color: lightGray;
         }
+        .webix_template {
+            padding: 0px;
+        }
         
         input[type=number]::-webkit-inner-spin-button {
             transform: scaleX(0.75);
@@ -223,6 +226,12 @@
             "inspect_mesh" : ["voxel_mesh_edit_0"],
             "inspect_particles" : ["particles_edit_0", "particles_edit_1"]
         };
+        const resourcesExtMapping = {
+            "null" : [],
+            "inspect_prefab" : [".txt"],
+            "inspect_mesh" : [".vox", ".txt"],
+            "inspect_particles" : [".txt", ".tga"]
+        };
         const uiPtcShapeTypes = [
             { id: 1, value: "Disk"}, 
             { id: 2, value: "Box"}
@@ -248,6 +257,44 @@
         var listResources = {};
         var dirBinaryData = null;
         var dirResources = null;
+
+        webix.protoUI({
+            name: "canvasfield",
+            defaults: {},
+
+            $init: function(cfg) {
+                this._canvasId = webix.uid().toString();
+                this._tmId = webix.uid().toString();
+                
+                this.ui = webix.ui({
+                    container: this.$view,
+                    height: cfg.height,
+                    id: "1111111111",
+                    rows: [
+                        {
+                            cols: [
+                                { view: "button", width: 80, value: "Go" },
+                                { view: "text", autowidth: true }
+                            ],
+                            height: 24
+                        },
+                        {
+                            view: "template",
+                            id: this._tmId,
+                            borderless: true,
+                            template: '<canvas id="' + this._canvasId + '" style="width:100%;height:100%;display:block"></canvas>'
+                        }
+                    ]
+                });
+            },
+
+            $setSize: function(x, y) {
+                webix.ui.view.prototype.$setSize.call(this, x, y);
+                $$(this._tmId).$view.style.height = (this.$height - 24).toString() + "px";
+            }
+
+        }, webix.ui.view);
+
 
         let utility = {
             parseConfig: function(text) {
@@ -280,6 +327,18 @@
                 }
                 return parseBlock(text);
             },
+            getPathDirectoryAndName: async function(dirHandle, relPath) {
+                const pathParts = relPath.split('/');
+                var handle = dirHandle;
+                for (let i = 0; i < pathParts.length; i++) {
+                    if (i == pathParts.length - 1) {
+                        return [handle, pathParts[i]];
+                    }
+                    else {
+                        handle = await handle.getDirectoryHandle(pathParts[i], { create: true });
+                    }
+                }
+            },
             listFilesInDirectory: async function(baseDirName, dirHandle, ext) {
                 var result = [];
                 for await (const value of dirHandle.values()) {                    
@@ -293,22 +352,32 @@
                 }
                 return result;
             },
-            setWorkingDirectory: async function() {
-                editorRootDirectory = await window.showDirectoryPicker({ mode: "readwrite" });
-                dirResources = await editorRootDirectory.getDirectoryHandle("resources");
-                dirBinaryData = await editorRootDirectory.getDirectoryHandle("binary").then(r => r.getDirectoryHandle("data"));
-                let texturesRoot = await dirBinaryData.getDirectoryHandle("textures");
-
-                listParticleTextures = await texturesRoot.getDirectoryHandle("particles").then(r => utility.listFilesInDirectory("textures/particles", r, "png"));
-                listParticleTextures.sort();
-
+            updateResourcesList: async function() {
                 listResources["null"] = []
-                listResources["inspect_mesh"] = await dirBinaryData.getDirectoryHandle("meshes").then(r => utility.listFilesInDirectory("meshes", r, "vxm"));
+                listResources["inspect_mesh"] = await dirResources.getDirectoryHandle("meshes").then(r => utility.listFilesInDirectory("meshes", r, "vox"));
                 listResources["inspect_mesh"].sort();
-                listResources["inspect_particles"] = await dirBinaryData.getDirectoryHandle("emitters").then(r => utility.listFilesInDirectory("emitters", r, "bin"));
+                listResources["inspect_particles"] = await dirResources.getDirectoryHandle("emitters").then(r => utility.listFilesInDirectory("emitters", r, "txt"));
                 listResources["inspect_particles"].sort();
                 listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
                 listResources["inspect_prefab"].sort();
+            },
+            setWorkingDirectory: async function() {
+                try {
+                    editorRootDirectory = await window.showDirectoryPicker({ mode: "readwrite" });
+                    dirResources = await editorRootDirectory.getDirectoryHandle("resources");
+                    dirBinaryData = await editorRootDirectory.getDirectoryHandle("binary").then(r => r.getDirectoryHandle("data"));
+                } 
+                catch (error) {
+                    webix.alert("Can't recognise working directory structure");
+                    return false;
+                }
+
+                texturesRoot = await dirBinaryData.getDirectoryHandle("textures");
+                listParticleTextures = await texturesRoot.getDirectoryHandle("particles").then(r => utility.listFilesInDirectory("textures/particles", r, "png"));
+                listParticleTextures.sort();
+
+                utility.updateResourcesList();
+                return true;
             },
             setElementValue: function(name, value) {
                 const e = $$(name);
@@ -396,8 +465,8 @@
                     view: "label", label: value, height: 24, autowidth: true, align: align
                 };
             },
-            button: function(id, value, tooltip, action = null) {
-                const bid = id != null ? id : webix.uid().toString();
+            button: function(value, tooltip, action = null) {
+                const bid = webix.uid().toString();
                 return { 
                     id: bid, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: 800 },
                     click: () => { if (action) action($$(bid)); }
@@ -475,10 +544,12 @@
 
         uiBindings = {
             setWorkingDirectory: async function(e) {
-                await utility.setWorkingDirectory();
-                document.getElementById("nodes").style.visibility = "visible";
-                $$("top_buttons").show();
-                e.hide();
+                let success = await utility.setWorkingDirectory();
+                if (success) {
+                    document.getElementById("nodes").style.visibility = "visible";
+                    $$("top_buttons").show();
+                    e.hide();                    
+                }
             },
             resourceSaveAndExit: function(e) {
                 $$("processing_popup").show();
@@ -502,17 +573,9 @@
                 $$("edit_resource_buttons").hide();
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiEditor.sendMsg("editor.selectNode", id);
-
-                if (uiNodeTree.getParentId(id) || uiNodeTree.getItem(id).isPrefab) {
-                    $$("root_nodes_only").hide();
-                }
-                else {
-                    $$("root_nodes_only").show();
-                }
             },
             spaceClick: function(e) {
                 $$("edit_resource_buttons").hide();
-                $$("root_nodes_only").hide();
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiNodeTree.unselectAll();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
@@ -566,6 +629,61 @@
             },
             prefabSave: function(e) {
                 uiEditor.sendMsg("editor.savePrefab", "");
+            },
+            deleteResource: async function(e) {
+                let path = uiResourceList.getSelectedId();
+                if (path.length) {
+                    try {
+                        let [dir, name] = await utility.getPathDirectoryAndName(dirResources, path);
+                        const exts = resourcesExtMapping[uiInspectType];
+                        for (const ext of exts) {
+                            let file = await dir.getFileHandle(name + ext);
+                            await file.remove();
+                        }
+                    } 
+                    catch (error) {}
+                }
+                listResources[uiInspectType] = listResources[uiInspectType].filter(item => item !== path);
+                uiResourceList.remove(path);
+                uiEditor.sendMsg("editor.setPath", "");
+                uiEditor["engine.refresh"]();
+            },
+            cloneResource: async function(e) {
+                let path = uiResourceList.getSelectedId();
+                if (path.length) {
+                    webix.prompt({
+                        title: "Clone with a new name", ok: "Clone", cancel: "Cancel", input: { value: path }
+                    }).then(async (newPath) => {
+                        $$("processing_popup").show();
+                        try {
+                            let [dstDir, dstName] = await utility.getPathDirectoryAndName(dirResources, newPath);
+                            let [srcDir, srcName] = await utility.getPathDirectoryAndName(dirResources, path);
+                            const exts = resourcesExtMapping[uiInspectType];
+                            for (const ext of exts) {
+                                try {
+                                    let file = await dstDir.getFileHandle(dstName + ext);
+                                    await file.remove();
+                                } 
+                                catch (error) {}
+
+                                const srcFileHandle = await srcDir.getFileHandle(srcName + ext);
+                                const srcFile = await srcFileHandle.getFile();
+                                const dstFileHandle = await dstDir.getFileHandle(dstName + ext, { create: true });
+                                const writable = await dstFileHandle.createWritable();
+                                await writable.write(srcFile);
+                                await writable.close();
+                            }
+                        } 
+                        catch (error) {}
+                        await utility.updateResourcesList();
+                        await utility.hostUpdateResources(() => {
+                            if (!uiResourceList.exists(newPath)) {
+                                uiResourceList.add({ id: newPath, value: newPath });
+                            }
+                            uiEditor.sendMsg("editor.reloadResources", newPath);
+                        });
+                    });
+                }
             }
         }
         
@@ -574,13 +692,13 @@
             margin: 0,
             rows: [
                 {cols: [
-                    elements.button(null, "\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
+                    elements.button("\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
                     {
                         id: "top_buttons",
                         hidden: true,
                         cols: [
-                            elements.button(null, "\uD83D\uDCE4", "Load scene"),
-                            elements.button(null, "\uD83D\uDCBE", "Save scene"),
+                            elements.button("\uD83D\uDCE4", "Load scene"),
+                            elements.button("\uD83D\uDCBE", "Save scene"),
                             elements.toggle('<img src="editor/arrows.svg"></img>', '<img src="editor/arrows.svg"></img>', true, "Hide/show moving tool", (e, nv) => {})
                         ]
                     },
@@ -589,8 +707,8 @@
                         id: "edit_resource_buttons",
                         hidden: true,
                         cols: [
-                            elements.button(null, "\uD83D\uDCBE", "Save resource & Exit", uiBindings.resourceSaveAndExit),
-                            elements.button(null, "\uD83D\uDEAB", "Discard changes in the resource & Exit", uiBindings.resourceDiscardAndExit)
+                            elements.button("\uD83D\uDCBE", "Save resource & Exit", uiBindings.resourceSaveAndExit),
+                            elements.button("\uD83D\uDEAB", "Discard changes in the resource & Exit", uiBindings.resourceDiscardAndExit)
                         ]
                     },
 
@@ -601,14 +719,9 @@
             container: "nodes",
             cols: [
                 {rows: [
-                        elements.button(null, "\u2795", "New node", uiBindings.treeNewNode),
-                        elements.button(null, "\u274C", "Delete node", uiBindings.treeDeleteNode),
-                        {
-                            id: "root_nodes_only",
-                            rows: [
-                                elements.button(null, "\uD83D\uDCBE", "Save prefab", uiBindings.prefabSave),
-                            ]
-                        },                        
+                        elements.button("\u2795", "New node", uiBindings.treeNewNode),
+                        elements.button("\u274C", "Delete node", uiBindings.treeDeleteNode),
+                        elements.button("\uD83D\uDCBE", "Save prefab", uiBindings.prefabSave),
                         {}
                 ]},
                 {rows: [
@@ -690,15 +803,16 @@
                                         }
                                     }
                                 },
+                                { view: "canvasfield", id: "cv1", height: 100 },
                                 { height: 16 }
                             ]},
                             {
                                 width: 28,
                                 css: {"margin-left": "3px !important"},
                                 rows: [
-                                    elements.button(null, "\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
-                                    elements.button(null, "\u2FFB", "Clone resource"),
-                                    elements.button(null, "\u274C", "Delete resource")
+                                    elements.button("\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
+                                    elements.button("\u2FFB", "Clone resource", uiBindings.cloneResource),
+                                    elements.button("\u274C", "Delete resource", uiBindings.deleteResource)
                                 ]
                             }
                         ]
@@ -744,12 +858,12 @@
                                 elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiBindings.particlesEmission),
                             ]},
                             {cols: [
-                                elements.button(null, "\u25b6", "Restart"), 
+                                elements.button("\u25b6", "Restart"), 
                                 elements.label("Looped:"),
                                 elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), { width: 10 },
                                 elements.label("Seed:"),
                                 elements.text("inspect_ptc_rnd_seed", "0", 70, true),
-                                elements.button(null, "\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
+                                elements.button("\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
                             ]},
                             { height: 16 }
                         ]
@@ -832,8 +946,6 @@
         uiNodeTree = $$("node_tree");
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
-
-        $$("root_nodes_only").hide();
 
         if (typeof uiEditor != 'undefined') {
             uiEditor["engine.nodeCreated"] = function(data) {
@@ -933,12 +1045,10 @@
                 });
             }
             uiEditor["engine.saved"] = async function(data) {
-                if (parseInt(data)) {
-                    utility.hostUpdateResources(() => {
-                        uiEditor.sendMsg("editor.reloadResources", "");
-                    });
-                }
-
+                console.log("[JS] engine.saved", data);
+                utility.hostUpdateResources(() => {
+                    uiEditor.sendMsg("editor.reloadResources", data);
+                });
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
                     $$(item).hide();
                 });
@@ -947,7 +1057,6 @@
                 });
 
                 $$("edit_resource_buttons").hide();
-                $$("processing_popup").hide();
             }
             uiEditor["engine.prefab.saveFail"] = function(data) {
                 webix.alert(data);
@@ -974,12 +1083,9 @@
 
                     console.log("[JS] Prefab saved as", fileHandle.name);
 
-                    listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
-                    listResources["inspect_prefab"].sort();
-
+                    await utility.updateResourcesList();
                     await utility.hostUpdateResources(() => {
                         uiEditor.sendMsg("editor.reloadPrefabs", "");
-                        $$("processing_popup").hide();
                     });
                 }
                 catch (err) {
@@ -987,6 +1093,9 @@
                         console.error("[JS] Error saving prefab:", err);
                     }
                 }
+            }
+            uiEditor["engine.resourcesReloaded"] = function(data) {
+                $$("processing_popup").hide();
             }
         }
 

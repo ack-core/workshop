@@ -20,12 +20,13 @@ namespace game {
         std::string name;
         std::string resourcePath = EDITOR_EMPTY_RESOURCE_PATH;
         EditorNodeType type;
-        math::vector3f position;
+        math::vector3f globalPosition;
+        math::vector3f localPosition;
         
         std::shared_ptr<EditorNode> parent;
         std::map<std::string, std::shared_ptr<EditorNode>> children;
         
-        EditorNode(std::size_t typeIndex) : type(EditorNodeType(typeIndex)), position(0, 0, 0) {}
+        EditorNode(std::size_t typeIndex) : type(EditorNodeType(typeIndex)), globalPosition(0, 0, 0), localPosition(0, 0, 0) {}
         virtual ~EditorNode() {}
         
         virtual void update(float dtSec) {}

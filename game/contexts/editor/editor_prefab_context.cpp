@@ -6,6 +6,17 @@ namespace game {
 
     }
 
+    void EditorNodePrefab::setResourcePath(const API &api, const std::string &path) {
+        if (path.empty()) {
+            resourcePath = EDITOR_EMPTY_RESOURCE_PATH;
+            prefabDesc = {};
+        }
+        else {
+            resourcePath = path;
+            prefabDesc = api.resources->getPrefab(path.c_str());
+        }
+    }
+
     EditorPrefabContext::EditorPrefabContext(API &&api, NodeAccessInterface &nodeAccess) : _api(std::move(api)), _nodeAccess(nodeAccess) {
         EditorNode::makeByType[std::size_t(EditorNodeType::PREFAB)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodePrefab>(typeIndex));
@@ -44,9 +55,7 @@ namespace game {
     
     bool EditorPrefabContext::_setResourcePath(const std::string &data) {
         if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
-            node->resourcePath = data;
-            node->prefabDesc = _api.resources->getPrefab(data.c_str());
-            
+            node->setResourcePath(_api, data);
             return true;
         }
         return false;
@@ -65,7 +74,7 @@ namespace game {
                                 _api.platform->sendEditorMsg("engine.prefab.editFail", index.first);
                                 break;
                             }
-                            position = node->position; // place tree where the prefab is
+                            position = node->localPosition; // place tree where the prefab is
                         }
 
                         const EditorNodeType type = desc->get<EditorNodeType>("type");
@@ -100,7 +109,7 @@ namespace game {
     bool EditorPrefabContext::_savePrefab(const std::string &data) {
         struct fn {
             static void addNode(util::Description &out, EditorNode &node, bool isRoot) {
-                const math::vector3f position = isRoot ? math::vector3f(0, 0, 0) : node.position;
+                const math::vector3f position = isRoot ? math::vector3f(0, 0, 0) : node.localPosition;
                 util::Description &nodeDesc = out.addSubDesc(node.name);
                 nodeDesc.set("type", int(node.type));
                 nodeDesc.set("position", position);
@@ -112,22 +121,32 @@ namespace game {
             }
         };
         if (std::shared_ptr<EditorNode> node = _nodeAccess.getSelectedNode().lock()) {
+            std::string errorString;
+            
+            // ignore without messagebox
+            if (node->type == EditorNodeType::PREFAB) {
+                return true;
+            }
+            
             if (_validatePrefab(*node) == false) { // no errors
                 util::Description prefabDesc;
                 fn::addNode(prefabDesc, *node, true);
                 _api.platform->sendEditorMsg("engine.savePrefab", util::serializeDescription(prefabDesc));
+                return true;
             }
             else {
-                _api.platform->sendEditorMsg("engine.prefab.saveFail", "Subtree is not valid for saving");
+                errorString = "Subtree is not valid for saving";
             }
+            
+            _api.platform->sendEditorMsg("engine.prefab.saveFail", errorString);
         }
         
         return true;
     }
 
     bool EditorPrefabContext::_reloadPrefabs(const std::string &data) {
-        _api.resources->reloadPrefabs([]() {
-            
+        _api.resources->reloadPrefabs([this]() {
+            _api.platform->sendEditorMsg("engine.resourcesReloaded", "");
         });
         return true;
     }
