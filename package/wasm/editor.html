@@ -5,181 +5,9 @@
     <meta charset="utf-8">
     <link rel="icon" href="data:;base64,=">
     <link rel="stylesheet" href="//cdn.webix.com/edge/skins/mini.css" type="text/css">
+    <link rel="stylesheet" href="editor/styles.css">
     <script src="//cdn.webix.com/edge/webix.js" type="text/javascript"></script>
-    <style>
-        html, body {
-            margin: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0.0, 0.0, 0.0, 1.0);
-        }
-        .rt {
-            width: 100%;
-            height: 100%;
-            display: block;
-            touch-action: none;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            z-index: -999;
-        }
-        .editor {
-            background: transparent;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        .top {
-            background: rgba(255, 255, 255, 0.7);
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: min-content;
-            width: 100%;
-        }
-        .nodes {
-            background: rgba(255, 255, 255, 0.5);
-            position: fixed;
-            overflow-y: auto;
-            scrollbar-color: rgba(255, 255, 255, 0.6) transparent;
-            top: 25px;
-            left: 0;
-            min-width: 100px;
-            height: calc(100vh - 25px);
-            visibility: hidden;
-        }
-        .output {
-            background: rgba(255, 255, 255, 0.6);
-            position: fixed;
-            overflow-y: scroll;
-            bottom: 0;
-            right: 0;
-            height: 100px;
-            min-width: 300px;
-            font-size: 8pt;
-            font-family: Courier New;
-        }
-        .inspect {
-            background: transparent;
-            position: fixed;
-            overflow-y: auto;
-            top: 25px;
-            right: 0;
-            min-width: 100px;
-        }
-        .webix_tree_img {
-            color: lightGrey;
-            background-color: transparent;
-            background-position: top 0px right 0.5px;
-        }
-        .webix_tree .webix_tree_item.webix_selected,
-        .webix_tree .webix_tree_item.webix_selected:active,
-        .webix_tree .webix_tree_item.webix_selected:focus {
-            background-color: #A4A4A4;
-        }
-        .webix_tree_item.highlight {
-            color: gold;
-        }
-        .webix_tree .webix_tree_checkbox {
-            -webkit-appearance: none;
-            appearance: none;
-            display: inline-block;
-            width: 8px; height: 8px;
-            border: 1px solid #DADEE0;
-            border-radius: 4px;
-            vertical-align: middle;
-            margin-left: 7px; margin-right: 9px;
-            position: relative;
-            outline: none;
-        }
-        .webix_tree .webix_tree_checkbox:checked{
-            background: #DADEE0;
-        }
-        .webix_el_text input {
-            padding: 2px;
-        }
-        .webix_inp_label, .webix_el_box {
-            font-size: 8pt !important;
-        }
-        .webix_list_item, .webix_list .webix_list_item.webix_selected {
-            line-height: 20px;
-            padding-top: 0;
-        }
-        .webix_button {
-            padding: 0.5px 2px 0px 2px;
-            color: #000000 !important;
-            font-size: 12px;
-        }
-        .webix_popup_button.confirm {
-            background: #c8c8c8;
-        }
-        .webix_popup_button:hover {
-            background: #d8d8d8 !important;
-        }
-        .webix_secondary .webix_button {
-            background: #d8d8d8;
-        }
-        .webix_view .webix_list {
-            background-color: rgba(255, 255, 255, 0.6);
-        }
-        .webix_el_text input {
-            background-color: #eeeeee;
-        }
-        .webix_el_combo input {
-            padding: 0px 2px 0px 2px !important;
-        }
-        .webix_el_combo .webix_input_icon {
-            width: 19px;
-        }
-        .webix_custom_checkbox {
-            margin-top: -2px;
-            color: #8888a3 !important;
-        }
-        .webix_accordionitem_button {
-            font-size: 10px !important;
-            width: 10px !important;
-            height: 10px !important;
-            color: #475466 !important;
-        }
-        .webix_accordionitem .webix_accordionitem_header {
-            line-height: 10px;
-            font-size: 6pt;
-            text-align: right;
-            background-color: lightGray;
-        }
-        .webix_accordionitem.collapsed .webix_accordionitem_header {
-            background-color: lightGray;
-        }
-        .webix_template {
-            padding: 0px;
-        }
-        
-        input[type=number]::-webkit-inner-spin-button {
-            transform: scaleX(0.75);
-            position: absolute;
-            right: -2px;
-            top: 0;
-            bottom: 0;
-        }
-        @media screen and (orientation:portrait) {
-            .rt, .editor {
-                visibility: hidden;
-            }
-            .output {
-                top: 0;
-                left: 0;
-                height: 100vh;
-            }
-        }
-        @media screen and (orientation:landscape) {
-            html, body {
-                position: fixed;
-            }
-        }
-
-    </style>
+    <script src="editor/components.js" type="text/javascript"></script>
 </head>
 <body>
     <canvas class="rt" id="render_target"></canvas>
@@ -201,11 +29,15 @@
                 return false;
             });
             document.getElementById(name).addEventListener("keydown", (event) => {
-                event.stopPropagation();
+                if (event.key != "Enter") {
+                    event.stopPropagation();
+                }
                 return false;
             });
             document.getElementById(name).addEventListener("keyup", (event) => {
-                event.stopPropagation();
+                if (event.key != "Enter") {
+                    event.stopPropagation();
+                }
                 return false;
             });
             document.getElementById(name).addEventListener("wheel", (event) => {
@@ -224,7 +56,7 @@
             "null" : [],
             "inspect_prefab" : [],
             "inspect_mesh" : ["voxel_mesh_edit_0"],
-            "inspect_particles" : ["particles_edit_0", "particles_edit_1"]
+            "inspect_particles" : ["particles_edit_0", "particles_edit_1", "particles_edit_2"]
         };
         const resourcesExtMapping = {
             "null" : [],
@@ -257,44 +89,6 @@
         var listResources = {};
         var dirBinaryData = null;
         var dirResources = null;
-
-        webix.protoUI({
-            name: "canvasfield",
-            defaults: {},
-
-            $init: function(cfg) {
-                this._canvasId = webix.uid().toString();
-                this._tmId = webix.uid().toString();
-                
-                this.ui = webix.ui({
-                    container: this.$view,
-                    height: cfg.height,
-                    id: "1111111111",
-                    rows: [
-                        {
-                            cols: [
-                                { view: "button", width: 80, value: "Go" },
-                                { view: "text", autowidth: true }
-                            ],
-                            height: 24
-                        },
-                        {
-                            view: "template",
-                            id: this._tmId,
-                            borderless: true,
-                            template: '<canvas id="' + this._canvasId + '" style="width:100%;height:100%;display:block"></canvas>'
-                        }
-                    ]
-                });
-            },
-
-            $setSize: function(x, y) {
-                webix.ui.view.prototype.$setSize.call(this, x, y);
-                $$(this._tmId).$view.style.height = (this.$height - 24).toString() + "px";
-            }
-
-        }, webix.ui.view);
-
 
         let utility = {
             parseConfig: function(text) {
@@ -455,89 +249,6 @@
                 } 
                 catch (error) {
                     console.error(error.message);
-                }
-            }
-        }
-
-        let elements = {
-            label: function(value, align = "left") {
-                return { 
-                    view: "label", label: value, height: 24, autowidth: true, align: align
-                };
-            },
-            button: function(value, tooltip, action = null) {
-                const bid = webix.uid().toString();
-                return { 
-                    id: bid, view: "button",  value: value, width: 24, height: 24, tooltip: { template: tooltip, delay: 800 },
-                    click: () => { if (action) action($$(bid)); }
-                };
-            },
-            toggle: function(on, off, value, tooltip, action = null) {
-                const id = webix.uid().toString();
-                return {
-                    id: id, view: "toggle", offLabel: off, onLabel: on, width: 24, height: 24, value: value,
-                    tooltip: { template: tooltip, delay: 800 },
-                    on: {
-                        onChange: function(nv) {
-                            if (action) action($$(id), nv === "true");
-                        }
-                    }
-                }
-            },
-            text: function(id, value, width, readonly, action = null) {
-                return { 
-                    id: id, view: "text", type: "text", value: value, width: width, height: 24, readonly: readonly, 
-                    on: {
-                        onEnter: function() { this.blur(); },
-                        onChange: function(nv, old) {
-                            if (action) action($$(id), nv, old);
-                        }
-                    }
-                };
-            },
-            number: function(id, tooltip, width, format, value, step, min, max, action = null) {
-                return { 
-                    id: id, view: "text", type:"number", format: format, value: value, height: 24, width: width, 
-                    tooltip: { template: tooltip, delay: 800 },
-                    on: {
-                        onEnter: function(e) {
-                            let element = $$(id);
-                            const currentValue = element.getText(); 
-                            const v = Math.max(min, Math.min(max, currentValue));
-                            element.setValue(v.toString());
-                            this.blur(); 
-                        },
-                        onChange: function(nv, old) {
-                            if (action) action($$(id), nv, old);
-                        }
-                    },
-                    attributes:{ step: step, min: min, max: max }
-                };
-            },
-            combo: function(id, value, list, width, action = null) {
-                return {
-                    id: id, view: "combo", container: "editor", value: value, width: width, height: 24, 
-                    options:{
-                        view: "suggest",
-                        body: {
-                            view: "list",
-                            type: {
-                                height: 22
-                            },
-                            data: list,
-                        }
-                    },
-                    on: {
-                        onChange: (nv, old) => { if (action) action($$(id), nv, old); }
-                    }
-                };
-            },
-            checkbox: function(id, value, action = null) {
-            	return {
-                    id: id, view: "checkbox", value: value, height: 24,
-                    on: {
-                        onChange: (nv, old) => { if (action) action($$(id), nv, old); }
-                    }
                 }
             }
         }
@@ -792,7 +503,6 @@
                                 {
                                     id: "node_resource_list",
                                     view: "list", height: 300, select: true,
-                                    css: {"margin": "3px !important"},
                                     type: {
                                         height: 22
                                     },
@@ -803,7 +513,6 @@
                                         }
                                     }
                                 },
-                                { view: "canvasfield", id: "cv1", height: 100 },
                                 { height: 16 }
                             ]},
                             {
@@ -834,7 +543,7 @@
                             { height: 16 }
                         ]
                     }
-                },                
+                },
                 {
                     id: "particles_edit_0", view: "accordionitem", hidden: true, header: "Emission", headerHeight: 10, headerAltHeight: 10,
                     css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -845,6 +554,7 @@
                                 elements.label("Particles emission time (ms):"), {},
                                 elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 1, 1, 4000, uiBindings.particlesEmission),
                             ]},
+                            elements.graphedit("inspect_ptc_emission_graph", "Emission", 1.0, 0.0, 1.0, 0.0),
                             {cols: [
                                 elements.label("Particles life time (ms):"), {},
                                 elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 1, 1, 4000, uiBindings.particlesEmission),
@@ -919,6 +629,20 @@
 
                                 }),
                             ]},
+                            { height: 16 }
+                        ]
+                    }
+                },
+                {
+                    id: "particles_edit_2", view: "accordionitem", hidden: true, header: "Dynamic", collapsed: true, headerHeight: 10, headerAltHeight: 10,
+                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                    body: {
+                        padding: 3,
+                        rows: [
+                            elements.graphedit("inspect_ptc_width_graph", "Ptc Width", 1.0, 0.0, 99.0, 99.0),
+                            elements.graphedit("inspect_ptc_height_graph", "Ptc Height", 1.0, 0.0, 99.0, 99.0),
+                            elements.graphedit("inspect_ptc_speed_graph", "Ptc Speed", 10.0, -999.0, 999.0, 999.0),
+                            elements.graphedit("inspect_ptc_alpha_graph", "Ptc Alpha", 1.0, 0.0, 1.0, 1.0),
                             { height: 16 }
                         ]
                     }
@@ -1009,6 +733,7 @@
                 $$("edit_resource_buttons").show();
                 uiInspectMappingEdit["inspect_particles"].forEach(item => {
                     $$(item).show();
+                    $$(item).expand();
                 });
 
                 $$("inspect_ptc_texture").getList().clearAll();

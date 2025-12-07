@@ -16,6 +16,7 @@
 // + reload prefabs on resources change
 // + graph widget
 // + split html/js
+// + button in nodes panel are scrolling with panel -> separate them
 // BUGS:
 // + save prefab works for non-top nodes
 // + transform in 3+ hierarchy

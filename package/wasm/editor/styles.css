@@ -1,0 +1,174 @@
+html, body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0.0, 0.0, 0.0, 1.0);
+}
+.rt {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    z-index: -999;
+}
+.editor {
+    background: transparent;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+.top {
+    background: rgba(255, 255, 255, 0.7);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: min-content;
+    width: 100%;
+}
+.nodes {
+    background: rgba(255, 255, 255, 0.5);
+    position: fixed;
+    overflow-y: auto;
+    scrollbar-width: none;
+    top: 25px;
+    left: 0;
+    min-width: 100px;
+    height: calc(100vh - 25px);
+    visibility: hidden;
+}
+.output {
+    background: rgba(255, 255, 255, 0.6);
+    position: fixed;
+    overflow-y: scroll;
+    scrollbar-width: none;
+    bottom: 0;
+    right: 0;
+    height: 100px;
+    min-width: 300px;
+    font-size: 8pt;
+    font-family: Courier New;
+}
+.inspect {
+    background: transparent;
+    position: fixed;
+    overflow-y: scroll;
+    scrollbar-width: none;
+    top: 25px;
+    right: 0;
+    height: calc(100vh - 127px);
+    min-width: 100px;
+}
+.webix_tree_img {
+    color: lightGrey;
+    background-color: transparent;
+    background-position: top 0px right 0.5px;
+}
+.webix_tree .webix_tree_item.webix_selected,
+.webix_tree .webix_tree_item.webix_selected:active,
+.webix_tree .webix_tree_item.webix_selected:focus {
+    background-color: #A4A4A4;
+}
+.webix_tree_item.highlight {
+    color: gold;
+}
+.webix_tree .webix_tree_checkbox {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-block;
+    width: 8px; height: 8px;
+    border: 1px solid #DADEE0;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-left: 7px; margin-right: 9px;
+    position: relative;
+    outline: none;
+}
+.webix_tree .webix_tree_checkbox:checked{
+    background: #DADEE0;
+}
+.webix_el_text input {
+    padding: 2px;
+}
+.webix_inp_label, .webix_el_box {
+    font-size: 8pt !important;
+}
+.webix_list_item, .webix_list .webix_list_item.webix_selected {
+    line-height: 20px;
+    padding-top: 0;
+}
+.webix_button {
+    padding: 0.5px 2px 0px 2px;
+    color: #000000 !important;
+    font-size: 12px;
+}
+.webix_popup_button.confirm {
+    background: #c8c8c8;
+}
+.webix_popup_button:hover {
+    background: #d8d8d8 !important;
+}
+.webix_secondary .webix_button {
+    background: #d8d8d8;
+}
+.webix_view .webix_list {
+    background-color: rgba(255, 255, 255, 0.6);
+}
+.webix_el_text input {
+    background-color: #eeeeee;
+}
+.webix_el_combo input {
+    padding: 0px 2px 0px 2px !important;
+}
+.webix_el_combo .webix_input_icon {
+    width: 19px;
+}
+.webix_custom_checkbox {
+    margin-top: -2px;
+    color: #8888a3 !important;
+}
+.webix_accordionitem_button {
+    font-size: 10px !important;
+    width: 10px !important;
+    height: 10px !important;
+    color: #475466 !important;
+}
+.webix_accordionitem .webix_accordionitem_header {
+    line-height: 10px;
+    font-size: 6pt;
+    text-align: right;
+    background-color: lightGray;
+}
+.webix_accordionitem.collapsed .webix_accordionitem_header {
+    background-color: lightGray;
+}
+.webix_template {
+    padding: 0px;
+}
+
+input[type=number]::-webkit-inner-spin-button {
+    transform: scaleX(0.75);
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+}
+@media screen and (orientation:portrait) {
+    .rt, .editor {
+        visibility: hidden;
+    }
+    .output {
+        top: 0;
+        left: 0;
+        height: 100vh;
+    }
+}
+@media screen and (orientation:landscape) {
+    html, body {
+        position: fixed;
+    }
+}
