@@ -657,9 +657,12 @@ namespace foundation {
         }
         if (rgba.has_value()) {
             cmask = cmask | GL_COLOR_BUFFER_BIT;
+            webgl_beginTarget(glTarget, platformDepth, cmask, rgba->r, rgba->g, rgba->b, rgba->a, 0.0f);
+        }
+        else {
+            webgl_beginTarget(glTarget, platformDepth, cmask, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         }
         
-        webgl_beginTarget(glTarget, platformDepth, cmask, rgba->r, rgba->g, rgba->b, rgba->a, 0.0f);
         webgl_viewPort(_frameConstants->rtBounds.x, _frameConstants->rtBounds.y);
         webgl_applyConstants(FRAME_CONST_BINDING_INDEX, _frameConstants.get(), sizeof(FrameConstants));
         _isForTarget = true;

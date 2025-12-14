@@ -14,12 +14,13 @@
 // Editor TODO:
 // + changing prefab (coordinates) -> resave doesnt work
 // + reload prefabs on resources change
-// + graph widget
-// + split html/js
+// + separate features in html/js for editor (everything about 'mesh' inside a single function)
 // + button in nodes panel are scrolling with panel -> separate them
 // BUGS:
 // + save prefab works for non-top nodes
 // + transform in 3+ hierarchy
+// + ctrl + a
+// + if right panel is not visible it still catches pointer events -> cant rotate camera
 
 namespace game {
     class EditorMainContext : public Context, public NodeAccessInterface {

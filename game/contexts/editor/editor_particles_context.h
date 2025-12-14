@@ -9,7 +9,7 @@
 // Bugs:
 // + particle: axis doesnt work
 // + particle: box in box -> incorrect calculation of coords range
-// + rename node as existing one -> previous node isn't deleted
+// + particle pivot parameter
 
 namespace game {
     enum class ShapeDistribution {
@@ -18,7 +18,20 @@ namespace game {
         LINEAR,       // the i-th point from start shape to the corresponding point of the end shape
     };
     struct Graph {
-        auto getFilling(float t) -> float;
+        Graph(float absMin, float absMax, float maxSpread, float defaultValue);
+        void setPointsFromString(const std::string &data);
+        auto getFilling(float t) const -> float;
+        auto getValue(float t) const -> float;
+        
+    private:
+        const float _absMin;
+        const float _absMax;
+        const float _maxSpread;
+        
+        struct Point {
+            float x, lower, upper;
+        };
+        std::vector<Point> _points;
     };
     struct Shape {
         enum class Type {
@@ -72,11 +85,15 @@ namespace game {
         std::size_t _bakingFrameTimeMs = 100;
         std::size_t _particlesToEmit = 100;
         
-        Graph _emissionGraph;
+        Graph _emissionGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
         float _emissionTimeMs = 1000.0f;
         float _particleLifeTimeMs = 1000.0f; // real lifetime is less by '_bakingFrameTimeMs'
-        float _particleSpeed = 10.0f; // how much of real distance per particle lifetime (TODO: per sec)
         
+        Graph _widthGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
+        Graph _heightGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
+        Graph _speedGraph = Graph(-999.0f, +999.0f, 999.0f, 10.0f);
+        Graph _alphaGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
+
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
         voxel::ParticlesParams _ptcParams;
@@ -139,6 +156,12 @@ namespace game {
         bool _save(const std::string &data);
         bool _emissionSet(const std::string &data);
         bool _visualSet(const std::string &data);
+        bool _graphSet(const std::string &data, const std::string &name);
+        bool _emissionGraphSet(const std::string &data);
+        bool _widthGraphSet(const std::string &data);
+        bool _heightGraphSet(const std::string &data);
+        bool _speedGraphSet(const std::string &data);
+        bool _alphaGraphSet(const std::string &data);
     };
 }
 

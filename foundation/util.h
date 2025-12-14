@@ -105,6 +105,9 @@ namespace util {
         void skipws() {
             while (_current < _end && std::isgraph(*_current) == false) _current++;
         }
+        const char *current() const {
+            return _current;
+        }
         
         void setError() {
             _error = true;

@@ -250,7 +250,14 @@
                 catch (error) {
                     console.error(error.message);
                 }
-            }
+            },
+            pointsToString: function(points) {
+                let result = "";
+                for (const p of points) {
+                    result += p.x.toFixed(4) + " " + p.value.toFixed(4) + " " + p.spread.toFixed(4) + " ";
+                }
+                return result;
+            },
         }
 
         uiBindings = {
@@ -337,6 +344,21 @@
                 args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
                 args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue();
                 uiEditor.sendMsg("editor.particles.visual", args);
+            },
+            particleEmissionGraph: function(e, points) {
+                uiEditor.sendMsg("editor.particles.emissionGraph", utility.pointsToString(points));
+            },
+            particleWidthGraph: function(e, points) {
+                uiEditor.sendMsg("editor.particles.widthGraph", utility.pointsToString(points));
+            },
+            particleHeightGraph: function(e, points) {
+                uiEditor.sendMsg("editor.particles.heightGraph", utility.pointsToString(points));
+            },
+            particleSpeedGraph: function(e, points) {
+                uiEditor.sendMsg("editor.particles.speedGraph", utility.pointsToString(points));
+            },
+            particleAlphaGraph: function(e, points) {
+                uiEditor.sendMsg("editor.particles.alphaGraph", utility.pointsToString(points));
             },
             prefabSave: function(e) {
                 uiEditor.sendMsg("editor.savePrefab", "");
@@ -554,7 +576,7 @@
                                 elements.label("Particles emission time (ms):"), {},
                                 elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 1, 1, 4000, uiBindings.particlesEmission),
                             ]},
-                            elements.graphedit("inspect_ptc_emission_graph", "Emission", 1.0, 0.0, 1.0, 0.0),
+                            elements.graphedit("inspect_ptc_emission_graph", "Emission", 1.0, 0.0, 1.0, 0.0, uiBindings.particleEmissionGraph),
                             {cols: [
                                 elements.label("Particles life time (ms):"), {},
                                 elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 1, 1, 4000, uiBindings.particlesEmission),
@@ -639,10 +661,15 @@
                     body: {
                         padding: 3,
                         rows: [
-                            elements.graphedit("inspect_ptc_width_graph", "Ptc Width", 1.0, 0.0, 99.0, 99.0),
-                            elements.graphedit("inspect_ptc_height_graph", "Ptc Height", 1.0, 0.0, 99.0, 99.0),
-                            elements.graphedit("inspect_ptc_speed_graph", "Ptc Speed", 10.0, -999.0, 999.0, 999.0),
-                            elements.graphedit("inspect_ptc_alpha_graph", "Ptc Alpha", 1.0, 0.0, 1.0, 1.0),
+                            {cols: [
+                                elements.label("Change width and height together:"),
+                                { css: {"margin": "0px !important"} },
+                                elements.checkbox("inspect_ptc_with_height_bind", false)
+                            ]},
+                            elements.graphedit("inspect_ptc_width_graph", "Ptc Width", 1.0, 0.0, 99.0, 99.0, uiBindings.particleWidthGraph),
+                            elements.graphedit("inspect_ptc_height_graph", "Ptc Height", 1.0, 0.0, 99.0, 99.0, uiBindings.particleHeightGraph),
+                            elements.graphedit("inspect_ptc_speed_graph", "Ptc Speed", 10.0, -999.0, 999.0, 999.0, uiBindings.particleSpeedGraph),
+                            elements.graphedit("inspect_ptc_alpha_graph", "Ptc Alpha", 1.0, 0.0, 1.0, 1.0, uiBindings.particleAlphaGraph),
                             { height: 16 }
                         ]
                     }
@@ -762,6 +789,17 @@
                 utility.setElementValue("inspect_ptc_shape_distr", desc.emitter.shapeDistributionType);
                 utility.setElementValue("inspect_ptc_orientation", desc.emitter.particleOrientation);
                 utility.setElementValue("inspect_ptc_texture", desc.emitter.texture);
+
+                let setGraphValue = (src, name) => {
+                    let graph = src.map((_, i, a) => i % 3 === 0 ? { x: a[i], value: a[i + 1], spread: a[i + 2] } : null).filter(Boolean);
+                    utility.setElementValue(name, graph);
+                };
+                setGraphValue(desc.emitter.emissionGraphData.trim().split(" ").map(Number), "inspect_ptc_emission_graph");
+                setGraphValue(desc.emitter.widthGraphData.trim().split(" ").map(Number), "inspect_ptc_width_graph");
+                setGraphValue(desc.emitter.heightGraphData.trim().split(" ").map(Number), "inspect_ptc_height_graph");
+                setGraphValue(desc.emitter.speedGraphData.trim().split(" ").map(Number), "inspect_ptc_speed_graph");
+                setGraphValue(desc.emitter.alphaGraphData.trim().split(" ").map(Number), "inspect_ptc_alpha_graph");
+
             }
             uiEditor["engine.ptcEndOffset"] = function(data) {
                 const [x, y, z] = data.split(' ');

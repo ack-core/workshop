@@ -137,7 +137,7 @@ const btypes = {
     2: function() {
         glcontext.enable(glcontext.BLEND);
         glcontext.blendEquation(glcontext.FUNC_ADD);
-        glcontext.blendFunc(glcontext.ONE, glcontext.ONE_MINUS_SRC_ALPHA);
+        glcontext.blendFunc(glcontext.SRC_ALPHA, glcontext.ONE_MINUS_SRC_ALPHA);
     },
     3: function() {
         glcontext.enable(glcontext.BLEND);
@@ -420,7 +420,7 @@ const imports = {
 
             if (mask) {
                 glcontext.depthMask(true);
-                glcontext.clearColor(r, g, b, 1.0);
+                glcontext.clearColor(r, g, b, a);
                 glcontext.clearDepth(d);
                 glcontext.clear(mask);
             }

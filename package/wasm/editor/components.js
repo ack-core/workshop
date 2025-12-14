@@ -8,14 +8,13 @@ webix.protoUI({
         this._spreadId = webix.uid().toString();
         this._absmin = cfg.min;
         this._absmax = cfg.max;
+        this._maxspread = cfg.spread;
         this._selected = null;
         this._isdragging = false;
 
         let tmpId = webix.uid();
         this._points = {};
-        this._points[tmpId] = { id: tmpId, x: -0.01, value: cfg.value, lower: cfg.value, upper: cfg.value, spread: 0.0 };
-        console.log("1:", this._canvasId, this._valueId, this._spreadId, tmpId);
-
+        this._points[tmpId] = { id: tmpId, x: -0.0001, value: cfg.value, lower: cfg.value, upper: cfg.value, spread: 0.0 };
         this.vminmax();
 
         cfg.rows = [
@@ -44,7 +43,7 @@ webix.protoUI({
                         on: {
                             onEnter: (e) => {
                                 const element = $$(this._spreadId);
-                                const v = Math.max(0.0, Math.min(cfg.spread, parseFloat(element.getText())));
+                                const v = Math.max(0.0, Math.min(this._maxspread, parseFloat(element.getText())));
                                 element.setValue(v.toString());
                                 element.blur(); 
                             },
@@ -110,10 +109,13 @@ webix.protoUI({
                 point.value = y;
                 point.lower = Math.max(y - point.spread, this._absmin);
                 point.upper = Math.min(y + point.spread, this._absmax);
-                this.draw();
+                this.draw();                
             }
         };
         this._pointerupHandler = (e) => {
+            if (this._selected && this._isdragging) {
+                this.callEvent("onChange", [this.getValue()]);
+            }
             this._isdragging = false;
         };
         this._dblclickHandler = (e) => {
@@ -126,6 +128,7 @@ webix.protoUI({
                 this._points[tmpId] = { id: tmpId, x: x, value: y, lower: y, upper: y, spread: 0.0 };
                 this._selected = tmpId;
                 this.draw();
+                this.callEvent("onChange", [this.getValue()]);
             }
         };
 
@@ -177,7 +180,7 @@ webix.protoUI({
 
         ctx.clearRect(0, 0, w, h);
         ctx.lineWidth = 1;
-        ctx.font = "11px arial";
+        ctx.font = "10px arial";
         ctx.beginPath();
         ctx.strokeStyle = "#888888";
         ctx.moveTo(fx, fy);
@@ -190,8 +193,8 @@ webix.protoUI({
         ctx.stroke();
         ctx.textAlign = "right";
         ctx.fillStyle = "#000000";
-        ctx.fillText(Number(this._vmax.toFixed(2)).toString(), fx - 0.015 * w, fy + 4);
-        ctx.fillText(Number(this._vmin.toFixed(2)).toString(), fx - 0.015 * w, fy + fh + 4);
+        ctx.fillText(Number(this._vmax.toFixed(2)).toString(), fx - 0.01 * w, fy + 4);
+        ctx.fillText(Number(this._vmin.toFixed(2)).toString(), fx - 0.01 * w, fy + fh + 4);
 
         var value = this.coords(0.0, points[0].value);
         var lower = this.coords(0.0, points[0].lower);
@@ -232,6 +235,7 @@ webix.protoUI({
         }
         this._selected = null;
         this.draw();
+        this.callEvent("onChange", [this.getValue()]);
     },
     pointValueChanged: function(nv, old) {
         if (this._selected) {
@@ -240,6 +244,7 @@ webix.protoUI({
             point.lower = Math.max(nv - point.spread, this._absmin);
             point.upper = Math.min(nv + point.spread, this._absmax);
             this.draw();
+            this.callEvent("onChange", [this.getValue()]);
         }
         else {
             $$(this._valueId).blockEvent();
@@ -254,6 +259,7 @@ webix.protoUI({
             point.lower = Math.max(point.value - point.spread, this._absmin);
             point.upper = Math.min(point.value + point.spread, this._absmax);
             this.draw();
+            this.callEvent("onChange", [this.getValue()]);
         }
         else {
             $$(this._spreadId).blockEvent();
@@ -262,10 +268,24 @@ webix.protoUI({
         }
     },
     setValue: function(v) {
-
+        this._selected = null;
+        if (v.length) {
+            const points = v.sort((a,b) => (a.x > b.x) ? 1 : ((b.x > a.x) ? -1 : 0));
+            this._points = {};
+            for (const p of points) {
+                let x = Object.keys(this._points).length == 0 ? -0.00001 : p.x;
+                let spread = Math.min(p.spread, this._maxspread);
+                let value = Math.max(this._absmin, Math.min(this._absmax, p.value));
+                let lower = Math.max(value - spread, this._absmin);
+                let upper = Math.min(value + spread, this._absmax);
+                let tmpId = webix.uid();
+                this._points[tmpId] = { id: tmpId, x: x, value: value, lower: lower, upper: upper, spread: spread };
+            }
+            this.draw();
+        }
     },
     getValue: function() {
-
+        return Object.values(this._points).sort((a,b) => (a.x > b.x) ? 1 : ((b.x > a.x) ? -1 : 0));
     }
 }, webix.ui.layout);
 
@@ -355,7 +375,10 @@ let elements = {
     graphedit: function(id, title, value, min, max, maxspread, action = null) {
         return {
             view: "graphedit", id: id, height: 100, borderless: true, margin: 3, css: {"background-color" : "transparent"},
-            title: title, value: value, min: min, max: max, spread: maxspread
+            title: title, value: value, min: min, max: max, spread: maxspread,
+            on: {
+                onChange: (points) => { if (action) action($$(id), points); }
+            }
         }
     }
 }

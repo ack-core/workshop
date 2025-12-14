@@ -12,13 +12,23 @@ namespace game {
             return prevRandom * 6364136223846793005LL + 1442695040888963407LL;
         }
         std::size_t combineRandom(std::size_t r1, std::size_t r2) {
-            return r1 * 6364136223846793005LL + r2 * 1442695040888963407LL;
+            return r1 * 6364136223846793005LL ^ r2 + 1442695040888963407LL;
         }
     }
     
-    float Graph::getFilling(float t) {
+    Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
+        
+    }
+    void Graph::setPointsFromString(const std::string &data) {
+        
+    }
+    float Graph::getFilling(float t) const {
         return std::min(std::max(t, 0.0f), 1.0f);
     }
+    auto Graph::getValue(float t) const -> float {
+        return 0.0f;
+    }
+
     float Shape::getMaxSize() const {
         if (type == Type::DISK) {
             return 2.0f * args.x;
@@ -58,7 +68,7 @@ namespace game {
                 const float koeff1 = 2.0f * M_PI * float(i + 1) / 36.0f;
                 const math::vector3f p0 = math::vector3f(0.5f * args.x * std::cosf(koeff0), 0.0f, 0.5f * args.x * std::sinf(koeff0)).transformed(rotation);
                 const math::vector3f p1 = math::vector3f(0.5f * args.x * std::cosf(koeff1), 0.0f, 0.5f * args.x * std::sinf(koeff1)).transformed(rotation);
-                lineSet->setLine(i, p0, p1, {0.4f, 0.4f, 0.0f, 0.1f});
+                lineSet->setLine(i, p0, p1, {0.7f, 0.7f, 0.0f, 0.6f});
             }
             lineSet->capLineCount(36);
         }
@@ -156,19 +166,19 @@ namespace game {
             // lineset
             const math::vector3f bbmin = -0.5f * args;
             const math::vector3f bbmax = 0.5f * args;
-            
-            lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(3,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(4,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(5,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(6,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(7,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(8,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
-            lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.4f, 0.4f, 0.0f, 0.07f});
+            const float alpha = 0.3f + 0.1 * float(std::max(dimCount, 1));
+            lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(3,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(4,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(5,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(6,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(7,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(8,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+            lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
 
             lineSet->capLineCount(12);
         }
@@ -204,6 +214,11 @@ namespace game {
         _shapeDistribution = desc.get<ShapeDistribution>("shapeDistributionType");
         _ptcParams.orientation = desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
         _ptcParams.additiveBlend = desc.get<bool>("additiveBlend");
+        _emissionGraph.setPointsFromString(desc.get<std::string>("emissionGraphData"));
+        _widthGraph.setPointsFromString(desc.get<std::string>("widthGraphData"));
+        _heightGraph.setPointsFromString(desc.get<std::string>("heightGraphData"));
+        _speedGraph.setPointsFromString(desc.get<std::string>("speedGraphData"));
+        _alphaGraph.setPointsFromString(desc.get<std::string>("alphaGraphData"));
     }
     
     void Emitter::setEndShapeOffset(const math::vector3f &offset) {
@@ -287,7 +302,7 @@ namespace game {
                     std::uint8_t *m2 = &_mapData[(voff + 2) * mapTextureWidth * 4 + i * 4];
                     
                     const math::vector3f direction = (ptc->end - ptc->start).normalized();
-                    math::vector3f position = ptc->start + direction * _particleSpeed * lifeKoeff;
+                    math::vector3f position = ptc->start + direction * 10.0f * lifeKoeff;
                     
                     // TODO: ptc position modificators
                     
@@ -302,8 +317,8 @@ namespace game {
                     m0[1] = std::uint8_t(255.0f * fract(positionKoeff.x));  // X low
                     m0[2] = std::uint8_t(positionKoeff.y);                  // Y hi
                     m0[3] = std::uint8_t(255.0f * fract(positionKoeff.y));  // Y low
-                    m1[0] = std::uint8_t(positionKoeff.z);                  // X hi
-                    m1[1] = std::uint8_t(255.0f * fract(positionKoeff.z));  // X low
+                    m1[0] = std::uint8_t(positionKoeff.z);                  // Z hi
+                    m1[1] = std::uint8_t(255.0f * fract(positionKoeff.z));  // Z low
                     m1[2] = 0;                                              // Alpha
                     m1[3] = 0;                                              //
                     
@@ -422,6 +437,11 @@ namespace game {
         _handlers["editor.reloadResources"] = &EditorParticlesContext::_reload;
         _handlers["editor.particles.emission"] = &EditorParticlesContext::_emissionSet;
         _handlers["editor.particles.visual"] = &EditorParticlesContext::_visualSet;
+        _handlers["editor.particles.emissionGraph"] = &EditorParticlesContext::_emissionGraphSet;
+        _handlers["editor.particles.widthGraph"] = &EditorParticlesContext::_widthGraphSet;
+        _handlers["editor.particles.heightGraph"] = &EditorParticlesContext::_heightGraphSet;
+        _handlers["editor.particles.speedGraph"] = &EditorParticlesContext::_speedGraphSet;
+        _handlers["editor.particles.alphaGraph"] = &EditorParticlesContext::_alphaGraphSet;
         _handlers["editor.resource.save"] = &EditorParticlesContext::_save;
 
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
@@ -448,7 +468,7 @@ namespace game {
                     _shapeStartLineset->setPosition(position);
                     _shapeEndLineset->setPosition(position + _endShapeTool->getPosition());
                     _shapeConnectLineset->setPosition(position);
-                    _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.4f, 0.4f, 0.0f, 0.1f}, false);
+                    _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.7f, 0.7f, 0.0f, 0.6f}, false);
                     currentTime += dtSec;
                     node->particles->setTime(currentTime, 0.0f);
                 }
@@ -668,6 +688,33 @@ namespace game {
         }
         return false;
     }
+    bool EditorParticlesContext::_graphSet(const std::string &data, const std::string &name) {
+        if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
+            util::Description *desc = node->currentDesc->getSubDesc("emitter");
+            desc->set(name, data);
+            node->emitter.setParameters(*node->currentDesc);
+            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+            _recreateParticles(*node, true);
+            return true;
+        }
+        return false;
+    }
+    bool EditorParticlesContext::_emissionGraphSet(const std::string &data) {
+        return _graphSet(data, "emissionGraphData");
+    }
+    bool EditorParticlesContext::_widthGraphSet(const std::string &data) {
+        return _graphSet(data, "widthGraphData");
+    }
+    bool EditorParticlesContext::_heightGraphSet(const std::string &data) {
+        return _graphSet(data, "heightGraphData");
+    }
+    bool EditorParticlesContext::_speedGraphSet(const std::string &data) {
+        return _graphSet(data, "speedGraphData");
+    }
+    bool EditorParticlesContext::_alphaGraphSet(const std::string &data) {
+        return _graphSet(data, "alphaGraphData");
+    }
+
 }
 
 
