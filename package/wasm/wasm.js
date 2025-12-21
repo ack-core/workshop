@@ -1,6 +1,4 @@
-const output = document.getElementById("output");
 function print(...a) {
-    output.innerHTML += a.join(" ") + "<br>";
     console.log(...a);
 }
 

@@ -11,7 +11,7 @@
 #include <memory>
 
 namespace voxel {
-    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 3;
+    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 4;
     
     struct ParticlesParams {
         ParticlesParams() = default;

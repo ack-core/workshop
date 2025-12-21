@@ -489,44 +489,55 @@ namespace {
         const {
             t0_t1_mask_cap : float4
             position_alpha : float4
-            normal_msw : float4
-            right_msh : float4
+            normal_mw : float4
+            right_mh : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
         }
         inout {
-            uv : float2
+            uv_alpha : float3
         }
         vssrc {
-            float  ptcv0 = 3.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
-            float  ptcv1 = ptcv0 + const_maxXYZ_vpix.w;
-            float  ptcv2 = ptcv1 + const_maxXYZ_vpix.w;
+            float  ptcvbase = 4.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
+            float4 ptcv = float4(ptcvbase, ptcvbase, ptcvbase, ptcvbase) + float4(0.0f, 1.0f, 2.0f, 3.0f) * const_maxXYZ_vpix.w;
 
             float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
             float  t1 = const_t0_t1_mask_cap.y;
             float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w;
+
+            float4 m0t0 = _tex2d(0, float2(t0, ptcv.x));
+            float4 m0t1 = _tex2d(0, float2(t1, ptcv.x));
+            float4 m1t0 = _tex2d(0, float2(t0, ptcv.y));
+            float4 m1t1 = _tex2d(0, float2(t1, ptcv.y));
+
+            float3 posKoeffT0 = float3(m0t0.x + m0t0.y / 255.0f, m0t0.z + m0t0.w / 255.0f, m1t0.x + m1t0.y / 255.0f);
+            float3 posKoeffT1 = float3(m0t1.x + m0t1.y / 255.0f, m0t1.z + m0t1.w / 255.0f, m1t1.x + m1t1.y / 255.0f);
+            float2 angleSrc = _lerp(m1t0.zw, m1t1.zw, tf);
+            float  angle = angleSrc.x + angleSrc.y / 255.0f;
+            float3 ptcposT0 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0;
+            float3 ptcposT1 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1;
+
+            float4 m2t0 = _tex2d(0, float2(t0, ptcv.z));
+            float4 m2t1 = _tex2d(0, float2(t1, ptcv.z));
+            float4 map2 = _lerp(m2t0, m2t1, tf);
+            float2 psize = float2(map2.x + map2.y / 255.0f, map2.z + map2.w / 255.0f);
             
-            float4 map0 = _lerp(_tex2d(0, float2(t0, ptcv0)), _tex2d(0, float2(t1, ptcv0)), tf);    // x, y
-            float4 map1 = _lerp(_tex2d(0, float2(t0, ptcv1)), _tex2d(0, float2(t1, ptcv1)), tf);    // z, angle
+            float4 m3t0 = _tex2d(0, float2(t0, ptcv.w));
+            float4 m3t1 = _tex2d(0, float2(t1, ptcv.w));
+            float3 map3 = _lerp(m3t0.xyz, m3t1.xyz, tf);                         // alpha, reserved, history, mask
+            float  fading = float(255.0f * map3.z > const_t0_t1_mask_cap.w);
+            float  isAlive = _step(0.5, float(uint(m3t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m3t1.w < 0.5) * fading;
 
-            float4 m2t0 = _tex2d(0, float2(t0, ptcv2));
-            float4 m2t1 = _tex2d(0, float2(t1, ptcv2));
-            float3 map2 = _lerp(m2t0.xyz, m2t1.xyz, tf);    // w, h, old
+            float3 ptcpos = _lerp(ptcposT0, ptcposT1, tf);
+            float2 wh = psize.xy * float2(const_normal_mw.w, const_right_mh.w) * isAlive;
 
-            float  fading = float(255.0f * map2.z > const_t0_t1_mask_cap.w);
-            float  isAlive = _step(0.5, float(uint(m2t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m2t1.w < 0.5) * fading;
-
-            float3 posKoeff = float3(map0.x + map0.y / 255.0f, map0.z + map0.w / 255.0f, map1.x + map1.y / 255.0f);
-            float3 ptcpos = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeff;
-
-            float2 wh = float2(const_normal_msw.w, const_right_msh.w) * map2.xy * isAlive;
-            float3 up = _cross(const_normal_msw.xyz, const_right_msh.xyz);
-            float3 relVertexPos = const_right_msh.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            float3 up = _cross(const_normal_mw.xyz, const_right_mh.xyz);
+            float3 relVertexPos = const_right_mh.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
             output_position = _transform(float4(const_position_alpha.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
-            output_uv = fixed_quad[repeat_ID].zw;
+            output_uv_alpha = float3(fixed_quad[repeat_ID].zw, map3.x);
         }
         fssrc {
-            output_color[0] = _tex2d(1, input_uv);
+            output_color[0] = _tex2d(1, input_uv_alpha.xy) * float4(1.0, 1.0, 1.0, input_uv_alpha.z);
         }
     )";
     const char *g_gbufferToScreenShaderSrc = R"(

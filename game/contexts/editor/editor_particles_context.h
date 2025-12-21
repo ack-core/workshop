@@ -7,9 +7,13 @@
 #include "editor_moving_tool.h"
 
 // Bugs:
+// + new random
+// + graph spread
 // + particle: axis doesnt work
-// + particle: box in box -> incorrect calculation of coords range
+// + baking time -> combo: 10, 20, 100 -> max emission time (devidable by 100)
+// ----
 // + particle pivot parameter
+// + cycling size graph 1.0 -> 0.0 doesnt work properly with baking = 100
 
 namespace game {
     enum class ShapeDistribution {
@@ -22,6 +26,7 @@ namespace game {
         void setPointsFromString(const std::string &data);
         auto getFilling(float t) const -> float;
         auto getValue(float t) const -> float;
+        auto getMaxValue() const -> float { return _maxValue; }
         
     private:
         const float _absMin;
@@ -32,6 +37,8 @@ namespace game {
             float x, lower, upper;
         };
         std::vector<Point> _points;
+        float _maxVolume = 0.0f;
+        float _maxValue = 0.0f;
     };
     struct Shape {
         enum class Type {
@@ -64,12 +71,13 @@ namespace game {
         
     private:
         struct ActiveParticle {
-            std::size_t index;
-            std::size_t randomSeed;
-            float bornTimeMs;
-            float lifeTimeMs;
-            math::vector3f start;
-            math::vector3f end;
+            const std::size_t index;
+            const std::size_t randomSeed;
+            const float bornTimeMs;
+            const float lifeTimeMs;
+            const math::vector3f start;
+            const math::vector3f end;
+            math::vector3f currentPosition;
         };
         
         bool _isLooped = true;

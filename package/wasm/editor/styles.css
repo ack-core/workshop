@@ -41,18 +41,6 @@ html, body {
     height: calc(100vh - 25px);
     visibility: hidden;
 }
-.output {
-    background: rgba(255, 255, 255, 0.6);
-    position: fixed;
-    overflow-y: scroll;
-    scrollbar-width: none;
-    bottom: 0;
-    right: 0;
-    height: 100px;
-    min-width: 300px;
-    font-size: 8pt;
-    font-family: Courier New;
-}
 .inspect {
     background: transparent;
     position: fixed;
@@ -115,6 +103,9 @@ html, body {
 .webix_secondary .webix_button {
     background: #d8d8d8;
 }
+.webix_view {
+    white-space: nowrap;
+}
 .webix_view .webix_list {
     background-color: rgba(255, 255, 255, 0.6);
 }
@@ -160,11 +151,6 @@ input[type=number]::-webkit-inner-spin-button {
 @media screen and (orientation:portrait) {
     .rt, .editor {
         visibility: hidden;
-    }
-    .output {
-        top: 0;
-        left: 0;
-        height: 100vh;
     }
 }
 @media screen and (orientation:landscape) {

@@ -17,16 +17,74 @@ namespace game {
     }
     
     Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
-        
+        _points.emplace_back(Point { -0.0001f, defaultValue, defaultValue });
+        _maxVolume = defaultValue;
     }
     void Graph::setPointsFromString(const std::string &data) {
+        util::strstream input(data.c_str(), data.length());
+        _points.clear();
+        _maxValue = 0.0f;
         
+        float minX = 0.0f;
+        while (!input.isEof()) {
+            float x, value, spread;
+            if (input >> x >> value >> spread) {
+                spread = std::min(spread, _maxSpread);
+                const float lower = std::max(value - spread, _absMin);
+                const float upper = std::min(value + spread, _absMax);
+                minX = std::min(x, minX);
+                _maxValue = std::max(_maxValue, upper);
+                _points.emplace_back(Point { std::min(x + minX, 1.0f), lower, upper });
+            }
+        }
+        
+        if (_absMin >= 0.0f) {
+            _maxVolume = 0.0f;
+            for (std::size_t i = 0; i < _points.size() - 1; i++) {
+                const float lx = _points[i].x;
+                const float rx = _points[i + 1].x;
+                const float lupper = _points[i].upper;
+                const float rupper = _points[i + 1].upper;
+                _maxVolume += 0.5f * (rx - lx) * (lupper + rupper);
+            }
+            _maxVolume += (1.0f - _points.back().x) * _points.back().upper;
+        }
     }
     float Graph::getFilling(float t) const {
-        return std::min(std::max(t, 0.0f), 1.0f);
+        float volume = 0.0f;
+        for (std::size_t i = 0; i < _points.size() - 1; i++) {
+            const float lx = _points[i].x;
+            const float rx = _points[i + 1].x;
+            const float lupper = _points[i].upper;
+            const float rupper = _points[i + 1].upper;
+            
+            if (t >= lx && t < rx) {
+                const float koeff = (t - lx) / (rx - lx);
+                const float tvalue = lupper + (rupper - lupper) * koeff;
+                volume += 0.5f * (t - lx) * (lupper + tvalue);
+                return volume / _maxVolume;
+            }
+            else {
+                volume += 0.5f * (rx - lx) * (lupper + rupper);
+            }
+        }
+        volume += (t - _points.back().x) * _points.back().upper;
+        return volume / _maxVolume;
     }
     auto Graph::getValue(float t) const -> float {
-        return 0.0f;
+        for (std::size_t i = 0; i < _points.size() - 1; i++) {
+            const float lx = _points[i].x;
+            const float rx = _points[i + 1].x;
+            const float lupper = _points[i].upper;
+            const float rupper = _points[i + 1].upper;
+            
+            if (t >= lx && t < rx) {
+                const float koeff = (t - lx) / (rx - lx);
+                return lupper + (rupper - lupper) * koeff;
+            }
+        }
+        
+        return _points.back().upper;
     }
 
     float Shape::getMaxSize() const {
@@ -227,15 +285,6 @@ namespace game {
     
     void Emitter::refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd) {
         const math::vector3f emitterDir = _endShapeOffset.lengthSq() > 0.1f ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
-        const float maxShapeSize = std::max(_startShape.getMaxSize(), _endShape.getMaxSize());
-        
-        _ptcParams.minXYZ = -1.0f * maxShapeSize * emitterDir.signs();
-        _ptcParams.maxXYZ = _endShapeOffset + 1.0f * maxShapeSize * emitterDir.signs();
-        
-        if (_ptcParams.minXYZ.x > _ptcParams.maxXYZ.x) std::swap(_ptcParams.minXYZ.x, _ptcParams.maxXYZ.x);
-        if (_ptcParams.minXYZ.y > _ptcParams.maxXYZ.y) std::swap(_ptcParams.minXYZ.y, _ptcParams.maxXYZ.y);
-        if (_ptcParams.minXYZ.z > _ptcParams.maxXYZ.z) std::swap(_ptcParams.minXYZ.z, _ptcParams.maxXYZ.z);
-        
         const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
         const std::size_t cyclesInRow = std::size_t(std::ceil((_isLooped ? std::max(_emissionTimeMs, _particleLifeTimeMs) : _emissionTimeMs + _particleLifeTimeMs) / _emissionTimeMs));
         
@@ -243,14 +292,28 @@ namespace game {
         _endShape.generate(shapeEnd, emitterDir.normalized(), combineRandom(_randomSeed, RND_SHAPE), 1024);
         
         const std::uint32_t mapTextureWidth = std::uint32_t(cyclesInRow * cycleLength);
-        const std::uint32_t mapTextureHeight = std::uint32_t(voxel::VERTICAL_PIXELS_PER_PARTICLE * _particlesToEmit * (_isLooped ? cyclesInRow : 1));
+        const std::uint32_t mapVerticalCount = std::uint32_t(_particlesToEmit * (_isLooped ? cyclesInRow : 1));
+        const std::uint32_t mapTextureHeight = voxel::VERTICAL_PIXELS_PER_PARTICLE * mapVerticalCount;
         
+        struct MapElement {
+            math::vector3f position;
+            float width, height;
+            float alpha, angle;
+            std::uint8_t mask = 128, history;
+        };
+        std::vector<MapElement> tmpMap;
+        tmpMap.resize(mapTextureWidth * mapVerticalCount);
+
         _mapData.resize(mapTextureWidth * mapTextureHeight * 4);
         std::fill(_mapData.begin(), _mapData.end(), 128);
         
         std::list<ActiveParticle> activeParticles;
         std::size_t bornParticleCount = 0;
         
+        _ptcParams.minXYZ = {0, 0, 0};
+        _ptcParams.maxXYZ = {0, 0, 0};
+        _ptcParams.maxSize = {_widthGraph.getMaxValue(), _heightGraph.getMaxValue()};
+
         // second loop is needed to bake old particles from previous cycle (_isLooped)
         for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //
             std::size_t bornRandom = combineRandom(_randomSeed, RND_BORN_PARTICLE);
@@ -281,7 +344,7 @@ namespace game {
                         const float ptcEmissionKoeff = float(c) / float(_particlesToEmit);
                         const std::pair<math::vector3f, math::vector3f> shapePoints = _getShapePoints(ptcEmissionKoeff, bornRandom, _endShapeOffset);
                         activeParticles.emplace_back(ActiveParticle {
-                            c, bornRandom, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second
+                            c, bornRandom, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second, shapePoints.first
                         });
                     }
                     
@@ -289,50 +352,75 @@ namespace game {
                 }
                 
                 for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ++ptc) {
-                    const std::size_t voff = ptc->index * voxel::VERTICAL_PIXELS_PER_PARTICLE;
                     const float ptcAbsTimeMs = currAbsTimeMs - ptc->bornTimeMs;
                     const float lifeKoeff = ptcAbsTimeMs / ptc->lifeTimeMs;
-                    
-                    if (voff >= mapTextureHeight) {
-                        //printf("");
-                    }
-                    
-                    std::uint8_t *m0 = &_mapData[(voff + 0) * mapTextureWidth * 4 + i * 4];
-                    std::uint8_t *m1 = &_mapData[(voff + 1) * mapTextureWidth * 4 + i * 4];
-                    std::uint8_t *m2 = &_mapData[(voff + 2) * mapTextureWidth * 4 + i * 4];
-                    
+                    MapElement &element = tmpMap[ptc->index * mapTextureWidth + i];
+
+                    element.position = ptc->currentPosition;
+
                     const math::vector3f direction = (ptc->end - ptc->start).normalized();
-                    math::vector3f position = ptc->start + direction * 10.0f * lifeKoeff;
+                    const float speed = _speedGraph.getValue(lifeKoeff);
+                    ptc->currentPosition = ptc->currentPosition + direction * speed * (_bakingFrameTimeMs / 1000.0f);
                     
                     // TODO: ptc position modificators
                     
-                    //float tmp;
-                    const math::vector3f positionKoeff = 255.0f * (position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
+                    if (ptc->currentPosition.x > _ptcParams.maxXYZ.x) _ptcParams.maxXYZ.x = ptc->currentPosition.x;
+                    if (ptc->currentPosition.y > _ptcParams.maxXYZ.y) _ptcParams.maxXYZ.y = ptc->currentPosition.y;
+                    if (ptc->currentPosition.z > _ptcParams.maxXYZ.z) _ptcParams.maxXYZ.z = ptc->currentPosition.z;
+                    if (ptc->currentPosition.x < _ptcParams.minXYZ.x) _ptcParams.minXYZ.x = ptc->currentPosition.x;
+                    if (ptc->currentPosition.y < _ptcParams.minXYZ.y) _ptcParams.minXYZ.y = ptc->currentPosition.y;
+                    if (ptc->currentPosition.z < _ptcParams.minXYZ.z) _ptcParams.minXYZ.z = ptc->currentPosition.z;
                     
-                    auto fract = [](float v) {
-                        return v - floor(v);
-                    };
-                    
-                    m0[0] = std::uint8_t(positionKoeff.x);                  // X hi
-                    m0[1] = std::uint8_t(255.0f * fract(positionKoeff.x));  // X low
-                    m0[2] = std::uint8_t(positionKoeff.y);                  // Y hi
-                    m0[3] = std::uint8_t(255.0f * fract(positionKoeff.y));  // Y low
-                    m1[0] = std::uint8_t(positionKoeff.z);                  // Z hi
-                    m1[1] = std::uint8_t(255.0f * fract(positionKoeff.z));  // Z low
-                    m1[2] = 0;                                              // Alpha
-                    m1[3] = 0;                                              //
-                    
-                    m2[0] = 255;                                      // Width
-                    m2[1] = 255;                                      // Height
-                    m2[3] = loop + 1;                               // Mask: 1 - newborn, 2 - old
-                    
-                    m2[2] = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (f.e. 0 - just born, 255 - 255 * BakingTimeSec)
+                    element.width = _widthGraph.getValue(lifeKoeff);
+                    element.height = _heightGraph.getValue(lifeKoeff);
+                    element.angle = 0.0f;
+                    element.alpha = _alphaGraph.getValue(lifeKoeff);
+                    element.mask = loop + 1; // Mask: 1 - newborn, 2 - old
+                    element.history = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 255 = 255 * BakingTimeSec)
                     
                     if (lifeKoeff < std::numeric_limits<float>::epsilon()) { // mark where the particle starts
-                        m2[3] |= 128;
+                        element.mask |= 128;
                     }
                 }
                 
+            }
+        }
+        
+        auto fract = [](float v) {
+            return v - floor(v);
+        };
+        
+        for (std::uint32_t c = 0; c < mapVerticalCount; c++) {
+            for (std::uint32_t i = 0; i < mapTextureWidth; i++) {
+                const MapElement &element = tmpMap[c * mapTextureWidth + i];
+                const std::size_t tvoff = c * voxel::VERTICAL_PIXELS_PER_PARTICLE;
+                const math::vector3f positionKoeff = 255.0f * (element.position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
+                
+                std::uint8_t *m0 = &_mapData[(tvoff + 0) * mapTextureWidth * 4 + i * 4];
+                std::uint8_t *m1 = &_mapData[(tvoff + 1) * mapTextureWidth * 4 + i * 4];
+                std::uint8_t *m2 = &_mapData[(tvoff + 2) * mapTextureWidth * 4 + i * 4];
+                std::uint8_t *m3 = &_mapData[(tvoff + 3) * mapTextureWidth * 4 + i * 4];
+                
+                const float widthKoeff = 255.0f * element.width / _ptcParams.maxSize.x;
+                const float heightKoeff = 255.0f * element.height / _ptcParams.maxSize.y;
+
+                m0[0] = std::uint8_t(positionKoeff.x);                  // X hi
+                m0[1] = std::uint8_t(255.0f * fract(positionKoeff.x));  // X low
+                m0[2] = std::uint8_t(positionKoeff.y);                  // Y hi
+                m0[3] = std::uint8_t(255.0f * fract(positionKoeff.y));  // Y low
+                m1[0] = std::uint8_t(positionKoeff.z);                  // Z hi
+                m1[1] = std::uint8_t(255.0f * fract(positionKoeff.z));  // Z low
+                m1[2] = std::uint8_t(element.angle);                    // Angle hi
+                m1[3] = std::uint8_t(255.0f * fract(element.angle));    // Angle low
+                m2[0] = std::uint8_t(widthKoeff);                       // Width hi
+                m2[1] = std::uint8_t(255.0f * fract(widthKoeff));       // Width low
+                m2[2] = std::uint8_t(heightKoeff);                      // Height hi
+                m2[3] = std::uint8_t(255.0f * fract(heightKoeff));      // Height low
+
+                m3[0] = 255.0f * element.alpha;                         // Alpha
+                m3[1] = 255;                                            // reserved
+                m3[2] = element.history;
+                m3[3] = element.mask;
             }
         }
         
@@ -505,7 +593,7 @@ namespace game {
             voxel::ParticlesParams parameters (*node.originDesc);
             const util::Description &desc = *node.originDesc->getSubDesc("emitter");
             node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
-            node.particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
+            node.particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 0.9f, 0.0f); // set almost at the end of second cycle
         }
     }
 
@@ -536,6 +624,8 @@ namespace game {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             if (node->originDesc.has_value()) {
                 node->currentDesc = node->originDesc;
+                const util::Description &desc = *node->currentDesc->getSubDesc("emitter");
+                node->endShapeOffset = desc.get<math::vector3f>("endShapeOffset");
                 
                 _endShapeTool = std::make_unique<MovingTool>(_api, _cameraAccess, node->endShapeOffset, 0.4f);
                 _endShapeTool->setEditorMsg("engine.endShapeOffset");
@@ -647,6 +737,9 @@ namespace game {
                 desc->set("particlesToEmit", particlesToEmit);
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                desc->set("minXYZ", node->emitter.getParams().minXYZ);
+                desc->set("maxXYZ", node->emitter.getParams().maxXYZ);
+                desc->set("maxSize", node->emitter.getParams().maxSize);
                 _recreateParticles(*node, true);
             }
             return true;
@@ -682,6 +775,9 @@ namespace game {
                 node->endShapeOffset = endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                desc->set("minXYZ", node->emitter.getParams().minXYZ);
+                desc->set("maxXYZ", node->emitter.getParams().maxXYZ);
+                desc->set("maxSize", node->emitter.getParams().maxSize);
                 _recreateParticles(*node, true);
             }
             return true;
@@ -694,6 +790,9 @@ namespace game {
             desc->set(name, data);
             node->emitter.setParameters(*node->currentDesc);
             node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+            desc->set("minXYZ", node->emitter.getParams().minXYZ);
+            desc->set("maxXYZ", node->emitter.getParams().maxXYZ);
+            desc->set("maxSize", node->emitter.getParams().maxSize);
             _recreateParticles(*node, true);
             return true;
         }

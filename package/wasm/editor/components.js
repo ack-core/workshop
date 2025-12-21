@@ -149,6 +149,9 @@ webix.protoUI({
             vmax = Math.max(vmax, v.upper);
             vmin = Math.min(vmin, v.lower);
         }
+        if (vmax - vmin < 0.0001) {
+            vmax = vmin + 0.0001;
+        }
         this._vmin = vmin;
         this._vmax = vmax;
     },
@@ -273,7 +276,7 @@ webix.protoUI({
             const points = v.sort((a,b) => (a.x > b.x) ? 1 : ((b.x > a.x) ? -1 : 0));
             this._points = {};
             for (const p of points) {
-                let x = Object.keys(this._points).length == 0 ? -0.00001 : p.x;
+                let x = Object.keys(this._points).length == 0 ? -0.0001 : p.x;
                 let spread = Math.min(p.spread, this._maxspread);
                 let value = Math.max(this._absmin, Math.min(this._absmax, p.value));
                 let lower = Math.max(value - spread, this._absmin);

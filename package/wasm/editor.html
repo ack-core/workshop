@@ -15,7 +15,6 @@
         <div class="top" id="top"></div>
         <div class="nodes" id="nodes"></div>
         <div class="inspect" id="inspect"></div>
-        <div class="output" id="output"></div>
     </div>
 
     <script type="text/javascript" charset="utf-8">
@@ -23,7 +22,7 @@
     </script>    
     <script type="text/javascript" src="wasm.js" binary="editor.wasm"></script>
     <script type="text/javascript" charset="utf-8">
-        ["nodes", "output", "inspect", "top"].forEach(name => {
+        ["nodes", "inspect", "top"].forEach(name => {
             document.getElementById(name).addEventListener("pointerdown", (event) => {
                 event.stopPropagation();
                 return false;
@@ -492,7 +491,7 @@
             }
         });
         webix.ui({
-            id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true,
+            id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true, width: 240,
             rows: [
                 {
                     id: "node_0", view: "accordionitem", hidden: true, header: "Parameters", headerHeight: 10, headerAltHeight: 10,
@@ -501,7 +500,7 @@
                         padding: 3,
                         rows: [
                             {cols: [
-                                elements.label("Name:"),
+                                elements.label("Name:"), {},
                                 elements.text("inspect_node_name", "", 183, false, uiBindings.nodeName),
                             ]},
                             {cols: [
@@ -592,7 +591,7 @@
                             {cols: [
                                 elements.button("\u25b6", "Restart"), 
                                 elements.label("Looped:"),
-                                elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), { width: 10 },
+                                elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), 
                                 elements.label("Seed:"),
                                 elements.text("inspect_ptc_rnd_seed", "0", 70, true),
                                 elements.button("\uD83C\uDFB2", "Reroll and reevaluate all randomized parameters")
@@ -608,7 +607,7 @@
                         padding: 3,
                         rows: [
                             {cols: [
-                                elements.label("Start shape type:"), { width: 2 },
+                                elements.label("Start shape type:"), { width: 17 },
                                 elements.combo("inspect_ptc_sshape_type", 0, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
                                 elements.label("Fill:"),
                                 elements.checkbox("inspect_ptc_sshape_fill", false, uiBindings.particlesVisual)
@@ -620,7 +619,7 @@
                                 elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
                             ]},
                             {cols: [
-                                elements.label("End shape type:"), { width: 8 },
+                                elements.label("End shape type:"), {  },
                                 elements.combo("inspect_ptc_eshape_type", 0, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
                                 elements.label("Fill:"),
                                 elements.checkbox("inspect_ptc_eshape_fill", false, uiBindings.particlesVisual)
@@ -638,7 +637,7 @@
                                 elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual)
                             ]},
                             {cols: [
-                                elements.label("Start-to-End Mapping:"),
+                                elements.label("Start-to-End Mapping:"), {},
                                 elements.combo("inspect_ptc_shape_distr", 0, uiPtcShapeDistribution, 106, uiBindings.particlesVisual),
                             ]},
                             {cols: [
@@ -646,7 +645,7 @@
                                 elements.combo("inspect_ptc_orientation", 0, uiPtcOrientation, 106, uiBindings.particlesVisual),
                             ]},
                             {cols: [
-                                elements.label("Texture:"),
+                                elements.label("Texture:"), {},
                                 elements.combo("inspect_ptc_texture", "", listParticleTextures, 175, (e, nv, old) => {
 
                                 }),
@@ -663,13 +662,13 @@
                         rows: [
                             {cols: [
                                 elements.label("Change width and height together:"),
-                                { css: {"margin": "0px !important"} },
+                                { width: 39 },
                                 elements.checkbox("inspect_ptc_with_height_bind", false)
                             ]},
-                            elements.graphedit("inspect_ptc_width_graph", "Ptc Width", 1.0, 0.0, 99.0, 99.0, uiBindings.particleWidthGraph),
-                            elements.graphedit("inspect_ptc_height_graph", "Ptc Height", 1.0, 0.0, 99.0, 99.0, uiBindings.particleHeightGraph),
-                            elements.graphedit("inspect_ptc_speed_graph", "Ptc Speed", 10.0, -999.0, 999.0, 999.0, uiBindings.particleSpeedGraph),
-                            elements.graphedit("inspect_ptc_alpha_graph", "Ptc Alpha", 1.0, 0.0, 1.0, 1.0, uiBindings.particleAlphaGraph),
+                            elements.graphedit("inspect_ptc_width_graph", "Width", 1.0, 0.0, 99.0, 99.0, uiBindings.particleWidthGraph),
+                            elements.graphedit("inspect_ptc_height_graph", "Height", 1.0, 0.0, 99.0, 99.0, uiBindings.particleHeightGraph),
+                            elements.graphedit("inspect_ptc_speed_graph", "Speed", 10.0, -999.0, 999.0, 999.0, uiBindings.particleSpeedGraph),
+                            elements.graphedit("inspect_ptc_alpha_graph", "Alpha", 1.0, 0.0, 1.0, 1.0, uiBindings.particleAlphaGraph),
                             { height: 16 }
                         ]
                     }

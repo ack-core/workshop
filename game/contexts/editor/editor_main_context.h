@@ -14,6 +14,7 @@
 // Editor TODO:
 // + changing prefab (coordinates) -> resave doesnt work
 // + reload prefabs on resources change
+// + ask before deleting resource
 // + separate features in html/js for editor (everything about 'mesh' inside a single function)
 // + button in nodes panel are scrolling with panel -> separate them
 // BUGS:

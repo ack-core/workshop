@@ -115,6 +115,9 @@ namespace util {
         bool isError() const {
             return _error;
         }
+        bool isEof() const {
+            return _current >= _end;
+        }
         
         operator bool() const {
             return _current <= _end && !_error;
