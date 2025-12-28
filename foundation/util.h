@@ -166,7 +166,7 @@ namespace util {
         
         static std::size_t ptow(std::uint16_t *p, const void *ptr);
         static std::size_t ltow(std::uint16_t *p, std::int64_t value);
-        static std::size_t ftow(std::uint16_t *p, double f);
+        static std::size_t ftow(std::uint16_t *p, double f, int precision = 6);
         static std::size_t ltoa(char *p, std::int64_t value);
         static std::string ftos(double f, int precision = 6);
 

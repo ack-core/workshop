@@ -22,25 +22,35 @@ namespace util {
         return out * sign;
     }
     double strstream::atof(const char *s, std::size_t &len) {
-        const char *input = s;
-        std::size_t length = 0;
-        std::int64_t ipart = atoi(input, length);
-        
-        double power = ipart < 0 ? -1.0 : 1.0;
-        double out = 0.0;
-        
-        if (length) {
-            input += length;
-            if (*input == '.') {
-                while (std::isdigit(*++input)) {
-                    power *= 10.0;
-                    out += (*input - '0') / power;
-                }
+        const char *p = s;
+
+        int sign = 1;
+        if (*p == '+' || *p == '-') {
+            if (*p == '-') {
+                sign = -1;
+            }
+            ++p;
+        }
+
+        double value = 0.0;
+
+        while (std::isdigit(static_cast<unsigned char>(*p))) {
+            value = value * 10.0 + (*p - '0');
+            ++p;
+        }
+
+        if (*p == '.') {
+            ++p;
+            double factor = 0.1;
+            while (std::isdigit(static_cast<unsigned char>(*p))) {
+                value += (*p - '0') * factor;
+                factor *= 0.1;
+                ++p;
             }
         }
-        
-        len = input - s;
-        return out + double(ipart);
+
+        len = static_cast<std::size_t>(p - s);
+        return sign * value;
     }
     std::size_t strstream::ptow(std::uint16_t *p, const void *ptr) {
         const int len = 2 * sizeof(std::size_t);
@@ -75,32 +85,48 @@ namespace util {
 
         return result;
     }
-    std::size_t strstream::ftow(std::uint16_t *p, double f) {
-        std::uint16_t *output = p;
-        const double af = std::abs(f);
-        std::int64_t ipart = std::int64_t(af);
-        double remainder = 10000000.0 * (af - double(ipart));
-        std::int64_t fpart = std::int64_t(remainder);
-        
-        if ((remainder - double(fpart)) > 0.5) {
-            fpart++;
-            if (fpart > 10000000) {
-                fpart = 0;
-                ipart++;
+    std::size_t strstream::ftow(std::uint16_t *p, double f, int precision) {
+        std::uint16_t *out = p;
+
+        if (f < 0.0) {
+            f = -f;
+            *out++ = '-';
+        }
+
+        double rounding = 0.5;
+        for (int i = 0; i < precision; ++i) {
+            rounding *= 0.1;
+        }
+        f += rounding;
+
+        std::uint64_t ipart = static_cast<std::uint64_t>(f);
+        double frac = f - ipart;
+
+        if (ipart == 0) {
+            *out++ = '0';
+        }
+        else {
+            std::uint16_t *start = out;
+            while (ipart > 0) {
+                *out++ = std::uint16_t('0' + (ipart % 10));
+                ipart /= 10;
+            }
+            for (std::uint16_t *a = start, *b = out - 1; a < b; ++a, --b) {
+                std::swap(*a, *b);
             }
         }
-        
-        if (f < 0.0) *output++ = '-';
-        output += ltow(output, ipart);
-        
-        int width = 10;
-        while (fpart % 10 == 0 && width-- > 0) {
-            fpart /= 10;
+
+        if (precision > 0) {
+            *out++ = '.';
+            for (int i = 0; i < precision; ++i) {
+                frac *= 10.0;
+                int digit = static_cast<int>(frac);
+                *out++ = std::uint16_t('0' + digit);
+                frac -= digit;
+            }
         }
-        *output++ = '.';
-        
-        output += ltow(output, fpart);
-        return output - p;
+
+        return static_cast<std::size_t>(out - p);
     }
     std::size_t strstream::ltoa(char *p, std::int64_t value) {
         std::int64_t absvalue = value < 0 ? -value : value;
@@ -125,41 +151,47 @@ namespace util {
         return result;
     }
     std::string strstream::ftos(double f, int precision) {
-        std::string result = std::string(48, 0);
-        char *output = result.data();
-        
-        const double af = std::abs(f);
-        std::int64_t ipart = std::int64_t(af);
-        
-        double scale = std::pow(10.0, precision);
-        double remainder = scale * (af - double(ipart));
-        std::int64_t fpart = std::int64_t(remainder);
-        
-        if ((remainder - double(fpart)) > 0.5) {
-            fpart++;
-            if (fpart > 10000000) {
-                fpart = 0;
-                ipart++;
-            }
+        bool negative = f < 0.0;
+        if (negative) {
+            f = -f;
         }
-        
-        if (f < 0.0) *output++ = '-';
-        output += ltoa(output, ipart);
-  
+
+        double rounding = 0.5;
+        for (int i = 0; i < precision; i++) {
+            rounding *= 0.1;
+        }
+        f += rounding;
+
+        std::int64_t ipart = static_cast<std::int64_t>(f);
+        double frac = f - ipart;
+
+        std::string result;
+        if (negative) {
+            result.push_back('-');
+        }
+
+        if (ipart == 0) {
+            result.push_back('0');
+        }
+        else {
+            std::string tmp;
+            while (ipart > 0) {
+                tmp.push_back(char('0' + ipart % 10));
+                ipart /= 10;
+            }
+            result.append(tmp.rbegin(), tmp.rend());
+        }
+
         if (precision > 0) {
-            *output++ = '.';
-
-            std::int64_t power = 1;
-            for (int i = 1; i < precision; ++i) power *= 10;
-            while (fpart < power && power > 1) {
-                *output++ = '0';
-                power /= 10;
+            result.push_back('.');
+            for (int i = 0; i < precision; ++i) {
+                frac *= 10.0;
+                int digit = static_cast<int>(frac);
+                result.push_back(char('0' + digit));
+                frac -= digit;
             }
-
-            output += ltoa(output, fpart);
         }
-        
-        result.resize(output - result.data());
+
         return result;
     }
 }

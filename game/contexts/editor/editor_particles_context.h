@@ -7,28 +7,44 @@
 #include "editor_moving_tool.h"
 
 // Bugs:
-// + new random
-// + graph spread
-// + particle: axis doesnt work
+// v new random
+// v graph spread
+// v particle: axis doesnt work
 // + baking time -> combo: 10, 20, 100 -> max emission time (devidable by 100)
 // ----
-// + particle pivot parameter
 // + cycling size graph 1.0 -> 0.0 doesnt work properly with baking = 100
+// + particle pivot parameter
+// + color graphs
+// +
 
 namespace game {
+    enum class BakingTime {
+        BAKE10 = 1,
+        BAKE20,
+        BAKE50,
+        BAKE100,
+    };
     enum class ShapeDistribution {
         RANDOM = 1,   // a random point from start shape to a random point of the end shape
         SHUFFLED,     // a random point from start shape to the corresponding point of the end shape
         LINEAR,       // the i-th point from start shape to the corresponding point of the end shape
     };
+    struct RandomSource {
+        RandomSource() {}
+        RandomSource(std::uint64_t seed, std::uint64_t seq);
+        std::uint32_t getNextRandom();
+        
+        std::uint64_t _state = 0;
+        std::uint64_t _inc = 0;
+    };
     struct Graph {
         Graph(float absMin, float absMax, float maxSpread, float defaultValue);
         void setPointsFromString(const std::string &data);
         auto getFilling(float t) const -> float;
-        auto getValue(float t) const -> float;
+        auto getValue(float t, float spreadKoeff) const -> float;
         auto getMaxValue() const -> float { return _maxValue; }
         
-    private:
+    public:
         const float _absMin;
         const float _absMax;
         const float _maxSpread;
@@ -69,19 +85,23 @@ namespace game {
         auto getMapRaw() const -> const std::uint8_t *;
         auto getParams() const -> const voxel::ParticlesParams &;
         
-    private:
+    public:
         struct ActiveParticle {
             const std::size_t index;
-            const std::size_t randomSeed;
             const float bornTimeMs;
             const float lifeTimeMs;
             const math::vector3f start;
             const math::vector3f end;
             math::vector3f currentPosition;
+            const float spreadKoeffSize;
+            const float spreadKoeffSpeed;
+            const float spreadKoeffAlpha;
         };
         
         bool _isLooped = true;
-        std::size_t _randomSeed = 0;
+        
+        std::size_t _randomSeed = 100;
+        RandomSource _shapeGetRandom;
 
         ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
         Shape _startShape = {Shape::Type::DISK, false, {0.0f, 0.0f, 0.0f}};
@@ -90,7 +110,7 @@ namespace game {
 
         foundation::RenderTexturePtr _texture;
         
-        std::size_t _bakingFrameTimeMs = 100;
+        std::size_t _bakingFrameTimeMs = 10;
         std::size_t _particlesToEmit = 100;
         
         Graph _emissionGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
@@ -100,14 +120,14 @@ namespace game {
         Graph _widthGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
         Graph _heightGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
         Graph _speedGraph = Graph(-999.0f, +999.0f, 999.0f, 10.0f);
-        Graph _alphaGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
+        Graph _alphaGraph = Graph(0.0f, 1.0f, 1.0f, 1.0f);
 
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
         voxel::ParticlesParams _ptcParams;
         
     private:
-        auto _getShapePoints(float cycleOffset, std::size_t random, const math::vector3f &shapeOffset) const -> std::pair<math::vector3f, math::vector3f>;
+        auto _getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) -> std::pair<math::vector3f, math::vector3f>;
     };
 }
 

@@ -5,19 +5,29 @@
 
 namespace game {
     namespace {
-        const std::size_t RND_SHAPE = 10000;
-        const std::size_t RND_BORN_PARTICLE = 20000;
+        const std::uint64_t RND_SHAPE_FILL = 100;
+        const std::uint64_t RND_SHAPE_GET = 200;
+        const std::uint64_t RND_BORN_PARTICLE = 300;
+        const std::uint64_t RND_GRAPH_SPREAD = 400;
+    }
 
-        std::size_t getNextRandom(std::size_t prevRandom) {
-            return prevRandom * 6364136223846793005LL + 1442695040888963407LL;
-        }
-        std::size_t combineRandom(std::size_t r1, std::size_t r2) {
-            return r1 * 6364136223846793005LL ^ r2 + 1442695040888963407LL;
-        }
+    RandomSource::RandomSource(std::uint64_t seed, std::uint64_t seq) {
+        _state = 0U;
+        _inc = (seq << 1u) | 1u;
+        getNextRandom();
+        _state += seed;
+        getNextRandom();
+    }
+    std::uint32_t RandomSource::getNextRandom() {
+        uint64_t oldstate = _state;
+        _state = oldstate * 6364136223846793005ULL + (_inc | 1);
+        uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
+        uint32_t rot = oldstate >> 59u;
+        return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
     }
     
     Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
-        _points.emplace_back(Point { -0.0001f, defaultValue, defaultValue });
+        _points.emplace_back(Point { 0.0f, defaultValue, defaultValue });
         _maxVolume = defaultValue;
     }
     void Graph::setPointsFromString(const std::string &data) {
@@ -25,16 +35,14 @@ namespace game {
         _points.clear();
         _maxValue = 0.0f;
         
-        float minX = 0.0f;
         while (!input.isEof()) {
             float x, value, spread;
             if (input >> x >> value >> spread) {
                 spread = std::min(spread, _maxSpread);
                 const float lower = std::max(value - spread, _absMin);
                 const float upper = std::min(value + spread, _absMax);
-                minX = std::min(x, minX);
                 _maxValue = std::max(_maxValue, upper);
-                _points.emplace_back(Point { std::min(x + minX, 1.0f), lower, upper });
+                _points.emplace_back(Point { std::max(0.0f, std::min(x, 1.0f)), lower, upper });
             }
         }
         
@@ -51,6 +59,9 @@ namespace game {
         }
     }
     float Graph::getFilling(float t) const {
+        if (_maxVolume < std::numeric_limits<float>::epsilon()) {
+            return 1.0f;
+        }
         float volume = 0.0f;
         for (std::size_t i = 0; i < _points.size() - 1; i++) {
             const float lx = _points[i].x;
@@ -71,20 +82,24 @@ namespace game {
         volume += (t - _points.back().x) * _points.back().upper;
         return volume / _maxVolume;
     }
-    auto Graph::getValue(float t) const -> float {
+    auto Graph::getValue(float t, float spreadKoeff) const -> float {
         for (std::size_t i = 0; i < _points.size() - 1; i++) {
             const float lx = _points[i].x;
             const float rx = _points[i + 1].x;
+            const float llower = _points[i].lower;
+            const float rlower = _points[i + 1].lower;
             const float lupper = _points[i].upper;
             const float rupper = _points[i + 1].upper;
-            
+
             if (t >= lx && t < rx) {
                 const float koeff = (t - lx) / (rx - lx);
-                return lupper + (rupper - lupper) * koeff;
+                const float lower = llower + (rlower - llower) * koeff;
+                const float upper = lupper + (rupper - lupper) * koeff;
+                return lower + (upper - lower) * spreadKoeff;
             }
         }
         
-        return _points.back().upper;
+        return _points.back().lower + (_points.back().upper - _points.back().lower) * spreadKoeff;
     }
 
     float Shape::getMaxSize() const {
@@ -98,6 +113,7 @@ namespace game {
         return 0.0f;
     }
     void Shape::generate(const voxel::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
+        RandomSource rnd = RandomSource(randomSeed, RND_SHAPE_FILL);
         if (type == Type::DISK) {
             points.clear();
             std::size_t random = randomSeed;
@@ -112,8 +128,7 @@ namespace game {
                 float r = 0.5f * args.x;
                 
                 if (fill) { // spread in [0..radius]
-                    random = getNextRandom(random);
-                    r = float(random % 991 + 10) / 1000.0f * args.x;
+                    r = float(rnd.getNextRandom() % 991 + 10) / 2000.0f * args.x;
                 }
                 
                 const math::vector3f poff (r * std::cosf(koeff), 0.0f, r * std::sinf(koeff));
@@ -132,7 +147,6 @@ namespace game {
         }
         else if (type == Type::BOX) {
             points.clear();
-            std::size_t random = randomSeed;
 
             int dimIndexes[3];
             int dimCount = 0;
@@ -157,12 +171,9 @@ namespace game {
                 else {
                     for (std::size_t i = 0; i < amount; i++) {
                         math::vector3f koeff;
-                        random = getNextRandom(random);
-                        koeff.x = float(random % 10001) / float(10000) - 0.5f;
-                        random = getNextRandom(random);
-                        koeff.y = float(random % 10001) / float(10000) - 0.5f;
-                        random = getNextRandom(random);
-                        koeff.z = float(random % 10001) / float(10000) - 0.5f;
+                        koeff.x = float(rnd.getNextRandom() % 10001) / float(10000) - 0.5f;
+                        koeff.y = float(rnd.getNextRandom() % 10001) / float(10000) - 0.5f;
+                        koeff.z = float(rnd.getNextRandom() % 10001) / float(10000) - 0.5f;
                         points.emplace_back(args * koeff);
                     }
                 }
@@ -203,16 +214,12 @@ namespace game {
                 else {
                     for (std::size_t i = 0; i < amount; i++) {
                         math::vector3f koeff;
-                        random = getNextRandom(random);
-                        koeff.x = float(random % 10001) / float(10000) - 0.5f;
-                        random = getNextRandom(random);
-                        koeff.y = float(random % 10001) / float(10000) - 0.5f;
-                        random = getNextRandom(random);
-                        koeff.z = float(random % 10001) / float(10000) - 0.5f;
+                        koeff.x = float(rnd.getNextRandom() % 10001) / float(10000) - 0.5f;
+                        koeff.y = float(rnd.getNextRandom() % 10001) / float(10000) - 0.5f;
+                        koeff.z = float(rnd.getNextRandom() % 10001) / float(10000) - 0.5f;
                         
                         if (dimCount) {
-                            random = getNextRandom(random);
-                            koeff.flat[dimIndexes[i % dimCount]] = random % 2000 >= 1000 ? 0.5f : -0.5f;
+                            koeff.flat[dimIndexes[i % dimCount]] = rnd.getNextRandom() % 2000 >= 1000 ? 0.5f : -0.5f;
                         }
                         
                         points.emplace_back(args * koeff);
@@ -255,10 +262,14 @@ namespace game {
     }
     
     void Emitter::setParameters(const util::Description &params) {
+        std::size_t bakingTimeTable[] = {
+            0, 10, 20, 50, 100
+        };
+        
         const util::Description &desc = *params.getSubDesc("emitter");
         _emissionTimeMs = desc.get<std::uint32_t>("emissionTimeMs");
         _particleLifeTimeMs = desc.get<std::uint32_t>("particleLifeTimeMs");
-        _bakingFrameTimeMs = desc.get<std::uint32_t>("bakingFrameTimeMs");
+        _bakingFrameTimeMs = bakingTimeTable[desc.get<std::uint32_t>("bakingFrameType")];
         _particlesToEmit = desc.get<std::uint32_t>("particlesToEmit");
         _isLooped = desc.get<bool>("looped");
         _randomSeed = desc.get<std::uint32_t>("randomSeed");
@@ -284,12 +295,14 @@ namespace game {
     }
     
     void Emitter::refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd) {
+        _shapeGetRandom = RandomSource(_randomSeed, RND_SHAPE_GET);
+        
         const math::vector3f emitterDir = _endShapeOffset.lengthSq() > 0.1f ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
         const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
         const std::size_t cyclesInRow = std::size_t(std::ceil((_isLooped ? std::max(_emissionTimeMs, _particleLifeTimeMs) : _emissionTimeMs + _particleLifeTimeMs) / _emissionTimeMs));
         
-        _startShape.generate(shapeStart, emitterDir.normalized(), combineRandom(_randomSeed, RND_SHAPE), 1024);
-        _endShape.generate(shapeEnd, emitterDir.normalized(), combineRandom(_randomSeed, RND_SHAPE), 1024);
+        _startShape.generate(shapeStart, emitterDir.normalized(), _randomSeed, 1024);
+        _endShape.generate(shapeEnd, emitterDir.normalized(), _randomSeed, 1024);
         
         const std::uint32_t mapTextureWidth = std::uint32_t(cyclesInRow * cycleLength);
         const std::uint32_t mapVerticalCount = std::uint32_t(_particlesToEmit * (_isLooped ? cyclesInRow : 1));
@@ -314,10 +327,10 @@ namespace game {
         _ptcParams.maxXYZ = {0, 0, 0};
         _ptcParams.maxSize = {_widthGraph.getMaxValue(), _heightGraph.getMaxValue()};
 
+        RandomSource rndSpread = RandomSource(RND_GRAPH_SPREAD, _randomSeed);
+        
         // second loop is needed to bake old particles from previous cycle (_isLooped)
         for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //
-            std::size_t bornRandom = combineRandom(_randomSeed, RND_BORN_PARTICLE);
-            
             for (std::size_t i = 0; i < mapTextureWidth; i++) {
                 const std::size_t timeIndex = i + loop * mapTextureWidth;
                 const float currAbsTimeMs = float((timeIndex + 0) * _bakingFrameTimeMs);
@@ -340,11 +353,14 @@ namespace game {
                     const std::size_t nextParticleCount = std::min(i / cycleLength * _particlesToEmit + nextEmissionGraphValue, _isLooped ? std::size_t(-1) : _particlesToEmit);
                     
                     for (std::size_t c = bornParticleCount; c < nextParticleCount; c++) {
-                        bornRandom = getNextRandom(bornRandom);
                         const float ptcEmissionKoeff = float(c) / float(_particlesToEmit);
-                        const std::pair<math::vector3f, math::vector3f> shapePoints = _getShapePoints(ptcEmissionKoeff, bornRandom, _endShapeOffset);
+                        const std::pair<math::vector3f, math::vector3f> shapePoints = _getShapePoints(ptcEmissionKoeff, _endShapeOffset);
+                        
                         activeParticles.emplace_back(ActiveParticle {
-                            c, bornRandom, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second, shapePoints.first
+                            c, currAbsTimeMs, _particleLifeTimeMs, shapePoints.first, shapePoints.second, shapePoints.first,
+                            float(rndSpread.getNextRandom() % 10001) / 10000.0f,
+                            float(rndSpread.getNextRandom() % 10001) / 10000.0f,
+                            float(rndSpread.getNextRandom() % 10001) / 10000.0f
                         });
                     }
                     
@@ -358,23 +374,25 @@ namespace game {
 
                     element.position = ptc->currentPosition;
 
-                    const math::vector3f direction = (ptc->end - ptc->start).normalized();
-                    const float speed = _speedGraph.getValue(lifeKoeff);
-                    ptc->currentPosition = ptc->currentPosition + direction * speed * (_bakingFrameTimeMs / 1000.0f);
-                    
-                    // TODO: ptc position modificators
-                    
                     if (ptc->currentPosition.x > _ptcParams.maxXYZ.x) _ptcParams.maxXYZ.x = ptc->currentPosition.x;
                     if (ptc->currentPosition.y > _ptcParams.maxXYZ.y) _ptcParams.maxXYZ.y = ptc->currentPosition.y;
                     if (ptc->currentPosition.z > _ptcParams.maxXYZ.z) _ptcParams.maxXYZ.z = ptc->currentPosition.z;
                     if (ptc->currentPosition.x < _ptcParams.minXYZ.x) _ptcParams.minXYZ.x = ptc->currentPosition.x;
                     if (ptc->currentPosition.y < _ptcParams.minXYZ.y) _ptcParams.minXYZ.y = ptc->currentPosition.y;
                     if (ptc->currentPosition.z < _ptcParams.minXYZ.z) _ptcParams.minXYZ.z = ptc->currentPosition.z;
+
                     
-                    element.width = _widthGraph.getValue(lifeKoeff);
-                    element.height = _heightGraph.getValue(lifeKoeff);
+                    const math::vector3f direction = (ptc->end - ptc->start).normalized();
+                    const float speed = _speedGraph.getValue(lifeKoeff, ptc->spreadKoeffSpeed);
+                    ptc->currentPosition = ptc->currentPosition + direction * speed * (_bakingFrameTimeMs / 1000.0f);
+                    
+                    // TODO: ptc position modificators
+                    
+                    
+                    element.width = _widthGraph.getValue(lifeKoeff, ptc->spreadKoeffSize);
+                    element.height = _heightGraph.getValue(lifeKoeff, ptc->spreadKoeffSize);
                     element.angle = 0.0f;
-                    element.alpha = _alphaGraph.getValue(lifeKoeff);
+                    element.alpha = _alphaGraph.getValue(lifeKoeff, ptc->spreadKoeffAlpha);
                     element.mask = loop + 1; // Mask: 1 - newborn, 2 - old
                     element.history = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 255 = 255 * BakingTimeSec)
                     
@@ -447,17 +465,18 @@ namespace game {
         return _ptcParams;
     }
 
-    std::pair<math::vector3f, math::vector3f> Emitter::_getShapePoints(float cycleOffset, std::size_t random, const math::vector3f &shapeOffset) const {
+    std::pair<math::vector3f, math::vector3f> Emitter::_getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) {
         switch (_shapeDistribution) {
             case ShapeDistribution::RANDOM:
             {
-                const std::size_t second = getNextRandom(random);
-                return std::make_pair(_startShape.points[random % _startShape.points.size()], shapeOffset + _endShape.points[second % _endShape.points.size()]);
+                const std::uint32_t r0 = _shapeGetRandom.getNextRandom();
+                const std::uint32_t r1 = _shapeGetRandom.getNextRandom();
+                return std::make_pair(_startShape.points[r0 % _startShape.points.size()], shapeOffset + _endShape.points[r1 % _endShape.points.size()]);
             }
             case ShapeDistribution::SHUFFLED:
             {
-                const std::size_t rnd = getNextRandom(random);
-                const std::size_t startIndex = rnd % _startShape.points.size();
+                const std::uint32_t r0 = _shapeGetRandom.getNextRandom();
+                const std::size_t startIndex = r0 % _startShape.points.size();
                 const std::size_t endIndex = std::size_t(float(startIndex) / float(_startShape.points.size()) * float(_endShape.points.size()));
                 return std::make_pair(_startShape.points[startIndex], shapeOffset + _endShape.points[endIndex]);
             }
@@ -725,16 +744,17 @@ namespace game {
     bool EditorParticlesContext::_emissionSet(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             util::strstream input(data.c_str(), data.length());
-            int emissionTimeMs, particleLifeTimeMs, bakingFrameTimeMs, particlesToEmit;
+            int emissionTimeMs, particleLifeTimeMs, bakingFrameType, particlesToEmit, rndSeed;
             bool looped;
             
-            if (input >> emissionTimeMs >> particleLifeTimeMs >> bakingFrameTimeMs >> particlesToEmit >> looped) {
+            if (input >> emissionTimeMs >> particleLifeTimeMs >> bakingFrameType >> particlesToEmit >> looped >> rndSeed) {
                 util::Description *desc = node->currentDesc->getSubDesc("emitter");
                 desc->set("looped", looped);
                 desc->set("emissionTimeMs", emissionTimeMs);
                 desc->set("particleLifeTimeMs", particleLifeTimeMs);
-                desc->set("bakingFrameTimeMs", bakingFrameTimeMs);
+                desc->set("bakingFrameType", bakingFrameType);
                 desc->set("particlesToEmit", particlesToEmit);
+                desc->set("randomSeed", rndSeed);
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
                 desc->set("minXYZ", node->emitter.getParams().minXYZ);

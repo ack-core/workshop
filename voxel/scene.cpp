@@ -13,10 +13,13 @@
 
 namespace voxel {
     ParticlesParams::ParticlesParams(const util::Description &emitterDesc) {
+        float bakingTimeTable[] = {
+            0.0f, 0.010f, 0.020f, 0.050f, 0.100f
+        };
         const util::Description &desc = *emitterDesc.getSubDesc("emitter");
         additiveBlend = desc.get<bool>("additiveBlend");
         orientation = desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
-        bakingTimeSec = float(desc.get<std::uint32_t>("bakingFrameTimeMs")) / 1000.0f;
+        bakingTimeSec = bakingTimeTable[desc.get<std::uint32_t>("bakingFrameType")];
         minXYZ = desc.get<math::vector3f>("minXYZ");
         maxXYZ = desc.get<math::vector3f>("maxXYZ");
         maxSize = desc.get<math::vector2f>("maxSize");
@@ -220,7 +223,8 @@ namespace voxel {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
-                    self._constants.normal = camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
+                    self._constants.normal = -1.0 * camDir;//camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
+                    self._constants.swtch = 1.0;
                 };
             }
             else if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::WORLD) {
@@ -238,7 +242,7 @@ namespace voxel {
                 };
             }
             
-            _constants.alpha = 1.0;
+            _constants.swtch = 0.0; // 0.0 - global normal, 1.0 - current speed dir
             _constants.t0_t1_mask_cap = math::vector4f {0, 0, TYPE_MASK_NEWBORN, 1.0f};
             _constants.hpix = 1.0f / float(map->getWidth());
             _constants.vpix = 1.0f / float(map->getHeight());
@@ -280,8 +284,8 @@ namespace voxel {
 
         struct Constants {
             math::vector4f t0_t1_mask_cap;
-            math::vector3f position; float alpha;
-            math::vector3f normal; float maxW;
+            math::vector3f position; float maxW;
+            math::vector3f normal; float swtch;
             math::vector3f right; float maxH;
             math::vector3f minXYZ; float hpix;
             math::vector3f maxXYZ; float vpix;
@@ -488,8 +492,8 @@ namespace {
         }
         const {
             t0_t1_mask_cap : float4
-            position_alpha : float4
-            normal_mw : float4
+            position_mw : float4
+            normal_swtch : float4
             right_mh : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
@@ -529,11 +533,14 @@ namespace {
             float  isAlive = _step(0.5, float(uint(m3t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m3t1.w < 0.5) * fading;
 
             float3 ptcpos = _lerp(ptcposT0, ptcposT1, tf);
-            float2 wh = psize.xy * float2(const_normal_mw.w, const_right_mh.w) * isAlive;
+            float2 wh = psize.xy * float2(const_position_mw.w, const_right_mh.w) * isAlive;
 
-            float3 up = _cross(const_normal_mw.xyz, const_right_mh.xyz);
-            float3 relVertexPos = const_right_mh.xyz * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
-            output_position = _transform(float4(const_position_alpha.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
+            float3 normal = _lerp(const_normal_swtch.xyz, _norm(frame_cameraPosition.xyz - ptcpos), const_normal_swtch.w);
+            float3 up = _lerp(_cross(const_normal_swtch.xyz, const_right_mh.xyz), _norm(ptcposT1 - ptcposT0), const_normal_swtch.w);
+            float3 right = _norm(_cross(up, normal));
+            
+            float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+            output_position = _transform(float4(const_position_mw.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv_alpha = float3(fixed_quad[repeat_ID].zw, map3.x);
         }
         fssrc {
