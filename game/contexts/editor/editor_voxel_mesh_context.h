@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include "node_access_interface.h"
 
+// BUGS:
+//
 namespace game {
     struct EditorNodeVoxelMesh : public EditorNode {
         voxel::SceneInterface::VoxelMeshPtr mesh;

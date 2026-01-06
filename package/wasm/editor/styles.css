@@ -48,7 +48,7 @@ html, body {
     scrollbar-width: none;
     top: 25px;
     right: 0;
-    height: calc(100vh - 127px);
+    max-height: calc(100vh - 127px);
     min-width: 100px;
 }
 .webix_tree_img {

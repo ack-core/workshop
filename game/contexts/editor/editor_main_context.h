@@ -12,16 +12,12 @@
 //
 
 // Editor TODO:
-// + changing prefab (coordinates) -> resave doesnt work
 // + reload prefabs on resources change
 // + ask before deleting resource
 // + separate features in html/js for editor (everything about 'mesh' inside a single function)
 // + button in nodes panel are scrolling with panel -> separate them
 // BUGS:
-// + save prefab works for non-top nodes
 // + transform in 3+ hierarchy
-// + ctrl + a
-// + if right panel is not visible it still catches pointer events -> cant rotate camera
 
 namespace game {
     class EditorMainContext : public Context, public NodeAccessInterface {
@@ -38,7 +34,7 @@ namespace game {
         
     private:
         const API _api;
-        const CameraAccessInterface &_cameraAccess;
+        CameraAccessInterface &_cameraAccess;
         foundation::EventHandlerToken _editorEventsToken;
         voxel::SceneInterface::LineSetPtr _axis;
         
@@ -47,6 +43,8 @@ namespace game {
         std::unordered_map<std::string, bool (EditorMainContext::*)(const std::string &)> _handlers;
         
         std::weak_ptr<EditorNode> _currentNode;
+        bool _doUpdateEveryFrame = false;
+        bool _isEditing = false;
         
     private:
         std::unique_ptr<MovingTool> _makeMovingTool(math::vector3f &target);
@@ -58,5 +56,10 @@ namespace game {
         bool _renameNode(const std::string &data);
         bool _moveNode(const std::string &data);
         bool _clearNodeSelection(const std::string &data);
+        bool _startEditing(const std::string &data);
+        bool _stopEditing(const std::string &data);
+        bool _centerOnObject(const std::string &data);
+        bool _axisSwitch(const std::string &data);
+        bool _updateSwitch(const std::string &data);
     };
 }

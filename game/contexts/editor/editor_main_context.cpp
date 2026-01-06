@@ -39,12 +39,20 @@ namespace game {
         _handlers["editor.renameNode"] = &EditorMainContext::_renameNode;
         _handlers["editor.moveNode"] = &EditorMainContext::_moveNode;
         _handlers["editor.clearNodeSelection"] = &EditorMainContext::_clearNodeSelection;
+        _handlers["editor.startEditing"] = &EditorMainContext::_startEditing;
+        _handlers["editor.stopEditing"] = &EditorMainContext::_stopEditing;
+        _handlers["editor.resource.save"] = &EditorMainContext::_stopEditing;
+        _handlers["editor.centerOnObject"] = &EditorMainContext::_centerOnObject;
+        _handlers["editor.axisSwitch"] = &EditorMainContext::_axisSwitch;
+        _handlers["editor.updateSwitch"] = &EditorMainContext::_updateSwitch;
         
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
             if (handler) {
                 _api.platform->logMsg("[Editor] msg = '%s' arg = '%s'", msg.data(), data.c_str());
-                return (this->*handler)(data);
+                const bool result = (this->*handler)(data);
+                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+                return result;
             }
             return false;
         });
@@ -92,6 +100,12 @@ namespace game {
     }
     
     void EditorMainContext::update(float dtSec) {
+        if (_doUpdateEveryFrame || _isEditing) {
+            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+        }
+        else {
+            dtSec = 0.0f;
+        }
         for (auto &item : _nodes) {
             item.second->update(dtSec);
         }
@@ -154,7 +168,6 @@ namespace game {
             }
             
             _api.platform->sendEditorMsg("engine.nodeDeleted", data);
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         }
         return true;
     }
@@ -165,7 +178,6 @@ namespace game {
             _currentNode = index->second;
             _movingTool = _makeMovingTool(index->second->localPosition);
             _movingTool->setBase(index->second->parent ? index->second->parent->globalPosition : math::vector3f(0, 0, 0));
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             return false; // A typed context must handle this
         }
         else {
@@ -228,7 +240,6 @@ namespace game {
         
         if (input >> newPos.x >> newPos.y >> newPos.z) {
             _movingTool->setPosition(newPos);
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         }
 
         return true;
@@ -237,9 +248,34 @@ namespace game {
     bool EditorMainContext::_clearNodeSelection(const std::string &data) {
         _movingTool = nullptr;
         _currentNode.reset();
-        _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
         return false;
     }
     
+    bool EditorMainContext::_startEditing(const std::string &data) {
+        _isEditing = true;
+        return false;
+    }
+    
+    bool EditorMainContext::_stopEditing(const std::string &data) {
+        _isEditing = false;
+        return false;
+    }
+    
+    bool EditorMainContext::_centerOnObject(const std::string &data) {
+        if (std::shared_ptr<EditorNode> node = _currentNode.lock()) {
+            _cameraAccess.setTarget(node->globalPosition);
+        }
+        return true;
+    }
+    
+    bool EditorMainContext::_axisSwitch(const std::string &data) {
+        _api.scene->setLinesDrawingEnabled(data == "true");
+        return true;
+    }
+    
+    bool EditorMainContext::_updateSwitch(const std::string &data) {
+        _doUpdateEveryFrame = (data == "true");
+        return true;
+    }
 }
 

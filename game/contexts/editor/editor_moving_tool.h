@@ -17,6 +17,7 @@ namespace game {
         void setOnDragEnd(util::callback<void()> &&handler);
 
         auto getPosition() const -> const math::vector3f &;
+        bool isDragging() const;
         
     public:
         const API &_api;

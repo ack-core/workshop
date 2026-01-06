@@ -83,6 +83,7 @@ namespace game {
                         _api.platform->sendEditorMsg("engine.insertNode", index.first);
                     }
                 }
+                _api.platform->sendEditorMsg("engine.prefab.editing", "");
             }
             return true;
         }
@@ -124,7 +125,7 @@ namespace game {
             std::string errorString;
             
             // ignore without messagebox
-            if (node->type == EditorNodeType::PREFAB) {
+            if (node->type == EditorNodeType::PREFAB || node->parent != nullptr) {
                 return true;
             }
             

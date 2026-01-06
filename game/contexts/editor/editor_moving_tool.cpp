@@ -115,5 +115,8 @@ namespace game {
     const math::vector3f &MovingTool::getPosition() const {
         return _target;
     }
+    bool MovingTool::isDragging() const {
+        return _capturedPointerId != foundation::INVALID_POINTER_ID;
+    }
 }
 

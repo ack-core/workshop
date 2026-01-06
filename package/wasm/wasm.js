@@ -85,6 +85,7 @@ const keyboardMap = {
     Space: 40, Enter: 41, Tab: 42,
     F1: 43, F2: 44, F3: 45, F4: 46, F5: 47, F6: 48, F7: 49, F8: 50, F9: 51, F10: 52
 }
+const keyboardActiveKeys = {}
 
 const vertexAttribFunctions = [
     (index, stride, offset) => { glcontext.vertexAttribPointer(index,  2, glcontext.HALF_FLOAT, false, stride, offset); return 4; },
@@ -607,13 +608,10 @@ worker.onmessage = (msg) => {
             }
         }
         function refreshFrame(data = 4) {
-            if (refreshCounter > 0) {
-                refreshCounter = Number(data);
-            }
-            else {
-                refreshCounter = Number(data);
+            if (refreshCounter <= 0) {
                 window.requestAnimationFrame(onFrame);
             }
+            refreshCounter = Number(data);
         }
 
         uiEditor.sendMsg = function(msg, data) {
@@ -697,8 +695,9 @@ worker.onmessage = (msg) => {
             return false;
         });
         window.addEventListener('keydown', function(event) {
-            if (event.repeat == false) {
+            if (event.repeat == false && event.ctrlKey == false && event.metaKey == false && event.shiftKey == false) {
                 if (event.code in keyboardMap) {
+                    keyboardActiveKeys[event.code] = true;
                     instance.exports.keyboardEvent(KEYBOARD_PRESS, keyboardMap[event.code]);
                     refreshFrame();
                     keyCount++;
@@ -707,7 +706,8 @@ worker.onmessage = (msg) => {
         });
         window.addEventListener('keyup', function(event) {
             if (event.repeat == false) {
-                if (event.code in keyboardMap) {
+                if (event.code in keyboardMap && keyboardActiveKeys[event.code]) {
+                    delete keyboardActiveKeys[event.code];
                     instance.exports.keyboardEvent(KEYBOARD_RELEASE, keyboardMap[event.code]);
                     refreshFrame();
                     keyCount--;

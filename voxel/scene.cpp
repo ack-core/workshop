@@ -319,6 +319,8 @@ namespace voxel {
         auto getWorldDirection(const math::vector2f &screenPosition, math::vector3f *outCamPosition) const -> math::vector3f override;
         void updateAndDraw(float dtSec) override;
         
+        void setLinesDrawingEnabled(bool enabled) override;
+        
     private:
         template<typename T> void _cleanupUnused(std::vector<T> &v) {
             for (auto index = v.begin(); index != v.end(); ) {
@@ -363,6 +365,8 @@ namespace voxel {
         std::vector<std::shared_ptr<VoxelMeshImpl>> _voxelMeshes;
         std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
+        
+        bool _lineDrawingEnabled = true;
     };
     
     std::shared_ptr<SceneInterface> SceneInterface::instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering) {
@@ -768,20 +772,26 @@ namespace voxel {
                 });
                 rendering.draw(emitter->particleCount);
             }
-            rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-            for (const auto &set : _lineSets) {
-                for (const auto &line : set->lines) {
-                    set->fillShaderConstants(line);
-                    rendering.applyShaderConstants(&set->shaderConstants);
-                    rendering.draw(2 + (line.arrowHead ? 32 : 0));
+            if (_lineDrawingEnabled) {
+                rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                for (const auto &set : _lineSets) {
+                    for (const auto &line : set->lines) {
+                        set->fillShaderConstants(line);
+                        rendering.applyShaderConstants(&set->shaderConstants);
+                        rendering.draw(2 + (line.arrowHead ? 32 : 0));
+                    }
+                }
+                rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                for (const auto &bbox : _boundingBoxes) {
+                    rendering.applyShaderConstants(&bbox->bboxData);
+                    rendering.draw();
                 }
             }
-            rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-            for (const auto &bbox : _boundingBoxes) {
-                rendering.applyShaderConstants(&bbox->bboxData);
-                rendering.draw();
-            }
         });
+    }
+
+    void SceneInterfaceImpl::setLinesDrawingEnabled(bool enabled) {
+        _lineDrawingEnabled = enabled;
     }
 }
 

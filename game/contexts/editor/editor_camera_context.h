@@ -12,6 +12,7 @@ namespace game {
         
         auto getOrbitSize() const -> float override;
         auto getTarget() const -> math::vector3f override;
+        void setTarget(const math::vector3f &position) override;
         
         void update(float dtSec) override;
         

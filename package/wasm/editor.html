@@ -96,6 +96,43 @@
         var dirResources = null;
 
         let utility = {
+            openDB: function() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open('fs-db');
+                    request.onupgradeneeded = () => {
+                        const db = request.result;
+                        if (!db.objectStoreNames.contains('handles')) {
+                            db.createObjectStore('handles');
+                        }
+                    };
+                    request.onsuccess = () => {
+                        const db = request.result;
+                        resolve({
+                            get(storeName, key) {
+                                return new Promise((resolve, reject) => {
+                                    const tx = db.transaction(storeName, 'readonly');
+                                    const store = tx.objectStore(storeName);
+                                    const req = store.get(key);
+
+                                    req.onsuccess = () => resolve(req.result);
+                                    req.onerror = () => reject(req.error);
+                                });
+                            },
+                            put(storeName, value, key) {
+                                return new Promise((resolve, reject) => {
+                                    const tx = db.transaction(storeName, 'readwrite');
+                                    const store = tx.objectStore(storeName);
+                                    const req = store.put(value, key);
+
+                                    req.onsuccess = () => resolve();
+                                    req.onerror = () => reject(req.error);
+                                });
+                            }
+                        });
+                    };
+                    request.onerror = () => reject(request.error);
+                });
+            },
             parseConfig: function(text) {
                 convertValue = (type, raw) => {
                     raw = raw.trim();
@@ -160,9 +197,8 @@
                 listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
                 listResources["inspect_prefab"].sort();
             },
-            setWorkingDirectory: async function() {
+            setWorkingDirectories: async function() {
                 try {
-                    editorRootDirectory = await window.showDirectoryPicker({ mode: "readwrite" });
                     dirResources = await editorRootDirectory.getDirectoryHandle("resources");
                     dirBinaryData = await editorRootDirectory.getDirectoryHandle("binary").then(r => r.getDirectoryHandle("data"));
                 } 
@@ -267,12 +303,41 @@
 
         uiBindings = {
             setWorkingDirectory: async function(e) {
-                let success = await utility.setWorkingDirectory();
+                editorRootDirectory = await window.showDirectoryPicker({ mode: "readwrite" });
+                const db = await utility.openDB();
+                await db.put('handles', editorRootDirectory, 'rootDirectory');                        
+                
+                let success = await utility.setWorkingDirectories();
                 if (success) {
                     document.getElementById("nodes").style.visibility = "visible";
                     $$("top_buttons").show();
-                    e.hide();                    
+                    e.hide();
                 }
+            },
+            initWorkingDirectory: async function() {
+                const db = await utility.openDB();
+                editorRootDirectory = await db.get("handles", "rootDirectory");
+                if (editorRootDirectory) {
+                    const permission = await editorRootDirectory.queryPermission({ mode: "readwrite" });
+                    if (permission === "granted") {
+                        let success = await utility.setWorkingDirectories();
+                        if (success) {
+                            document.getElementById("nodes").style.visibility = "visible";
+                            $$("top_buttons").show();
+                            return;
+                        }
+                    }
+                }
+                $$("swd").show();
+            },
+            centerOnObject: function(e) {
+                uiEditor.sendMsg("editor.centerOnObject", "");
+            },
+            axisSwitch: function(e, nv) {
+                uiEditor.sendMsg("editor.axisSwitch", nv.toString());
+            },
+            updateSwitch: function(e, nv) {
+                uiEditor.sendMsg("editor.updateSwitch", nv.toString());
             },
             resourceSaveAndExit: function(e) {
                 $$("processing_popup").show();
@@ -431,14 +496,22 @@
             margin: 0,
             rows: [
                 {cols: [
-                    elements.button("\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
+                    {
+                        id: "swd",
+                        hidden: true,
+                        cols: [
+                            elements.button("\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
+                        ]
+                    },
                     {
                         id: "top_buttons",
                         hidden: true,
                         cols: [
                             elements.button("\uD83D\uDCE4", "Load scene"),
                             elements.button("\uD83D\uDCBE", "Save scene"),
-                            elements.toggle('<img src="editor/arrows.svg"></img>', '<img src="editor/arrows.svg"></img>', true, "Hide/show moving tool", (e, nv) => {})
+                            elements.button("\u2316", "Center on selected object", uiBindings.centerOnObject),
+                            elements.toggle('<img src="editor/axis.svg"></img>', '<img src="editor/axis_off.svg"></img>', true, "Hide/show axis", uiBindings.axisSwitch),
+                            elements.toggle('\u25FC\uFE0F', '\u25B6', false, "Update every frame", uiBindings.updateSwitch)
                         ]
                     },
                     {},
@@ -704,6 +777,8 @@
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
 
+        uiBindings.initWorkingDirectory();
+
         if (typeof uiEditor != 'undefined') {
             uiEditor["engine.nodeCreated"] = function(data) {
                 console.log("[JS] engine.nodeCreated", data);
@@ -806,6 +881,9 @@
                 setGraphValue(desc.emitter.speedGraphData.trim().split(" ").map(Number), "inspect_ptc_speed_graph");
                 setGraphValue(desc.emitter.alphaGraphData.trim().split(" ").map(Number), "inspect_ptc_alpha_graph");
 
+            }
+            uiEditor["engine.prefab.editing"] = function(data) {
+                uiEditor.sendMsg("editor.stopEditing", "");
             }
             uiEditor["engine.ptcEndOffset"] = function(data) {
                 const [x, y, z] = data.split(' ');

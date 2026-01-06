@@ -497,6 +497,8 @@ namespace game {
         if (particles) {
             globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
             particles->setTransform(math::transform3f::identity().translated(globalPosition));
+            particles->setTime(currentTime, 0.0f);
+            currentTime += dtSec;
         }
     }
     void EditorNodeParticles::setResourcePath(const API &api, const std::string &path) {
@@ -519,7 +521,6 @@ namespace game {
                         voxel::ParticlesParams parameters (*originDesc);
                         const util::Description &desc = *originDesc->getSubDesc("emitter");
                         particles = api.scene->addParticles(texture, map, parameters);
-                        particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 1.9f, 0.0f); // set almost at the end of second cycle
                         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     }
                 }
@@ -576,11 +577,7 @@ namespace game {
                     _shapeEndLineset->setPosition(position + _endShapeTool->getPosition());
                     _shapeConnectLineset->setPosition(position);
                     _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.7f, 0.7f, 0.0f, 0.6f}, false);
-                    currentTime += dtSec;
-                    node->particles->setTime(currentTime, 0.0f);
                 }
-                
-                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             }
         }
     }
@@ -612,7 +609,6 @@ namespace game {
             voxel::ParticlesParams parameters (*node.originDesc);
             const util::Description &desc = *node.originDesc->getSubDesc("emitter");
             node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
-            node.particles->setTime((desc.get<std::uint32_t>("emissionTimeMs") / 1000.0f) * 0.9f, 0.0f); // set almost at the end of second cycle
         }
     }
 
@@ -662,7 +658,6 @@ namespace game {
                 
                 std::string args = util::serializeDescription(*node->currentDesc);
                 _api.platform->sendEditorMsg("engine.particles.editing", args);
-                _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                 return true;
             }
         }

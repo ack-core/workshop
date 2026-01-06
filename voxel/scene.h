@@ -94,6 +94,8 @@ namespace voxel {
         
         virtual void updateAndDraw(float dtSec) = 0;
         
+        virtual void setLinesDrawingEnabled(bool enabled) = 0;
+        
     public:
         virtual ~SceneInterface() = default;
     };

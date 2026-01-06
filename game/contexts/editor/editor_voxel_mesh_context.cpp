@@ -83,7 +83,7 @@ namespace game {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             node->mesh->resetOffset();
-            _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            //_api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             return true;
         }
         return false;

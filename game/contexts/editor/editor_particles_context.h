@@ -6,13 +6,7 @@
 #include "camera_access_interface.h"
 #include "editor_moving_tool.h"
 
-// Bugs:
-// v new random
-// v graph spread
-// v particle: axis doesnt work
-// + baking time -> combo: 10, 20, 100 -> max emission time (devidable by 100)
-// ----
-// + cycling size graph 1.0 -> 0.0 doesnt work properly with baking = 100
+// Next:
 // + particle pivot parameter
 // + color graphs
 // +
@@ -140,6 +134,7 @@ namespace game {
         Emitter emitter;
         voxel::SceneInterface::ParticlesPtr particles;
         math::vector3f endShapeOffset = {0, 10, 0};
+        float currentTime = 0.0f;
         
         EditorNodeParticles(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeParticles() override {}
@@ -166,7 +161,6 @@ namespace game {
         voxel::SceneInterface::LineSetPtr _shapeConnectLineset;
         voxel::SceneInterface::LineSetPtr _shapeStartLineset;
         voxel::SceneInterface::LineSetPtr _shapeEndLineset;
-        float currentTime = 0.0f;
         
         std::string _savingCfg;
         std::unique_ptr<std::uint8_t[]> _savingMap;

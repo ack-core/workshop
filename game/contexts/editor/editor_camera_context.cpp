@@ -91,10 +91,10 @@ namespace game {
         });
         
         _axis = _api.scene->addLineSet();
-        _axis->setLine(0, {-3, 0, -3}, {3, 0, -3}, {0.2, 0.2, 0.2, 0.25});
-        _axis->setLine(1, {3, 0, -3}, {3, 0, 3}, {0.2, 0.2, 0.2, 0.25});
-        _axis->setLine(2, {3, 0, 3}, {-3, 0, 3}, {0.2, 0.2, 0.2, 0.25});
-        _axis->setLine(3, {-3, 0, 3}, {-3, 0, -3}, {0.2, 0.2, 0.2, 0.25});
+        _axis->setLine(0, {-3, 0, -3}, {3, 0, -3}, {0.8, 0.8, 0.8, 0.25});
+        _axis->setLine(1, {3, 0, -3}, {3, 0, 3}, {0.8, 0.8, 0.8, 0.25});
+        _axis->setLine(2, {3, 0, 3}, {-3, 0, 3}, {0.8, 0.8, 0.8, 0.25});
+        _axis->setLine(3, {-3, 0, 3}, {-3, 0, -3}, {0.8, 0.8, 0.8, 0.25});
     }
     
     EditorCameraContext::~EditorCameraContext() {
@@ -109,7 +109,11 @@ namespace game {
     math::vector3f EditorCameraContext::getTarget() const {
         return _target;
     }
-
+    
+    void EditorCameraContext::setTarget(const math::vector3f &position) {
+        _target = position;
+    }
+    
     void EditorCameraContext::update(float dtSec) {
         const math::vector3f right = math::vector3f(0, 1, 0).cross(_orbit).normalized();
         const math::vector3f forward = math::vector3f(0, 1, 0).cross(right).normalized();
