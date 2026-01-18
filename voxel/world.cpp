@@ -13,18 +13,27 @@ namespace {
 }
 
 namespace voxel {
-    struct Node {
+    class ObjectNode {
+    public:
         math::transform3f transform;
         std::string resourcePath;
-        std::vector<Node *> children;
-        
-        Node(const util::Description &nodeDesc) {
+
+        ObjectNode(const util::Description &nodeDesc) {
             
         }
-        
-        virtual void load() {
+        virtual ~ObjectNode() {
             
         }
+        virtual void update(float dtSec) {
+            
+        }
+    };
+
+    struct VoxelMeshNode : public ObjectNode {
+        
+    };
+
+    struct ParticlesNode : public ObjectNode {
         
     };
 }
@@ -38,38 +47,22 @@ namespace voxel {
         ~ObjectImpl() override {
             
         }
-        void setTransform(const math::transform3f &trfm) override {
-            _transform = trfm;
-        }
-        void release() override {
+        void setTransform(const char *nodeName, const math::transform3f &trfm) override {
             
         }
-        void load(const util::Description &objDesc) {
-            for (auto &item : objDesc) {
-                if (const util::Description *nodeDesc = std::any_cast<util::Description>(&item.second)) {
-                    const std::string *name = nullptr;
-                    auto index = nodeDesc->find("name");
-                    if (index != nodeDesc->end() && (name = std::any_cast<std::string>(&index->second)) != nullptr) {
-                        const std::string parentName = getParentName(*name);
-                        Node *newNode = _nodes.emplace(*name, std::make_unique<Node>(*nodeDesc)).first->second.get();
-                        if (parentName.length()) {
-                            _nodes.at(parentName)->children.emplace_back(newNode);
-                        }
-                        else {
-                            _root = newNode;
-                        }
-                    }
-                    else {
-                        
-                    }
-                }
-            }
+        void loadResources(util::callback<void(WorldInterface::ObjectPtr)> &&completion) override {
+            
+        }
+        void unloadResources() override {
+            
+        }
+        void update(float dtSec) {
+            
         }
         
     private:
-        Node *_root = nullptr;
-        std::unordered_map<std::string, std::unique_ptr<Node>> _nodes;
-        math::transform3f _transform = math::transform3f::identity();
+        std::vector<std::unique_ptr<ObjectNode>> _nodes;
+        std::unordered_map<std::string, std::size_t> _nameToNodeIndex;
     };
 }
 
@@ -84,9 +77,8 @@ namespace voxel {
         ~WorldImpl() override;
         
     public:
-        void loadWorld(const char *descPath, util::callback<void(bool, float)> &&progress) override;
         auto getObject(const char *name) -> ObjectPtr override;
-        auto createObject(const char *name, const char *prefabPath, util::callback<void(ObjectPtr)> &&completion) -> ObjectPtr override;
+        auto createObject(const char *name, const char *prefabPath) -> ObjectPtr override;
         void update(float dtSec) override;
 
     public:
@@ -113,13 +105,10 @@ namespace voxel {
     WorldImpl::~WorldImpl() {
     
     }
-    void WorldImpl::loadWorld(const char *descPath, util::callback<void(bool, float)> &&progress) {
-        
-    }
     WorldInterface::ObjectPtr WorldImpl::getObject(const char *name) {
         return nullptr;
     }
-    WorldInterface::ObjectPtr WorldImpl::createObject(const char *name, const char *prefabPath, util::callback<void(ObjectPtr)> &&completion) {
+    WorldInterface::ObjectPtr WorldImpl::createObject(const char *name, const char *prefabPath) {
         return nullptr;
     }
     void WorldImpl::update(float dtSec) {

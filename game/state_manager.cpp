@@ -15,6 +15,7 @@ namespace game {
             const voxel::SceneInterfacePtr &scene,
             const voxel::WorldInterfacePtr &world,
             const voxel::RaycastInterfacePtr &raycast,
+            const voxel::SimulationInterfacePtr &simulation,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
         )
@@ -53,11 +54,12 @@ namespace game {
         const voxel::SceneInterfacePtr &scene,
         const voxel::WorldInterfacePtr &world,
         const voxel::RaycastInterfacePtr &raycast,
+        const voxel::SimulationInterfacePtr &simulation,
         const ui::StageInterfacePtr &ui,
         const dh::DataHubPtr &dh
     )
     {
-        return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, world, raycast, ui, dh);
+        return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, world, raycast, simulation, ui, dh);
     }
     
     void StateManagerImpl::switchToState(const char *name) {

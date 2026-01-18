@@ -4,7 +4,7 @@
 namespace voxel {
     class RaycastInterfaceImpl : public RaycastInterface {
     public:
-        RaycastInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const voxel::SceneInterfacePtr &scene) {}
+        RaycastInterfaceImpl(const foundation::PlatformInterfacePtr &platform) {}
         ~RaycastInterfaceImpl() override {}
         
     public:
@@ -17,9 +17,6 @@ namespace voxel {
         bool sphereCast(const math::vector3f &start, const math::vector3f &target, float radius, float length) const override {
             return false;
         }
-        void update(float dtSec) override {
-            
-        }
 
     public:
 
@@ -27,8 +24,8 @@ namespace voxel {
 }
 
 namespace voxel {
-    std::shared_ptr<RaycastInterface> RaycastInterface::instance(const foundation::PlatformInterfacePtr &platform, const voxel::SceneInterfacePtr &scene) {
-        return std::make_shared<RaycastInterfaceImpl>(platform, scene);
+    std::shared_ptr<RaycastInterface> RaycastInterface::instance(const foundation::PlatformInterfacePtr &platform) {
+        return std::make_shared<RaycastInterfaceImpl>(platform);
     }
 }
 

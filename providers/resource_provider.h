@@ -62,7 +62,7 @@ namespace resource {
         // @meshPath - path to file without extension
         // @return - mesh frames (zero size if not loaded)
         //
-        virtual void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) = 0;
+        virtual void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> &&completion) = 0;
         
         // Asynchronously load ground from file if it isn't loaded yet
         // @groundPath - path to file without extension

@@ -4,7 +4,6 @@
 #include "foundation/rendering.h"
 #include "foundation/layouts.h"
 #include "foundation/math.h"
-#include "foundation/util.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -49,8 +48,8 @@ namespace voxel {
         };
         struct VoxelMesh {
             virtual void resetOffset() = 0;
-            virtual auto getCenterOffset() const -> util::IntegerOffset3D = 0;
-            virtual void setCenterOffset(const util::IntegerOffset3D& offset) = 0;
+            virtual auto getCenterOffset() const -> math::vector3f = 0;
+            virtual void setCenterOffset(const math::vector3f& offset) = 0;
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setFrame(std::uint32_t index) = 0;
@@ -83,7 +82,7 @@ namespace voxel {
         
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D &originOffset) -> VoxelMeshPtr = 0;
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f &originOffset) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;

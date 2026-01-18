@@ -25,7 +25,7 @@ namespace {
             std::int16_t positionX, positionY, positionZ;
             std::uint8_t colorIndex, mask;
         };
-        util::IntegerOffset3D originOffset = {0, 0, 0};
+        math::vector3f originOffset = {0, 0, 0};
         std::vector<std::vector<VTXMVOX>> voxels;
     };
     
@@ -46,11 +46,11 @@ namespace {
         
         if (memcmp(data, "VOX ", 4) == 0) {
             if (*(std::int32_t *)(data + 4) == 0x7f) { // vox made by gen_meshes.py
-                data += 32;
-                ctx.originOffset.x = *(std::int8_t *)(data + 0);
-                ctx.originOffset.y = *(std::int8_t *)(data + 1);
-                ctx.originOffset.z = *(std::int8_t *)(data + 2);
-                data += 4;
+                data += 24;
+                ctx.originOffset.x = *(float *)(data + 0);
+                ctx.originOffset.y = *(float *)(data + 4);
+                ctx.originOffset.z = *(float *)(data + 8);
+                data += 3 * 4;
                 std::uint32_t frameCount = *(std::uint32_t *)data;
                 ctx.voxels.resize(frameCount);
                 data += sizeof(std::uint32_t);
@@ -60,6 +60,7 @@ namespace {
                     data += sizeof(std::uint32_t);
                     ctx.voxels[f].resize(voxelCount);
                     
+                    // TODO: move that loop to the mesh-preparing tool
                     for (std::uint32_t i = 0; i < voxelCount; i++) {
                         const MeshAsyncContext::Voxel &src = *(MeshAsyncContext::Voxel *)data;
                         MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][i];
@@ -113,7 +114,7 @@ namespace resource {
         auto getGroundInfo(const char *groundPath) -> const GroundInfo * override;
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
-        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
 
@@ -137,7 +138,7 @@ namespace resource {
         };
         struct VoxelMesh {
             std::vector<foundation::RenderDataPtr> frames;
-            util::IntegerOffset3D originOffset;
+            math::vector3f originOffset;
             bool outdated = false;
         };
         struct GroundMesh {
@@ -165,7 +166,7 @@ namespace resource {
         };
         struct QueueEntryMesh {
             std::string meshPath;
-            util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> callback;
+            util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> callback;
         };
         struct QueueEntryGround {
             std::string groundPath;
@@ -302,7 +303,7 @@ namespace resource {
         }
     }
         
-    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::IntegerOffset3D &)> &&completion) {
+    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueMesh.emplace_back(QueueEntryMesh {
                 .meshPath = meshPath,

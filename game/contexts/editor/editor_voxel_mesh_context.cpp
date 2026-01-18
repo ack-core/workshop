@@ -15,7 +15,7 @@ namespace game {
         }
         else {
             resourcePath = path;
-            api.resources->getOrLoadVoxelMesh(path.c_str(), [this, &api](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+            api.resources->getOrLoadVoxelMesh(path.c_str(), [this, &api](const std::vector<foundation::RenderDataPtr> &data, const math::vector3f& offset) {
                 mesh = api.scene->addVoxelMesh(data, offset);
                 api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             });
@@ -71,8 +71,8 @@ namespace game {
     bool EditorVoxelMeshContext::_startEditing(const std::string &data) {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
-            util::IntegerOffset3D offset = node->mesh->getCenterOffset();
-            _api.platform->sendEditorMsg("engine.mesh.editing", std::to_string(offset.x) + " " + std::to_string(offset.y) + " " + std::to_string(offset.z));
+            const math::vector3f offset = node->mesh->getCenterOffset();
+            _api.platform->sendEditorMsg("engine.mesh.editing", util::strstream::ftos(offset.x) + " " + util::strstream::ftos(offset.y) + " " + util::strstream::ftos(offset.z));
             return true;
         }
         
@@ -99,7 +99,7 @@ namespace game {
             _nodeAccess.forEachNode([this](const std::shared_ptr<EditorNode> &node) {
                 std::shared_ptr<EditorNodeVoxelMesh> meshNode = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(node);
                 if (meshNode && meshNode->mesh) {
-                    _api.resources->getOrLoadVoxelMesh(meshNode->resourcePath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const util::IntegerOffset3D& offset) {
+                    _api.resources->getOrLoadVoxelMesh(meshNode->resourcePath.data(), [meshNode, this](const std::vector<foundation::RenderDataPtr> &data, const math::vector3f& offset) {
                         meshNode->mesh = _api.scene->addVoxelMesh(data, offset);
                         meshNode->mesh->setPosition(meshNode->globalPosition);
                         _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
@@ -117,9 +117,9 @@ namespace game {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
             util::strstream input(data.c_str(), data.length());
-            int x = 0, y = 0, z = 0;
+            float x = 0, y = 0, z = 0;
             if (input >> x >> y >> z) {
-                node->mesh->setCenterOffset(util::IntegerOffset3D { x, y, z });
+                node->mesh->setCenterOffset(math::vector3f { x, y, z });
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             }
         }
@@ -130,10 +130,10 @@ namespace game {
     bool EditorVoxelMeshContext::_save(const std::string &data) {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
         if (node && node->mesh) {
-            util::IntegerOffset3D off = node->mesh->getCenterOffset();
+            const math::vector3f off = node->mesh->getCenterOffset();
             const std::string extPath = node->resourcePath + ".txt";
             
-            if (off.x || off.y || off.z) {
+            if (std::fabs(off.x) + std::fabs(off.y) + std::fabs(off.z) > std::numeric_limits<float>::epsilon()) {
                 util::Description desc;
                 util::Description &parameters = desc.addSubDesc("parameters");
                 parameters.set("offset", math::vector3f(off.x, off.y, off.z));

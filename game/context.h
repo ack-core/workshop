@@ -28,6 +28,7 @@ namespace game {
         virtual ~Interface() = default;
     };
     
+    // TODO: need to get shared_ptr to context during init -> void init();
     class Context {
     public:
         virtual void update(float dtSec) = 0;

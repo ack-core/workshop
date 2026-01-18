@@ -23,18 +23,23 @@ namespace voxel {
         using ObjectPtr = std::shared_ptr<Object>;
         
         struct Object {
-            virtual void setActive(bool active) = 0;
             virtual void loadResources(util::callback<void(WorldInterface::ObjectPtr)> &&completion);
             virtual void unloadResources();
-            virtual void setTransform(const math::transform3f &trfm) = 0;
-            virtual void release() = 0;
+            virtual void setTransform(const char *nodeName, const math::transform3f &trfm) = 0;
+            
+            // Play animation
+            // @animationName - name of the animation node
+            //     or name of the particles node
+            //     or name of the mesh animation concatenated with the node name. Example: 'root...voxelMeshNode.animationName'
+            // @completion    - callback is called when animation ends or instantly if animation wasn't found
+            //
+            virtual void play(const char *animationName, util::callback<void(WorldInterface::ObjectPtr)> &&completion);
             virtual ~Object() = default;
         };
         
     public:
-        virtual void loadWorld(const char *descPath, util::callback<void(bool, float)> &&progress) = 0;
-        virtual auto getObject(const char *name) -> WorldInterface::ObjectPtr = 0;
-        virtual auto createObject(const char *name, const char *prefabPath, util::callback<void(WorldInterface::ObjectPtr)> &&completion) -> ObjectPtr = 0;
+        virtual auto getObject(const char *name) -> ObjectPtr = 0;
+        virtual auto createObject(const char *name, const char *prefabPath) -> ObjectPtr = 0;
         virtual void update(float dtSec) = 0;
         
     public:

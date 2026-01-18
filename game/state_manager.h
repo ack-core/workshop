@@ -5,6 +5,7 @@
 #include "voxel/scene.h"
 #include "voxel/world.h"
 #include "voxel/raycast.h"
+#include "voxel/simulation.h"
 #include "ui/stage.h"
 #include "datahub/datahub.h"
 
@@ -18,6 +19,7 @@ namespace game {
             const voxel::SceneInterfacePtr &scene,
             const voxel::WorldInterfacePtr &world,
             const voxel::RaycastInterfacePtr &raycast,
+            const voxel::SimulationInterfacePtr &simulation,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
         );

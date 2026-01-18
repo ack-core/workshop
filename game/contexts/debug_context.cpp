@@ -65,13 +65,13 @@ namespace game {
         _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
         _axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.5});
         
-        _api.resources->getOrLoadVoxelMesh("meshes/stool", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D& offset) {
+        _api.resources->getOrLoadVoxelMesh("meshes/stool", [this](const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f& offset) {
             if (frames.size()) {
                 _actor = _api.scene->addVoxelMesh(frames, offset);
                 _actor->setTransform(math::transform3f({0, 1, 0}, M_PI / 4).translated({20, 0, 40}));
             }
         });
-        _api.resources->getOrLoadVoxelMesh("meshes/test/ruins", [this](const std::vector<foundation::RenderDataPtr> &mesh, const util::IntegerOffset3D& offset) {
+        _api.resources->getOrLoadVoxelMesh("meshes/test/ruins", [this](const std::vector<foundation::RenderDataPtr> &mesh, const math::vector3f& offset) {
             if (mesh.size()) {
                 _thing = _api.scene->addVoxelMesh(mesh, offset);
             }

@@ -10,17 +10,8 @@ set(
 	"${m_source_root}/world.cpp"
 	"${m_source_root}/raycast.h"
 	"${m_source_root}/raycast.cpp"
-
-	#"${m_source_root}/yard.h"
-	#"${m_source_root}/yard.cpp"
-	#"${m_source_root}/yard_base.h"
-	#"${m_source_root}/yard_base.cpp"
-	#"${m_source_root}/yard_actor.h"
-	#"${m_source_root}/yard_actor.cpp"
-	#"${m_source_root}/yard_stead.h"
-	#"${m_source_root}/yard_stead.cpp"
-	#"${m_source_root}/yard_thing.h"
-	#"${m_source_root}/yard_thing.cpp"
+	"${m_source_root}/simulation.h"
+	"${m_source_root}/simulation.cpp"
 )
 source_group("" FILES ${m_sources_list})
 add_library(voxel ${m_sources_list})

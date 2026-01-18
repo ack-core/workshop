@@ -21,15 +21,6 @@ TODO:
 
  */
 
-// TODO: where to place it?
-namespace util {
-    struct IntegerOffset3D {
-        int x;
-        int y;
-        int z;
-    };
-}
-
 namespace util {
     template <typename M> class callback final {};
     template <typename R, typename... Args> class callback <R(Args...)> final {
@@ -274,6 +265,7 @@ namespace util {
 }
 
 namespace util {
+    // TODO: simplicity, better naming and types support. Functions to get array-range of values (multimap)
     struct Description : public std::multimap<std::string, std::any> {
         using std::multimap<std::string, std::any>::multimap;
         template <typename T> const typename std::enable_if<std::is_integral<T>::value, T>::type get(const std::string &key) const {

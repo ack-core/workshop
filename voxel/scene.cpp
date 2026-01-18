@@ -118,11 +118,11 @@ namespace voxel {
         math::transform3f transform;
         
         // for editor
-        util::IntegerOffset3D originVoxelOffset;
-        util::IntegerOffset3D currentVoxelOffset;
+        math::vector3f originVoxelOffset;
+        math::vector3f currentVoxelOffset;
         
     public:
-        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count, util::IntegerOffset3D voxelOffset) : transform(math::transform3f::identity()) {
+        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count, const math::vector3f &voxelOffset) : transform(math::transform3f::identity()) {
             frameIndex = 0;
             frameCount = count;
             frames = std::make_unique<foundation::RenderDataPtr[]>(count);
@@ -138,14 +138,14 @@ namespace voxel {
         void resetOffset() override {
             currentVoxelOffset = {0, 0, 0};
         }
-        auto getCenterOffset() const -> util::IntegerOffset3D override {
+        auto getCenterOffset() const -> math::vector3f override {
             return {
                 originVoxelOffset.x + currentVoxelOffset.x,
                 originVoxelOffset.y + currentVoxelOffset.y,
                 originVoxelOffset.z + currentVoxelOffset.z
             };
         }
-        void setCenterOffset(const util::IntegerOffset3D& offset) override {
+        void setCenterOffset(const math::vector3f& offset) override {
             currentVoxelOffset.x = offset.x - originVoxelOffset.x;
             currentVoxelOffset.y = offset.y - originVoxelOffset.y;
             currentVoxelOffset.z = offset.z - originVoxelOffset.z;
@@ -161,9 +161,9 @@ namespace voxel {
         }
         auto getFinalTransform() const -> math::transform3f {
             math::vector3f offset;
-            offset.x = -float(currentVoxelOffset.x);
-            offset.y = -float(currentVoxelOffset.y);
-            offset.z = -float(currentVoxelOffset.z);
+            offset.x = -currentVoxelOffset.x;
+            offset.y = -currentVoxelOffset.y;
+            offset.z = -currentVoxelOffset.z;
             return math::transform3f::identity().translated(offset) * transform;
         }
     };
@@ -310,7 +310,7 @@ namespace voxel {
         
         auto addLineSet() -> LineSetPtr override;
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
-        auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D &originOffset) -> VoxelMeshPtr override;
+        auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f &originOffset) -> VoxelMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
@@ -670,7 +670,7 @@ namespace voxel {
         return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox));
     }
     
-    SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::IntegerOffset3D &originOffset) {
+    SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f &originOffset) {
         std::shared_ptr<VoxelMeshImpl> result = std::make_shared<VoxelMeshImpl>(frames.data(), std::uint32_t(frames.size()), originOffset);
         return _voxelMeshes.emplace_back(result);
     }
@@ -723,8 +723,8 @@ namespace voxel {
         return (math::vector3f(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w) - _camera.position).normalized();
     }
     
-    // Next:
-    // + Particles
+    // TODO: render
+    // + Particles (dithering mask opaque)
     // + Skybox + texture types
     //
     //
@@ -795,7 +795,6 @@ namespace voxel {
     }
 }
 
-// + Ground color influence effect
 // + Cubemap shadows
 //
 

@@ -5,10 +5,9 @@ Tool to generate optimized meshes from *.vox
 Format:
 4 bytes  - 'VOX '
 1 uint32 - 127 (0x7f)
-1 uint64 - flags (0x0)
-1 uint32 - reserved
+1 uint32 - flags (0x0)
 3 uint32 - size (x, y, z)
-4 uint16 - origin voxel offset (x, y, z) + reserved
+3 float  - origin voxel offset (x, y, z)
 1 uint32 - frame count
 1 uint32 - voxel count in frame
 voxels
@@ -88,7 +87,7 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
             cfgstring = cfg_file.read()
             match = re.search(r'offset\s*:\s*vector3f\s*=\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)', cfgstring)
             if match:
-                offsetX, offsetY, offsetZ = (int(round(float(v))) for v in match.groups())
+                offsetX, offsetY, offsetZ = (float(v) for v in match.groups())
     except OSError as e:
         pass
     
@@ -133,9 +132,9 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
                     print("------ Error: '{}' has no 'SIZE' block".format(src))
                     return
 
-            dst_file.write(b'VOX \x7f\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0')
+            dst_file.write(b'VOX \x7f\0\0\0\0\0\0\0')
             dst_file.write(struct.pack("<iii", sx, sy, sz))
-            dst_file.write(struct.pack("<bbbb", offsetX, offsetY, offsetZ, 0))
+            dst_file.write(struct.pack("<fff", offsetX, offsetY, offsetZ))
             dst_file.write(struct.pack("<i", frame_count))
 
             for i in range(0, frame_count):
