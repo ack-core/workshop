@@ -1,5 +1,6 @@
 
 #include "editor_prefab_context.h"
+#include "utils.h"
 
 namespace game {
     void EditorNodePrefab::update(float dtSec) {
@@ -18,7 +19,7 @@ namespace game {
     }
 
     EditorPrefabContext::EditorPrefabContext(API &&api, NodeAccessInterface &nodeAccess) : _api(std::move(api)), _nodeAccess(nodeAccess) {
-        EditorNode::makeByType[std::size_t(EditorNodeType::PREFAB)] = [](std::size_t typeIndex) {
+        EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::PREFAB)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodePrefab>(typeIndex));
         };
         
@@ -77,7 +78,7 @@ namespace game {
                             position = node->localPosition; // place tree where the prefab is
                         }
 
-                        const EditorNodeType type = desc->get<EditorNodeType>("type");
+                        const voxel::WorldInterface::NodeType type = desc->get<voxel::WorldInterface::NodeType>("type");
                         const std::string resourcePath = desc->get<std::string>("resourcePath");
                         _nodeAccess.createNode(type, index.first, position, resourcePath);
                         _api.platform->sendEditorMsg("engine.insertNode", index.first);
@@ -125,13 +126,24 @@ namespace game {
             std::string errorString;
             
             // ignore without messagebox
-            if (node->type == EditorNodeType::PREFAB || node->parent != nullptr) {
+            if (node->type == voxel::WorldInterface::NodeType::PREFAB || node->parent != nullptr) {
                 return true;
             }
             
             if (_validatePrefab(*node) == false) { // no errors
                 util::Description prefabDesc;
                 fn::addNode(prefabDesc, *node, true);
+                
+                for (auto &item : prefabDesc) {
+                    const std::string parentName = editor::getParentName(item.first);
+                    const auto parentItem = prefabDesc.find(parentName);
+                    if (parentItem != prefabDesc.end()) {
+                        const int parentIndex = int(std::distance(prefabDesc.begin(), parentItem));
+                        util::Description *nodeDesc = std::any_cast<util::Description>(&item.second);
+                        nodeDesc->set("parentIndex", parentIndex);
+                    }
+                }
+                
                 _api.platform->sendEditorMsg("engine.savePrefab", util::serializeDescription(prefabDesc));
                 return true;
             }

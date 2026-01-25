@@ -357,6 +357,7 @@ namespace foundation {
             "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
             "#define _norm(a) normalize(a)\n"
             "#define _lerp(a, b, k) mix((a), (b), k)\n"
+            "#define _select(a, b, k) (k ? (b) : (a))\n"
             "#define _step(k, a) step((k), (a))\n"
             "#define _smooth(a, b, k) smoothstep((a), (b), (k))\n"
             "#define _min(a, b) min((a), (b))\n"

@@ -533,7 +533,7 @@ namespace game {
     , _nodeAccess(nodeAccess)
     , _cameraAccess(cameraAccess)
     {
-        EditorNode::makeByType[std::size_t(EditorNodeType::PARTICLES)] = [](std::size_t typeIndex) {
+        EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::PARTICLES)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodeParticles>(typeIndex));
         };
         

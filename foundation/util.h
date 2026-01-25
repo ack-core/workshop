@@ -265,7 +265,7 @@ namespace util {
 }
 
 namespace util {
-    // TODO: simplicity, better naming and types support. Functions to get array-range of values (multimap)
+    // TODO: simplicity, better naming and types support. Functions to get array-range of values (multimap), std::variant?
     struct Description : public std::multimap<std::string, std::any> {
         using std::multimap<std::string, std::any>::multimap;
         template <typename T> const typename std::enable_if<std::is_integral<T>::value, T>::type get(const std::string &key) const {

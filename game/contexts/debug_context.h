@@ -17,19 +17,10 @@ namespace game {
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
-        math::vector3f _orbit = { 15, 15, 15 };
+        math::vector3f _orbit = { 45, 45, 45 };
         
         voxel::SceneInterface::LineSetPtr _axis;
-        voxel::SceneInterface::LineSetPtr _shapeStart;
-        voxel::SceneInterface::LineSetPtr _shapeEnd;
-        voxel::SceneInterface::BoundingBoxPtr _bbox;
-        voxel::SceneInterface::VoxelMeshPtr _thing;
-        voxel::SceneInterface::TexturedMeshPtr _ground;
-        voxel::SceneInterface::VoxelMeshPtr _actor;
-        voxel::SceneInterface::ParticlesPtr _ptc;
+        voxel::WorldInterface::ObjectPtr _object;
         
-        Emitter _emitter;
-        float _ptcTimeSec = 0.0f;
-        float _ptcFiniStamp = -1.0f;
     };
 }

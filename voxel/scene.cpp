@@ -221,22 +221,19 @@ namespace voxel {
         {
             if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
-                    self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
-                    self._constants.normal = -1.0 * camDir;//camRight.cross(math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23));
+                    self._constants.normal = -1.0 * camDir;
                     self._constants.swtch = 1.0;
                 };
             }
             else if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::WORLD) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
-                    self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
-                    self._constants.right = math::vector3f(self._transform.m11, self._transform.m12, self._transform.m13);
-                    self._constants.normal = math::vector3f(self._transform.m21, self._transform.m22, self._transform.m23);
+                    self._constants.right = math::vector3f(self._constants.transform.m11, self._constants.transform.m12, self._constants.transform.m13);
+                    self._constants.normal = math::vector3f(self._constants.transform.m21, self._constants.transform.m22, self._constants.transform.m23);
                 };
             }
             else {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
-                    self._constants.position = math::vector3f(self._transform.m41, self._transform.m42, self._transform.m43);
                     self._constants.right = camRight;
                     self._constants.normal = -1.0 * camDir;
                 };
@@ -258,7 +255,7 @@ namespace voxel {
             return &_constants;
         }
         void setTransform(const math::transform3f &trfm) override {
-            _transform = trfm;
+            _constants.transform = trfm;
         }
         void setTime(float totalTimeSec, float fadingTimeSec) override {
             float koeff = std::max(totalTimeSec, 0.0f) / _secondsPerTextureWidth;
@@ -278,14 +275,14 @@ namespace voxel {
         }
         
     private:
-        math::transform3f _transform = math::transform3f::identity();
         const float _secondsPerTextureWidth;
         const float _bakingTimeSec;
 
         struct Constants {
+            math::transform3f transform = math::transform3f::identity();
             math::vector4f t0_t1_mask_cap;
-            math::vector3f position; float maxW;
-            math::vector3f normal; float swtch;
+            math::vector3f reserved; float swtch;
+            math::vector3f normal; float maxW;
             math::vector3f right; float maxH;
             math::vector3f minXYZ; float hpix;
             math::vector3f maxXYZ; float vpix;
@@ -490,14 +487,79 @@ namespace {
             output_color[0] = float4(input_nrm * 0.5 + 0.5, paletteIndex);
         }
     )";
+/*
+ 
+ struct Constants {
+     math::transform3f transform = math::transform3f::identity();
+     math::vector4f t0_t1_mask_cap;
+     math::vector3f reserved; float swtch;
+     math::vector3f normal; float maxW;
+     math::vector3f right; float maxH;
+     math::vector3f minXYZ; float hpix;
+     math::vector3f maxXYZ; float vpix;
+ }
+ const {
+     modelTransform : matrix4
+     t0_t1_mask_cap : float4
+     reserved_swtch : float4
+     normal_mw : float4
+     right_mh : float4
+     minXYZ_hpix : float4
+     maxXYZ_vpix : float4
+ }
+ 
+ float  ptcvbase = 4.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
+ float4 ptcv = float4(ptcvbase, ptcvbase, ptcvbase, ptcvbase) + float4(0.0f, 1.0f, 2.0f, 3.0f) * const_maxXYZ_vpix.w;
+
+ float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
+ float  t1 = const_t0_t1_mask_cap.y;
+ float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w;
+
+ float4 m0t0 = _tex2d(0, float2(t0, ptcv.x));
+ float4 m0t1 = _tex2d(0, float2(t1, ptcv.x));
+ float4 m1t0 = _tex2d(0, float2(t0, ptcv.y));
+ float4 m1t1 = _tex2d(0, float2(t1, ptcv.y));
+
+ float3 posKoeffT0 = float3(m0t0.x + m0t0.y / 255.0f, m0t0.z + m0t0.w / 255.0f, m1t0.x + m1t0.y / 255.0f);
+ float3 posKoeffT1 = float3(m0t1.x + m0t1.y / 255.0f, m0t1.z + m0t1.w / 255.0f, m1t1.x + m1t1.y / 255.0f);
+ float2 angleSrc = _lerp(m1t0.zw, m1t1.zw, tf);
+ float  angle = angleSrc.x + angleSrc.y / 255.0f;
+ float3 ptcposT0 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0;
+ float3 ptcposT1 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1;
+ //float3 ptcposT0 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0, 1.0), const_modelTransform).xyz;
+ //float3 ptcposT1 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1, 1.0), const_modelTransform).xyz;
+
+ float4 m2t0 = _tex2d(0, float2(t0, ptcv.z));
+ float4 m2t1 = _tex2d(0, float2(t1, ptcv.z));
+ float4 map2 = _lerp(m2t0, m2t1, tf);
+ float2 psize = float2(map2.x + map2.y / 255.0f, map2.z + map2.w / 255.0f);
+ 
+ float4 m3t0 = _tex2d(0, float2(t0, ptcv.w));
+ float4 m3t1 = _tex2d(0, float2(t1, ptcv.w));
+ float3 map3 = _lerp(m3t0.xyz, m3t1.xyz, tf);                         // alpha, reserved, history, mask
+ float  fading = float(255.0f * map3.z > const_t0_t1_mask_cap.w);
+ float  isAlive = _step(0.5, float(uint(m3t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m3t1.w < 0.5) * fading;
+
+ float3 ptcpos = _lerp(ptcposT0, ptcposT1, tf);
+ float2 wh = psize.xy * float2(const_normal_mw.w, const_right_mh.w) * isAlive;
+
+ float3 normal = _lerp(const_normal_mw.xyz, _norm(frame_cameraPosition.xyz - ptcpos), const_reserved_swtch.w);
+ float3 up = _lerp(_cross(const_normal_mw.xyz, const_right_mh.xyz), _norm(ptcposT1 - ptcposT0), const_reserved_swtch.w);
+ float3 right = _norm(_cross(up, normal));
+ 
+ float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
+ output_position = _transform(float4(ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
+ output_uv_alpha = float3(fixed_quad[repeat_ID].zw, map3.x);
+ */
     const char *g_particlesShaderSrc = R"(
         fixed {
             quad[4] : float4 = [-0.5, 0.5, 0, 0][0.5, 0.5, 1, 0][-0.5, -0.5, 0, 1][0.5, -0.5, 1, 1]
         }
         const {
+            modelTransform : matrix4
             t0_t1_mask_cap : float4
-            position_mw : float4
-            normal_swtch : float4
+            reserved_swtch : float4
+            normal_mw : float4
             right_mh : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
@@ -522,8 +584,8 @@ namespace {
             float3 posKoeffT1 = float3(m0t1.x + m0t1.y / 255.0f, m0t1.z + m0t1.w / 255.0f, m1t1.x + m1t1.y / 255.0f);
             float2 angleSrc = _lerp(m1t0.zw, m1t1.zw, tf);
             float  angle = angleSrc.x + angleSrc.y / 255.0f;
-            float3 ptcposT0 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0;
-            float3 ptcposT1 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1;
+            float3 ptcposT0 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0, 1.0), const_modelTransform).xyz;
+            float3 ptcposT1 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1, 1.0), const_modelTransform).xyz;
 
             float4 m2t0 = _tex2d(0, float2(t0, ptcv.z));
             float4 m2t1 = _tex2d(0, float2(t1, ptcv.z));
@@ -537,14 +599,15 @@ namespace {
             float  isAlive = _step(0.5, float(uint(m3t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m3t1.w < 0.5) * fading;
 
             float3 ptcpos = _lerp(ptcposT0, ptcposT1, tf);
-            float2 wh = psize.xy * float2(const_position_mw.w, const_right_mh.w) * isAlive;
+            float2 wh = psize.xy * float2(const_normal_mw.w, const_right_mh.w) * isAlive;
 
-            float3 normal = _lerp(const_normal_swtch.xyz, _norm(frame_cameraPosition.xyz - ptcpos), const_normal_swtch.w);
-            float3 up = _lerp(_cross(const_normal_swtch.xyz, const_right_mh.xyz), _norm(ptcposT1 - ptcposT0), const_normal_swtch.w);
+            bool camSwitch = const_reserved_swtch.w > 0.0;
+            float3 normal = _select(const_normal_mw.xyz, _norm(frame_cameraPosition.xyz - ptcpos), camSwitch);
+            float3 up = _select(_cross(const_normal_mw.xyz, const_right_mh.xyz), _norm(ptcposT1 - ptcposT0), camSwitch);
             float3 right = _norm(_cross(up, normal));
             
             float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
-            output_position = _transform(float4(const_position_mw.xyz + ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
+            output_position = _transform(float4(ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv_alpha = float3(fixed_quad[repeat_ID].zw, map3.x);
         }
         fssrc {

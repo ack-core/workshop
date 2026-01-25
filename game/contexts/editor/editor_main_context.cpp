@@ -1,31 +1,25 @@
 
 #include "editor_main_context.h"
+#include "utils.h"
 #include <list>
 
 namespace game {
-    std::shared_ptr<EditorNode> (*EditorNode::makeByType[std::size_t(EditorNodeType::_count)])(std::size_t typeIndex) = {nullptr};
+    std::shared_ptr<EditorNode> (*EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::_count)])(std::size_t typeIndex) = {nullptr};
     
     namespace {
         std::size_t g_unknownPrefabIndex = 0;
         std::size_t g_unknownNodeIndex = 0;
     
-        std::string getNextUnknownName(EditorNodeType type) {
-            if (type == EditorNodeType::PREFAB) {
+        std::string getNextUnknownName(voxel::WorldInterface::NodeType type) {
+            if (type == voxel::WorldInterface::NodeType::PREFAB) {
                 return "p" + std::to_string(g_unknownPrefabIndex++);
             }
             else {
                 return "new" + std::to_string(g_unknownNodeIndex++);
             }
         }
-        std::string getParentName(const std::string &nodeName) {
-            std::size_t pos = nodeName.rfind('.');
-            if (pos == std::string::npos)
-                return "";
-
-            return nodeName.substr(0, pos);
-        }
         
-        std::string nodeTypeToPanelMapping[std::size_t(EditorNodeType::_count)] = {
+        std::string nodeTypeToPanelMapping[std::size_t(voxel::WorldInterface::NodeType::_count)] = {
             "inspect_prefab",
             "inspect_mesh",
             "inspect_particles",
@@ -85,10 +79,10 @@ namespace game {
         }
     }
     
-    void EditorMainContext::createNode(EditorNodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) {
+    void EditorMainContext::createNode(voxel::WorldInterface::NodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) {
         std::size_t typeIndex = std::size_t(type);
         const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
-        const std::string parentName = getParentName(name);
+        const std::string parentName = editor::getParentName(name);
         if (parentName.length()) {
             auto parentIndex = _nodes.find(parentName);
             value->second->parent = parentIndex->second;
@@ -122,17 +116,17 @@ namespace game {
         util::strstream args(data.c_str(), data.length());
         std::size_t typeIndex;
         if (args >> typeIndex) {
-            if (typeIndex < std::size_t(EditorNodeType::_count) && EditorNode::makeByType[typeIndex]) {
-                std::string name = getNextUnknownName(EditorNodeType(typeIndex));
+            if (typeIndex < std::size_t(voxel::WorldInterface::NodeType::_count) && EditorNode::makeByType[typeIndex]) {
+                std::string name = getNextUnknownName(voxel::WorldInterface::NodeType(typeIndex));
                 while (_nodes.find(name) != _nodes.end()) {
-                    name = getNextUnknownName(EditorNodeType(typeIndex));
+                    name = getNextUnknownName(voxel::WorldInterface::NodeType(typeIndex));
                 }
                 
                 const auto &value = _nodes.emplace(name, EditorNode::makeByType[typeIndex](typeIndex)).first;
                 value->second->name = name;
                 value->second->localPosition = _cameraAccess.getTarget();
                 _movingTool = _makeMovingTool(value->second->localPosition);
-                const char *isPrefab = value->second->type == EditorNodeType::PREFAB ? " 1" : " 0";
+                const char *isPrefab = value->second->type == voxel::WorldInterface::NodeType::PREFAB ? " 1" : " 0";
                 _api.platform->sendEditorMsg("engine.nodeCreated", value->first + isPrefab);
             }
             else {
@@ -196,10 +190,10 @@ namespace game {
                 if (nodeIndex != _nodes.end()) {
                     std::shared_ptr<EditorNode> tmp = nodeIndex->second;
                     if (tmp->children.empty()) {
-                        const std::string newParentName = getParentName(nv);
+                        const std::string newParentName = editor::getParentName(nv);
                         if (newParentName.length()) {
                             auto newParentIndex = _nodes.find(newParentName);
-                            bool prefabLimited = tmp->type != EditorNodeType::PREFAB && newParentIndex->second->type != EditorNodeType::PREFAB;
+                            bool prefabLimited = tmp->type != voxel::WorldInterface::NodeType::PREFAB && newParentIndex->second->type != voxel::WorldInterface::NodeType::PREFAB;
                             if (newParentIndex != _nodes.end() && newParentName != old && prefabLimited) {
                                 newParentIndex->second->children.emplace(nv, tmp);
                                 tmp->parent->children.erase(tmp->name);

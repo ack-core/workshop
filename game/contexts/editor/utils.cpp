@@ -2,6 +2,14 @@
 #include "utils.h"
 
 namespace editor {
+    std::string getParentName(const std::string &nodeName) {
+        std::size_t pos = nodeName.rfind('.');
+        if (pos == std::string::npos)
+            return "";
+
+        return nodeName.substr(0, pos);
+    }
+    
     std::pair<std::unique_ptr<std::uint8_t[]>, std::size_t> writeTGA(const std::uint8_t *rgbaData, std::size_t width, std::size_t height) {
         std::size_t totalSize = 18 + width * height * 4;
         std::unique_ptr<std::uint8_t[]> tga = std::make_unique<std::uint8_t[]>(totalSize);

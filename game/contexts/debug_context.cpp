@@ -2,19 +2,8 @@
 #include "debug_context.h"
 #include <list>
 
-const char *dbgCfg = R"(
-mesh {
-    name : string = "aaa"
-    position : vector3f = 0.000000 0.000000 0.000000
-    texture : string = "meshes/test/pillon"
-}
-
-mesh {
-    name : string = "aaa.bbb"
-    position : vector3f = 0.000000 10.000000 0.000000
-    texture : string = "meshes/stool"
-}
-)";
+bool dbg_switch = false;
+float dbg_rot = 0;
 
 namespace game {
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
@@ -23,8 +12,6 @@ namespace game {
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
                     _pointerId = args.pointerID;
                     _lockedCoordinates = { args.coordinateX, args.coordinateY };
-                    _ptcTimeSec = 0.0f;
-                    _ptcFiniStamp = -1.0f;
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
                     if (_pointerId != foundation::INVALID_POINTER_ID) {
@@ -44,7 +31,7 @@ namespace game {
                     }
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
-                    _ptcFiniStamp = _ptcTimeSec;
+                    dbg_switch = !dbg_switch;
                     _pointerId = foundation::INVALID_POINTER_ID;
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
@@ -54,86 +41,17 @@ namespace game {
                 return true;
             }
         );
-        
-        _shapeStart = _api.scene->addLineSet();
-        _shapeEnd = _api.scene->addLineSet();
 
         //_emitter.refresh(_api.rendering, _shapeStart, _shapeEnd);
         
         _axis = _api.scene->addLineSet();
-        _axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.5});
-        _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.5});
-        _axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.5});
-        
-        _api.resources->getOrLoadVoxelMesh("meshes/stool", [this](const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f& offset) {
-            if (frames.size()) {
-                _actor = _api.scene->addVoxelMesh(frames, offset);
-                _actor->setTransform(math::transform3f({0, 1, 0}, M_PI / 4).translated({20, 0, 40}));
-            }
-        });
-        _api.resources->getOrLoadVoxelMesh("meshes/test/ruins", [this](const std::vector<foundation::RenderDataPtr> &mesh, const math::vector3f& offset) {
-            if (mesh.size()) {
-                _thing = _api.scene->addVoxelMesh(mesh, offset);
-            }
-        });
-        _api.resources->getOrLoadGround("grounds/white", [this](const foundation::RenderDataPtr &data, const foundation::RenderTexturePtr &texture) {
-            if (data && texture) {
-                _ground = _api.scene->addTexturedMesh(data, texture);
-            }
-        });
-        _api.resources->getOrLoadEmitter("emitters/basic", [this](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
-            voxel::ParticlesParams parameters (desc);
-//            parameters.additiveBlend = desc->additiveBlend;
-//            parameters.orientation = voxel::ParticlesParams::ParticlesOrientation(desc->particleOrientation);
-//            parameters.bakingTimeSec = float(desc->bakingFrameTimeMs) / 1000.0f;
-//            parameters.minXYZ = desc->minXYZ;
-//            parameters.maxXYZ = desc->maxXYZ;
-//            parameters.maxSize = desc->maxSize;
+        _axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.9});
+        _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.9});
+        _axis->setLine(2, {0, 0, 0}, {0, 0, 1000}, {0, 0, 1, 0.9});
+        _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
+        _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-            if (m && t) {
-                _ptc = _api.scene->addParticles(t, m, parameters);
-                _ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
-            }
-        });
-        _api.resources->getOrLoadTexture("textures/particles/test", [this](const foundation::RenderTexturePtr &texture){
-            if (texture) {
-//                std::uint32_t ptcparamssrc[] = {
-//                    0x00000000,
-//                    0x00000000,
-//                    0x000000ff,
-//                    0x00000000,
-//                };
-//                foundation::RenderTexturePtr ptcparams = _api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 4, { ptcparamssrc });
-//                _ptc = _api.scene->addParticles(texture, ptcparams, voxel::ParticlesParams {
-//                    .additiveBlend = false,
-//                    .orientation = voxel::ParticlesOrientation::CAMERA,
-//                    .minXYZ = {-5.0, 0, 0},
-//                    .maxXYZ = {5.0, 0, 0},
-//                    .minMaxWidth = {2.0f, 2.0f},
-//                    .minMaxHeight = {2.0f, 2.0f},
-//                });
-//                _api.platform->logMsg("0--->>> %f %f %f", _emitter.getParams().minXYZ.x, _emitter.getParams().minXYZ.y, _emitter.getParams().minXYZ.z);
-//                _api.platform->logMsg("1--->>> %f %f %f", _emitter.getParams().maxXYZ.x, _emitter.getParams().maxXYZ.y, _emitter.getParams().maxXYZ.z);
-//
-//                _ptc = _api.scene->addParticles(texture, _emitter.getMap(), _emitter.getParams());
-//                _ptc->setTransform(math::transform3f::identity().translated({32, 5, 32}));
-            }
-        });
 
-//        math::bound3f bb1 = {-0.5f, -0.5f, -0.5f, 63.0f + 0.5f, 19.0f + 0.5f, 63.0f + 0.5f};
-//        _bbox = _api.scene->addBoundingBox(bb1);
-//        _bbox->setColor({0.5f, 0.5f, 0.5f, 0.5f});
-//
-//        std::string t0 = util::strstream::ftos(0.299999999999);
-        
-//        util::Config cfg = util::parseConfig((const std::uint8_t *)dbgCfg, strlen(dbgCfg));
-//        printf("--->>> %d\n", int(cfg.size()));
-//        std::string ooo = util::serializeConfig(cfg);
-        
-        
-        printf("--->> %s\n", util::serializeDescription(_api.resources->getPrefab("prefabs/prefab")).c_str());
-        printf("--->> %s\n", util::serializeDescription(_api.resources->getPrefab("prefabs/new_prefab_name")).c_str());
-        printf("--->> %s\n", util::serializeDescription(_api.resources->getPrefab("prefabs/test1")).c_str());
     }
     
     DebugContext::~DebugContext() {
@@ -141,11 +59,23 @@ namespace game {
     }
     
     void DebugContext::update(float dtSec) {
-        if (_ptc) {
-            _ptc->setTime(_ptcTimeSec, _ptcFiniStamp >= 0.0f ? _ptcTimeSec - _ptcFiniStamp : 0.0f);
+        if (!dbg_switch && _object) {
+            _object->unloadResources();
+            _object = nullptr;
         }
-        
-        _api.scene->setCameraLookAt(_orbit + math::vector3f{32, 10, 32}, {32, 10, 32});
-        _ptcTimeSec += dtSec * 0.5f;
+        if (dbg_switch && !_object) {
+            _object = _api.world->createObject("player", "prefabs/ship");
+            _object->loadResources([](voxel::WorldInterface::Object &) {
+                printf("!!! completed !!!\n");
+            });
+        }
+        const math::transform3f trfm = math::transform3f({0, 1, 0}, dbg_rot);
+        if (_object) {
+            _object->setTransform(trfm);
+        }
+
+        _api.scene->setCameraLookAt(_orbit + math::vector3f{0, 0, 0}, {0, 0, 0});
+        dbg_rot += dtSec;
+        printf("--->>> %f\n", dbg_rot);
     }
 }

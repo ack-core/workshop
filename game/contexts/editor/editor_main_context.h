@@ -28,7 +28,7 @@ namespace game {
         const std::weak_ptr<EditorNode> &getSelectedNode() const override;
         bool hasNodeWithName(const std::string &name) const override;
         void forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) override;
-        void createNode(EditorNodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) override;
+        void createNode(voxel::WorldInterface::NodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) override;
         
         void update(float dtSec) override;
         
