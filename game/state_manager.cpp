@@ -63,7 +63,7 @@ namespace game {
     }
     
     void StateManagerImpl::switchToState(const char *name) {
-        for (auto index = std::begin(states); index != std::end(states); ++index) {
+        for (auto index = std::begin(STATES); index != std::end(STATES); ++index) {
             if (::strcmp(name, index->name) == 0) {
                 std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> newContextList;
                 std::vector<Interface *> interfaces;

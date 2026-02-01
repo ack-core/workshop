@@ -147,6 +147,7 @@ namespace foundation {
         virtual void editorLoopbackMsg(const std::string &msg, const std::string &data) = 0;
         
         // Set handlers for editors
+        // @setTop - the hander will be set at the top of the queue. So it fires first
         // @return nullptr if not supported
         //
         virtual EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop = false) = 0;

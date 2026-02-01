@@ -19,7 +19,6 @@ namespace resource {
         {"meshes/proto/9x16x9", { 9, 1082130432, 0 }},
         {"meshes/test/ruins", { 40, 0, 0 }},
         {"meshes/test/pillon", { 8, 1077936128, 0 }},
-        {"meshes/test/pillon1", { 8, 17, 8 }},
         {"meshes/test/tree", { 8, 1077936128, 0 }},
     };
 }

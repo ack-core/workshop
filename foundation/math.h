@@ -14,11 +14,15 @@
 
 namespace math {
     using scalar = float;
+    using integer = int;
     
     struct vector2f;
     struct vector3f;
     struct vector4f;
-    
+    struct vector2i;
+    struct vector3i;
+    struct vector4i;
+
     struct transform2f;
     struct transform3f;
     
@@ -897,6 +901,36 @@ namespace math {
         
         return transform3f(r0, r1, r2, r3);
     }
+}
+
+namespace math {
+    struct vector2i {
+        integer x, y;
+        
+        vector2i() = default;
+        vector2i(const vector2i &) = default;
+        vector2i(const integer v) : x(v), y(v) {}
+        vector2i(const integer (&xy)[2]) : x(xy[0]), y(xy[1]) {}
+        vector2i(integer x, integer y) : x(x), y(y) {}
+    };
+    struct vector3i {
+        int x, y, z;
+
+        vector3i() = default;
+        vector3i(const vector3i &) = default;
+        vector3i(const integer v) : x(v), y(v), z(v) {}
+        vector3i(const integer (&xyz)[3]) : x(xyz[0]), y(xyz[1]), z(xyz[2]) {}
+        vector3i(integer x, integer y, integer z) : x(x), y(y), z(z) {}
+    };
+    struct vector4i {
+        int x, y, z, w;
+
+        vector4i() = default;
+        vector4i(const vector4i &) = default;
+        vector4i(const integer v) : x(v), y(v), z(v), w(v) {}
+        vector4i(const integer (&xyzw)[4]) : x(xyzw[0]), y(xyzw[1]), z(xyzw[2]), w(xyzw[3]) {}
+        vector4i(integer x, integer y, integer z, integer w) : x(x), y(y), z(z), w(w) {}
+    };
 }
 
 namespace math {

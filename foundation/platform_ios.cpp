@@ -425,7 +425,7 @@ namespace foundation {
     }
     
     void IOSPlatform::exit() {
-        
+        _exit(0);
     }
     
     void IOSPlatform::logMsg(const char *fmt, ...) {

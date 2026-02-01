@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
+#include <variant>
 #include <any>
 #include "math.h"
 
@@ -265,102 +267,139 @@ namespace util {
 }
 
 namespace util {
-    // TODO: simplicity, better naming and types support. Functions to get array-range of values (multimap), std::variant?
-    struct Description : public std::multimap<std::string, std::any> {
-        using std::multimap<std::string, std::any>::multimap;
-        template <typename T> const typename std::enable_if<std::is_integral<T>::value, T>::type get(const std::string &key) const {
-            return T(_getValue<std::int64_t>(key));
-        }
-        template <typename T> const typename std::enable_if<std::is_floating_point<T>::value, T>::type get(const std::string &key) const {
-            return T(_getValue<double>(key));
-        }
-        template <typename T> const typename std::enable_if<std::is_enum<T>::value, T>::type get(const std::string &key) const {
-            return T(_getValue<std::int64_t>(key));
-        }
-        template <> const bool get<bool>(const std::string &key) const {
-            return _getValue<bool>(key);
-        }
-        template <typename T> const typename std::enable_if<std::is_same<T, math::vector2f>::value, T>::type get(const std::string &key) const {
-            return _getValue<math::vector2f>(key);
-        }
-        template <typename T> const typename std::enable_if<std::is_same<T, math::vector3f>::value, T>::type get(const std::string &key) const {
-            return _getValue<math::vector3f>(key);
-        }
-        template <typename T> const typename std::enable_if<std::is_same<T, math::vector4f>::value, T>::type get(const std::string &key) const {
-            return _getValue<math::vector4f>(key);
-        }
-        template <typename T> const typename std::enable_if<std::is_same<T, std::string>::value, T>::type get(const std::string &key) const {
-            return _getValue<std::string>(key);
-        }
-        const util::Description *getSubDesc(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<util::Description>(&index->second);
+    struct Description : private std::multimap<
+        std::string,
+        std::variant<Description, bool, std::int64_t, double, std::string, math::vector2f, math::vector3f, math::vector4f, math::vector2i, math::vector3i, math::vector4i>
+    >
+    {
+        static Description parse(const std::uint8_t *data, std::size_t length);
+        static std::string serialize(const util::Description &cfg);
+        
+        Description() {}
+        
+        bool addBool(const char *name, bool value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addNumber(const char *name, double value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addInteger(const char *name, std::int64_t value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addString(const char *name, const std::string &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addVector2f(const char *name, const math::vector2f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addVector3f(const char *name, const math::vector3f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addVector4f(const char *name, const math::vector4f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addVector2i(const char *name, const math::vector2f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addVector3i(const char *name, const math::vector3f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool addVector4i(const char *name, const math::vector4f &value, bool replace = false) { return _addValue(name, value, replace); }
+        auto addDescription(const char *name, bool replace = false) -> util::Description * {
+            std::string nameString (name);
+            auto index = this->find(nameString);
+            if (index != this->end()) {
+                if (Description *desc = std::get_if<Description>(&index->second)) {
+                    if (replace) {
+                        desc->clear();
+                        return desc;
+                    }
+                }
+                else return nullptr;
             }
-            
+            return std::get_if<Description>(&this->emplace(std::move(nameString), Description{})->second);
+        }
+        
+        auto getBool(const char *name) const -> const bool * { return _getAnyValue<bool>(name); }
+        auto getInteger(const char *name) const -> const std::int64_t * { return _getAnyValue<std::int64_t>(name); }
+        auto getNumber(const char *name) const -> const double * { return _getAnyValue<double>(name); }
+        auto getString(const char *name) const -> const std::string * { return _getAnyValue<std::string>(name); }
+        auto getVector2f(const char *name) const -> const math::vector2f * { return _getAnyValue<math::vector2f>(name); }
+        auto getVector3f(const char *name) const -> const math::vector3f * { return _getAnyValue<math::vector3f>(name); }
+        auto getVector4f(const char *name) const -> const math::vector4f * { return _getAnyValue<math::vector4f>(name); }
+        auto getVector2i(const char *name) const -> const math::vector2i * { return _getAnyValue<math::vector2i>(name); }
+        auto getVector3i(const char *name) const -> const math::vector3i * { return _getAnyValue<math::vector3i>(name); }
+        auto getVector4i(const char *name) const -> const math::vector4i * { return _getAnyValue<math::vector4i>(name); }
+        auto getDescription(const char *name) const -> const util::Description * {
+            auto index = this->find(name);
+            if (index != this->end()) {
+                return std::get_if<Description>(&index->second);
+            }
             return nullptr;
         }
-        util::Description *getSubDesc(const std::string &key) {
-            auto index = find(key);
-            if (index != end()) {
-                return std::any_cast<util::Description>(&index->second);
+        auto getIntegers() const -> std::unordered_map<std::string, std::int64_t> { return _getAllValues<std::int64_t>(); }
+        auto getIntegers(const char *name) const -> std::vector<std::int64_t> { return _getAllValues<std::int64_t>(name); }
+        auto getNumbers() const -> std::unordered_map<std::string, double> { return _getAllValues<double>(); }
+        auto getNumbers(const char *name) const -> std::vector<double> { return _getAllValues<double>(name); }
+        auto getStrings() const -> std::unordered_map<std::string, std::string> { return _getAllValues<std::string>(); }
+        auto getStrings(const char *name) const -> std::vector<std::string> { return _getAllValues<std::string>(name); }
+        auto getVector2fs() const -> std::unordered_map<std::string, math::vector2f> { return _getAllValues<math::vector2f>(); }
+        auto getVector3fs() const -> std::unordered_map<std::string, math::vector3f> { return _getAllValues<math::vector3f>(); }
+        auto getVector4fs() const -> std::unordered_map<std::string, math::vector4f> { return _getAllValues<math::vector4f>(); }
+        auto getVector2is() const -> std::unordered_map<std::string, math::vector2i> { return _getAllValues<math::vector2i>(); }
+        auto getVector3is() const -> std::unordered_map<std::string, math::vector3i> { return _getAllValues<math::vector3i>(); }
+        auto getVector4is() const -> std::unordered_map<std::string, math::vector4i> { return _getAllValues<math::vector4i>(); }
+        auto getVector2fs(const char *name) const -> std::vector<math::vector2f> { return _getAllValues<math::vector2f>(name); }
+        auto getVector3fs(const char *name) const -> std::vector<math::vector3f> { return _getAllValues<math::vector3f>(name); }
+        auto getVector4fs(const char *name) const -> std::vector<math::vector4f> { return _getAllValues<math::vector4f>(name); }
+        auto getVector2is(const char *name) const -> std::vector<math::vector2i> { return _getAllValues<math::vector2i>(name); }
+        auto getVector3is(const char *name) const -> std::vector<math::vector3i> { return _getAllValues<math::vector3i>(name); }
+        auto getVector4is(const char *name) const -> std::vector<math::vector4i> { return _getAllValues<math::vector4i>(name); }
+        auto getDescriptions(const char *name) const -> std::vector<const util::Description *> {
+            std::vector<const util::Description *> result;
+            auto range = this->equal_range(name);
+            for (auto index = range.first; index != range.second; ++index) {
+                if (std::holds_alternative<Description>(index->second)) {
+                    result.emplace_back(std::get_if<Description>(&index->second));
+                }
             }
-            
-            return nullptr;
+            return result;
         }
-        util::Description &addSubDesc(const std::string &key) {
-            return *std::any_cast<util::Description>(&emplace(key, std::make_any<util::Description>())->second);
-        }
-        void set(const std::string &key, const int &value) {
-            _setValue(key, std::int64_t(value));
-        }
-        void set(const std::string &key, const std::int64_t &value) {
-            _setValue(key, value);
-        }
-        void set(const std::string &key, const double &value) {
-            _setValue(key, value);
-        }
-        void set(const std::string &key, const bool &value) {
-            _setValue(key, value);
-        }
-        void set(const std::string &key, const math::vector2f &value) {
-            _setValue(key, value);
-        }
-        void set(const std::string &key, const math::vector3f &value) {
-            _setValue(key, value);
-        }
-        void set(const std::string &key, const math::vector4f &value) {
-            _setValue(key, value);
-        }
-        void set(const std::string &key, const std::string &value) {
-            _setValue(key, value);
+        auto getDescriptions() const -> std::unordered_map<std::string, const util::Description *> {
+            std::unordered_map<std::string, const util::Description *> result;
+            for (auto index = this->begin(); index != this->end(); ++index) {
+                if (std::holds_alternative<Description>(index->second)) {
+                    result.emplace(index->first, std::get_if<Description>(&index->second));
+                }
+            }
+            return result;
         }
         
     private:
-        template <typename T> T _getValue(const std::string &key) const {
-            auto index = find(key);
-            if (index != end()) {
-                return *std::any_cast<T>(&index->second);
+        template <typename T> bool _addValue(const char *name, const T &value, bool replace) {
+            std::string nameString (name);
+            auto index = this->find(nameString);
+            if (index != this->end()) {
+                if (std::holds_alternative<T>(index->second)) {
+                    if (replace) {
+                        index->second = value;
+                    }
+                }
+                else return false;
             }
-            
-            return {};
+            this->emplace(std::move(nameString), value);
+            return true;
         }
-        template <typename T> void _setValue(const std::string &key, const T &value) {
-            auto index = find(key);
-            if (index != end()) {
-                T *target = std::any_cast<T>(&index->second);
-                if (target) {
-                    *target = value;
+        template <typename T> const T *_getAnyValue(const char *name) const {
+            auto index = this->find(name);
+            if (index != this->end()) {
+                return std::get_if<T>(&index->second);
+            }
+            return nullptr;
+        }
+        template <typename T> std::vector<T> _getAllValues(const char *name) const {
+            std::vector<T> result;
+            auto range = this->equal_range(name);
+            for (auto index = range.first; index != range.second; ++index) {
+                if (std::holds_alternative<T>(index->second)) {
+                    result.emplace_back(*std::get_if<T>(&index->second));
                 }
             }
-            else {
-                emplace(key, std::make_any<T>(value));
+            return result;
+        }
+        template <typename T> std::unordered_map<std::string, T> _getAllValues() const {
+            std::unordered_map<std::string, T> result;
+            for (auto index = this->begin(); index != this->end(); ++index) {
+                if (std::holds_alternative<T>(index->second)) {
+                    result.emplace(index->first, *std::get_if<T>(&index->second));
+                }
             }
+            return result;
         }
 
     };
-    Description parseDescription(const std::uint8_t *data, std::size_t length);
-    std::string serializeDescription(const Description &cfg);
 }
 
 // TODO: move to dedicated shader generator
