@@ -161,7 +161,7 @@ namespace util {
         static std::size_t ltow(std::uint16_t *p, std::int64_t value);
         static std::size_t ftow(std::uint16_t *p, double f, int precision = 6);
         static std::size_t ltoa(char *p, std::int64_t value);
-        static std::string ftos(double f, int precision = 6);
+        static std::string ftos(double f, int precision = 4);
 
         const char *_end;
         const char *_current;
@@ -273,29 +273,34 @@ namespace util {
     >
     {
         static Description parse(const std::uint8_t *data, std::size_t length);
-        static std::string serialize(const util::Description &cfg);
+        static std::string serialize(const util::Description &desc);
         
         Description() {}
         
-        bool addBool(const char *name, bool value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addNumber(const char *name, double value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addInteger(const char *name, std::int64_t value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addString(const char *name, const std::string &value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addVector2f(const char *name, const math::vector2f &value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addVector3f(const char *name, const math::vector3f &value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addVector4f(const char *name, const math::vector4f &value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addVector2i(const char *name, const math::vector2f &value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addVector3i(const char *name, const math::vector3f &value, bool replace = false) { return _addValue(name, value, replace); }
-        bool addVector4i(const char *name, const math::vector4f &value, bool replace = false) { return _addValue(name, value, replace); }
-        auto addDescription(const char *name, bool replace = false) -> util::Description * {
+        using multimap::empty;
+        using multimap::begin;
+        using multimap::end;
+        using multimap::find;
+        
+        bool setBool(const char *name, bool value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setNumber(const char *name, double value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setInteger(const char *name, std::int64_t value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setString(const char *name, const std::string &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setVector2f(const char *name, const math::vector2f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setVector3f(const char *name, const math::vector3f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setVector4f(const char *name, const math::vector4f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setVector2i(const char *name, const math::vector2f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setVector3i(const char *name, const math::vector3f &value, bool replace = false) { return _addValue(name, value, replace); }
+        bool setVector4i(const char *name, const math::vector4f &value, bool replace = false) { return _addValue(name, value, replace); }
+        auto setDescription(const char *name, bool replace = false) -> util::Description * {
             std::string nameString (name);
             auto index = this->find(nameString);
             if (index != this->end()) {
                 if (Description *desc = std::get_if<Description>(&index->second)) {
                     if (replace) {
                         desc->clear();
-                        return desc;
                     }
+                    return desc;
                 }
                 else return nullptr;
             }
@@ -312,6 +317,16 @@ namespace util {
         auto getVector2i(const char *name) const -> const math::vector2i * { return _getAnyValue<math::vector2i>(name); }
         auto getVector3i(const char *name) const -> const math::vector3i * { return _getAnyValue<math::vector3i>(name); }
         auto getVector4i(const char *name) const -> const math::vector4i * { return _getAnyValue<math::vector4i>(name); }
+        auto getBool(const char *name, const bool &def) const -> const bool & { return _getAnyOrDefault<bool>(name, def); }
+        auto getInteger(const char *name, const std::int64_t &def) const -> const std::int64_t & { return _getAnyOrDefault<std::int64_t>(name, def); }
+        auto getNumber(const char *name, const double &def) const -> const double & { return _getAnyOrDefault<double>(name, def); }
+        auto getString(const char *name, const std::string &def) const -> const std::string & { return _getAnyOrDefault<std::string>(name, def); }
+        auto getVector2f(const char *name, const math::vector2f &def) const -> const math::vector2f & { return _getAnyOrDefault<math::vector2f>(name, def); }
+        auto getVector3f(const char *name, const math::vector3f &def) const -> const math::vector3f & { return _getAnyOrDefault<math::vector3f>(name, def); }
+        auto getVector4f(const char *name, const math::vector4f &def) const -> const math::vector4f & { return _getAnyOrDefault<math::vector4f>(name, def); }
+        auto getVector2i(const char *name, const math::vector2i &def) const -> const math::vector2i & { return _getAnyOrDefault<math::vector2i>(name, def); }
+        auto getVector3i(const char *name, const math::vector3i &def) const -> const math::vector3i & { return _getAnyOrDefault<math::vector3i>(name, def); }
+        auto getVector4i(const char *name, const math::vector4i &def) const -> const math::vector4i & { return _getAnyOrDefault<math::vector4i>(name, def); }
         auto getDescription(const char *name) const -> const util::Description * {
             auto index = this->find(name);
             if (index != this->end()) {
@@ -320,9 +335,7 @@ namespace util {
             return nullptr;
         }
         auto getIntegers() const -> std::unordered_map<std::string, std::int64_t> { return _getAllValues<std::int64_t>(); }
-        auto getIntegers(const char *name) const -> std::vector<std::int64_t> { return _getAllValues<std::int64_t>(name); }
         auto getNumbers() const -> std::unordered_map<std::string, double> { return _getAllValues<double>(); }
-        auto getNumbers(const char *name) const -> std::vector<double> { return _getAllValues<double>(name); }
         auto getStrings() const -> std::unordered_map<std::string, std::string> { return _getAllValues<std::string>(); }
         auto getStrings(const char *name) const -> std::vector<std::string> { return _getAllValues<std::string>(name); }
         auto getVector2fs() const -> std::unordered_map<std::string, math::vector2f> { return _getAllValues<math::vector2f>(); }
@@ -378,6 +391,15 @@ namespace util {
                 return std::get_if<T>(&index->second);
             }
             return nullptr;
+        }
+        template <typename T> const T &_getAnyOrDefault(const char *name, const T &def) const {
+            auto index = this->find(name);
+            if (index != this->end()) {
+                return *std::get_if<T>(&index->second);
+            }
+            else {
+                return def;
+            }
         }
         template <typename T> std::vector<T> _getAllValues(const char *name) const {
             std::vector<T> result;

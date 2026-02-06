@@ -266,28 +266,27 @@ namespace game {
             0, 10, 20, 50, 100
         };
         
-        const util::Description &desc = *params.getSubDesc("emitter");
-        _emissionTimeMs = desc.get<std::uint32_t>("emissionTimeMs");
-        _particleLifeTimeMs = desc.get<std::uint32_t>("particleLifeTimeMs");
-        _bakingFrameTimeMs = bakingTimeTable[desc.get<std::uint32_t>("bakingFrameType")];
-        _particlesToEmit = desc.get<std::uint32_t>("particlesToEmit");
-        _isLooped = desc.get<bool>("looped");
-        _randomSeed = desc.get<std::uint32_t>("randomSeed");
-        _startShape.type = desc.get<Shape::Type>("startShapeType");
-        _startShape.fill = desc.get<bool>("startShapeFill");
-        _startShape.args = desc.get<math::vector3f>("startShapeArgs");
-        _endShape.type = desc.get<Shape::Type>("endShapeType");
-        _endShape.fill = desc.get<bool>("endShapeFill");
-        _endShape.args = desc.get<math::vector3f>("endShapeArgs");
-        _endShapeOffset = desc.get<math::vector3f>("endShapeOffset");
-        _shapeDistribution = desc.get<ShapeDistribution>("shapeDistributionType");
-        _ptcParams.orientation = desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
-        _ptcParams.additiveBlend = desc.get<bool>("additiveBlend");
-        _emissionGraph.setPointsFromString(desc.get<std::string>("emissionGraphData"));
-        _widthGraph.setPointsFromString(desc.get<std::string>("widthGraphData"));
-        _heightGraph.setPointsFromString(desc.get<std::string>("heightGraphData"));
-        _speedGraph.setPointsFromString(desc.get<std::string>("speedGraphData"));
-        _alphaGraph.setPointsFromString(desc.get<std::string>("alphaGraphData"));
+        _emissionTimeMs = params.getInteger("emissionTimeMs", 0);
+        _particleLifeTimeMs = params.getInteger("particleLifeTimeMs", 0);
+        _bakingFrameTimeMs = bakingTimeTable[params.getInteger("bakingFrameType", 0)];
+        _particlesToEmit = params.getInteger("particlesToEmit", 0);
+        _isLooped = params.getBool("looped", false);
+        _randomSeed = params.getInteger("randomSeed", 0);
+        _startShape.type = static_cast<Shape::Type>(params.getInteger("startShapeType", 0));
+        _startShape.fill = params.getBool("startShapeFill", false);
+        _startShape.args = params.getVector3f("startShapeArgs", {});
+        _endShape.type = static_cast<Shape::Type>(params.getInteger("endShapeType", 0));
+        _endShape.fill = params.getBool("endShapeFill", false);
+        _endShape.args = params.getVector3f("endShapeArgs", {});
+        _endShapeOffset = params.getVector3f("endShapeOffset", {});
+        _shapeDistribution = static_cast<ShapeDistribution>(params.getInteger("shapeDistributionType", 0));
+        _ptcParams.orientation = static_cast<voxel::ParticlesParams::ParticlesOrientation>(params.getInteger("particleOrientation", 0));
+        _ptcParams.additiveBlend = params.getBool("additiveBlend", false);
+        _emissionGraph.setPointsFromString(params.getString("emissionGraphData", ""));
+        _widthGraph.setPointsFromString(params.getString("widthGraphData", ""));
+        _heightGraph.setPointsFromString(params.getString("heightGraphData", ""));
+        _speedGraph.setPointsFromString(params.getString("speedGraphData", ""));
+        _alphaGraph.setPointsFromString(params.getString("alphaGraphData", ""));
     }
     
     void Emitter::setEndShapeOffset(const math::vector3f &offset) {
@@ -519,7 +518,6 @@ namespace game {
                     
                     if (map) {
                         voxel::ParticlesParams parameters (*originDesc);
-                        const util::Description &desc = *originDesc->getSubDesc("emitter");
                         particles = api.scene->addParticles(texture, map, parameters);
                         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     }
@@ -592,8 +590,7 @@ namespace game {
     void EditorParticlesContext::_endShapeDragFinished() {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             math::vector3f off = _endShapeTool->getPosition();
-            util::Description &desc = *node->currentDesc->getSubDesc("emitter");
-            desc.set("endShapeOffset", off);
+            node->currentDesc->setVector3f("endShapeOffset", off);
             node->emitter.setEndShapeOffset(off);
             node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
             _recreateParticles(*node, true);
@@ -607,7 +604,6 @@ namespace game {
         }
         else {
             voxel::ParticlesParams parameters (*node.originDesc);
-            const util::Description &desc = *node.originDesc->getSubDesc("emitter");
             node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
         }
     }
@@ -639,8 +635,7 @@ namespace game {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             if (node->originDesc.has_value()) {
                 node->currentDesc = node->originDesc;
-                const util::Description &desc = *node->currentDesc->getSubDesc("emitter");
-                node->endShapeOffset = desc.get<math::vector3f>("endShapeOffset");
+                node->endShapeOffset = node->currentDesc->getVector3f("endShapeOffset", {});
                 
                 _endShapeTool = std::make_unique<MovingTool>(_api, _cameraAccess, node->endShapeOffset, 0.4f);
                 _endShapeTool->setEditorMsg("engine.endShapeOffset");
@@ -656,7 +651,7 @@ namespace game {
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
                 _recreateParticles(*node, true);
                 
-                std::string args = util::serializeDescription(*node->currentDesc);
+                std::string args = util::Description::serialize(*node->currentDesc);
                 _api.platform->sendEditorMsg("engine.particles.editing", args);
                 return true;
             }
@@ -674,8 +669,7 @@ namespace game {
                 }
             }
             if (node->originDesc) {
-                const util::Description &desc = *node->originDesc->getSubDesc("emitter");
-                node->endShapeOffset = desc.get<math::vector3f>("endShapeOffset");
+                node->endShapeOffset = node->originDesc->getVector3f("endShapeOffset", {});
             }
         }
         _clearEditingTools();
@@ -715,7 +709,7 @@ namespace game {
     
     bool EditorParticlesContext::_save(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            _savingCfg = util::serializeDescription(*node->currentDesc);
+            _savingCfg = util::Description::serialize(*node->currentDesc);
             _api.platform->saveFile((node->resourcePath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, node](bool result) {
                 const std::size_t width = node->emitter.getMap()->getWidth();
                 const std::size_t height = node->emitter.getMap()->getHeight();
@@ -743,18 +737,18 @@ namespace game {
             bool looped;
             
             if (input >> emissionTimeMs >> particleLifeTimeMs >> bakingFrameType >> particlesToEmit >> looped >> rndSeed) {
-                util::Description *desc = node->currentDesc->getSubDesc("emitter");
-                desc->set("looped", looped);
-                desc->set("emissionTimeMs", emissionTimeMs);
-                desc->set("particleLifeTimeMs", particleLifeTimeMs);
-                desc->set("bakingFrameType", bakingFrameType);
-                desc->set("particlesToEmit", particlesToEmit);
-                desc->set("randomSeed", rndSeed);
+                util::Description &desc = node->currentDesc.value();
+                desc.setBool("looped", looped);
+                desc.setInteger("emissionTimeMs", emissionTimeMs);
+                desc.setInteger("particleLifeTimeMs", particleLifeTimeMs);
+                desc.setInteger("bakingFrameType", bakingFrameType);
+                desc.setInteger("particlesToEmit", particlesToEmit);
+                desc.setInteger("randomSeed", rndSeed);
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-                desc->set("minXYZ", node->emitter.getParams().minXYZ);
-                desc->set("maxXYZ", node->emitter.getParams().maxXYZ);
-                desc->set("maxSize", node->emitter.getParams().maxSize);
+                desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
+                desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
+                desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
                 _recreateParticles(*node, true);
             }
             return true;
@@ -777,22 +771,22 @@ namespace game {
             success |= input >> shapeDistributionType >> particleOrientation;
             
             if (success) {
-                util::Description *desc = node->currentDesc->getSubDesc("emitter");
-                desc->set("startShapeType", startShapeType);
-                desc->set("startShapeFill", startShapeFill);
-                desc->set("startShapeArgs", startShapeArgs);
-                desc->set("endShapeType", endShapeType);
-                desc->set("endShapeFill", endShapeFill);
-                desc->set("endShapeArgs", endShapeArgs);
-                desc->set("endShapeOffset", endShapeOffset);
-                desc->set("shapeDistributionType", shapeDistributionType);
-                desc->set("particleOrientation", particleOrientation);
+                util::Description &desc = node->currentDesc.value();
+                desc.setInteger("startShapeType", startShapeType);
+                desc.setBool("startShapeFill", startShapeFill);
+                desc.setVector3f("startShapeArgs", startShapeArgs);
+                desc.setInteger("endShapeType", endShapeType);
+                desc.setBool("endShapeFill", endShapeFill);
+                desc.setVector3f("endShapeArgs", endShapeArgs);
+                desc.setVector3f("endShapeOffset", endShapeOffset);
+                desc.setInteger("shapeDistributionType", shapeDistributionType);
+                desc.setInteger("particleOrientation", particleOrientation);
                 node->endShapeOffset = endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-                desc->set("minXYZ", node->emitter.getParams().minXYZ);
-                desc->set("maxXYZ", node->emitter.getParams().maxXYZ);
-                desc->set("maxSize", node->emitter.getParams().maxSize);
+                desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
+                desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
+                desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
                 _recreateParticles(*node, true);
             }
             return true;
@@ -801,13 +795,13 @@ namespace game {
     }
     bool EditorParticlesContext::_graphSet(const std::string &data, const std::string &name) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
-            util::Description *desc = node->currentDesc->getSubDesc("emitter");
-            desc->set(name, data);
+            util::Description &desc = node->currentDesc.value();
+            desc.setString(name.c_str(), data);
             node->emitter.setParameters(*node->currentDesc);
             node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
-            desc->set("minXYZ", node->emitter.getParams().minXYZ);
-            desc->set("maxXYZ", node->emitter.getParams().maxXYZ);
-            desc->set("maxSize", node->emitter.getParams().maxSize);
+            desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
+            desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
+            desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
             _recreateParticles(*node, true);
             return true;
         }

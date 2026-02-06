@@ -12,17 +12,16 @@
 #include <list>
 
 namespace voxel {
-    ParticlesParams::ParticlesParams(const util::Description &emitterDesc) {
+    ParticlesParams::ParticlesParams(const util::Description &desc) {
         float bakingTimeTable[] = {
             0.0f, 0.010f, 0.020f, 0.050f, 0.100f
         };
-        const util::Description &desc = *emitterDesc.getSubDesc("emitter");
-        additiveBlend = desc.get<bool>("additiveBlend");
-        orientation = desc.get<voxel::ParticlesParams::ParticlesOrientation>("particleOrientation");
-        bakingTimeSec = bakingTimeTable[desc.get<std::uint32_t>("bakingFrameType")];
-        minXYZ = desc.get<math::vector3f>("minXYZ");
-        maxXYZ = desc.get<math::vector3f>("maxXYZ");
-        maxSize = desc.get<math::vector2f>("maxSize");
+        additiveBlend = desc.getBool("additiveBlend", false);
+        orientation = static_cast<voxel::ParticlesParams::ParticlesOrientation>(desc.getInteger("particleOrientation", 0));
+        bakingTimeSec = bakingTimeTable[desc.getInteger("bakingFrameType", 0)];
+        minXYZ = desc.getVector3f("minXYZ", {});
+        maxXYZ = desc.getVector3f("maxXYZ", {});
+        maxSize = desc.getVector2f("maxSize", {});
     }
 }
 

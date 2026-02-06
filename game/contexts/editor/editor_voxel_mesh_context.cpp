@@ -135,9 +135,8 @@ namespace game {
             
             if (std::fabs(off.x) + std::fabs(off.y) + std::fabs(off.z) > std::numeric_limits<float>::epsilon()) {
                 util::Description desc;
-                util::Description &parameters = desc.addSubDesc("parameters");
-                parameters.set("offset", math::vector3f(off.x, off.y, off.z));
-                _savingCfg = util::serializeDescription(desc);
+                desc.setVector3f("offset", math::vector3f(off.x, off.y, off.z));
+                _savingCfg = util::Description::serialize(desc);
                 _api.platform->saveFile(extPath.c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, path = node->resourcePath](bool result) {
                     _api.platform->sendEditorMsg("engine.saved", path);
                 });

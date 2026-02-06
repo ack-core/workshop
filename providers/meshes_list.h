@@ -4,21 +4,18 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
-        {"meshes/stool", { 5, 1065353216, 0 }},
-        {"meshes/proto/16x8x8", { 8, 0, 1080033280 }},
+        {"meshes/stool", { 5, 0, 0 }},
         {"meshes/proto/16x16", { 16, 0, 0 }},
-        {"meshes/proto/16x4x4", { 4, 1098383360, 1069547520 }},
-        {"meshes/proto/32x8x16", { 16, 0, 1080033280 }},
-        {"meshes/proto/5x8x5", { 5, 1073741824, 0 }},
+        {"meshes/proto/5x8x5", { 5, 0, 0 }},
         {"meshes/proto/32x32", { 32, 0, 0 }},
-        {"meshes/proto/8x8x8", { 8, 1080033280, 1080033280 }},
+        {"meshes/proto/8x8x8", { 8, 0, 0 }},
         {"meshes/proto/64x64", { 64, 0, 0 }},
-        {"meshes/proto/17x24x17", { 17, 1090519040, 0 }},
+        {"meshes/proto/17x24x17", { 17, 0, 0 }},
         {"meshes/proto/48x48", { 48, 0, 0 }},
         {"meshes/proto/24x24", { 24, 0, 0 }},
-        {"meshes/proto/9x16x9", { 9, 1082130432, 0 }},
+        {"meshes/proto/9x16x9", { 9, 0, 0 }},
         {"meshes/test/ruins", { 40, 0, 0 }},
         {"meshes/test/pillon", { 8, 1077936128, 0 }},
-        {"meshes/test/tree", { 8, 1077936128, 0 }},
+        {"meshes/test/tree", { 8, 0, 0 }},
     };
 }

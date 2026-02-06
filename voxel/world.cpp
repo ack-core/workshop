@@ -58,28 +58,26 @@ namespace voxel {
     class ObjectImpl : public WorldInterface::Object, public std::enable_shared_from_this<ObjectImpl> {
     public:
         ObjectImpl(std::shared_ptr<WorldImpl> &&owner,  const util::Description &objDesc) : _id(getNextUniqueId()), _owner(std::move(owner)) {
-            for (const auto &item : objDesc) {
-                if (const util::Description *nodeDesc = std::any_cast<util::Description>(&item.second)) {
-                    const std::size_t type = nodeDesc->get<std::size_t>("type");
-                    
-                    if (g_nodeConstructors[type]) {
-                        _nameToNodeIndex.emplace(item.first, _nodes.size());
-                        _nodes.emplace_back(g_nodeConstructors[type]());
-                        _nodes.back()->localTransform = math::transform3f::identity().translated(nodeDesc->get<math::vector3f>("position"));
-                        _nodes.back()->resourcePath = nodeDesc->get<std::string>("resourcePath");
+            const std::unordered_map<std::string, const util::Description *> descs = objDesc.getDescriptions();
+            
+            for (const auto &nodeDesc : descs) {
+                if (const std::int64_t *type = nodeDesc.second->getInteger("type")) {
+                    if (g_nodeConstructors[*type]) {
+                        _nameToNodeIndex.emplace(nodeDesc.first, _nodes.size());
+                        _nodes.emplace_back(g_nodeConstructors[*type]());
+                        _nodes.back()->localTransform = math::transform3f::identity().translated(nodeDesc.second->getVector3f("position", {}));
+                        _nodes.back()->resourcePath = nodeDesc.second->getString("resourcePath", "<Unknown>");
                         
-                        auto parentIndexProperty = nodeDesc->find("parentIndex");
-                        if (parentIndexProperty != nodeDesc->end()) {
-                            const std::size_t parentIndex = *std::any_cast<std::int64_t>(&parentIndexProperty->second);
-                            _nodes.back()->parent = _nodes[parentIndex].get();
-                            _nodes.back()->worldTransform = _nodes.back()->localTransform * _nodes[parentIndex]->worldTransform;
+                        if (const std::int64_t *parentIndex = nodeDesc.second->getInteger("parentIndex")) {
+                            _nodes.back()->parent = _nodes[*parentIndex].get();
+                            _nodes.back()->worldTransform = _nodes.back()->localTransform * _nodes[*parentIndex]->worldTransform;
                         }
                         else {
                             _nodes.back()->worldTransform = _nodes.back()->localTransform;
                         }
                     }
                     else {
-                        owner->getPlatform().logError("[ObjectImpl::ObjectImpl] Unknown object type = %d", int(type));
+                        owner->getPlatform().logError("[ObjectImpl::ObjectImpl] Unknown object type = %d", int(*type));
                         break;
                     }
                 }
@@ -186,7 +184,7 @@ namespace voxel {
             resource::ResourceProvider &res = world->getResources();
             res.getOrLoadEmitter(resourcePath.c_str(), [world, this, objweak](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
                 if (auto object = objweak.lock()) {
-                    if (m && desc.size()) {
+                    if (m && desc.empty() == false) {
                         const voxel::ParticlesParams parameters (desc);
                         particles = world->getScene().addParticles(t, m, parameters);
                         particles->setTransform(worldTransform);

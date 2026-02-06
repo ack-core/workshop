@@ -214,9 +214,9 @@ namespace util {
                             if (fn::parseScope(scopeText, block)) {
                                 result.emplace(elementName, std::move(block));
                             }
-                            else return {};
+                            else return false;
                         }
-                        else return {};
+                        else return false;
                     }
                     else if (input.getChar() == ':') {
                         std::string type, op;
@@ -252,7 +252,7 @@ namespace util {
                                     if (input >> braced(valueString, '"', '"')) {
                                         result.emplace(std::make_pair(elementName, std::move(valueString)));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else if (type == "vector2f" && input >> sequence("=")) {
@@ -260,7 +260,7 @@ namespace util {
                                     if (input >> valueFloat[0] >> valueFloat[1]) {
                                         result.emplace(std::make_pair(elementName, math::vector2f(valueFloat[0], valueFloat[1])));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else if (type == "vector3f" && input >> sequence("=")) {
@@ -268,7 +268,7 @@ namespace util {
                                     if (input >> valueFloat[0] >> valueFloat[1] >> valueFloat[2]) {
                                         result.emplace(std::make_pair(elementName, math::vector3f(valueFloat[0], valueFloat[1], valueFloat[2])));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else if (type == "vector4f" && input >> sequence("=")) {
@@ -276,7 +276,7 @@ namespace util {
                                     if (input >> valueFloat[0] >> valueFloat[1] >> valueFloat[2] >> valueFloat[3]) {
                                         result.emplace(std::make_pair(elementName, math::vector4f(valueFloat[0], valueFloat[1], valueFloat[2], valueFloat[3])));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else if (type == "vector2i" && input >> sequence("=")) {
@@ -284,7 +284,7 @@ namespace util {
                                     if (input >> valueInt[0] >> valueInt[1]) {
                                         result.emplace(std::make_pair(elementName, math::vector2i(valueInt[0], valueInt[1])));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else if (type == "vector3i" && input >> sequence("=")) {
@@ -292,7 +292,7 @@ namespace util {
                                     if (input >> valueInt[0] >> valueInt[1] >> valueInt[2]) {
                                         result.emplace(std::make_pair(elementName, math::vector3i(valueInt[0], valueInt[1], valueInt[2])));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else if (type == "vector4i" && input >> sequence("=")) {
@@ -300,7 +300,7 @@ namespace util {
                                     if (input >> valueInt[0] >> valueInt[1] >> valueInt[2] >> valueInt[3]) {
                                         result.emplace(std::make_pair(elementName, math::vector4i(valueInt[0], valueInt[1], valueInt[2], valueInt[3])));
                                     }
-                                    else return;
+                                    else return false;
                                 }
                             }
                             else return false;
@@ -320,56 +320,104 @@ namespace util {
         }
         else return {};
     }
-    std::string Description::serialize(const util::Description &cfg) {
-        return {};
-//        struct fn {
-//            static bool serializeScope(int ident, const Description1 &cfg, std::string &result) {
-//                for (auto &item : cfg) {
-//                    if (const Description1 *block = std::get_if<Description1>(&item.second)) {
-//                        result += std::string(ident, ' ') + item.first + " {\r\n";
-//                        if (fn::serializeScope(ident + 4, *block, result)) {
-//                            result += std::string(ident, ' ') + "}\r\n\r\n";
-//                        }
-//                        else return false;
-//                    }
-//                    else {
-//                        if (const std::int64_t *v = std::get_if<std::int64_t>(&item.second)) {
-//                            result += std::string(ident, ' ') + item.first + " : integer = " + std::to_string(*v) + "\r\n";
-//                        }
-//                        else if (const double *v = std::get_if<double>(&item.second)) {
-//                            result += std::string(ident, ' ') + item.first + " : number = " + strstream::ftos(*v) + "\r\n";
-//                        }
-//                        else if (const bool *v = std::get_if<bool>(&item.second)) {
-//                            result += std::string(ident, ' ') + item.first + " : bool = " + ((*v) ? "true\r\n" : "false\r\n");
-//                        }
-//                        else if (const std::string *v = std::get_if<std::string>(&item.second)) {
-//                            result += std::string(ident, ' ') + item.first + " : string = \"" + *v + "\"\r\n";
-//                        }
-//                        else if (const math::vector2f *v = std::get_if<math::vector2f>(&item.second)) {
-//                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y);
-//                            result += std::string(ident, ' ') + item.first + " : vector2f = " + stringValue + "\r\n";
-//                        }
-//                        else if (const math::vector3f *v = std::get_if<math::vector3f>(&item.second)) {
-//                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y) + " " + strstream::ftos(v->z);
-//                            result += std::string(ident, ' ') + item.first + " : vector3f = " + stringValue + "\r\n";
-//                        }
-//                        else if (const math::vector4f *v = std::get_if<math::vector4f>(&item.second)) {
-//                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y) + " " + strstream::ftos(v->z) + " " + strstream::ftos(v->w);
-//                            result += std::string(ident, ' ') + item.first + " : vector4f = " + stringValue + "\r\n";
-//                        }
-//                        else return false;
-//                    }
-//                }
-//
-//                return true;
-//            }
-//        };
-//
-//        std::string result;
-//        if (fn::serializeScope(0, cfg, result)) {
-//            return result;
-//        }
-//        else return {};
+    std::string Description::serialize(const util::Description &desc) {
+        struct fn {
+            static bool serializeScope(int ident, const Description &desc, std::string &result) {
+                int arrayCount = 0;
+                std::string arrayString;
+                Description::const_iterator index, next;
+                
+                auto accumulateOrPut = [&](const std::string &v, const std::string &key) {
+                    if (next == desc.end() || next->first != index->first) {
+                        if (arrayCount) {
+                            result += std::string(ident, ' ') + index->first + "[" + std::to_string(arrayCount + 1) + "] : " + key + " = " + arrayString + v + "\r\n";
+                            arrayString.clear();
+                            arrayCount = 0;
+                        }
+                        else {
+                            result += std::string(ident, ' ') + index->first + " : " + key + " = " + v + "\r\n";
+                        }
+                    }
+                    else {
+                        arrayString += v + "  ";
+                        arrayCount++;
+                    }
+                };
+                
+                for (index = desc.begin(); index != desc.end(); ++index) {
+                    next = index;
+                    next++;
+                    
+                    if (const Description *block = std::get_if<Description>(&index->second)) {
+                        result += std::string(ident, ' ') + index->first + " {\r\n";
+                        if (fn::serializeScope(ident + 4, *block, result)) {
+                            result += std::string(ident, ' ') + "}\r\n\r\n";
+                        }
+                        else return false;
+                    }
+                    else {
+                        if (const std::int64_t *v = std::get_if<std::int64_t>(&index->second)) {
+                            result += std::string(ident, ' ') + index->first + " : integer = " + std::to_string(*v) + "\r\n";
+                        }
+                        else if (const double *v = std::get_if<double>(&index->second)) {
+                            result += std::string(ident, ' ') + index->first + " : number = " + strstream::ftos(*v) + "\r\n";
+                        }
+                        else if (const bool *v = std::get_if<bool>(&index->second)) {
+                            result += std::string(ident, ' ') + index->first + " : bool = " + ((*v) ? "true\r\n" : "false\r\n");
+                        }
+                        else if (const std::string *v = std::get_if<std::string>(&index->second)) {
+                            if (next == desc.end() || next->first != index->first) {
+                                if (arrayCount) {
+                                    result += std::string(ident, ' ') + index->first + "[" + std::to_string(arrayCount + 1) + "] : string = " + arrayString + "\"" + *v + "\"\r\n";
+                                    arrayString.clear();
+                                    arrayCount = 0;
+                                }
+                                else {
+                                    result += std::string(ident, ' ') + index->first + " : string = \"" + *v + "\"\r\n";
+                                }
+                            }
+                            else {
+                                arrayString += "\"" + *v + "\"  ";
+                                arrayCount++;
+                            }
+                        }
+                        else if (const math::vector2f *v = std::get_if<math::vector2f>(&index->second)) {
+                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y);
+                            accumulateOrPut(stringValue, "vector2f");
+                        }
+                        else if (const math::vector3f *v = std::get_if<math::vector3f>(&index->second)) {
+                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y) + " " + strstream::ftos(v->z);
+                            accumulateOrPut(stringValue, "vector3f");
+                        }
+                        else if (const math::vector4f *v = std::get_if<math::vector4f>(&index->second)) {
+                            const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y) + " " + strstream::ftos(v->z) + " " + strstream::ftos(v->w);
+                            accumulateOrPut(stringValue, "vector4f");
+                        }
+                        else if (const math::vector2i *v = std::get_if<math::vector2i>(&index->second)) {
+                            const std::string stringValue = std::to_string(v->x) + " " + std::to_string(v->y);
+                            accumulateOrPut(stringValue, "vector2i");
+                        }
+                        else if (const math::vector3i *v = std::get_if<math::vector3i>(&index->second)) {
+                            const std::string stringValue = std::to_string(v->x) + " " + std::to_string(v->y) + " " + std::to_string(v->z);
+                            accumulateOrPut(stringValue, "vector3i");
+                        }
+                        else if (const math::vector4i *v = std::get_if<math::vector4i>(&index->second)) {
+                            const std::string stringValue = std::to_string(v->x) + " " + std::to_string(v->y) + " " + std::to_string(v->z) + " " + std::to_string(v->w);
+                            accumulateOrPut(stringValue, "vector4i");
+                        }
+                        else return false;
+                    }
+                }
+
+                return true;
+            }
+        };
+
+        std::string result;
+        if (fn::serializeScope(0, desc, result)) {
+            return result;
+        }
+        else return {};
     }
 }
 

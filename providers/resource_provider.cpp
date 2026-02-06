@@ -34,7 +34,7 @@ namespace {
         if (memcmp(data, "EMTR", 4) == 0) {
             const std::size_t descLen = *(std::uint32_t *)(data + 4) - 4;
             const std::uint8_t *src = data + 8;
-            desc = util::parseDescription(src, descLen);
+            desc = util::Description::parse(src, descLen);
             read = 8 + descLen;
             return true;
         }
@@ -87,7 +87,7 @@ namespace {
                 std::string prefabPath = reinterpret_cast<const char *>(data + 4);
                 data += *(std::uint32_t *)(data + 0);
                 const std::size_t descLen = *(std::uint32_t *)(data + 0) - 4;
-                prefabs.emplace(std::move(prefabPath), util::parseDescription(data + 4, descLen));
+                prefabs.emplace(std::move(prefabPath), util::Description::parse(data + 4, descLen));
                 data += *(std::uint32_t *)(data + 0);
             }
             
@@ -503,8 +503,7 @@ namespace resource {
                         util::Description desc;
                         
                         if (readEmitter(mem.get(), desc, imgoff)) {
-                            const util::Description &emitterDesc = *desc.getSubDesc("emitter");
-                            const std::string &texture = emitterDesc.get<std::string>("texture");
+                            const std::string &texture = desc.getString("texture", "<Unknown>");
                             
                             self->_emitters.erase(path);
                             Emitter &emitter = self->_emitters.emplace(path, Emitter{}).first->second;

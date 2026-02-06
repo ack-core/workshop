@@ -200,7 +200,7 @@
             setWorkingDirectories: async function() {
                 try {
                     dirResources = await editorRootDirectory.getDirectoryHandle("resources");
-                    dirBinaryData = await editorRootDirectory.getDirectoryHandle("binary").then(r => r.getDirectoryHandle("data"));
+                    dirBinaryData = await editorRootDirectory.getDirectoryHandle("binary_editor").then(r => r.getDirectoryHandle("data"));
                 } 
                 catch (error) {
                     webix.alert("Can't recognise working directory structure");
