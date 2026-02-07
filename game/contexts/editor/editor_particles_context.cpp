@@ -553,7 +553,6 @@ namespace game {
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
             if (handler) {
-                _api.platform->logMsg("[Particles Context] msg = '%s' arg = '%s'", msg.data(), data.c_str());
                 return (this->*handler)(data);
             }
             return false;

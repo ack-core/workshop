@@ -1,0 +1,41 @@
+new0 {
+    position : vector3f = 0.000000 0.000000 0.000000
+    resourcePath : string = "meshes/test/ruins"
+    type : integer = 1
+}
+
+new0.new1 {
+    parentIndex : integer = 0
+    position : vector3f = 14.000000 0.000000 42.000000
+    resourcePath : string = "meshes/test/pillon"
+    type : integer = 1
+}
+
+new0.new1.new3 {
+    parentIndex : integer = 1
+    position : vector3f = 0.000000 20.000000 0.000000
+    resourcePath : string = "meshes/stool"
+    type : integer = 1
+}
+
+new0.new1.new4 {
+    parentIndex : integer = 1
+    position : vector3f = 2.000000 0.000000 -17.000000
+    resourcePath : string = "meshes/stool"
+    type : integer = 1
+}
+
+new0.new1.new4.new1 {
+    parentIndex : integer = 3
+    position : vector3f = 1.000000 5.000000 0.000000
+    resourcePath : string = "emitters/basic"
+    type : integer = 2
+}
+
+new0.new2 {
+    parentIndex : integer = 0
+    position : vector3f = 46.000000 0.000000 15.000000
+    resourcePath : string = "meshes/test/tree"
+    type : integer = 1
+}
+

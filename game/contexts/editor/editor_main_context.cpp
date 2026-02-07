@@ -43,7 +43,7 @@ namespace game {
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
             if (handler) {
-                _api.platform->logMsg("[Editor] msg = '%s' arg = '%s'", msg.data(), data.c_str());
+                //_api.platform->logMsg("[Editor] msg = '%s' arg = '%s'", msg.data(), data.c_str());
                 const bool result = (this->*handler)(data);
                 _api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                 return result;

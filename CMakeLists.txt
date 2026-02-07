@@ -100,6 +100,8 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 	file(COPY "${m_resources_root}/meshes" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/emitters" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/grounds" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
+	file(COPY "${m_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
+	file(COPY "${m_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
 
 	message(STATUS "Generating palette...")

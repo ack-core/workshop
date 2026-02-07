@@ -217,7 +217,7 @@ namespace voxel {
     , _resourceProvider(resources)
     , _scene(scene)
     {
-        g_nodeConstructors[int(WorldInterface::NodeType::VOXELMESH)] = []() -> std::unique_ptr<ObjectNode> {
+        g_nodeConstructors[int(WorldInterface::NodeType::VOXEL)] = []() -> std::unique_ptr<ObjectNode> {
             return std::make_unique<VoxelMeshNode>();
         };
         g_nodeConstructors[int(WorldInterface::NodeType::PARTICLES)] = []() -> std::unique_ptr<ObjectNode> {

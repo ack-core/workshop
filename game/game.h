@@ -10,6 +10,8 @@
 #include "contexts/editor/editor_prefab_context.h"
 #include "contexts/editor/editor_voxel_mesh_context.h"
 #include "contexts/editor/editor_particles_context.h"
+#include "contexts/editor/editor_raycast_shape_context.h"
+#include "contexts/editor/editor_collision_shape_context.h"
 
 // Rule of states:
 // Context is created if the next state contains it and current state does not
@@ -33,6 +35,8 @@ namespace game {
             &makeContext<EditorMainContext, CameraAccessInterface>,
             &makeContext<EditorPrefabContext, NodeAccessInterface>,
             &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
+            &makeContext<EditorRaycastShapeContext, NodeAccessInterface, CameraAccessInterface>,
+            &makeContext<EditorCollisionShapeContext, NodeAccessInterface, CameraAccessInterface>,
             &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
         }}
 #endif

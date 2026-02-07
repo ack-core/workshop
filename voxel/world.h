@@ -14,13 +14,13 @@ namespace voxel {
     public:
         enum class NodeType : std::size_t {
             PREFAB = 0,
-            VOXELMESH,
-            PARTICLES,
-            GROUND,
-            LOWPOLYMESH,
-            RAYCAST,
-            COLLISION,
-            ANIMATION,
+            VOXEL = 1,
+            LOWPOLY = 2,
+            GROUND = 3,
+            PARTICLES = 10,
+            RAYCAST = 20,
+            COLLISION = 21,
+            ANIMATION = 30,
             _count
         };
         

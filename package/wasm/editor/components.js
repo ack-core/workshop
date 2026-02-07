@@ -375,6 +375,19 @@ let elements = {
             }
         }
     },
+    list: function(id, height, action = null) {
+        return {
+            id: id,
+            view: "list", height: height, select: true,
+            type: {
+                height: 22
+            },
+            data: [],
+            on: {
+                onAfterSelect: (path) => { if (action) action($$(id), path); }
+            }
+        }
+    },
     graphedit: function(id, title, value, min, max, maxspread, action = null) {
         return {
             view: "graphedit", id: id, height: 100, borderless: true, margin: 3, css: {"background-color" : "transparent"},

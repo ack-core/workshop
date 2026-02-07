@@ -35,6 +35,10 @@ set(
     "${m_source_root}/contexts/editor/editor_voxel_mesh_context.cpp"
     "${m_source_root}/contexts/editor/editor_particles_context.h"
     "${m_source_root}/contexts/editor/editor_particles_context.cpp"
+    "${m_source_root}/contexts/editor/editor_raycast_shape_context.h"
+    "${m_source_root}/contexts/editor/editor_raycast_shape_context.cpp"
+    "${m_source_root}/contexts/editor/editor_collision_shape_context.h"
+    "${m_source_root}/contexts/editor/editor_collision_shape_context.cpp"
 )
 source_group("contexts/editor" FILES ${m_editor_contexts_list})
 

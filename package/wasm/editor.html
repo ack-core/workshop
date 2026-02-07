@@ -45,53 +45,24 @@
             });
         })
 
-        const uiInspectMappingBasic = {
-            "null" : [],
-            "inspect_prefab" : ["node_0", "node_1_resource_list"],
-            "inspect_mesh" : ["node_0", "node_1_resource_list"],
-            "inspect_particles" : ["node_0", "node_1_resource_list"]
+        let uiInspectMappingBasic = ["node_0", "node_1_resource_list"];
+        var uiInspectMappingEdit = {
+            "null" : []
         };
-        const uiInspectMappingEdit = {
-            "null" : [],
-            "inspect_prefab" : [],
-            "inspect_mesh" : ["voxel_mesh_edit_0"],
-            "inspect_particles" : ["particles_edit_0", "particles_edit_1", "particles_edit_2"]
+        var resourcesExtMapping = {
+            "null" : []
         };
-        const resourcesExtMapping = {
-            "null" : [],
-            "inspect_prefab" : [".txt"],
-            "inspect_mesh" : [".vox", ".txt"],
-            "inspect_particles" : [".txt", ".tga"]
-        };
-        const uiPtcFrameType = [
-            { id: 1, value: "10"}, 
-            { id: 2, value: "20"},
-            { id: 3, value: "50"},
-            { id: 4, value: "100"},
-        ];
-        const uiPtcShapeTypes = [
-            { id: 1, value: "Disk"}, 
-            { id: 2, value: "Box"}
-        ];
-        const uiPtcShapeDistribution = [
-            { id: 1, value: "Random"}, 
-            { id: 2, value: "Shuffled"},
-            { id: 3, value: "Linear"}
-        ];
-        const uiPtcOrientation = [
-            { id: 1, value: "Camera"}, 
-            { id: 2, value: "Axis"},
-            { id: 3, value: "World"}
-        ];
-
+        var texturesRoot = null;
         var uiNodeTree = null;
         var uiNodeName = null;
         var uiNodeTree = null;
         var uiInspectPanel = null;
         var uiInspectType = null;
         var uiResourceList = null;
-        var listParticleTextures = [];
-        var listResources = {};
+        var listResources = {
+            "null" : []
+        };
+        var listResFunctions = [];
         var dirBinaryData = null;
         var dirResources = null;
 
@@ -189,13 +160,9 @@
                 return result;
             },
             updateResourcesList: async function() {
-                listResources["null"] = []
-                listResources["inspect_mesh"] = await dirResources.getDirectoryHandle("meshes").then(r => utility.listFilesInDirectory("meshes", r, "vox"));
-                listResources["inspect_mesh"].sort();
-                listResources["inspect_particles"] = await dirResources.getDirectoryHandle("emitters").then(r => utility.listFilesInDirectory("emitters", r, "txt"));
-                listResources["inspect_particles"].sort();
-                listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
-                listResources["inspect_prefab"].sort();
+                for (const func of listResFunctions) {
+                    await func();
+                }
             },
             setWorkingDirectories: async function() {
                 try {
@@ -208,9 +175,6 @@
                 }
 
                 texturesRoot = await dirBinaryData.getDirectoryHandle("textures");
-                listParticleTextures = await texturesRoot.getDirectoryHandle("particles").then(r => utility.listFilesInDirectory("textures/particles", r, "png"));
-                listParticleTextures.sort();
-
                 utility.updateResourcesList();
                 return true;
             },
@@ -256,28 +220,6 @@
                     uiNodeTree.addCss(child.id, "highlight");
                 });
                 uiNodeTree.refresh(id);
-            },
-            showInspectPanel: function(panel, arg0) {
-                uiInspectMappingEdit[uiInspectType].forEach(item => {
-                    $$(item).hide();
-                });
-                uiInspectMappingBasic[uiInspectType].forEach(item => {
-                    $$(item).hide();
-                });
-                uiInspectMappingBasic[panel].forEach(item => {
-                    $$(item).show();
-                });
-
-                uiResourceList.clearAll();
-                uiResourceList.parse(listResources[panel]);
-                if (uiResourceList.exists(arg0)) {
-                    uiResourceList.select(arg0);
-                }
-                else {
-                    uiResourceList.unselectAll();
-                }
-
-                uiInspectType = panel;
             },
             hostUpdateResources: async function(handler) {
                 try {
@@ -367,7 +309,12 @@
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiNodeTree.unselectAll();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
-                utility.showInspectPanel("null", "");
+                uiInspectMappingEdit[uiInspectType].forEach(item => {
+                    $$(item).hide();
+                });
+                uiInspectMappingBasic.forEach(item => {
+                    $$(item).hide();
+                });
             },
             nodeName: function(e, nv, old) {
                 if (/^(?!\.)[A-Za-z0-9_.]+(?<!\.)$/.test(nv) && !uiNodeTree.exists(nv)) {
@@ -383,53 +330,6 @@
             },
             nodeStartEdit: function(e) {
                 uiEditor.sendMsg("editor.startEditing", "");
-            },
-            meshOffset: function(e, nv, old) {
-                let args = $$("inspect_mesh_cx").getValue() + " " + $$("inspect_mesh_cy").getValue() + " " + $$("inspect_mesh_cz").getValue()
-                uiEditor.sendMsg("editor.mesh.offset", args);
-            },
-            particlesEmission: function(e, nv, old) {
-                if (e.data.id == "inspect_ptc_lifetime") {
-                    let isLooped = parseInt($$("inspect_ptc_looped").getValue());
-                    if (isLooped && parseInt(nv) > parseInt($$("inspect_ptc_emission_time").getValue())) {
-                        utility.setElementValue(e.data.id, old);
-                    }
-                }
-                if (e.data.id == "inspect_ptc_looped") {
-                    let lifeTime = parseInt($$("inspect_ptc_lifetime").getValue());
-                    let emissionTime = parseInt($$("inspect_ptc_emission_time").getValue())
-                    if (nv && lifeTime > emissionTime) {
-                        utility.setElementValue("inspect_ptc_lifetime", emissionTime);
-                    }
-                }
-                let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
-                args += $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
-                args += $$("inspect_ptc_rnd_seed").getValue();
-                uiEditor.sendMsg("editor.particles.emission", args);
-            },
-            particlesVisual: function(e, nv, old) {
-                let args = $$("inspect_ptc_sshape_type").getValue() + " " + $$("inspect_ptc_sshape_fill").getValue() + " ";
-                args += $$("inspect_ptc_sshape_arg0").getValue() + " " + $$("inspect_ptc_sshape_arg1").getValue() + " " + $$("inspect_ptc_sshape_arg2").getValue() + " ";
-                args += $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " ";
-                args += $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue() + " ";
-                args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
-                args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue();
-                uiEditor.sendMsg("editor.particles.visual", args);
-            },
-            particleEmissionGraph: function(e, points) {
-                uiEditor.sendMsg("editor.particles.emissionGraph", utility.pointsToString(points));
-            },
-            particleWidthGraph: function(e, points) {
-                uiEditor.sendMsg("editor.particles.widthGraph", utility.pointsToString(points));
-            },
-            particleHeightGraph: function(e, points) {
-                uiEditor.sendMsg("editor.particles.heightGraph", utility.pointsToString(points));
-            },
-            particleSpeedGraph: function(e, points) {
-                uiEditor.sendMsg("editor.particles.speedGraph", utility.pointsToString(points));
-            },
-            particleAlphaGraph: function(e, points) {
-                uiEditor.sendMsg("editor.particles.alphaGraph", utility.pointsToString(points));
             },
             prefabSave: function(e) {
                 uiEditor.sendMsg("editor.savePrefab", "");
@@ -554,11 +454,7 @@
         });
         webix.ui({
             id: "add_node_menu", container: "editor", view: "contextmenu", master: "nodes",
-            data: [
-                { id: "0", value: "Add Prefab" },
-                { id: "1", value: "Add Voxel Mesh" },
-                { id: "2", value: "Add Particles" }
-            ],
+            data: [],
             submenuConfig: {
                 type: {
                     height: 22
@@ -601,19 +497,7 @@
                         padding: 3,
                         cols: [
                             {rows: [
-                                {
-                                    id: "node_resource_list",
-                                    view: "list", height: 300, select: true,
-                                    type: {
-                                        height: 22
-                                    },
-                                    data: ["lib/path/aaa1", "lib/path/bbbbbbbb1", "lib/path/cc1"],
-                                    on: {
-                                        onAfterSelect: function(path) {
-                                            uiEditor.sendMsg("editor.setPath", path);
-                                        }
-                                    }
-                                },
+                                elements.list("node_resource_list", 500, (id, path) => { uiEditor.sendMsg("editor.setPath", path); }),
                                 { height: 16 }
                             ]},
                             {
@@ -627,139 +511,13 @@
                             }
                         ]
                     }
-                },
-                {
-                    id: "voxel_mesh_edit_0", view: "accordionitem", hidden: true, header: "Edit Mesh", headerHeight: 10, headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
-                    body: {
-                        padding: 3,
-                        rows: [
-                            {cols: [
-                                elements.label("Center point:"),
-                                {},
-                                elements.number("inspect_mesh_cx", null, 44, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset),
-                                elements.number("inspect_mesh_cy", null, 44, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset),
-                                elements.number("inspect_mesh_cz", null, 44, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset)
-                            ]},
-                            { height: 16 }
-                        ]
-                    }
-                },
-                {
-                    id: "particles_edit_0", view: "accordionitem", hidden: true, header: "Emission", headerHeight: 10, headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
-                    body: {
-                        padding: 3,
-                        rows: [
-                            {cols: [
-                                elements.label("Particles emission time (ms):"), {},
-                                elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 100, 100, 10000, uiBindings.particlesEmission),
-                            ]},
-                            elements.graphedit("inspect_ptc_emission_graph", "Emission", 1.0, 0.0, 1.0, 0.0, uiBindings.particleEmissionGraph),
-                            {cols: [
-                                elements.label("Particles life time (ms):"), {},
-                                elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 100, 100, 10000, uiBindings.particlesEmission),
-                            ]},
-                            {cols: [
-                                elements.label("Baking frame time (ms):"), {},
-                                elements.combo("inspect_ptc_baking_time", 1, uiPtcFrameType, 60, uiBindings.particlesEmission),
-                            ]},
-                            {cols: [
-                                elements.label("Amount of particles to emit:"), {},
-                                elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiBindings.particlesEmission),
-                            ]},
-                            {cols: [
-                                elements.button("\u25b6", "Restart"), 
-                                elements.label("Looped:"),
-                                elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), 
-                                elements.label("Seed:"),
-                                elements.number("inspect_ptc_rnd_seed", "", 70, "11111111", 100, 1, 0, 99999999, uiBindings.particlesEmission),
-                                elements.button("\uD83C\uDFB2", "Reroll")
-                            ]},
-                            { height: 16 }
-                        ]
-                    }
-                },
-                {
-                    id: "particles_edit_1", view: "accordionitem", hidden: true, header: "Visual", headerHeight: 10, headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
-                    body: {
-                        padding: 3,
-                        rows: [
-                            {cols: [
-                                elements.label("Start shape type:"), { width: 17 },
-                                elements.combo("inspect_ptc_sshape_type", 1, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
-                                elements.label("Fill:"),
-                                elements.checkbox("inspect_ptc_sshape_fill", false, uiBindings.particlesVisual)
-                            ]},
-                            {cols: [
-                                elements.label("Start shape args:"), {},
-                                elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                                elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                                elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                            ]},
-                            {cols: [
-                                elements.label("End shape type:"), {  },
-                                elements.combo("inspect_ptc_eshape_type", 1, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
-                                elements.label("Fill:"),
-                                elements.checkbox("inspect_ptc_eshape_fill", false, uiBindings.particlesVisual)
-                            ]},
-                            {cols: [
-                                elements.label("End shape args:"), {},
-                                elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                                elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                                elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual)
-                            ]},
-                            {cols: [
-                                elements.label("End shape offset:"), {},
-                                elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
-                                elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
-                                elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual)
-                            ]},
-                            {cols: [
-                                elements.label("Start-to-End Mapping:"), {},
-                                elements.combo("inspect_ptc_shape_distr", 1, uiPtcShapeDistribution, 106, uiBindings.particlesVisual),
-                            ]},
-                            {cols: [
-                                elements.label("Particle orientation:"), {},
-                                elements.combo("inspect_ptc_orientation", 1, uiPtcOrientation, 106, uiBindings.particlesVisual),
-                            ]},
-                            {cols: [
-                                elements.label("Texture:"), {},
-                                elements.combo("inspect_ptc_texture", "", listParticleTextures, 175, (e, nv, old) => {
-
-                                }),
-                            ]},
-                            { height: 16 }
-                        ]
-                    }
-                },
-                {
-                    id: "particles_edit_2", view: "accordionitem", hidden: true, header: "Dynamic", collapsed: true, headerHeight: 10, headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
-                    body: {
-                        padding: 3,
-                        rows: [
-                            {cols: [
-                                elements.label("Change width and height together:"),
-                                { width: 39 },
-                                elements.checkbox("inspect_ptc_with_height_bind", false)
-                            ]},
-                            elements.graphedit("inspect_ptc_width_graph", "Width", 1.0, 0.0, 99.0, 99.0, uiBindings.particleWidthGraph),
-                            elements.graphedit("inspect_ptc_height_graph", "Height", 1.0, 0.0, 99.0, 99.0, uiBindings.particleHeightGraph),
-                            elements.graphedit("inspect_ptc_speed_graph", "Speed", 10.0, -999.0, 999.0, 999.0, uiBindings.particleSpeedGraph),
-                            elements.graphedit("inspect_ptc_alpha_graph", "Alpha", 1.0, 0.0, 1.0, 1.0, uiBindings.particleAlphaGraph),
-                            { height: 16 }
-                        ]
-                    }
                 }
             ]
         });
         webix.ui({
             view: "popup",
             id: "processing_popup",
-            height: 50,
-            width: 150,
+            height: 50, width: 150,
             modal: true,
             position: "center",
             body: {
@@ -777,54 +535,79 @@
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
 
-        uiBindings.initWorkingDirectory();
+        function registerMeshResource() {
+            listResFunctions.push(async function() {
+                listResources["inspect_mesh"] = await dirResources.getDirectoryHandle("meshes").then(r => utility.listFilesInDirectory("meshes", r, "vox"));
+                listResources["inspect_mesh"].sort();
+            });
 
-        if (typeof uiEditor != 'undefined') {
-            uiEditor["engine.nodeCreated"] = function(data) {
-                console.log("[JS] engine.nodeCreated", data);
-                const [name, isPrefabStr] = data.split(' ');
-                const isPrefab = parseInt(isPrefabStr);
-                utility.addItemToNodeTree(name, isPrefab);
-                utility.setElementValue("inspect_node_name", name);
-            }
-            uiEditor["engine.nodeDeleted"] = function(data) {
-                console.log("[JS] engine.nodeDeleted", data);
-                uiNodeTree.remove(uiNodeTree.getSelectedId());
-                utility.adjustTree();
-                uiNodeTree.refresh();
-                uiBindings.spaceClick(null);
-            }
-            uiEditor["engine.nodeSelected"] = function(data) {
-                console.log("[JS] engine.nodeSelected", data);
-                const [name, panel, arg0] = data.split(' ');
-                utility.showInspectPanel(panel, arg0);
-                utility.setElementValue("inspect_node_name", name);
-            }
-            uiEditor["engine.nodeRenamed"] = function(data) {
-                console.log("[JS] engine.nodeRenamed", data);
-                var [success, old, nv] = data.split(' ');
-                if (success == "ok") {
-                    let isPrefab = uiNodeTree.getItem(old).isPrefab;
-                    uiNodeTree.remove(old);
-                    utility.addItemToNodeTree(nv, isPrefab);                    
+            uiInspectMappingEdit["inspect_mesh"] = ["voxel_mesh_edit_0", "voxel_mesh_edit_1"];
+            resourcesExtMapping["inspect_mesh"] = [".vox", ".txt"];
+
+            uiBindings.meshOffset = function(e, nv, old) {
+                let args = $$("inspect_mesh_cx").getValue() + " " + $$("inspect_mesh_cy").getValue() + " " + $$("inspect_mesh_cz").getValue()
+                uiEditor.sendMsg("editor.mesh.offset", args);
+            };
+
+            $$("add_node_menu").add({ id: "1", value: "Add Voxel Mesh" });
+            $$("inspect_panel").addView({
+                id: "voxel_mesh_edit_0", view: "accordionitem", hidden: true, header: "Edit Mesh", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Center point:"),
+                            {},
+                            elements.number("inspect_mesh_cx", null, 54, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset),
+                            elements.number("inspect_mesh_cy", null, 54, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset),
+                            elements.number("inspect_mesh_cz", null, 54, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset)
+                        ]},
+                        { height: 16 }
+                    ]
                 }
-                else {
-                    utility.setElementValue($$("inspect_node_name"), old);
+            });
+            $$("inspect_panel").addView({
+                id: "voxel_mesh_edit_1", view: "accordionitem", hidden: true, header: "Animation", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Name:"), {},
+                            elements.text("inspect_mesh_anim_name", "", 183, false),
+                        ]},
+                        {cols: [
+                            elements.label("First:"),
+                            elements.number("inspect_mesh_anim_first", null, 44, "11", 0, 1, 0, 99), {},
+                            elements.label("Last:"),
+                            elements.number("inspect_mesh_anim_last", null, 44, "11", 0, 1, 0, 99), {},
+                            elements.label("Ms:"),
+                            elements.number("inspect_mesh_anim_time", null, 66, "1111", 0, 10, 0, 9000)
+                        ]},
+                        {
+                            css: {"margin-top": "3px !important"},
+                            cols: [
+                                {rows: [
+                                    elements.list("inspect_mesh_anim_list", 200),
+                                    { height: 16 }
+                                ]},
+                                {
+                                    width: 28,
+                                    css: {"margin-left": "3px !important"},
+                                    rows: [
+                                        elements.button("\u2795", "Add animation"),
+                                        elements.button("\u25B6", "Play animation"),
+                                        elements.button("\u274C", "Delete animation")
+                                    ]
+                                }
+                            ]
+                        },
+                        { height: 16 }
+                    ]
                 }
-            }
-            uiEditor["engine.nodeCoordinates"] = function(data) {
-                const [x, y, z] = data.split(' ');
-                Object.entries({inspect_node_x: x, inspect_node_y: y, inspect_node_z: z}).forEach(([k, v]) => {
-                    utility.setElementValue(k, v);
-                });
-            }
-            uiEditor["engine.insertNode"] = function(data) {
-                console.log("[JS] engine.insertNode", data);
-                utility.insertItemToNodeTree(data);
-            }
-            uiEditor["engine.prefab.editFail"] = function(data) {
-                webix.alert("Attempt to edit a prefab with the root node '" + data + "'. But the tree already has a node with that name");
-            }
+            });
+
             uiEditor["engine.mesh.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
                 $$("edit_resource_buttons").show();
@@ -836,6 +619,195 @@
                     utility.setElementValue(k, v);
                 });
             }
+        }
+        function registerParticlesResource() {
+            const uiPtcFrameType = [
+                { id: 1, value: "10"}, 
+                { id: 2, value: "20"},
+                { id: 3, value: "50"},
+                { id: 4, value: "100"},
+            ];
+            const uiPtcShapeTypes = [
+                { id: 1, value: "Disk"}, 
+                { id: 2, value: "Box"}
+            ];
+            const uiPtcShapeDistribution = [
+                { id: 1, value: "Random"}, 
+                { id: 2, value: "Shuffled"},
+                { id: 3, value: "Linear"}
+            ];
+            const uiPtcOrientation = [
+                { id: 1, value: "Camera"}, 
+                { id: 2, value: "Axis"},
+                { id: 3, value: "World"}
+            ];
+            var listParticleTextures = [];
+
+            listResFunctions.push(async function() {
+                listResources["inspect_particles"] = await dirResources.getDirectoryHandle("emitters").then(r => utility.listFilesInDirectory("emitters", r, "txt"));
+                listResources["inspect_particles"].sort();
+                listParticleTextures = await texturesRoot.getDirectoryHandle("particles").then(r => utility.listFilesInDirectory("textures/particles", r, "png"));
+                listParticleTextures.sort();                
+            });
+
+            uiInspectMappingEdit["inspect_particles"] = ["particles_edit_0", "particles_edit_1", "particles_edit_2"];
+            resourcesExtMapping["inspect_particles"] = [".txt", ".tga"];
+
+            uiBindings.particlesEmission = function(e, nv, old) {
+                if (e.data.id == "inspect_ptc_lifetime") {
+                    let isLooped = parseInt($$("inspect_ptc_looped").getValue());
+                    if (isLooped && parseInt(nv) > parseInt($$("inspect_ptc_emission_time").getValue())) {
+                        utility.setElementValue(e.data.id, old);
+                    }
+                }
+                if (e.data.id == "inspect_ptc_looped") {
+                    let lifeTime = parseInt($$("inspect_ptc_lifetime").getValue());
+                    let emissionTime = parseInt($$("inspect_ptc_emission_time").getValue())
+                    if (nv && lifeTime > emissionTime) {
+                        utility.setElementValue("inspect_ptc_lifetime", emissionTime);
+                    }
+                }
+                let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
+                args += $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
+                args += $$("inspect_ptc_rnd_seed").getValue();
+                uiEditor.sendMsg("editor.particles.emission", args);
+            };
+            uiBindings.particlesVisual = function(e, nv, old) {
+                let args = $$("inspect_ptc_sshape_type").getValue() + " " + $$("inspect_ptc_sshape_fill").getValue() + " ";
+                args += $$("inspect_ptc_sshape_arg0").getValue() + " " + $$("inspect_ptc_sshape_arg1").getValue() + " " + $$("inspect_ptc_sshape_arg2").getValue() + " ";
+                args += $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " ";
+                args += $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue() + " ";
+                args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
+                args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue();
+                uiEditor.sendMsg("editor.particles.visual", args);
+            };
+            uiBindings.particleEmissionGraph = function(e, points) {
+                uiEditor.sendMsg("editor.particles.emissionGraph", utility.pointsToString(points));
+            };
+            uiBindings.particleWidthGraph = function(e, points) {
+                uiEditor.sendMsg("editor.particles.widthGraph", utility.pointsToString(points));
+            };
+            uiBindings.particleHeightGraph = function(e, points) {
+                uiEditor.sendMsg("editor.particles.heightGraph", utility.pointsToString(points));
+            };
+            uiBindings.particleSpeedGraph = function(e, points) {
+                uiEditor.sendMsg("editor.particles.speedGraph", utility.pointsToString(points));
+            };
+            uiBindings.particleAlphaGraph = function(e, points) {
+                uiEditor.sendMsg("editor.particles.alphaGraph", utility.pointsToString(points));
+            };
+
+
+            $$("add_node_menu").add({ id: "10", value: "Add Particles" });
+            $$("inspect_panel").addView({
+                id: "particles_edit_0", view: "accordionitem", hidden: true, header: "Emission", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Particles emission time (ms):"), {},
+                            elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 100, 100, 10000, uiBindings.particlesEmission),
+                        ]},
+                        elements.graphedit("inspect_ptc_emission_graph", "Emission", 1.0, 0.0, 1.0, 0.0, uiBindings.particleEmissionGraph),
+                        {cols: [
+                            elements.label("Particles life time (ms):"), {},
+                            elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 100, 100, 10000, uiBindings.particlesEmission),
+                        ]},
+                        {cols: [
+                            elements.label("Baking frame time (ms):"), {},
+                            elements.combo("inspect_ptc_baking_time", 1, uiPtcFrameType, 60, uiBindings.particlesEmission),
+                        ]},
+                        {cols: [
+                            elements.label("Amount of particles to emit:"), {},
+                            elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiBindings.particlesEmission),
+                        ]},
+                        {cols: [
+                            elements.button("\u25b6", "Restart"), 
+                            elements.label("Looped:"),
+                            elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), 
+                            elements.label("Seed:"),
+                            elements.number("inspect_ptc_rnd_seed", "", 70, "11111111", 100, 1, 0, 99999999, uiBindings.particlesEmission),
+                            elements.button("\uD83C\uDFB2", "Reroll")
+                        ]},
+                        { height: 16 }
+                    ]
+                }
+            });
+            $$("inspect_panel").addView({
+                id: "particles_edit_1", view: "accordionitem", hidden: true, header: "Visual", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Start shape type:"), { width: 17 },
+                            elements.combo("inspect_ptc_sshape_type", 1, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
+                            elements.label("Fill:"),
+                            elements.checkbox("inspect_ptc_sshape_fill", false, uiBindings.particlesVisual)
+                        ]},
+                        {cols: [
+                            elements.label("Start shape args:"), {},
+                            elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                            elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                            elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                        ]},
+                        {cols: [
+                            elements.label("End shape type:"), {  },
+                            elements.combo("inspect_ptc_eshape_type", 1, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
+                            elements.label("Fill:"),
+                            elements.checkbox("inspect_ptc_eshape_fill", false, uiBindings.particlesVisual)
+                        ]},
+                        {cols: [
+                            elements.label("End shape args:"), {},
+                            elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                            elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
+                            elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual)
+                        ]},
+                        {cols: [
+                            elements.label("End shape offset:"), {},
+                            elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
+                            elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
+                            elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual)
+                        ]},
+                        {cols: [
+                            elements.label("Start-to-End Mapping:"), {},
+                            elements.combo("inspect_ptc_shape_distr", 1, uiPtcShapeDistribution, 106, uiBindings.particlesVisual),
+                        ]},
+                        {cols: [
+                            elements.label("Particle orientation:"), {},
+                            elements.combo("inspect_ptc_orientation", 1, uiPtcOrientation, 106, uiBindings.particlesVisual),
+                        ]},
+                        {cols: [
+                            elements.label("Texture:"), {},
+                            elements.combo("inspect_ptc_texture", "", listParticleTextures, 175, (e, nv, old) => {
+
+                            }),
+                        ]},
+                        { height: 16 }
+                    ]
+                }
+            });
+            $$("inspect_panel").addView({
+                id: "particles_edit_2", view: "accordionitem", hidden: true, header: "Dynamic", collapsed: true, headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Change width and height together:"),
+                            { width: 39 },
+                            elements.checkbox("inspect_ptc_with_height_bind", false)
+                        ]},
+                        elements.graphedit("inspect_ptc_width_graph", "Width", 1.0, 0.0, 99.0, 99.0, uiBindings.particleWidthGraph),
+                        elements.graphedit("inspect_ptc_height_graph", "Height", 1.0, 0.0, 99.0, 99.0, uiBindings.particleHeightGraph),
+                        elements.graphedit("inspect_ptc_speed_graph", "Speed", 10.0, -999.0, 999.0, 999.0, uiBindings.particleSpeedGraph),
+                        elements.graphedit("inspect_ptc_alpha_graph", "Alpha", 1.0, 0.0, 1.0, 1.0, uiBindings.particleAlphaGraph),
+                        { height: 16 }
+                    ]
+                }
+            });
+
             uiEditor["engine.particles.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
                 $$("edit_resource_buttons").show();
@@ -848,42 +820,38 @@
                 $$("inspect_ptc_texture").getList().parse(listParticleTextures);
 
                 let desc = utility.parseConfig(data);
-                utility.setElementValue("inspect_ptc_emission_time", desc.emitter.emissionTimeMs);
-                utility.setElementValue("inspect_ptc_lifetime", desc.emitter.particleLifeTimeMs);
-                utility.setElementValue("inspect_ptc_baking_time", desc.emitter.bakingFrameType);
-                utility.setElementValue("inspect_ptc_count", desc.emitter.particlesToEmit);
-                utility.setElementValue("inspect_ptc_looped", desc.emitter.looped);
-                utility.setElementValue("inspect_ptc_rnd_seed", desc.emitter.randomSeed);
-                utility.setElementValue("inspect_ptc_sshape_type", desc.emitter.startShapeType);
-                utility.setElementValue("inspect_ptc_sshape_fill", desc.emitter.startShapeFill);
-                utility.setElementValue("inspect_ptc_sshape_arg0", desc.emitter.startShapeArgs[0]);
-                utility.setElementValue("inspect_ptc_sshape_arg1", desc.emitter.startShapeArgs[1]);
-                utility.setElementValue("inspect_ptc_sshape_arg2", desc.emitter.startShapeArgs[2]);
-                utility.setElementValue("inspect_ptc_eshape_type", desc.emitter.endShapeType);
-                utility.setElementValue("inspect_ptc_eshape_fill", desc.emitter.endShapeFill);
-                utility.setElementValue("inspect_ptc_eshape_arg0", desc.emitter.endShapeArgs[0]);
-                utility.setElementValue("inspect_ptc_eshape_arg1", desc.emitter.endShapeArgs[1]);
-                utility.setElementValue("inspect_ptc_eshape_arg2", desc.emitter.endShapeArgs[2]);
-                utility.setElementValue("inspect_ptc_end_offset_x", desc.emitter.endShapeOffset[0]);
-                utility.setElementValue("inspect_ptc_end_offset_y", desc.emitter.endShapeOffset[1]);
-                utility.setElementValue("inspect_ptc_end_offset_z", desc.emitter.endShapeOffset[2]);
-                utility.setElementValue("inspect_ptc_shape_distr", desc.emitter.shapeDistributionType);
-                utility.setElementValue("inspect_ptc_orientation", desc.emitter.particleOrientation);
-                utility.setElementValue("inspect_ptc_texture", desc.emitter.texture);
+                utility.setElementValue("inspect_ptc_emission_time", desc.emissionTimeMs);
+                utility.setElementValue("inspect_ptc_lifetime", desc.particleLifeTimeMs);
+                utility.setElementValue("inspect_ptc_baking_time", desc.bakingFrameType);
+                utility.setElementValue("inspect_ptc_count", desc.particlesToEmit);
+                utility.setElementValue("inspect_ptc_looped", desc.looped);
+                utility.setElementValue("inspect_ptc_rnd_seed", desc.randomSeed);
+                utility.setElementValue("inspect_ptc_sshape_type", desc.startShapeType);
+                utility.setElementValue("inspect_ptc_sshape_fill", desc.startShapeFill);
+                utility.setElementValue("inspect_ptc_sshape_arg0", desc.startShapeArgs[0]);
+                utility.setElementValue("inspect_ptc_sshape_arg1", desc.startShapeArgs[1]);
+                utility.setElementValue("inspect_ptc_sshape_arg2", desc.startShapeArgs[2]);
+                utility.setElementValue("inspect_ptc_eshape_type", desc.endShapeType);
+                utility.setElementValue("inspect_ptc_eshape_fill", desc.endShapeFill);
+                utility.setElementValue("inspect_ptc_eshape_arg0", desc.endShapeArgs[0]);
+                utility.setElementValue("inspect_ptc_eshape_arg1", desc.endShapeArgs[1]);
+                utility.setElementValue("inspect_ptc_eshape_arg2", desc.endShapeArgs[2]);
+                utility.setElementValue("inspect_ptc_end_offset_x", desc.endShapeOffset[0]);
+                utility.setElementValue("inspect_ptc_end_offset_y", desc.endShapeOffset[1]);
+                utility.setElementValue("inspect_ptc_end_offset_z", desc.endShapeOffset[2]);
+                utility.setElementValue("inspect_ptc_shape_distr", desc.shapeDistributionType);
+                utility.setElementValue("inspect_ptc_orientation", desc.particleOrientation);
+                utility.setElementValue("inspect_ptc_texture", desc.texture);
 
                 let setGraphValue = (src, name) => {
                     let graph = src.map((_, i, a) => i % 3 === 0 ? { x: a[i], value: a[i + 1], spread: a[i + 2] } : null).filter(Boolean);
                     utility.setElementValue(name, graph);
                 };
-                setGraphValue(desc.emitter.emissionGraphData.trim().split(" ").map(Number), "inspect_ptc_emission_graph");
-                setGraphValue(desc.emitter.widthGraphData.trim().split(" ").map(Number), "inspect_ptc_width_graph");
-                setGraphValue(desc.emitter.heightGraphData.trim().split(" ").map(Number), "inspect_ptc_height_graph");
-                setGraphValue(desc.emitter.speedGraphData.trim().split(" ").map(Number), "inspect_ptc_speed_graph");
-                setGraphValue(desc.emitter.alphaGraphData.trim().split(" ").map(Number), "inspect_ptc_alpha_graph");
-
-            }
-            uiEditor["engine.prefab.editing"] = function(data) {
-                uiEditor.sendMsg("editor.stopEditing", "");
+                setGraphValue(desc.emissionGraphData.trim().split(" ").map(Number), "inspect_ptc_emission_graph");
+                setGraphValue(desc.widthGraphData.trim().split(" ").map(Number), "inspect_ptc_width_graph");
+                setGraphValue(desc.heightGraphData.trim().split(" ").map(Number), "inspect_ptc_height_graph");
+                setGraphValue(desc.speedGraphData.trim().split(" ").map(Number), "inspect_ptc_speed_graph");
+                setGraphValue(desc.alphaGraphData.trim().split(" ").map(Number), "inspect_ptc_alpha_graph");
             }
             uiEditor["engine.ptcEndOffset"] = function(data) {
                 const [x, y, z] = data.split(' ');
@@ -891,19 +859,163 @@
                     utility.setElementValue(k, v);
                 });
             }
-            uiEditor["engine.saved"] = async function(data) {
-                console.log("[JS] engine.saved", data);
-                utility.hostUpdateResources(() => {
-                    uiEditor.sendMsg("editor.reloadResources", data);
-                });
-                uiInspectMappingEdit[uiInspectType].forEach(item => {
-                    $$(item).hide();
-                });
-                uiInspectMappingBasic[uiInspectType].forEach(item => {
+        }
+        function registerRaycastShapeResource() {
+            const uiRaycastShapeTypes = [
+                { id: 1, value: "Sphere shape approx"}, 
+                { id: 2, value: "Convex triangle shape"}
+            ];
+
+            listResFunctions.push(async function() {
+                listResources["inspect_raycast"] = await dirResources.getDirectoryHandle("raycast").then(r => utility.listFilesInDirectory("raycast", r, "txt"));
+                listResources["inspect_raycast"].sort();
+            });
+
+            uiInspectMappingEdit["inspect_raycast"] = ["raycast_edit_0"];
+            resourcesExtMapping["inspect_raycast"] = [".txt"];
+
+            $$("add_node_menu").add({ id: "20", value: "Add Raycast Shape" });
+            $$("inspect_panel").addView({
+                id: "raycast_edit_0", view: "accordionitem", hidden: true, header: "Edit Raycast Shape", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Shape type:"), {},
+                            elements.combo("inspect_raycast_shape_type", 1, uiRaycastShapeTypes, 160)
+                        ]},
+                        {cols: [
+                            elements.label("Coord/Arg:"),
+                            {},
+                            elements.number("inspect_raycast_shape_point_x", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0),
+                            elements.number("inspect_raycast_shape_point_y", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0),
+                            elements.number("inspect_raycast_shape_point_z", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0),
+                            elements.number("inspect_raycast_shape_point_w", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0)
+                        ]},
+                        {
+                            css: {"margin-top": "3px !important"},
+                            cols: [
+                                {rows: [
+                                    elements.list("inspect_raycast_shape_pointlist", 200),
+                                    { height: 16 }
+                                ]},
+                                {
+                                    width: 28,
+                                    css: {"margin-left": "3px !important"},
+                                    rows: [
+                                        elements.button("\u2795", "Add point"),
+                                        elements.button("\u274C", "Delete point")
+                                    ]
+                                }
+                            ]
+                        },
+                        { height: 16 }
+                    ]
+                }
+            });
+
+            uiEditor["engine.raycast.editing"] = function(data) {
+                $$("node_1_resource_list").hide();
+                $$("edit_resource_buttons").show();
+                uiInspectMappingEdit["inspect_raycast"].forEach(item => {
                     $$(item).show();
                 });
+            }
+        }
+        function registerCollisionShapeResource() {
+            const uiCollisionShapeTypes = [
+                { id: 1, value: "CircleXZ"}, 
+                { id: 2, value: "ObstaclePolygonXZ"}
+            ];
 
-                $$("edit_resource_buttons").hide();
+            listResFunctions.push(async function() {
+                listResources["inspect_collision"] = await dirResources.getDirectoryHandle("collision").then(r => utility.listFilesInDirectory("collision", r, "txt"));
+                listResources["inspect_collision"].sort();
+            });
+
+            uiInspectMappingEdit["inspect_collision"] = ["collision_edit_0"];
+            resourcesExtMapping["inspect_collision"] = [".txt"];
+
+            $$("add_node_menu").add({ id: "21", value: "Add Collision Shape" });
+            $$("inspect_panel").addView({
+                id: "collision_edit_0", view: "accordionitem", hidden: true, header: "Edit Collision Shape", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("Shape type:"), {},
+                            elements.combo("inspect_collision_shape_type", 1, uiCollisionShapeTypes, 160, (e, nv, old) => {
+                                $$("collision_edit_0_type_" + old).hide();
+                                $$("collision_edit_0_type_" + nv).show();
+                            }),
+                        ]},
+                        {
+                            id: "collision_edit_0_type_1",
+                            cols: [
+                                elements.label("Radius:"),
+                                elements.number("inspect_collision_shape_radius", null, 64, "11.0", 0, 0.1, 1.0, 99.0), {},
+                                elements.label("Mass:"),
+                                elements.number("inspect_collision_shape_mass", null, 94, "111.0", 0, 0.1, 1.0, 999.0)
+                            ]
+                        },
+                        {
+                            id: "collision_edit_0_type_2", hidden: true,
+                            rows: [
+                                {cols: [
+                                    elements.label("XZ Coordinates:"), {},
+                                    elements.number("inspect_collision_shape_px", null, 54, "1111.0", 0, 0.1, -999.0, 999.0),
+                                    elements.number("inspect_collision_shape_pz", null, 54, "1111.0", 0, 0.1, -999.0, 999.0)
+                                ]},
+                                {
+                                    css: {"margin-top": "3px !important"},
+                                    cols: [
+                                        {rows: [
+                                            elements.list("inspect_collision_shape_pointlist", 200),
+                                            { height: 16 }
+                                        ]},
+                                        {
+                                            width: 28,
+                                            css: {"margin-left": "3px !important"},
+                                            rows: [
+                                                elements.button("\u2795", "Add point"),
+                                                elements.button("\u274C", "Delete point")
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        { height: 16 }
+                    ]
+                }
+            });
+
+            uiEditor["engine.collision.editing"] = function(data) {
+                $$("node_1_resource_list").hide();
+                $$("edit_resource_buttons").show();
+                uiInspectMappingEdit["inspect_collision"].forEach(item => {
+                    $$(item).show();
+                });
+            }
+        }
+        function registerPrefabResource() {
+            listResFunctions.push(async function() {
+                listResources["inspect_prefab"] = await dirResources.getDirectoryHandle("prefabs").then(r => utility.listFilesInDirectory("prefabs", r, "txt"));
+                listResources["inspect_prefab"].sort();
+            });
+
+            uiInspectMappingEdit["inspect_prefab"] = [];
+            resourcesExtMapping["inspect_prefab"] = [".txt"];
+
+            $$("add_node_menu").add({ id: "0", value: "Add Prefab" });
+            
+            uiEditor["engine.prefab.editFail"] = function(data) {
+                webix.alert("Attempt to edit a prefab with the root node '" + data + "'. But the tree already has a node with that name");
+            }
+            uiEditor["engine.prefab.editing"] = function(data) {
+                uiEditor.sendMsg("editor.stopEditing", "");
             }
             uiEditor["engine.prefab.saveFail"] = function(data) {
                 webix.alert(data);
@@ -941,12 +1053,94 @@
                     }
                 }
             }
+        }
+
+        if (typeof uiEditor != 'undefined') {
+            uiEditor["engine.nodeCreated"] = function(data) {
+                console.log("[JS] engine.nodeCreated", data);
+                const [name, isPrefabStr] = data.split(' ');
+                const isPrefab = parseInt(isPrefabStr);
+                utility.addItemToNodeTree(name, isPrefab);
+                utility.setElementValue("inspect_node_name", name);
+            }
+            uiEditor["engine.nodeDeleted"] = function(data) {
+                console.log("[JS] engine.nodeDeleted", data);
+                uiNodeTree.remove(uiNodeTree.getSelectedId());
+                utility.adjustTree();
+                uiNodeTree.refresh();
+                uiBindings.spaceClick(null);
+            }
+            uiEditor["engine.nodeSelected"] = function(data) {
+                console.log("[JS] engine.nodeSelected", data);
+                const [name, panel, arg0] = data.split(' ');
+
+                uiInspectMappingEdit[uiInspectType].forEach(item => {
+                    $$(item).hide();
+                });
+                uiInspectMappingBasic.forEach(item => {
+                    $$(item).show();
+                });
+
+                uiResourceList.clearAll();
+                uiResourceList.parse(listResources[panel]);
+                if (uiResourceList.exists(arg0)) {
+                    uiResourceList.select(arg0);
+                }
+                else {
+                    uiResourceList.unselectAll();
+                }
+
+                uiInspectType = panel;
+                utility.setElementValue("inspect_node_name", name);
+            }
+            uiEditor["engine.nodeRenamed"] = function(data) {
+                console.log("[JS] engine.nodeRenamed", data);
+                var [success, old, nv] = data.split(' ');
+                if (success == "ok") {
+                    let isPrefab = uiNodeTree.getItem(old).isPrefab;
+                    uiNodeTree.remove(old);
+                    utility.addItemToNodeTree(nv, isPrefab);
+                }
+                else {
+                    utility.setElementValue($$("inspect_node_name"), old);
+                }
+            }
+            uiEditor["engine.nodeCoordinates"] = function(data) {
+                const [x, y, z] = data.split(' ');
+                Object.entries({inspect_node_x: x, inspect_node_y: y, inspect_node_z: z}).forEach(([k, v]) => {
+                    utility.setElementValue(k, v);
+                });
+            }
+            uiEditor["engine.insertNode"] = function(data) {
+                console.log("[JS] engine.insertNode", data);
+                utility.insertItemToNodeTree(data);
+            }
+            uiEditor["engine.saved"] = async function(data) {
+                console.log("[JS] engine.saved", data);
+                utility.hostUpdateResources(() => {
+                    uiEditor.sendMsg("editor.reloadResources", data);
+                });
+                uiInspectMappingEdit[uiInspectType].forEach(item => {
+                    $$(item).hide();
+                });
+                uiInspectMappingBasic.forEach(item => {
+                    $$(item).show();
+                });
+
+                $$("edit_resource_buttons").hide();
+            }
             uiEditor["engine.resourcesReloaded"] = function(data) {
                 $$("processing_popup").hide();
             }
+
+            registerPrefabResource();
+            registerMeshResource();
+            registerParticlesResource();
+            registerRaycastShapeResource();
+            registerCollisionShapeResource();
         }
 
-        
+        uiBindings.initWorkingDirectory();
 
     </script>
 </body>
