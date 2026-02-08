@@ -289,9 +289,9 @@ namespace util {
         bool setVector2f(const char *name, const math::vector2f &value, bool replace = true) { return _setValue(name, value, replace); }
         bool setVector3f(const char *name, const math::vector3f &value, bool replace = true) { return _setValue(name, value, replace); }
         bool setVector4f(const char *name, const math::vector4f &value, bool replace = true) { return _setValue(name, value, replace); }
-        bool setVector2i(const char *name, const math::vector2f &value, bool replace = true) { return _setValue(name, value, replace); }
-        bool setVector3i(const char *name, const math::vector3f &value, bool replace = true) { return _setValue(name, value, replace); }
-        bool setVector4i(const char *name, const math::vector4f &value, bool replace = true) { return _setValue(name, value, replace); }
+        bool setVector2i(const char *name, const math::vector2i &value, bool replace = true) { return _setValue(name, value, replace); }
+        bool setVector3i(const char *name, const math::vector3i &value, bool replace = true) { return _setValue(name, value, replace); }
+        bool setVector4i(const char *name, const math::vector4i &value, bool replace = true) { return _setValue(name, value, replace); }
         auto setDescription(const char *name, bool replace = true) -> util::Description * {
             std::string nameString (name);
             auto index = this->find(nameString);

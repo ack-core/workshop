@@ -11,7 +11,8 @@
 
 namespace voxel {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 4;
-    
+
+    // TODO: remove and use just util::Description
     struct ParticlesParams {
         ParticlesParams() = default;
         ParticlesParams(const util::Description &emitterDesc);
@@ -53,6 +54,8 @@ namespace voxel {
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setFrame(std::uint32_t index) = 0;
+            virtual auto getFrameCount() const -> std::uint32_t = 0;
+            virtual auto getDescription() const -> const util::Description & = 0;
             virtual ~VoxelMesh() = default;
         };
         struct TexturedMesh {
@@ -82,7 +85,7 @@ namespace voxel {
         
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
-        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f &originOffset) -> VoxelMeshPtr = 0;
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;

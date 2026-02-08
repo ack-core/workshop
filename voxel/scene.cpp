@@ -115,17 +115,19 @@ namespace voxel {
         std::uint32_t frameIndex;
         std::uint32_t frameCount;
         math::transform3f transform;
+        util::Description description;
         
         // for editor
         math::vector3f originVoxelOffset;
         math::vector3f currentVoxelOffset;
         
     public:
-        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count, const math::vector3f &voxelOffset) : transform(math::transform3f::identity()) {
+        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count, const util::Description &desc) : transform(math::transform3f::identity()) {
             frameIndex = 0;
             frameCount = count;
             frames = std::make_unique<foundation::RenderDataPtr[]>(count);
-            originVoxelOffset = voxelOffset;
+            description = desc;
+            originVoxelOffset = description.getVector3f("offset", {});
             currentVoxelOffset = {0, 0, 0};
 
             for (std::uint32_t i = 0; i < count; i++) {
@@ -157,6 +159,12 @@ namespace voxel {
         }
         void setFrame(std::uint32_t index) override {
             frameIndex = std::min(index, frameCount - 1);
+        }
+        std::uint32_t getFrameCount() const override {
+            return frameCount;
+        }
+        const util::Description &getDescription() const override {
+            return description;
         }
         auto getFinalTransform() const -> math::transform3f {
             math::vector3f offset;
@@ -306,7 +314,7 @@ namespace voxel {
         
         auto addLineSet() -> LineSetPtr override;
         auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
-        auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f &originOffset) -> VoxelMeshPtr override;
+        auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
@@ -732,8 +740,8 @@ namespace voxel {
         return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox));
     }
     
-    SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const math::vector3f &originOffset) {
-        std::shared_ptr<VoxelMeshImpl> result = std::make_shared<VoxelMeshImpl>(frames.data(), std::uint32_t(frames.size()), originOffset);
+    SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) {
+        std::shared_ptr<VoxelMeshImpl> result = std::make_shared<VoxelMeshImpl>(frames.data(), std::uint32_t(frames.size()), description);
         return _voxelMeshes.emplace_back(result);
     }
     

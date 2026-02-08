@@ -1,6 +1,5 @@
 
 #include "editor_particles_context.h"
-#include "utils.h"
 #include <list>
 
 namespace game {
@@ -9,21 +8,6 @@ namespace game {
         const std::uint64_t RND_SHAPE_GET = 200;
         const std::uint64_t RND_BORN_PARTICLE = 300;
         const std::uint64_t RND_GRAPH_SPREAD = 400;
-    }
-
-    RandomSource::RandomSource(std::uint64_t seed, std::uint64_t seq) {
-        _state = 0U;
-        _inc = (seq << 1u) | 1u;
-        getNextRandom();
-        _state += seed;
-        getNextRandom();
-    }
-    std::uint32_t RandomSource::getNextRandom() {
-        uint64_t oldstate = _state;
-        _state = oldstate * 6364136223846793005ULL + (_inc | 1);
-        uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
-        uint32_t rot = oldstate >> 59u;
-        return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
     }
     
     Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
@@ -113,7 +97,7 @@ namespace game {
         return 0.0f;
     }
     void Shape::generate(const voxel::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
-        RandomSource rnd = RandomSource(randomSeed, RND_SHAPE_FILL);
+        editor::RandomSource rnd = editor::RandomSource(randomSeed, RND_SHAPE_FILL);
         if (type == Type::DISK) {
             points.clear();
             std::size_t random = randomSeed;
@@ -294,7 +278,7 @@ namespace game {
     }
     
     void Emitter::refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd) {
-        _shapeGetRandom = RandomSource(_randomSeed, RND_SHAPE_GET);
+        _shapeGetRandom = editor::RandomSource(_randomSeed, RND_SHAPE_GET);
         
         const math::vector3f emitterDir = _endShapeOffset.lengthSq() > 0.1f ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
         const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
@@ -326,7 +310,7 @@ namespace game {
         _ptcParams.maxXYZ = {0, 0, 0};
         _ptcParams.maxSize = {_widthGraph.getMaxValue(), _heightGraph.getMaxValue()};
 
-        RandomSource rndSpread = RandomSource(RND_GRAPH_SPREAD, _randomSeed);
+        editor::RandomSource rndSpread = editor::RandomSource(RND_GRAPH_SPREAD, _randomSeed);
         
         // second loop is needed to bake old particles from previous cycle (_isLooped)
         for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //

@@ -156,10 +156,10 @@ namespace voxel {
         
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
-            res.getOrLoadVoxelMesh(resourcePath.c_str(), [world, this, objweak](const std::vector<foundation::RenderDataPtr> &data, const math::vector3f& offset) {
+            res.getOrLoadVoxelMesh(resourcePath.c_str(), [world, this, objweak](const std::vector<foundation::RenderDataPtr> &data, const util::Description& desc) {
                 if (auto object = objweak.lock()) {
                     if (data.size()) {
-                        mesh = world->getScene().addVoxelMesh(data, offset);
+                        mesh = world->getScene().addVoxelMesh(data, desc);
                         mesh->setTransform(worldTransform);
                     }
                     object->nodeLoadingComplete();

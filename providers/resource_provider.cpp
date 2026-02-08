@@ -25,7 +25,7 @@ namespace {
             std::int16_t positionX, positionY, positionZ;
             std::uint8_t colorIndex, mask;
         };
-        math::vector3f originOffset = {0, 0, 0};
+        util::Description description;
         std::vector<std::vector<VTXMVOX>> voxels;
     };
     
@@ -47,10 +47,11 @@ namespace {
         if (memcmp(data, "VOX ", 4) == 0) {
             if (*(std::int32_t *)(data + 4) == 0x7f) { // vox made by gen_meshes.py
                 data += 24;
-                ctx.originOffset.x = *(float *)(data + 0);
-                ctx.originOffset.y = *(float *)(data + 4);
-                ctx.originOffset.z = *(float *)(data + 8);
-                data += 3 * 4;
+                const std::uint32_t cfglen = *(std::uint32_t *)(data + 0);
+                ctx.description = util::Description::parse((const std::uint8_t *)(data + 4), cfglen);
+                data += 4 + cfglen;
+                const math::vector3f originOffset = ctx.description.getVector3f("offset", {});
+                
                 std::uint32_t frameCount = *(std::uint32_t *)data;
                 ctx.voxels.resize(frameCount);
                 data += sizeof(std::uint32_t);
@@ -64,9 +65,9 @@ namespace {
                     for (std::uint32_t i = 0; i < voxelCount; i++) {
                         const MeshAsyncContext::Voxel &src = *(MeshAsyncContext::Voxel *)data;
                         MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][i];
-                        voxel.positionX = src.positionX - ctx.originOffset.x;
-                        voxel.positionY = src.positionY - ctx.originOffset.y;
-                        voxel.positionZ = src.positionZ - ctx.originOffset.z;
+                        voxel.positionX = src.positionX - originOffset.x;
+                        voxel.positionY = src.positionY - originOffset.y;
+                        voxel.positionZ = src.positionZ - originOffset.z;
                         voxel.colorIndex = src.colorIndex;
                         voxel.mask = src.mask;
 
@@ -114,7 +115,7 @@ namespace resource {
         auto getGroundInfo(const char *groundPath) -> const GroundInfo * override;
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
-        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> &&completion) override;
+        void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
 
@@ -138,7 +139,8 @@ namespace resource {
         };
         struct VoxelMesh {
             std::vector<foundation::RenderDataPtr> frames;
-            math::vector3f originOffset;
+            util::Description description;
+            //math::vector3f originOffset;
             bool outdated = false;
         };
         struct GroundMesh {
@@ -166,7 +168,7 @@ namespace resource {
         };
         struct QueueEntryMesh {
             std::string meshPath;
-            util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> callback;
+            util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> callback;
         };
         struct QueueEntryGround {
             std::string groundPath;
@@ -303,7 +305,7 @@ namespace resource {
         }
     }
         
-    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const math::vector3f &)> &&completion) {
+    void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueMesh.emplace_back(QueueEntryMesh {
                 .meshPath = meshPath,
@@ -317,7 +319,7 @@ namespace resource {
 
         auto index = _meshes.find(path);
         if (index != _meshes.end() && index->second.outdated == false) {
-            completion(index->second.frames, index->second.originOffset);
+            completion(index->second.frames, index->second.description);
         }
         else {
             _asyncInProgress = true;
@@ -342,8 +344,8 @@ namespace resource {
                                     }
                                     
                                     self->_meshes.erase(path);
-                                    const VoxelMesh &result = self->_meshes.emplace(path, VoxelMesh{std::move(frames), ctx.originOffset}).first->second;
-                                    completion(result.frames, result.originOffset);
+                                    const VoxelMesh &result = self->_meshes.emplace(path, VoxelMesh{std::move(frames), std::move(ctx.description)}).first->second;
+                                    completion(result.frames, result.description);
                                 }
                                 else {
                                     self->_platform->logError("[ResourceProviderImpl::getOrLoadVoxelMesh] '%s' is not a valid vxm file", path.data());
@@ -354,7 +356,7 @@ namespace resource {
                     else {
                         self->_asyncInProgress = false;
                         self->_platform->logError("[ResourceProviderImpl::getOrLoadVoxelMesh] Unable to find file '%s'", path.data());
-                        completion({}, {0, 0, 0});
+                        completion({}, {});
                     }
                 }
             });

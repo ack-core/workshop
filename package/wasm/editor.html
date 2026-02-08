@@ -67,6 +67,14 @@
         var dirResources = null;
 
         let utility = {
+            getRandomName: function() {
+                var result = "";
+                var characters = "abcdefghijklmnopqrstuvwxyz";
+                for (let i = 0; i < 6; i++) {
+                    result += characters.charAt(Math.floor(Math.random() * characters.length));
+                }
+                return result;
+            },
             openDB: function() {
                 return new Promise((resolve, reject) => {
                     const request = indexedDB.open('fs-db');
@@ -497,7 +505,7 @@
                         padding: 3,
                         cols: [
                             {rows: [
-                                elements.list("node_resource_list", 500, (id, path) => { uiEditor.sendMsg("editor.setPath", path); }),
+                                elements.list("node_resource_list", 500, (obj, path) => { uiEditor.sendMsg("editor.setPath", path); }),
                                 { height: 16 }
                             ]},
                             {
@@ -548,6 +556,31 @@
                 let args = $$("inspect_mesh_cx").getValue() + " " + $$("inspect_mesh_cy").getValue() + " " + $$("inspect_mesh_cz").getValue()
                 uiEditor.sendMsg("editor.mesh.offset", args);
             };
+            uiBindings.meshAddAnimation = function(e) {
+                const list = $$("inspect_mesh_anim_list");
+                const newName = utility.getRandomName();
+                list.add({ id: newName, value: newName });
+                list.select(newName);
+            };
+            uiBindings.meshRemoveAnimation = function(e) {
+                const list = $$("inspect_mesh_anim_list");
+                const id = list.getSelectedId();
+                list.remove(id);
+                utility.setElementValue("inspect_mesh_anim_name", "");
+                uiEditor.sendMsg("editor.mesh.animationRemoved", id);
+                list.select(list.getFirstId());
+            };
+            uiBindings.meshAnimationParameters = function(e, nv, old) {
+                let args = $$("inspect_mesh_anim_name").getValue() + " " + $$("inspect_mesh_anim_first").getValue() + " ";
+                args += $$("inspect_mesh_anim_last").getValue() + " " + $$("inspect_mesh_anim_time").getValue();
+                uiEditor.sendMsg("editor.mesh.animationParameters", args);
+            };
+            uiBindings.meshAnimationPlay = function(e) {
+                uiEditor.sendMsg("editor.mesh.animationPlay", "0");
+            };
+            uiBindings.meshAnimationLoop = function(e) {
+                uiEditor.sendMsg("editor.mesh.animationPlay", "1");
+            };
 
             $$("add_node_menu").add({ id: "1", value: "Add Voxel Mesh" });
             $$("inspect_panel").addView({
@@ -575,30 +608,33 @@
                     rows: [
                         {cols: [
                             elements.label("Name:"), {},
-                            elements.text("inspect_mesh_anim_name", "", 183, false),
+                            elements.text("inspect_mesh_anim_name", "", 183, false, uiBindings.meshAnimationParameters),
                         ]},
                         {cols: [
                             elements.label("First:"),
-                            elements.number("inspect_mesh_anim_first", null, 44, "11", 0, 1, 0, 99), {},
+                            elements.number("inspect_mesh_anim_first", null, 44, "11", 0, 1, 0, 99, uiBindings.meshAnimationParameters), {},
                             elements.label("Last:"),
-                            elements.number("inspect_mesh_anim_last", null, 44, "11", 0, 1, 0, 99), {},
+                            elements.number("inspect_mesh_anim_last", null, 44, "11", 0, 1, 0, 99, uiBindings.meshAnimationParameters), {},
                             elements.label("Ms:"),
-                            elements.number("inspect_mesh_anim_time", null, 66, "1111", 0, 10, 0, 9000)
+                            elements.number("inspect_mesh_anim_time", null, 66, "1111", 100, 10, 100, 9000, uiBindings.meshAnimationParameters)
                         ]},
                         {
                             css: {"margin-top": "3px !important"},
                             cols: [
                                 {rows: [
-                                    elements.list("inspect_mesh_anim_list", 200),
+                                    elements.list("inspect_mesh_anim_list", 200, (obj, id) => { 
+                                        uiEditor.sendMsg("editor.mesh.animationSelected", id);
+                                    }),
                                     { height: 16 }
                                 ]},
                                 {
                                     width: 28,
                                     css: {"margin-left": "3px !important"},
                                     rows: [
-                                        elements.button("\u2795", "Add animation"),
-                                        elements.button("\u25B6", "Play animation"),
-                                        elements.button("\u274C", "Delete animation")
+                                        elements.button("\u25B6", "Play animation", uiBindings.meshAnimationPlay),
+                                        elements.button("\u27F3", "Loop animation", uiBindings.meshAnimationLoop),
+                                        elements.button("\u2795", "Add animation", uiBindings.meshAddAnimation),
+                                        elements.button("\u274C", "Delete animation", uiBindings.meshRemoveAnimation)
                                     ]
                                 }
                             ]
@@ -607,8 +643,29 @@
                     ]
                 }
             });
+            
+            uiEditor["engine.mesh.animationUpdate"] = function(data) {
+                const list = $$("inspect_mesh_anim_list");
+                const [name, first, last, time, isNew] = data.split(' ');
+                const oldName = isNew == "new" ?  "" : list.getSelectedId();
+                
+                if (oldName != name) {
+                    list.blockEvent();
+                    if (list.exists(oldName)) {
+                        list.remove(oldName);                        
+                    }
+                    list.add({ id: name, value: name });
+                    list.select(name);
+                    list.unblockEvent();
+                }
 
+                utility.setElementValue("inspect_mesh_anim_name", name);
+                utility.setElementValue("inspect_mesh_anim_first", first);
+                utility.setElementValue("inspect_mesh_anim_last", last);
+                utility.setElementValue("inspect_mesh_anim_time", time);
+            }
             uiEditor["engine.mesh.editing"] = function(data) {
+                $$("inspect_mesh_anim_list").clearAll();
                 $$("node_1_resource_list").hide();
                 $$("edit_resource_buttons").show();
                 uiInspectMappingEdit["inspect_mesh"].forEach(item => {

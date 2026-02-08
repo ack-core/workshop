@@ -5,6 +5,7 @@
 #include "node_access_interface.h"
 #include "camera_access_interface.h"
 #include "editor_moving_tool.h"
+#include "utils.h"
 
 // Next:
 // + particle pivot parameter
@@ -22,14 +23,6 @@ namespace game {
         RANDOM = 1,   // a random point from start shape to a random point of the end shape
         SHUFFLED,     // a random point from start shape to the corresponding point of the end shape
         LINEAR,       // the i-th point from start shape to the corresponding point of the end shape
-    };
-    struct RandomSource {
-        RandomSource() {}
-        RandomSource(std::uint64_t seed, std::uint64_t seq);
-        std::uint32_t getNextRandom();
-        
-        std::uint64_t _state = 0;
-        std::uint64_t _inc = 0;
     };
     struct Graph {
         Graph(float absMin, float absMax, float maxSpread, float defaultValue);
@@ -95,7 +88,7 @@ namespace game {
         bool _isLooped = true;
         
         std::size_t _randomSeed = 100;
-        RandomSource _shapeGetRandom;
+        editor::RandomSource _shapeGetRandom;
 
         ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
         Shape _startShape = {Shape::Type::DISK, false, {0.0f, 0.0f, 0.0f}};

@@ -101,7 +101,16 @@ namespace game {
             dtSec = 0.0f;
         }
         for (auto &item : _nodes) {
-            item.second->update(dtSec);
+            if (auto selected = _currentNode.lock()) {
+                if (item.second.get() == selected.get()) {
+                    item.second->update(dtSec);
+                }
+            }
+            else {
+                if (_doUpdateEveryFrame) {
+                    item.second->update(dtSec);
+                }
+            }
         }
     }
     

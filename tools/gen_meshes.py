@@ -7,7 +7,8 @@ Format:
 1 uint32 - 127 (0x7f)
 1 uint32 - flags (0x0)
 3 uint32 - size (x, y, z)
-3 float  - origin voxel offset (x, y, z)
+1 uint32 - N
+N uint8  - description as string + zero at the end
 1 uint32 - frame count
 1 uint32 - voxel count in frame
 voxels
@@ -79,15 +80,10 @@ def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) 
 
 def convert_vox(src: str, cfg: str, dst: str, opt: int):
     print("---- ", src)
-    offsetX = 0
-    offsetY = 0
-    offsetZ = 0
+    cfgstring = ""
     try:
         with open(cfg, "r", encoding="utf-8") as cfg_file:
             cfgstring = cfg_file.read()
-            match = re.search(r'offset\s*:\s*vector3f\s*=\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)', cfgstring)
-            if match:
-                offsetX, offsetY, offsetZ = (float(v) for v in match.groups())
     except OSError as e:
         pass
     
@@ -134,7 +130,11 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
 
             dst_file.write(b'VOX \x7f\0\0\0\0\0\0\0')
             dst_file.write(struct.pack("<iii", sx, sy, sz))
-            dst_file.write(struct.pack("<fff", offsetX, offsetY, offsetZ))
+
+            # description
+            dst_file.write(struct.pack("<i", len(cfgstring) + 1))
+            dst_file.write(cfgstring.encode('utf-8') + b'\x00')
+
             dst_file.write(struct.pack("<i", frame_count))
 
             for i in range(0, frame_count):

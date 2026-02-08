@@ -10,6 +10,24 @@ import argparse
 
 from array import array
 
+def srgb_to_linear(c):
+    c = c / 255.0
+    if c <= 0.04045:
+        return c / 12.92
+    else:
+        return ((c + 0.055) / 1.055) ** 2.4
+
+def linear_to_srgb(c):
+    c = c / 255.0
+    if c <= 0.0031308:
+        c = 12.92 * c
+    else:
+        c = 1.055 * (c ** (1 / 2.4)) - 0.055
+    return c
+
+def linear_to_linear(c):
+    return c / 255.0
+
 def main(src: str, dst: str):
     src = os.path.abspath(src)
     dst = os.path.abspath(dst)
@@ -29,7 +47,10 @@ def main(src: str, dst: str):
                 pixel_end = i * 4 + 4
                 c = src_img[pixel_start:pixel_end]
                 f.write("        ".encode("utf-8"))
-                f.write("0x{:02x}{:02x}{:02x}{:02x},\r\n".format(c[3], c[2], c[1], c[0]).encode("utf-8"))
+                lr = int(linear_to_linear(c[0]) * 255.0)
+                lg = int(linear_to_linear(c[1]) * 255.0)
+                lb = int(linear_to_linear(c[2]) * 255.0)
+                f.write("0x{:02x}{:02x}{:02x}{:02x},\r\n".format(c[3], lb, lg, lr).encode("utf-8"))
 
         except (Exception,) as e:
             print("---- Error: '{}'".format(e))

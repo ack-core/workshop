@@ -4,18 +4,19 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
-        {"meshes/stool", { 5, 0, 0 }},
-        {"meshes/proto/16x16", { 16, 0, 0 }},
-        {"meshes/proto/5x8x5", { 5, 0, 0 }},
-        {"meshes/proto/32x32", { 32, 0, 0 }},
-        {"meshes/proto/8x8x8", { 8, 0, 0 }},
-        {"meshes/proto/64x64", { 64, 0, 0 }},
-        {"meshes/proto/17x24x17", { 17, 0, 0 }},
-        {"meshes/proto/48x48", { 48, 0, 0 }},
-        {"meshes/proto/24x24", { 24, 0, 0 }},
-        {"meshes/proto/9x16x9", { 9, 0, 0 }},
-        {"meshes/test/ruins", { 40, 0, 0 }},
-        {"meshes/test/pillon", { 8, 1077936128, 0 }},
-        {"meshes/test/tree", { 8, 0, 0 }},
+        {"meshes/stool", { 5, 1, 256 }},
+        {"meshes/knight", { 15, 151, 1835626081 }},
+        {"meshes/proto/16x16", { 16, 1, 256 }},
+        {"meshes/proto/5x8x5", { 5, 1, 256 }},
+        {"meshes/proto/32x32", { 32, 1, 256 }},
+        {"meshes/proto/8x8x8", { 8, 1, 256 }},
+        {"meshes/proto/64x64", { 64, 1, 256 }},
+        {"meshes/proto/17x24x17", { 17, 1, 256 }},
+        {"meshes/proto/48x48", { 48, 1, 256 }},
+        {"meshes/proto/24x24", { 24, 1, 256 }},
+        {"meshes/proto/9x16x9", { 9, 1, 256 }},
+        {"meshes/test/ruins", { 40, 1, 256 }},
+        {"meshes/test/pillon", { 8, 49, 1936090735 }},
+        {"meshes/test/tree", { 8, 1, 256 }},
     };
 }
