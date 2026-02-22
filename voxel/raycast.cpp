@@ -8,13 +8,13 @@ namespace voxel {
         ~RaycastInterfaceImpl() override {}
         
     public:
-        auto addSphereMesh(const std::vector<math::vector4f> &data) -> MeshPtr override {
-            return nullptr;
-        }
-        auto addTriangleMesh(const std::vector<math::vector3f> &vtx, const std::vector<std::uint16_t> &idx) -> MeshPtr override {
-            return nullptr;
+        auto addMesh(const util::Description &desc) -> MeshPtr override {
+            return {};
         }
         bool sphereCast(const math::vector3f &start, const math::vector3f &target, float radius, float length) const override {
+            return false;
+        }
+        bool rayCast(const math::vector3f &start, const math::vector3f &target, float length) const override {
             return false;
         }
 

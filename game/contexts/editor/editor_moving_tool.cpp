@@ -14,7 +14,7 @@ namespace game {
     MovingTool::MovingTool(const API &api, const CameraAccessInterface &cameraAccess, math::vector3f &target, float size)
     : _api(api)
     , _cameraAccess(cameraAccess)
-    , _target(target)
+    , _target(&target)
     , _toolSize(size)
     {
         const float currentToolSize = _cameraAccess.getOrbitSize() / 10.0f * _toolSize;
@@ -40,7 +40,7 @@ namespace game {
                 minDistance = std::numeric_limits<float>::max();
 
                 for (std::uint32_t i = 0; i < 3; i++) {
-                    const float dist = math::distanceRayLine(camPosition, cursorDir, _base + _target, _base + _target + currentToolSize * lineDirs[i]);
+                    const float dist = math::distanceRayLine(camPosition, cursorDir, _base + *_target, _base + *_target + currentToolSize * lineDirs[i]);
                     if (dist < minDistance) {
                         minDistance = dist;
                         index = i;
@@ -53,26 +53,26 @@ namespace game {
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::START) {
                     _capturedLineIndex = index;
                     _capturedPointerId = args.pointerID;
-                    _capturedPosition = _target;
-                    _capturedMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _base + _target, lineDirs[_capturedLineIndex]).y;
+                    _capturedPosition = *_target;
+                    _capturedMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _base + *_target, lineDirs[_capturedLineIndex]).y;
                     return true;
                 }
             }
             if (args.type == foundation::PlatformPointerEventArgs::EventType::MOVE) {
                 if (_capturedPointerId == args.pointerID) {
                     const float lineMovingKoeff = math::nearestKoeffsRayRay(camPosition, cursorDir, _base + _capturedPosition, lineDirs[_capturedLineIndex]).y;
-                    _target = _capturedPosition + (lineMovingKoeff - _capturedMovingKoeff) * lineDirs[_capturedLineIndex];
+                    *_target = _capturedPosition + (lineMovingKoeff - _capturedMovingKoeff) * lineDirs[_capturedLineIndex];
                     
                     if (_useGrid) {
-                        _target.x = std::floor(_target.x);
-                        _target.y = std::floor(_target.y);
-                        _target.z = std::floor(_target.z);
+                        _target->x = std::floor(_target->x);
+                        _target->y = std::floor(_target->y);
+                        _target->z = std::floor(_target->z);
                     }
                     
-                    _lineset->setPosition(_base + _target);
+                    _lineset->setPosition(_base + *_target);
                     
                     if (_editorMsg.size()) {
-                        _api.platform->sendEditorMsg(_editorMsg, util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
+                        _api.platform->sendEditorMsg(_editorMsg, util::strstream::ftos(_target->x) + " " + util::strstream::ftos(_target->y) + " " + util::strstream::ftos(_target->z));
                     }
                     
                     return true;
@@ -94,26 +94,30 @@ namespace game {
         _api.platform->removeEventHandler(_token);
     }
     
+    void MovingTool::setTarget(math::vector3f &target) {
+        _target = &target;
+        _lineset->setPosition(_base + *_target);
+    }
     void MovingTool::setPosition(const math::vector3f &position) {
-        _target = position;
-        _lineset->setPosition(_base + _target);
+        *_target = position;
+        _lineset->setPosition(_base + *_target);
     }
     void MovingTool::setUseGrid(bool useGrid) {
         _useGrid = useGrid;
     }
     void MovingTool::setEditorMsg(const char *editorMsg) {
         _editorMsg = editorMsg;
-        _api.platform->sendEditorMsg(_editorMsg, util::strstream::ftos(_target.x) + " " + util::strstream::ftos(_target.y) + " " + util::strstream::ftos(_target.z));
+        _api.platform->sendEditorMsg(_editorMsg, util::strstream::ftos(_target->x) + " " + util::strstream::ftos(_target->y) + " " + util::strstream::ftos(_target->z));
     }
     void MovingTool::setBase(const math::vector3f &base) {
         _base = base;
-        _lineset->setPosition(_base + _target);
+        _lineset->setPosition(_base + *_target);
     }
     void MovingTool::setOnDragEnd(util::callback<void()> &&handler) {
         _onDragEnd = std::move(handler);
     }
     const math::vector3f &MovingTool::getPosition() const {
-        return _target;
+        return *_target;
     }
     bool MovingTool::isDragging() const {
         return _capturedPointerId != foundation::INVALID_POINTER_ID;

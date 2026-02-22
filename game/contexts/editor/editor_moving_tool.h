@@ -10,6 +10,7 @@ namespace game {
         MovingTool(const API &api, const CameraAccessInterface &cameraAccess, math::vector3f &target, float size);
         ~MovingTool();
         
+        void setTarget(math::vector3f &target);
         void setPosition(const math::vector3f &position);
         void setUseGrid(bool useGrid);
         void setEditorMsg(const char *editorMsg);
@@ -25,7 +26,7 @@ namespace game {
         voxel::SceneInterface::LineSetPtr _lineset;
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         util::callback<void()> _onDragEnd;
-        math::vector3f &_target;
+        math::vector3f *_target = nullptr;
         math::vector3f _base = {0, 0, 0};
         std::string _editorMsg;
         std::size_t _capturedPointerId = foundation::INVALID_POINTER_ID;

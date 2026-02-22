@@ -20,6 +20,8 @@ namespace game {
         math::vector3f _orbit = { 45, 45, 45 };
         
         voxel::SceneInterface::LineSetPtr _axis;
+        voxel::SceneInterface::OctahedronPtr _point;
+        voxel::SceneInterface::BoundingSpherePtr _bsphere;
         voxel::WorldInterface::ObjectPtr _object;
         
     };

@@ -118,15 +118,17 @@ namespace resource {
         void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
-
+        void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) override;
+        
         auto getPrefab(const char *prefabPath) -> util::Description override;
         
         void removeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
         void removeGround(const char *groundPath) override;
         void removeEmitter(const char *configPath) override;
+        void removeDescription(const char *descPath) override;
         void reloadPrefabs(util::callback<void()> &&completion) override;
-
+        
         void update(float dtSec) override;
         
     private:
@@ -140,7 +142,6 @@ namespace resource {
         struct VoxelMesh {
             std::vector<foundation::RenderDataPtr> frames;
             util::Description description;
-            //math::vector3f originOffset;
             bool outdated = false;
         };
         struct GroundMesh {
@@ -154,12 +155,17 @@ namespace resource {
             foundation::RenderTexturePtr texture;
             bool outdated = false;
         };
+        struct Description {
+            util::Description desc;
+            bool outdated = false;
+        };
         
         std::unordered_map<std::string, TextureData> _textures;
         std::unordered_map<std::string, VoxelMesh> _meshes;
         std::unordered_map<std::string, GroundMesh> _grounds;
         std::unordered_map<std::string, Emitter> _emitters;
-        
+        std::unordered_map<std::string, Description> _descriptions;
+
         std::unordered_map<std::string, util::Description> _prefabs;
         
         struct QueueEntryTexture {
@@ -178,11 +184,16 @@ namespace resource {
             std::string descPath;
             util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> callback;
         };
-        
+        struct QueueEntryDescription {
+            std::string descPath;
+            util::callback<void(const util::Description &)> callback;
+        };
+
         std::list<QueueEntryTexture> _callsQueueTexture;
         std::list<QueueEntryMesh> _callsQueueMesh;
         std::list<QueueEntryGround> _callsQueueGround;
         std::list<QueueEntryEmitter> _callsQueueEmitter;
+        std::list<QueueEntryDescription> _callsQueueDescription;
 
         bool _asyncInProgress;
     };
@@ -543,7 +554,50 @@ namespace resource {
         }
 
     }
+    
+    void ResourceProviderImpl::getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) {
+        if (_asyncInProgress) {
+            _callsQueueDescription.emplace_back(QueueEntryDescription {
+                .descPath = descPath,
+                .callback = std::move(completion)
+            });
+            
+            return;
+        }
+        
+        std::string path = std::string(descPath);
 
+        auto index = _descriptions.find(path);
+        if (index != _descriptions.end() && index->second.outdated == false) {
+            completion(index->second.desc);
+        }
+        else {
+            _asyncInProgress = true;
+            _platform->loadFile((path + ".txt").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
+                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                    self->_asyncInProgress = false;
+                    if (len) {
+                        util::Description desc = util::Description::parse(mem.get(), len);
+                        
+                        if (desc.empty() == false) {
+                            self->_descriptions.erase(path);
+                            const util::Description &result = self->_descriptions.emplace(path, Description{ std::move(desc), false }).first->second.desc;
+                            completion(result);
+                        }
+                        else {
+                            self->_platform->logError("[ResourceProviderImpl::getOrLoadDescription] '%s' is not a valid description", path.data());
+                            completion({});
+                        }
+                    }
+                    else {
+                        self->_platform->logError("[ResourceProviderImpl::getOrLoadEmitter] Unable to find file '%s'", path.data());
+                        completion({});
+                    }
+                }
+            });
+        }
+    }
+    
     util::Description ResourceProviderImpl::getPrefab(const char *prefabPath) {
         auto index = _prefabs.find(prefabPath);
         if (index != _prefabs.end()) {
@@ -580,6 +634,12 @@ namespace resource {
             index->second.outdated = true;
         }
     }
+    void ResourceProviderImpl::removeDescription(const char *descPath) {
+        auto index = _descriptions.find(descPath);
+        if (index != _descriptions.end()) {
+            index->second.outdated = true;
+        }
+    }
     void ResourceProviderImpl::reloadPrefabs(util::callback<void()> &&completion) {
         _platform->loadFile(resource::PREFAB_BIN, [this, cb = std::move(completion)](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
             if (prefabsSize && readPrefabs(_prefabs, prefabsData.get())) {
@@ -612,6 +672,11 @@ namespace resource {
             QueueEntryEmitter &entry = _callsQueueEmitter.front();
             getOrLoadEmitter(entry.descPath.data(), std::move(entry.callback));
             _callsQueueEmitter.pop_front();
+        }
+        while (_asyncInProgress == false && _callsQueueDescription.size()) {
+            QueueEntryDescription &entry = _callsQueueDescription.front();
+            getOrLoadDescription(entry.descPath.data(), std::move(entry.callback));
+            _callsQueueDescription.pop_front();
         }
     }
 }

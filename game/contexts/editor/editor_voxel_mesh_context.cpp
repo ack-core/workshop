@@ -35,6 +35,7 @@ namespace game {
         _handlers["editor.reloadResources"] = &EditorVoxelMeshContext::_reload;
         _handlers["editor.mesh.offset"] = &EditorVoxelMeshContext::_meshOffset;
         _handlers["editor.resource.save"] = &EditorVoxelMeshContext::_save;
+        _handlers["editor.mesh.animationAdd"] = &EditorVoxelMeshContext::_animationAdd;
         _handlers["editor.mesh.animationRemoved"] = &EditorVoxelMeshContext::_animationRemoved;
         _handlers["editor.mesh.animationSelected"] = &EditorVoxelMeshContext::_animationSelected;
         _handlers["editor.mesh.animationParameters"] = &EditorVoxelMeshContext::_animationParameters;
@@ -117,7 +118,6 @@ namespace game {
             node->mesh->resetOffset();
             node->animations.clear();
             _currentAnimation = "";
-            _currentAnimationTime.reset();
             return true;
         }
         return false;
@@ -167,7 +167,7 @@ namespace game {
             const math::vector3f off = node->mesh->getCenterOffset();
             const std::string extPath = node->resourcePath + ".txt";
             
-            if (std::fabs(off.x) + std::fabs(off.y) + std::fabs(off.z) > std::numeric_limits<float>::epsilon()) {
+            if (std::fabs(off.x) + std::fabs(off.y) + std::fabs(off.z) > std::numeric_limits<float>::epsilon() || node->animations.empty() == false) {
                 util::Description desc;
                 desc.setVector3f("offset", math::vector3f(off.x, off.y, off.z));
                 util::Description *anims = desc.setDescription("animations");
@@ -198,6 +198,18 @@ namespace game {
             params += std::to_string(anim->second.x) + " " + std::to_string(anim->second.y) + " " + std::to_string(anim->second.z);
             _api.platform->sendEditorMsg("engine.mesh.animationUpdate", params);
         }
+    }
+    bool EditorVoxelMeshContext::_animationAdd(const std::string &data) {
+        std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());
+        if (node) {
+            const std::string rndName = editor::getRandomName();
+            node->animations.emplace(rndName, math::vector3i(0, 0, 100));
+            _currentAnimation = rndName;
+            _currentAnimationTime.reset();
+            _api.platform->sendEditorMsg("engine.mesh.animationUpdate", rndName + " 0 0 100 new");
+            return true;
+        }
+        return false;
     }
     bool EditorVoxelMeshContext::_animationSelected(const std::string &data) {
         std::shared_ptr<EditorNodeVoxelMesh> node = std::dynamic_pointer_cast<EditorNodeVoxelMesh>(_nodeAccess.getSelectedNode().lock());

@@ -46,6 +46,10 @@ namespace game {
         bool _doUpdateEveryFrame = false;
         bool _isEditing = false;
         
+        voxel::SceneInterface::OctahedronPtr _point;
+        voxel::SceneInterface::BoundingSpherePtr _bsphere;
+
+        
     private:
         std::unique_ptr<MovingTool> _makeMovingTool(math::vector3f &target);
         

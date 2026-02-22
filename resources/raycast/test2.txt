@@ -1,0 +1,3 @@
+point : vector3f = 0.0000 0.0000 0.0000
+size : vector3f = 10.0000 1.0000 10.0000
+type : integer = 2

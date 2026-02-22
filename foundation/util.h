@@ -278,6 +278,8 @@ namespace util {
         Description() {}
         
         using multimap::empty;
+        using multimap::size;
+        using multimap::clear;
         using multimap::begin;
         using multimap::end;
         using multimap::find;
@@ -335,7 +337,9 @@ namespace util {
             return nullptr;
         }
         auto getIntegers() const -> std::unordered_map<std::string, std::int64_t> { return _getAllValues<std::int64_t>(); }
+        auto getIntegers(const char *name) const -> std::vector<std::int64_t> { return _getAllValues<std::int64_t>(name); }
         auto getNumbers() const -> std::unordered_map<std::string, double> { return _getAllValues<double>(); }
+        auto getNumbers(const char *name) const -> std::vector<double> { return _getAllValues<double>(name); }
         auto getStrings() const -> std::unordered_map<std::string, std::string> { return _getAllValues<std::string>(); }
         auto getStrings(const char *name) const -> std::vector<std::string> { return _getAllValues<std::string>(name); }
         auto getVector2fs() const -> std::unordered_map<std::string, math::vector2f> { return _getAllValues<math::vector2f>(); }

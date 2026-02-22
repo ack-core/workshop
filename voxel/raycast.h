@@ -3,9 +3,17 @@
 #include <memory>
 #include "foundation/math.h"
 #include "foundation/platform.h"
+#include "foundation/util.h"
 
 namespace voxel {
     class RaycastInterface {
+    public:
+        enum class ShapeType {
+            SPHERES = 1,
+            BOXES,
+            TRIANGLES
+        };
+        
     public:
         static std::shared_ptr<RaycastInterface> instance(
           const foundation::PlatformInterfacePtr &platform
@@ -20,8 +28,8 @@ namespace voxel {
         using MeshPtr = std::shared_ptr<Mesh>;
         
     public:
-        virtual auto addSphereMesh(const std::vector<math::vector4f> &data) -> MeshPtr = 0;
-        virtual auto addTriangleMesh(const std::vector<math::vector3f> &vtx, const std::vector<std::uint16_t> &idx) -> MeshPtr = 0;
+        virtual auto addMesh(const util::Description &desc) -> MeshPtr = 0;
+        virtual bool rayCast(const math::vector3f &start, const math::vector3f &target, float length) const = 0;
         virtual bool sphereCast(const math::vector3f &start, const math::vector3f &target, float radius, float length) const = 0;
         
     public:

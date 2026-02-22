@@ -3,6 +3,7 @@
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
 
+// TODO: only texture lists needed. Remove all others
 namespace resource {
     inline const char *PREFAB_BIN = "prefabs.bin";
 
@@ -75,7 +76,13 @@ namespace resource {
         // @return - description to construct emitter or nullptrs. It's ok to return map and texture == nullptr - usable for editors
         //
         virtual void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
-        
+
+        // Asynchronously Load description from txt file if it isn't loaded yet
+        // @descPath - path to file without extension
+        // @return - description (could be empty if nothing loaded)
+        //
+        virtual void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) = 0;
+
         // Get prefab description. All prefabs are loaded synchronously at start
         // @prefabPath - path without extension
         //
@@ -87,6 +94,7 @@ namespace resource {
         virtual void removeMesh(const char *meshPath) = 0;
         virtual void removeGround(const char *groundPath) = 0;
         virtual void removeEmitter(const char *configPath) = 0;
+        virtual void removeDescription(const char *descPath) = 0;
         virtual void reloadPrefabs(util::callback<void()> &&completion) = 0;
 
         // Provider tracks resources life time and tries to free them

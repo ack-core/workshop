@@ -1,0 +1,3 @@
+point : vector3f[2] = 0.0000 0.0000 0.0000  0.0000 4.2000 0.0000
+radius : number[2] = 5.0000  3.0000
+type : integer = 1

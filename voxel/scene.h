@@ -42,8 +42,18 @@ namespace voxel {
             virtual void capLineCount(std::uint32_t limit) = 0;
             virtual ~LineSet() = default;
         };
+        struct Octahedron {
+            virtual void setPositionAndRadius(const math::vector4f &arg) = 0;
+            virtual void setColor(const math::color &rgba) = 0;
+            virtual ~Octahedron() = default;
+        };
+        struct BoundingSphere {
+            virtual void setPositionAndRadius(const math::vector4f &arg) = 0;
+            virtual void setColor(const math::color &rgba) = 0;
+            virtual ~BoundingSphere() = default;
+        };
         struct BoundingBox {
-            virtual void setBBoxData(const math::bound3f &bbox) = 0;
+            virtual void setBBox(const math::bound3f &bbox) = 0;
             virtual void setColor(const math::color &rgba) = 0;
             virtual ~BoundingBox() = default;
         };
@@ -73,6 +83,8 @@ namespace voxel {
         };
         
         using LineSetPtr = std::shared_ptr<LineSet>;
+        using OctahedronPtr = std::shared_ptr<Octahedron>;
+        using BoundingSpherePtr = std::shared_ptr<BoundingSphere>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using VoxelMeshPtr = std::shared_ptr<VoxelMesh>;
         using TexturedMeshPtr = std::shared_ptr<TexturedMesh>;
@@ -84,7 +96,9 @@ namespace voxel {
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
         virtual auto addLineSet() -> LineSetPtr = 0;
-        virtual auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr = 0;
+        virtual auto addOctahedron(const math::vector4f &args, const math::color &rgba) -> OctahedronPtr = 0;
+        virtual auto addBoundingSphere(const math::vector4f &args, const math::color &rgba) -> BoundingSpherePtr = 0;
+        virtual auto addBoundingBox(const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
         virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;

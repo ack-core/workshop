@@ -1,0 +1,2 @@
+type : integer = 2 
+point : vector3f[1] = 0.0 0.0 0.0size : vector3f[1] =  1.0 1.0 1.0

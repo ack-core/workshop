@@ -46,6 +46,7 @@ namespace game {
         bool _meshOffset(const std::string &data);
         bool _save(const std::string &data);
         void _sendCurrentAnimParams(const EditorNodeVoxelMesh &node);
+        bool _animationAdd(const std::string &data);
         bool _animationSelected(const std::string &data);
         bool _animationRemoved(const std::string &data);
         bool _animationParameters(const std::string &data);

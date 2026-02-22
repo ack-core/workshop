@@ -4,6 +4,7 @@ import socketserver
 import ssl
 import os
 import sys
+import shutil
 
 binaryRoot = os.path.dirname(os.path.abspath(__file__))
 resourcesRoot = os.path.normpath(binaryRoot + "/../resources")
@@ -44,6 +45,8 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
             gen_meshes.main(resourcesRoot + "/meshes", binaryRoot + "/data/meshes", 1)
             gen_emitters.main(resourcesRoot + "/emitters", binaryRoot + "/data/emitters")
             gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")
+            print("Copying raycast dir")
+            shutil.copytree(resourcesRoot + "/raycast", binaryRoot + "/data/raycast", dirs_exist_ok = True)
             print("Finished")
 
             self.send_response(200)

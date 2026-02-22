@@ -621,7 +621,6 @@ namespace game {
                 node->endShapeOffset = node->currentDesc->getVector3f("endShapeOffset", {});
                 
                 _endShapeTool = std::make_unique<MovingTool>(_api, _cameraAccess, node->endShapeOffset, 0.4f);
-                _endShapeTool->setEditorMsg("engine.endShapeOffset");
                 _endShapeTool->setOnDragEnd([this] {
                     this->_endShapeDragFinished();
                 });

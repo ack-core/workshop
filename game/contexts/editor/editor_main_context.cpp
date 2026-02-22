@@ -59,6 +59,10 @@ namespace game {
         _axis->setLine(4, {10, 0, -10}, {10, 0, 10}, {0.3, 0.3, 0.3, 0.6});
         _axis->setLine(5, {10, 0, 10}, {-10, 0, 10}, {0.3, 0.3, 0.3, 0.6});
         _axis->setLine(6, {-10, 0, 10}, {-10, 0, -10}, {0.3, 0.3, 0.3, 0.6});
+        
+//        _point = _api.scene->addOctahedron({10, 0, 0, 5}, {1, 1, 0, 1});
+//        _bsphere = _api.scene->addBoundingSphere({-10, 0, 0, 10}, {1, 0, 1, 1});
+
     }
     
     EditorMainContext::~EditorMainContext() {

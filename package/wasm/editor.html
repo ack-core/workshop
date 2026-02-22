@@ -156,7 +156,7 @@
             },
             listFilesInDirectory: async function(baseDirName, dirHandle, ext) {
                 var result = [];
-                for await (const value of dirHandle.values()) {                    
+                for await (const value of dirHandle.values()) {
                     if (value.kind == "directory") {
                         subDirHandle = await dirHandle.getDirectoryHandle(value.name);
                         result = result.concat(await utility.listFilesInDirectory(baseDirName + '/' + value.name, subDirHandle, ext));
@@ -208,7 +208,7 @@
                         uiNodeTree.data.add({id: current, value: node, open: true}, -1, lastParent );
                     }
                     if (lastParent) {
-                        uiNodeTree.open(lastParent);                        
+                        uiNodeTree.open(lastParent);
                     }
                     lastParent = current;
                 });
@@ -392,7 +392,7 @@
                             if (!uiResourceList.exists(newPath)) {
                                 uiResourceList.add({ id: newPath, value: newPath });
                             }
-                            uiEditor.sendMsg("editor.reloadResources", newPath);
+                            $$("processing_popup").hide();
                         });
                     });
                 }
@@ -557,18 +557,17 @@
                 uiEditor.sendMsg("editor.mesh.offset", args);
             };
             uiBindings.meshAddAnimation = function(e) {
-                const list = $$("inspect_mesh_anim_list");
-                const newName = utility.getRandomName();
-                list.add({ id: newName, value: newName });
-                list.select(newName);
+                uiEditor.sendMsg("editor.mesh.animationAdd", "");
             };
             uiBindings.meshRemoveAnimation = function(e) {
                 const list = $$("inspect_mesh_anim_list");
                 const id = list.getSelectedId();
-                list.remove(id);
-                utility.setElementValue("inspect_mesh_anim_name", "");
-                uiEditor.sendMsg("editor.mesh.animationRemoved", id);
-                list.select(list.getFirstId());
+                if (list.exists(id)) {
+                    list.remove(id);
+                    utility.setElementValue("inspect_mesh_anim_name", "");
+                    uiEditor.sendMsg("editor.mesh.animationRemoved", id);
+                    list.select(list.getFirstId());
+                }
             };
             uiBindings.meshAnimationParameters = function(e, nv, old) {
                 let args = $$("inspect_mesh_anim_name").getValue() + " " + $$("inspect_mesh_anim_first").getValue() + " ";
@@ -652,7 +651,7 @@
                 if (oldName != name) {
                     list.blockEvent();
                     if (list.exists(oldName)) {
-                        list.remove(oldName);                        
+                        list.remove(oldName);
                     }
                     list.add({ id: name, value: name });
                     list.select(name);
@@ -920,7 +919,8 @@
         function registerRaycastShapeResource() {
             const uiRaycastShapeTypes = [
                 { id: 1, value: "Sphere shape approx"}, 
-                { id: 2, value: "Convex triangle shape"}
+                { id: 2, value: "Boxes shape approx"},
+                { id: 3, value: "Convex triangle shape"}
             ];
 
             listResFunctions.push(async function() {
@@ -931,6 +931,29 @@
             uiInspectMappingEdit["inspect_raycast"] = ["raycast_edit_0"];
             resourcesExtMapping["inspect_raycast"] = [".txt"];
 
+            uiBindings.raycastPointType = function(e, nv, old) {
+                uiEditor.sendMsg("editor.raycast.pointType", nv);
+                $$("inspect_raycast_shape_pointlist").clearAll();
+            };
+            uiBindings.raycastAddPoint = function(e) {
+                uiEditor.sendMsg("editor.raycast.pointAdd", "");
+            };
+            uiBindings.raycastRemovePoint = function(e) {
+                const list = $$("inspect_raycast_shape_pointlist");
+                const id = list.getSelectedId();
+                if (list.exists(id)) {
+                    list.remove(id);
+                    uiEditor.sendMsg("editor.raycast.pointRemove", id);
+                    list.select(list.getFirstId());
+                }
+            };
+            uiBindings.raycastPointArgs = function(e, nv, old) {
+                let args = $$("inspect_raycast_shape_point_x").getValue() + " " + $$("inspect_raycast_shape_point_y").getValue() + " ";
+                args += $$("inspect_raycast_shape_point_z").getValue() + " " + $$("inspect_raycast_shape_arg_x").getValue() + " ";
+                args += $$("inspect_raycast_shape_arg_y").getValue() + " " + $$("inspect_raycast_shape_arg_z").getValue();
+                uiEditor.sendMsg("editor.raycast.pointArgs", args);
+            };
+
             $$("add_node_menu").add({ id: "20", value: "Add Raycast Shape" });
             $$("inspect_panel").addView({
                 id: "raycast_edit_0", view: "accordionitem", hidden: true, header: "Edit Raycast Shape", headerHeight: 10, headerAltHeight: 10,
@@ -940,29 +963,37 @@
                     rows: [
                         {cols: [
                             elements.label("Shape type:"), {},
-                            elements.combo("inspect_raycast_shape_type", 1, uiRaycastShapeTypes, 160)
+                            elements.combo("inspect_raycast_shape_type", 1, uiRaycastShapeTypes, 160, uiBindings.raycastPointType)
                         ]},
                         {cols: [
-                            elements.label("Coord/Arg:"),
+                            elements.label("Coordinates:"),
                             {},
-                            elements.number("inspect_raycast_shape_point_x", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0),
-                            elements.number("inspect_raycast_shape_point_y", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0),
-                            elements.number("inspect_raycast_shape_point_z", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0),
-                            elements.number("inspect_raycast_shape_point_w", null, 44, "111.0", 0.0, 0.1, -999.0, 999.0)
+                            elements.number("inspect_raycast_shape_point_x", null, 54, "111.0", 0.0, 0.1, -999.0, 999.0, uiBindings.raycastPointArgs),
+                            elements.number("inspect_raycast_shape_point_y", null, 54, "111.0", 0.0, 0.1, -999.0, 999.0, uiBindings.raycastPointArgs),
+                            elements.number("inspect_raycast_shape_point_z", null, 54, "111.0", 0.0, 0.1, -999.0, 999.0, uiBindings.raycastPointArgs)
+                        ]},
+                        {cols: [
+                            elements.label("Args:"),
+                            {},
+                            elements.number("inspect_raycast_shape_arg_x", null, 54, "111.0", 0.0, 0.1, 0.0, 999.0, uiBindings.raycastPointArgs),
+                            elements.number("inspect_raycast_shape_arg_y", null, 54, "111.0", 0.0, 0.1, 0.0, 999.0, uiBindings.raycastPointArgs),
+                            elements.number("inspect_raycast_shape_arg_z", null, 54, "111.0", 0.0, 0.1, 0.0, 999.0, uiBindings.raycastPointArgs)
                         ]},
                         {
                             css: {"margin-top": "3px !important"},
                             cols: [
                                 {rows: [
-                                    elements.list("inspect_raycast_shape_pointlist", 200),
+                                    elements.list("inspect_raycast_shape_pointlist", 200, (obj, id) => { 
+                                        uiEditor.sendMsg("editor.raycast.pointSelected", id);
+                                    }),
                                     { height: 16 }
                                 ]},
                                 {
                                     width: 28,
                                     css: {"margin-left": "3px !important"},
                                     rows: [
-                                        elements.button("\u2795", "Add point"),
-                                        elements.button("\u274C", "Delete point")
+                                        elements.button("\u2795", "Add point", uiBindings.raycastAddPoint),
+                                        elements.button("\u274C", "Delete point", uiBindings.raycastRemovePoint)
                                     ]
                                 }
                             ]
@@ -972,9 +1003,36 @@
                 }
             });
 
+            uiEditor["engine.raycast.pointUpdate"] = function(data) {
+                const list = $$("inspect_raycast_shape_pointlist");
+                const [id, x, y, z, argx, argy, argz, isNew] = data.split(' ');
+                const oldId = isNew == "new" ?  "" : list.getSelectedId();
+
+                list.blockEvent();
+                if (oldId != id) {
+                    if (list.exists(oldId)) {
+                        list.remove(oldId);
+                    }
+                    list.add({ id: id, value: x + " " + y + " " + z });                    
+                }
+                else {
+                    list.updateItem(id, { value: x + " " + y + " " + z });
+                }
+                list.select(id);
+                list.unblockEvent();
+
+                utility.setElementValue("inspect_raycast_shape_point_x", x);
+                utility.setElementValue("inspect_raycast_shape_point_y", y);
+                utility.setElementValue("inspect_raycast_shape_point_z", z);
+                utility.setElementValue("inspect_raycast_shape_arg_x", argx);
+                utility.setElementValue("inspect_raycast_shape_arg_y", argy);
+                utility.setElementValue("inspect_raycast_shape_arg_z", argz);
+            }
             uiEditor["engine.raycast.editing"] = function(data) {
+                $$("inspect_raycast_shape_pointlist").clearAll();
                 $$("node_1_resource_list").hide();
                 $$("edit_resource_buttons").show();
+                utility.setElementValue("inspect_raycast_shape_type", data);
                 uiInspectMappingEdit["inspect_raycast"].forEach(item => {
                     $$(item).show();
                 });

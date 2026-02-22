@@ -51,7 +51,8 @@ namespace game {
         _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-
+        _point = _api.scene->addOctahedron({10, 0, 0, 5}, {1, 1, 0, 1});
+        _bsphere = _api.scene->addBoundingSphere({-10, 0, 0, 10}, {1, 0, 1, 1});
     }
     
     DebugContext::~DebugContext() {
@@ -59,23 +60,23 @@ namespace game {
     }
     
     void DebugContext::update(float dtSec) {
-        if (!dbg_switch && _object) {
-            _object->unloadResources();
-            _object = nullptr;
-        }
-        if (dbg_switch && !_object) {
-            _object = _api.world->createObject("player", "prefabs/ship");
-            _object->loadResources([](voxel::WorldInterface::Object &) {
-                printf("!!! completed !!!\n");
-            });
-        }
-        const math::transform3f trfm = math::transform3f({0, 1, 0}, dbg_rot);
-        if (_object) {
-            _object->setTransform(trfm);
-        }
-
+//        if (!dbg_switch && _object) {
+//            _object->unloadResources();
+//            _object = nullptr;
+//        }
+//        if (dbg_switch && !_object) {
+//            _object = _api.world->createObject("player", "prefabs/ship");
+//            _object->loadResources([](voxel::WorldInterface::Object &) {
+//                printf("!!! completed !!!\n");
+//            });
+//        }
+//        const math::transform3f trfm = math::transform3f({0, 1, 0}, dbg_rot);
+//        if (_object) {
+//            _object->setTransform(trfm);
+//        }
+//
         _api.scene->setCameraLookAt(_orbit + math::vector3f{0, 0, 0}, {0, 0, 0});
-        dbg_rot += dtSec;
-        printf("--->>> %f\n", dbg_rot);
+//        dbg_rot += dtSec;
+//        printf("--->>> %f\n", dbg_rot);
     }
 }

@@ -238,11 +238,21 @@ namespace util {
                         
                         if (input >> type) {
                             type = extractNameAndCount(type, arrayCount);
-                            if (type == "integer" && input >> sequence("=") >> valueInt[0]) {
-                                result.emplace(std::make_pair(elementName, valueInt[0]));
+                            if (type == "integer" && input >> sequence("=")) {
+                                for (int i = 0; i < arrayCount; i++) {
+                                    if (input >> valueInt[0]) {
+                                        result.emplace(std::make_pair(elementName, valueInt[0]));
+                                    }
+                                    else return false;
+                                }
                             }
-                            else if (type == "number" && input >> sequence("=") >> valueFloat[0]) {
-                                result.emplace(std::make_pair(elementName, valueFloat[0]));
+                            else if (type == "number" && input >> sequence("=")) {
+                                for (int i = 0; i < arrayCount; i++) {
+                                    if (input >> valueFloat[0]) {
+                                        result.emplace(std::make_pair(elementName, valueFloat[0]));
+                                    }
+                                    else return false;
+                                }
                             }
                             else if (type == "bool" && input >> sequence("=") >> valueString) {
                                 result.emplace(std::make_pair(elementName, valueString == "true"));
@@ -330,7 +340,7 @@ namespace util {
                 auto accumulateOrPut = [&](const std::string &v, const std::string &key) {
                     if (next == desc.end() || next->first != index->first) {
                         if (arrayCount) {
-                            result += std::string(ident, ' ') + index->first + "[" + std::to_string(arrayCount + 1) + "] : " + key + " = " + arrayString + v + "\r\n";
+                            result += std::string(ident, ' ') + index->first + " : " + key + "[" + std::to_string(arrayCount + 1) + "] = " + arrayString + v + "\r\n";
                             arrayString.clear();
                             arrayCount = 0;
                         }
@@ -357,10 +367,10 @@ namespace util {
                     }
                     else {
                         if (const std::int64_t *v = std::get_if<std::int64_t>(&index->second)) {
-                            result += std::string(ident, ' ') + index->first + " : integer = " + std::to_string(*v) + "\r\n";
+                            accumulateOrPut(std::to_string(*v), "integer");
                         }
                         else if (const double *v = std::get_if<double>(&index->second)) {
-                            result += std::string(ident, ' ') + index->first + " : number = " + strstream::ftos(*v) + "\r\n";
+                            accumulateOrPut(strstream::ftos(*v), "number");
                         }
                         else if (const bool *v = std::get_if<bool>(&index->second)) {
                             result += std::string(ident, ' ') + index->first + " : bool = " + ((*v) ? "true\r\n" : "false\r\n");

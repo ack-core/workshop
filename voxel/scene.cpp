@@ -81,6 +81,51 @@ namespace voxel {
     };
     
     //---
+
+    struct OctahedronImpl : public SceneInterface::Octahedron {
+    public:
+        struct OctahedronData {
+            math::vector4f positionRadius;
+            math::color color;
+        }
+        octahedronData;
+
+    public:
+        void setPositionAndRadius(const math::vector4f &arg) override {
+            octahedronData.positionRadius = arg;
+        }
+        void setColor(const math::color &rgba) override {
+            octahedronData.color = rgba;
+        }
+    public:
+        OctahedronImpl(const math::vector4f& args, const math::color &rgba) : octahedronData{args, rgba} {}
+        ~OctahedronImpl() override {}
+    };
+    
+    //---
+    
+    struct BoundingSphereImpl : public SceneInterface::BoundingSphere {
+    public:
+        struct BSphereData {
+            math::vector4f positionRadius;
+            math::color color;
+        }
+        bsphereData;
+
+    public:
+        void setPositionAndRadius(const math::vector4f &arg) override {
+            bsphereData.positionRadius = arg;
+        }
+        void setColor(const math::color &rgba) override {
+            bsphereData.color = rgba;
+        }
+    public:
+        BoundingSphereImpl(const math::vector4f& args, const math::color &rgba) : bsphereData{args, rgba} {}
+        ~BoundingSphereImpl() override {}
+    };
+
+
+    //---
     
     class BoundingBoxImpl : public SceneInterface::BoundingBox {
     public:
@@ -92,7 +137,7 @@ namespace voxel {
         bboxData;
         
     public:
-        void setBBoxData(const math::bound3f &bbox) override {
+        void setBBox(const math::bound3f &bbox) override {
             bboxData.min = math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 1.0f);
             bboxData.max = math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 1.0f);
         }
@@ -101,8 +146,8 @@ namespace voxel {
         }
         
     public:
-        BoundingBoxImpl(const math::bound3f &bbox) : bboxData{math::color(1.0f, 1.0f, 1.0f, 1.0f)} {
-            setBBoxData(bbox);
+        BoundingBoxImpl(const math::bound3f &bbox, const math::color &rgba) : bboxData{rgba} {
+            setBBox(bbox);
         }
         ~BoundingBoxImpl() override {}
     };
@@ -313,7 +358,9 @@ namespace voxel {
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
         auto addLineSet() -> LineSetPtr override;
-        auto addBoundingBox(const math::bound3f &bbox) -> BoundingBoxPtr override;
+        auto addOctahedron(const math::vector4f &args, const math::color &rgba) -> OctahedronPtr override;
+        auto addBoundingSphere(const math::vector4f &args, const math::color &rgba) -> BoundingSpherePtr override;
+        auto addBoundingBox(const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
@@ -356,6 +403,8 @@ namespace voxel {
         foundation::RenderTexturePtr _palette;
         
         foundation::RenderShaderPtr _lineShader;
+        foundation::RenderShaderPtr _octahedronShader;
+        foundation::RenderShaderPtr _boundingSphereShader;
         foundation::RenderShaderPtr _boundingBoxShader;
         foundation::RenderShaderPtr _voxelMeshShader;
         foundation::RenderShaderPtr _texturedMeshShader;
@@ -365,6 +414,8 @@ namespace voxel {
         foundation::RenderShaderPtr _gbufferToScreenShader;
         
         std::vector<std::shared_ptr<LineSetImpl>> _lineSets;
+        std::vector<std::shared_ptr<OctahedronImpl>> _octahedrons;
+        std::vector<std::shared_ptr<BoundingSphereImpl>> _boundingSpheres;
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<VoxelMeshImpl>> _voxelMeshes;
         std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
@@ -417,6 +468,52 @@ namespace {
         }
         fssrc {
             output_color[0] = input_color;
+        }
+    )";
+    const char *g_octahedronShaderSrc = R"(
+        fixed {
+            lines[24] : float3 =
+                [0, -1, 0][-1, 0, 0][0, -1, 0][1, 0, 0][0, -1, 0][0, 0, -1][0, -1, 0][0, 0, 1]
+                [0, +1, 0][-1, 0, 0][0, +1, 0][1, 0, 0][0, +1, 0][0, 0, -1][0, +1, 0][0, 0, 1]
+                [-1, 0, 0][0, 0, -1][0, 0, -1][1, 0, 0][1, 0, 0][0, 0, 1][0, 0, 1][-1, 0, 0]
+        }
+        const {
+            position_radius : float4
+            color : float4
+        }
+        inout {
+            color : float4
+        }
+        vssrc {
+            float3 position = fixed_lines[repeat_ID] * const_position_radius.w;
+            output_position = _transform(float4(const_position_radius.xyz + position, 1.0), frame_plmVPMatrix);
+            output_color = const_color;
+        }
+        fssrc {
+            output_color[0] = const_color;
+        }
+    )";
+    const char *g_boundingSphereShaderSrc = R"(
+        fixed {
+            axis[3] : float4 = [1, 0, 0, 1][1, 0, 1, 0][0, 1, 0, 1]
+        }
+        const {
+            position_radius : float4
+            color : float4
+        }
+        inout {
+            color : float4
+        }
+        vssrc {
+            float  koeff = 2.0 * 3.14159265359 * float(repeat_ID) / 31.0;
+            float3 relPos = float3(0, 0, 0);
+            relPos.x = const_position_radius.w * _sin(koeff) * fixed_axis[vertex_ID].x;
+            relPos.y = const_position_radius.w * (_sin(koeff) * fixed_axis[vertex_ID].y + _cos(koeff) * fixed_axis[vertex_ID].z);
+            relPos.z = const_position_radius.w * _cos(koeff) * fixed_axis[vertex_ID].w;
+            output_position = _transform(float4(const_position_radius.xyz + relPos, 1.0f), frame_plmVPMatrix);
+        }
+        fssrc {
+            output_color[0] = const_color;
         }
     )";
     const char *g_boundingBoxShaderSrc = R"(
@@ -494,70 +591,6 @@ namespace {
             output_color[0] = float4(input_nrm * 0.5 + 0.5, paletteIndex);
         }
     )";
-/*
- 
- struct Constants {
-     math::transform3f transform = math::transform3f::identity();
-     math::vector4f t0_t1_mask_cap;
-     math::vector3f reserved; float swtch;
-     math::vector3f normal; float maxW;
-     math::vector3f right; float maxH;
-     math::vector3f minXYZ; float hpix;
-     math::vector3f maxXYZ; float vpix;
- }
- const {
-     modelTransform : matrix4
-     t0_t1_mask_cap : float4
-     reserved_swtch : float4
-     normal_mw : float4
-     right_mh : float4
-     minXYZ_hpix : float4
-     maxXYZ_vpix : float4
- }
- 
- float  ptcvbase = 4.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
- float4 ptcv = float4(ptcvbase, ptcvbase, ptcvbase, ptcvbase) + float4(0.0f, 1.0f, 2.0f, 3.0f) * const_maxXYZ_vpix.w;
-
- float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
- float  t1 = const_t0_t1_mask_cap.y;
- float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w;
-
- float4 m0t0 = _tex2d(0, float2(t0, ptcv.x));
- float4 m0t1 = _tex2d(0, float2(t1, ptcv.x));
- float4 m1t0 = _tex2d(0, float2(t0, ptcv.y));
- float4 m1t1 = _tex2d(0, float2(t1, ptcv.y));
-
- float3 posKoeffT0 = float3(m0t0.x + m0t0.y / 255.0f, m0t0.z + m0t0.w / 255.0f, m1t0.x + m1t0.y / 255.0f);
- float3 posKoeffT1 = float3(m0t1.x + m0t1.y / 255.0f, m0t1.z + m0t1.w / 255.0f, m1t1.x + m1t1.y / 255.0f);
- float2 angleSrc = _lerp(m1t0.zw, m1t1.zw, tf);
- float  angle = angleSrc.x + angleSrc.y / 255.0f;
- float3 ptcposT0 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0;
- float3 ptcposT1 = const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1;
- //float3 ptcposT0 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0, 1.0), const_modelTransform).xyz;
- //float3 ptcposT1 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1, 1.0), const_modelTransform).xyz;
-
- float4 m2t0 = _tex2d(0, float2(t0, ptcv.z));
- float4 m2t1 = _tex2d(0, float2(t1, ptcv.z));
- float4 map2 = _lerp(m2t0, m2t1, tf);
- float2 psize = float2(map2.x + map2.y / 255.0f, map2.z + map2.w / 255.0f);
- 
- float4 m3t0 = _tex2d(0, float2(t0, ptcv.w));
- float4 m3t1 = _tex2d(0, float2(t1, ptcv.w));
- float3 map3 = _lerp(m3t0.xyz, m3t1.xyz, tf);                         // alpha, reserved, history, mask
- float  fading = float(255.0f * map3.z > const_t0_t1_mask_cap.w);
- float  isAlive = _step(0.5, float(uint(m3t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m3t1.w < 0.5) * fading;
-
- float3 ptcpos = _lerp(ptcposT0, ptcposT1, tf);
- float2 wh = psize.xy * float2(const_normal_mw.w, const_right_mh.w) * isAlive;
-
- float3 normal = _lerp(const_normal_mw.xyz, _norm(frame_cameraPosition.xyz - ptcpos), const_reserved_swtch.w);
- float3 up = _lerp(_cross(const_normal_mw.xyz, const_right_mh.xyz), _norm(ptcposT1 - ptcposT0), const_reserved_swtch.w);
- float3 right = _norm(_cross(up, normal));
- 
- float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
- output_position = _transform(float4(ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
- output_uv_alpha = float3(fixed_quad[repeat_ID].zw, map3.x);
- */
     const char *g_particlesShaderSrc = R"(
         fixed {
             quad[4] : float4 = [-0.5, 0.5, 0, 0][0.5, 0.5, 1, 0][-0.5, -0.5, 0, 1][0.5, -0.5, 1, 1]
@@ -683,12 +716,18 @@ namespace voxel {
     , _rendering(rendering)
     {
         _palette = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, {resource::PALETTE});
-        _lineShader = rendering->createShader("scene_static_lineset", g_lineShaderSrc, foundation::InputLayout {});
-        _boundingBoxShader = rendering->createShader("scene_static_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
+        _lineShader = rendering->createShader("scene_lineset", g_lineShaderSrc, foundation::InputLayout {});
+        _octahedronShader = rendering->createShader("scene_octahedron", g_octahedronShaderSrc, foundation::InputLayout {
             .repeat = 24
         });
-        _voxelMeshShader = rendering->createShader("scene_dynamic_voxel_mesh", g_voxelMeshShaderSrc, layouts::VTXMVOX);
-        _texturedMeshShader = rendering->createShader("scene_static_textured_mesh", g_texturedMeshShaderSrc, layouts::VTXNRMUV);
+        _boundingSphereShader = rendering->createShader("scene_bounding_sphere", g_boundingSphereShaderSrc, foundation::InputLayout {
+            .repeat = 62
+        });
+        _boundingBoxShader = rendering->createShader("scene_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
+            .repeat = 24
+        });
+        _voxelMeshShader = rendering->createShader("scene_voxel_mesh", g_voxelMeshShaderSrc, layouts::VTXMVOX);
+        _texturedMeshShader = rendering->createShader("scene_textured_mesh", g_texturedMeshShaderSrc, layouts::VTXNRMUV);
         _particlesShader = rendering->createShader("scene_particles", g_particlesShaderSrc, foundation::InputLayout {
             .repeat = 4
         });
@@ -736,8 +775,16 @@ namespace voxel {
         return _lineSets.emplace_back(std::make_shared<LineSetImpl>());
     }
     
-    SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::bound3f &bbox) {
-        return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox));
+    SceneInterface::OctahedronPtr SceneInterfaceImpl::addOctahedron(const math::vector4f &args, const math::color &rgba) {
+        return _octahedrons.emplace_back(std::make_shared<OctahedronImpl>(args, rgba));
+    }
+    
+    SceneInterface::BoundingSpherePtr SceneInterfaceImpl::addBoundingSphere(const math::vector4f &args, const math::color &rgba) {
+        return _boundingSpheres.emplace_back(std::make_shared<BoundingSphereImpl>(args, rgba));
+    }
+    
+    SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::bound3f &bbox, const math::color &rgba) {
+        return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox, rgba));
     }
     
     SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) {
@@ -800,6 +847,8 @@ namespace voxel {
     //
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
         _cleanupUnused(_lineSets);
+        _cleanupUnused(_octahedrons);
+        _cleanupUnused(_boundingSpheres);
         _cleanupUnused(_boundingBoxes);
         _cleanupUnused(_voxelMeshes);
         _cleanupUnused(_texturedMeshes);
@@ -854,6 +903,16 @@ namespace voxel {
                 rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
                 for (const auto &bbox : _boundingBoxes) {
                     rendering.applyShaderConstants(&bbox->bboxData);
+                    rendering.draw();
+                }
+                rendering.applyShader(_boundingSphereShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                for (const auto &bsphere : _boundingSpheres) {
+                    rendering.applyShaderConstants(&bsphere->bsphereData);
+                    rendering.draw(3);
+                }
+                rendering.applyShader(_octahedronShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                for (const auto &octahedron : _octahedrons) {
+                    rendering.applyShaderConstants(&octahedron->octahedronData);
                     rendering.draw();
                 }
             }
