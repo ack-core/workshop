@@ -30,7 +30,7 @@ if (!crossOriginIsolated) {
 }
 
 const WASM_BINARY = document.currentScript.getAttribute('binary');
-const BUFFERS_REUSE_MAX = 256;
+const BUFFERS_REUSE_MAX = 2048;
 const FRAME_CONST_BINDING_INDEX = 0;
 const DRAW_CONST_BINDING_INDEX = 1;
 const POINTER_DOWN = 1;

@@ -22,6 +22,10 @@
     </script>    
     <script type="text/javascript" src="wasm.js" binary="editor.wasm"></script>
     <script type="text/javascript" charset="utf-8">
+        // 
+        // TODO: center on object button -> node inspect, edit/save/cancel -> node inspect
+        //
+
         ["nodes", "inspect", "top"].forEach(name => {
             document.getElementById(name).addEventListener("pointerdown", (event) => {
                 event.stopPropagation();
@@ -67,14 +71,6 @@
         var dirResources = null;
 
         let utility = {
-            getRandomName: function() {
-                var result = "";
-                var characters = "abcdefghijklmnopqrstuvwxyz";
-                for (let i = 0; i < 6; i++) {
-                    result += characters.charAt(Math.floor(Math.random() * characters.length));
-                }
-                return result;
-            },
             openDB: function() {
                 return new Promise((resolve, reject) => {
                     const request = indexedDB.open('fs-db');
@@ -325,7 +321,7 @@
                 });
             },
             nodeName: function(e, nv, old) {
-                if (/^(?!\.)[A-Za-z0-9_.]+(?<!\.)$/.test(nv) && !uiNodeTree.exists(nv)) {
+                if (/^(?!\.)[A-Za-z0-9_.]+(?<!\.)$/.test(nv)) {
                     uiEditor.sendMsg("editor.renameNode", old + " " + nv);
                 }
                 else {
@@ -538,6 +534,7 @@
             }
         });
         webix.event($$("space").getNode(), "click", uiBindings.spaceClick);
+        webix.message.position = "bottom";
 
         uiNodeTree = $$("node_tree");
         uiInspectPanel = $$("inspect_panel");
@@ -1043,6 +1040,10 @@
                 { id: 1, value: "CircleXZ"}, 
                 { id: 2, value: "ObstaclePolygonXZ"}
             ];
+            const uiCollisionPanelMap = {
+                "1": "actor",
+                "2": "obstacle",
+            };
 
             listResFunctions.push(async function() {
                 listResources["inspect_collision"] = await dirResources.getDirectoryHandle("collision").then(r => utility.listFilesInDirectory("collision", r, "txt"));
@@ -1051,6 +1052,34 @@
 
             uiInspectMappingEdit["inspect_collision"] = ["collision_edit_0"];
             resourcesExtMapping["inspect_collision"] = [".txt"];
+
+            uiBindings.collisionShapeType = function(e, nv, old) {
+                uiEditor.sendMsg("editor.collision.shapeType", nv);
+                $$("inspect_collision_shape_pointlist").clearAll();
+                $$("collision_edit_0_" + uiCollisionPanelMap[old]).hide();
+                $$("collision_edit_0_" + uiCollisionPanelMap[nv]).show();
+            };
+            uiBindings.collisionActorArgs = function(e, nv, old) {
+                let args = $$("inspect_collision_shape_mass").getValue() + " ";
+                args += $$("inspect_collision_shape_radius").getValue() + " " + $$("inspect_collision_shape_height").getValue();
+                uiEditor.sendMsg("editor.collision.actorArgs", args);
+            };
+            uiBindings.collisionAddPoint = function(e) {
+                uiEditor.sendMsg("editor.collision.pointAdd", "");
+            };
+            uiBindings.collisionRemovePoint = function(e) {
+                const list = $$("inspect_collision_shape_pointlist");
+                const id = list.getSelectedId();
+                if (list.exists(id)) {
+                    list.remove(id);
+                    uiEditor.sendMsg("editor.collision.pointRemove", id);
+                    list.select(list.getFirstId());
+                }
+            };
+            uiBindings.collisionPointArgs = function(e, nv, old) {
+                let args = $$("inspect_collision_shape_p1").getValue() + " " + $$("inspect_collision_shape_p2").getValue();
+                uiEditor.sendMsg("editor.collision.pointArgs", args);
+            };
 
             $$("add_node_menu").add({ id: "21", value: "Add Collision Shape" });
             $$("inspect_panel").addView({
@@ -1061,41 +1090,46 @@
                     rows: [
                         {cols: [
                             elements.label("Shape type:"), {},
-                            elements.combo("inspect_collision_shape_type", 1, uiCollisionShapeTypes, 160, (e, nv, old) => {
-                                $$("collision_edit_0_type_" + old).hide();
-                                $$("collision_edit_0_type_" + nv).show();
-                            }),
+                            elements.combo("inspect_collision_shape_type", 1, uiCollisionShapeTypes, 160, uiBindings.collisionShapeType),
                         ]},
                         {
-                            id: "collision_edit_0_type_1",
+                            id: "collision_edit_0_actor",
                             cols: [
-                                elements.label("Radius:"),
-                                elements.number("inspect_collision_shape_radius", null, 64, "11.0", 0, 0.1, 1.0, 99.0), {},
-                                elements.label("Mass:"),
-                                elements.number("inspect_collision_shape_mass", null, 94, "111.0", 0, 0.1, 1.0, 999.0)
+                                elements.label("Mass:"),{},
+                                elements.number("inspect_collision_shape_mass", null, 47, "111.0", 0, 0.1, 1.0, 999.0, uiBindings.collisionActorArgs), 
+                                elements.label("R:"),
+                                elements.number("inspect_collision_shape_radius", "Radius", 44, "11.0", 0, 0.1, 1.0, 99.0, uiBindings.collisionActorArgs),
+                                {
+                                    cols: [
+                                        elements.label("H:"),
+                                        elements.number("inspect_collision_shape_height", "Height", 44, "111.0", 0, 0.1, 0.0, 99.0, uiBindings.collisionActorArgs),
+                                    ]
+                                }
                             ]
                         },
                         {
-                            id: "collision_edit_0_type_2", hidden: true,
+                            id: "collision_edit_0_obstacle", hidden: true,
                             rows: [
                                 {cols: [
-                                    elements.label("XZ Coordinates:"), {},
-                                    elements.number("inspect_collision_shape_px", null, 54, "1111.0", 0, 0.1, -999.0, 999.0),
-                                    elements.number("inspect_collision_shape_pz", null, 54, "1111.0", 0, 0.1, -999.0, 999.0)
+                                    elements.label("Coordinates:"), {},
+                                    elements.number("inspect_collision_shape_p1", null, 54, "1111.0", 0, 0.1, -999.0, 999.0, uiBindings.collisionPointArgs),
+                                    elements.number("inspect_collision_shape_p2", null, 54, "1111.0", 0, 0.1, -999.0, 999.0, uiBindings.collisionPointArgs)
                                 ]},
                                 {
                                     css: {"margin-top": "3px !important"},
                                     cols: [
                                         {rows: [
-                                            elements.list("inspect_collision_shape_pointlist", 200),
+                                            elements.list("inspect_collision_shape_pointlist", 200, (obj, id) => { 
+                                                uiEditor.sendMsg("editor.collision.pointSelected", id);
+                                            }),
                                             { height: 16 }
                                         ]},
                                         {
                                             width: 28,
                                             css: {"margin-left": "3px !important"},
                                             rows: [
-                                                elements.button("\u2795", "Add point"),
-                                                elements.button("\u274C", "Delete point")
+                                                elements.button("\u2795", "Add point", uiBindings.collisionAddPoint),
+                                                elements.button("\u274C", "Delete point", uiBindings.collisionRemovePoint)
                                             ]
                                         }
                                     ]
@@ -1108,11 +1142,44 @@
             });
 
             uiEditor["engine.collision.editing"] = function(data) {
+                const [type, panel] = data.split(' ');
+                $$("inspect_collision_shape_pointlist").clearAll();
                 $$("node_1_resource_list").hide();
                 $$("edit_resource_buttons").show();
                 uiInspectMappingEdit["inspect_collision"].forEach(item => {
                     $$(item).show();
                 });
+                $$("collision_edit_0_actor").hide();
+                $$("collision_edit_0_obstacle").hide();
+                $$("collision_edit_0_" + panel).show();
+                utility.setElementValue("inspect_collision_shape_type", type);
+            }
+            uiEditor["engine.collision.circleXZ"] = function(data) {
+                const [mass, radius, height] = data.split(' ');
+                utility.setElementValue("inspect_collision_shape_mass", mass);
+                utility.setElementValue("inspect_collision_shape_radius", radius);
+                utility.setElementValue("inspect_collision_shape_height", height);
+            }
+            uiEditor["engine.collision.obstaclePoint"] = function(data) {
+                const list = $$("inspect_collision_shape_pointlist");
+                const [id, p1, p2, isNew] = data.split(' ');
+                const oldId = isNew == "new" ?  "" : list.getSelectedId();
+
+                list.blockEvent();
+                if (oldId != id) {
+                    if (list.exists(oldId)) {
+                        list.remove(oldId);
+                    }
+                    list.add({ id: id, value: p1 + " " + p2 });                    
+                }
+                else {
+                    list.updateItem(id, { value: p1 + " " + p2 });
+                }
+                list.select(id);
+                list.unblockEvent();
+
+                utility.setElementValue("inspect_collision_shape_p1", p1);
+                utility.setElementValue("inspect_collision_shape_p2", p2);
             }
         }
         function registerPrefabResource() {
@@ -1209,7 +1276,7 @@
                 utility.setElementValue("inspect_node_name", name);
             }
             uiEditor["engine.nodeRenamed"] = function(data) {
-                console.log("[JS] engine.nodeRenamed", data);
+                console.log(data);
                 var [success, old, nv] = data.split(' ');
                 if (success == "ok") {
                     let isPrefab = uiNodeTree.getItem(old).isPrefab;
@@ -1246,6 +1313,10 @@
             }
             uiEditor["engine.resourcesReloaded"] = function(data) {
                 $$("processing_popup").hide();
+            }
+            uiEditor["engine.failmsg"] = function(data) {
+                console.log(data);
+                webix.message({ text: data, expire: 3000});
             }
 
             registerPrefabResource();

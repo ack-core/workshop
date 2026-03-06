@@ -7,6 +7,12 @@
 namespace voxel {
     class SimulationInterface {
     public:
+        enum class ShapeType {
+            CircleXZ = 1,
+            ObstaclePolygonXZ,
+        };
+
+    public:
         static std::shared_ptr<SimulationInterface> instance(
           const foundation::PlatformInterfacePtr &platform
       );

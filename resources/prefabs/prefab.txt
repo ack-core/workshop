@@ -29,7 +29,7 @@ new0.new1.new4.new1 {
     parentIndex : integer = 3
     position : vector3f = 1.000000 5.000000 0.000000
     resourcePath : string = "emitters/basic"
-    type : integer = 2
+    type : integer = 10
 }
 
 new0.new2 {

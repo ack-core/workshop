@@ -1,3 +1,0 @@
-type : integer = 1
-radius : number = 10.0
-mass : number = 100.0

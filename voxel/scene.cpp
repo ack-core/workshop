@@ -435,6 +435,7 @@ namespace voxel {
 // + fssrc [tex2d tex3d cube] {...} <- types of samplers
 //
 namespace {
+    // TODO: pack of 16-32 lines (256b block)
     const char *g_lineShaderSrc = R"(
         fixed {
             offset[34] : float3 =

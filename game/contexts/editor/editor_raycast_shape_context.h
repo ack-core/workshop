@@ -12,11 +12,22 @@ namespace game {
     struct EditorNodeRaycastShape : public EditorNode {
         util::Description description;
         
+        voxel::RaycastInterface::ShapeType shapeType;
+        struct Point {
+            math::vector3f position;
+            math::vector3f args;
+            voxel::SceneInterface::BoundingSpherePtr sphere;
+            voxel::SceneInterface::OctahedronPtr point;
+            voxel::SceneInterface::BoundingBoxPtr box;
+        };
+        std::unordered_map<std::uint32_t, Point> points;
+        
         EditorNodeRaycastShape(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeRaycastShape() override {}
         
         void update(float dtSec) override;
         void setResourcePath(const API &api, const std::string &path) override;
+        void updateVisual(const API &api);
     };
 
     class EditorRaycastShapeContext : public Context {
@@ -33,21 +44,12 @@ namespace game {
         foundation::EventHandlerToken _editorEventsToken;
         std::unordered_map<std::string, bool (EditorRaycastShapeContext::*)(const std::string &)> _handlers;
         
-        struct Point {
-            math::vector3f position;
-            math::vector3f args;
-            voxel::SceneInterface::BoundingSpherePtr sphere;
-            voxel::SceneInterface::OctahedronPtr point;
-            voxel::SceneInterface::BoundingBoxPtr box;
-        };
-        std::unordered_map<std::uint32_t, Point> _points;
         std::uint32_t _currentPoint = 0;
-        voxel::RaycastInterface::ShapeType _shapeType;
         std::unique_ptr<MovingTool> _movePointTool; // not null when editing is in progress
 
     private:
-        void _endShapeDragFinished();
-        void _sendCurrentPointParameters(bool isNew);
+        void _endPointDragFinished();
+        void _sendCurrentPointParameters(EditorNodeRaycastShape &node, bool isNew);
         bool _selectNode(const std::string &data);
         bool _setResourcePath(const std::string &data);
         bool _startEditing(const std::string &data);

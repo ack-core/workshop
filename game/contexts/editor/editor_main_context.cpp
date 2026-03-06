@@ -198,6 +198,7 @@ namespace game {
         util::strstream args(data.c_str(), data.length());
         std::string old, nv;
         if (args >> old >> nv) {
+            const std::string decline = "declined " + old + " " + nv;
             if (_nodes.find(nv) == _nodes.end()) {
                 const auto &nodeIndex = _nodes.find(old);
                 if (nodeIndex != _nodes.end()) {
@@ -206,25 +207,37 @@ namespace game {
                         const std::string newParentName = editor::getParentName(nv);
                         if (newParentName.length()) {
                             auto newParentIndex = _nodes.find(newParentName);
-                            bool prefabLimited = tmp->type != voxel::WorldInterface::NodeType::PREFAB && newParentIndex->second->type != voxel::WorldInterface::NodeType::PREFAB;
-                            if (newParentIndex != _nodes.end() && newParentName != old && prefabLimited) {
+                            const bool prefabLimited = tmp->type == voxel::WorldInterface::NodeType::PREFAB || newParentIndex->second->type == voxel::WorldInterface::NodeType::PREFAB;
+                            if (newParentIndex == _nodes.end()) {
+                                _api.platform->sendEditorMsg("engine.nodeRenamed", decline);
+                                _api.platform->sendEditorMsg("engine.failmsg", "Cannot find a parent with name " + newParentName);
+                                return true;
+                            }
+                            else if (newParentName == old) {
+                                _api.platform->sendEditorMsg("engine.nodeRenamed", decline);
+                                _api.platform->sendEditorMsg("engine.failmsg", "Already a child of that parent");
+                                return true;
+                            }
+                            else if (prefabLimited) {
+                                _api.platform->sendEditorMsg("engine.nodeRenamed", decline);
+                                _api.platform->sendEditorMsg("engine.failmsg", "Prefab cannot has/be a child");
+                                return true;
+                            }
+                            else { // ok
                                 newParentIndex->second->children.emplace(nv, tmp);
                                 tmp->parent->children.erase(tmp->name);
                                 tmp->parent = newParentIndex->second;
                             }
-                            else {
-                                _api.platform->sendEditorMsg("engine.nodeRenamed", "declined " + old + " " + nv);
-                                return true;
-                            }
                         }
-
+                        
                         tmp->name = nv;
                         _nodes.erase(nodeIndex);
                         _nodes.emplace(nv, tmp);
                         _api.platform->sendEditorMsg("engine.nodeRenamed", "ok " + data);
                     }
                     else {
-                        _api.platform->sendEditorMsg("engine.nodeRenamed", "declined " + old + " " + nv);
+                        _api.platform->sendEditorMsg("engine.nodeRenamed", decline);
+                        _api.platform->sendEditorMsg("engine.failmsg", "Remove children before making subnode");
                     }
                 }
                 else {
@@ -232,7 +245,8 @@ namespace game {
                 }
             }
             else {
-                _api.platform->sendEditorMsg("engine.nodeRenamed", "declined " + old + " " + nv);
+                _api.platform->sendEditorMsg("engine.nodeRenamed", decline);
+                _api.platform->sendEditorMsg("engine.failmsg", "Node with that name already exists");
             }
         }
         else {

@@ -47,6 +47,8 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
             gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")
             print("Copying raycast dir")
             shutil.copytree(resourcesRoot + "/raycast", binaryRoot + "/data/raycast", dirs_exist_ok = True)
+            print("Copying collision dir")
+            shutil.copytree(resourcesRoot + "/collision", binaryRoot + "/data/collision", dirs_exist_ok = True)
             print("Finished")
 
             self.send_response(200)

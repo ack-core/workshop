@@ -140,6 +140,13 @@ html, body {
 .webix_template {
     padding: 0px;
 }
+.webix_message {
+    margin: 0px;
+}
+.webix_message_area {
+    width: 240px;
+    right: 0px;
+}
 
 input[type=number]::-webkit-inner-spin-button {
     transform: scaleX(0.75);

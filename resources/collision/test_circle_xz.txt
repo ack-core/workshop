@@ -1,0 +1,3 @@
+mass : number = 100.0000
+radius : number = 5.0000
+type : integer = 1
