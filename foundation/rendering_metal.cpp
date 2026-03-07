@@ -96,6 +96,8 @@ namespace {
         {"uint3",   "packed_uint3",         12, MTLVertexFormatUInt3},
         {"uint4",   "packed_uint4",         16, MTLVertexFormatUInt4}
     };
+
+    std::weak_ptr<foundation::RenderingInterface> g_instance;
 }
 
 namespace foundation {
@@ -1082,7 +1084,16 @@ namespace foundation {
 
 namespace foundation {
     std::shared_ptr<RenderingInterface> RenderingInterface::instance(const std::shared_ptr<PlatformInterface> &platform) {
-        return std::make_shared<MetalRendering>(platform);
+        std::shared_ptr<RenderingInterface> result;
+
+        if (g_instance.use_count() == 0) {
+            g_instance = result = std::make_shared<MetalRendering>(platform);
+        }
+        else {
+            result = g_instance.lock();
+        }
+
+        return result;
     }
 }
 

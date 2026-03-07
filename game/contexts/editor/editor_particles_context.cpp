@@ -1,5 +1,6 @@
 
 #include "editor_particles_context.h"
+#include "foundation/rendering.h"
 #include <list>
 
 namespace game {
@@ -96,7 +97,7 @@ namespace game {
         
         return 0.0f;
     }
-    void Shape::generate(const voxel::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
+    void Shape::generate(const core::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
         editor::RandomSource rnd = editor::RandomSource(randomSeed, RND_SHAPE_FILL);
         if (type == Type::DISK) {
             points.clear();
@@ -235,7 +236,7 @@ namespace game {
     
     Emitter::Emitter() {
         _ptcParams.additiveBlend = false;
-        _ptcParams.orientation = voxel::ParticlesParams::ParticlesOrientation::CAMERA;
+        _ptcParams.orientation = core::ParticlesParams::ParticlesOrientation::CAMERA;
         _ptcParams.minXYZ = {-10, 0, -10};
         _ptcParams.maxXYZ = {10, 10, 10};
         _ptcParams.maxSize = {1.0f, 1.0f};
@@ -264,7 +265,7 @@ namespace game {
         _endShape.args = params.getVector3f("endShapeArgs", {});
         _endShapeOffset = params.getVector3f("endShapeOffset", {});
         _shapeDistribution = static_cast<ShapeDistribution>(params.getInteger("shapeDistributionType", 0));
-        _ptcParams.orientation = static_cast<voxel::ParticlesParams::ParticlesOrientation>(params.getInteger("particleOrientation", 0));
+        _ptcParams.orientation = static_cast<core::ParticlesParams::ParticlesOrientation>(params.getInteger("particleOrientation", 0));
         _ptcParams.additiveBlend = params.getBool("additiveBlend", false);
         _emissionGraph.setPointsFromString(params.getString("emissionGraphData", ""));
         _widthGraph.setPointsFromString(params.getString("widthGraphData", ""));
@@ -277,7 +278,9 @@ namespace game {
         _endShapeOffset = offset;
     }
     
-    void Emitter::refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd) {
+    void Emitter::refresh(const core::SceneInterface::LineSetPtr &shapeStart, const core::SceneInterface::LineSetPtr &shapeEnd) {
+        // WARNING: editor can only be single-threaded
+        foundation::RenderingInterfacePtr rendering = foundation::RenderingInterface::instance(foundation::PlatformInterface::instance());
         _shapeGetRandom = editor::RandomSource(_randomSeed, RND_SHAPE_GET);
         
         const math::vector3f emitterDir = _endShapeOffset.lengthSq() > 0.1f ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
@@ -289,7 +292,7 @@ namespace game {
         
         const std::uint32_t mapTextureWidth = std::uint32_t(cyclesInRow * cycleLength);
         const std::uint32_t mapVerticalCount = std::uint32_t(_particlesToEmit * (_isLooped ? cyclesInRow : 1));
-        const std::uint32_t mapTextureHeight = voxel::VERTICAL_PIXELS_PER_PARTICLE * mapVerticalCount;
+        const std::uint32_t mapTextureHeight = core::VERTICAL_PIXELS_PER_PARTICLE * mapVerticalCount;
         
         struct MapElement {
             math::vector3f position;
@@ -394,7 +397,7 @@ namespace game {
         for (std::uint32_t c = 0; c < mapVerticalCount; c++) {
             for (std::uint32_t i = 0; i < mapTextureWidth; i++) {
                 const MapElement &element = tmpMap[c * mapTextureWidth + i];
-                const std::size_t tvoff = c * voxel::VERTICAL_PIXELS_PER_PARTICLE;
+                const std::size_t tvoff = c * core::VERTICAL_PIXELS_PER_PARTICLE;
                 const math::vector3f positionKoeff = 255.0f * (element.position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
                 
                 std::uint8_t *m0 = &_mapData[(tvoff + 0) * mapTextureWidth * 4 + i * 4];
@@ -444,7 +447,7 @@ namespace game {
     const std::uint8_t * Emitter::getMapRaw() const {
         return _mapData.data();
     }
-    const voxel::ParticlesParams &Emitter::getParams() const {
+    const core::ParticlesParams &Emitter::getParams() const {
         return _ptcParams;
     }
 
@@ -477,8 +480,8 @@ namespace game {
 
 namespace game {
     void EditorNodeParticles::update(float dtSec) {
+        globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
         if (particles) {
-            globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
             particles->setTransform(math::transform3f::identity().translated(globalPosition));
             particles->setTime(currentTime, 0.0f);
             currentTime += dtSec;
@@ -501,7 +504,7 @@ namespace game {
                     map = m;
                     
                     if (map) {
-                        voxel::ParticlesParams parameters (*originDesc);
+                        core::ParticlesParams parameters (*originDesc);
                         particles = api.scene->addParticles(texture, map, parameters);
                         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     }
@@ -515,7 +518,7 @@ namespace game {
     , _nodeAccess(nodeAccess)
     , _cameraAccess(cameraAccess)
     {
-        EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::PARTICLES)] = [](std::size_t typeIndex) {
+        EditorNode::makeByType[std::size_t(core::WorldInterface::NodeType::PARTICLES)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodeParticles>(typeIndex));
         };
         
@@ -575,7 +578,7 @@ namespace game {
             math::vector3f off = _endShapeTool->getPosition();
             node->currentDesc->setVector3f("endShapeOffset", off);
             node->emitter.setEndShapeOffset(off);
-            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+            node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
             _recreateParticles(*node, true);
             _api.platform->sendEditorMsg("engine.ptcEndOffset", util::strstream::ftos(off.x) + " " + util::strstream::ftos(off.y) + " " + util::strstream::ftos(off.z));
         }
@@ -586,7 +589,7 @@ namespace game {
             node.particles = _api.scene->addParticles(node.texture, node.emitter.getMap(), node.emitter.getParams());
         }
         else {
-            voxel::ParticlesParams parameters (*node.originDesc);
+            core::ParticlesParams parameters (*node.originDesc);
             node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
         }
     }
@@ -630,7 +633,7 @@ namespace game {
 
                 node->emitter.setParameters(node->currentDesc.value());
                 node->emitter.setEndShapeOffset(_endShapeTool->getPosition());
-                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
                 _recreateParticles(*node, true);
                 
                 std::string args = util::Description::serialize(*node->currentDesc);
@@ -727,7 +730,7 @@ namespace game {
                 desc.setInteger("particlesToEmit", particlesToEmit);
                 desc.setInteger("randomSeed", rndSeed);
                 node->emitter.setParameters(*node->currentDesc);
-                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
                 desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
                 desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
                 desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
@@ -765,7 +768,7 @@ namespace game {
                 desc.setInteger("particleOrientation", particleOrientation);
                 node->endShapeOffset = endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
-                node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+                node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
                 desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
                 desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
                 desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
@@ -780,7 +783,7 @@ namespace game {
             util::Description &desc = node->currentDesc.value();
             desc.setString(name.c_str(), data);
             node->emitter.setParameters(*node->currentDesc);
-            node->emitter.refresh(_api.rendering, _shapeStartLineset, _shapeEndLineset);
+            node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
             desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
             desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
             desc.setVector2f("maxSize", node->emitter.getParams().maxSize);

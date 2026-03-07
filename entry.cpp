@@ -2,10 +2,10 @@
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
 #include "providers/resource_provider.h"
-#include "voxel/scene.h"
-#include "voxel/world.h"
-#include "voxel/raycast.h"
-#include "voxel/simulation.h"
+#include "core/scene.h"
+#include "core/world.h"
+#include "core/raycast.h"
+#include "core/simulation.h"
 #include "ui/stage.h"
 
 #include "game/game.h"
@@ -15,10 +15,10 @@
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 resource::ResourceProviderPtr resourceProvider;
-voxel::SceneInterfacePtr scene;
-voxel::WorldInterfacePtr world;
-voxel::RaycastInterfacePtr raycast;
-voxel::SimulationInterfacePtr simulation;
+core::SceneInterfacePtr scene;
+core::WorldInterfacePtr world;
+core::RaycastInterfacePtr raycast;
+core::SimulationInterfacePtr simulation;
 ui::StageInterfacePtr stage;
 game::StateManagerPtr stateManager;
 dh::DataHubPtr datahub;
@@ -28,13 +28,13 @@ extern "C" void initialize() {
     platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
         rendering = foundation::RenderingInterface::instance(platform);
         resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
-        scene = voxel::SceneInterface::instance(platform, rendering);
-        world = voxel::WorldInterface::instance(platform, resourceProvider, scene);
-        raycast = voxel::RaycastInterface::instance(platform);
-        simulation = voxel::SimulationInterface::instance(platform);
+        scene = core::SceneInterface::instance(platform, rendering);
+        world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
+        raycast = core::RaycastInterface::instance(platform, scene);
+        simulation = core::SimulationInterface::instance(platform, scene);
         stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
         datahub = dh::DataHub::instance(platform, game::datahub);
-        stateManager = game::StateManager::instance(platform, rendering, resourceProvider, scene, world, raycast, simulation, stage, datahub);
+        stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
         stateManager->switchToState("default");
         
         platform->setLoop([](float dtSec) {

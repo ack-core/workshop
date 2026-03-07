@@ -364,8 +364,8 @@ namespace util {
             }
             return result;
         }
-        auto getDescriptions() const -> std::unordered_map<std::string, const util::Description *> {
-            std::unordered_map<std::string, const util::Description *> result;
+        auto getDescriptions() const -> std::map<std::string, const util::Description *> {
+            std::map<std::string, const util::Description *> result;
             for (auto index = this->begin(); index != this->end(); ++index) {
                 if (std::holds_alternative<Description>(index->second)) {
                     result.emplace(index->first, std::get_if<Description>(&index->second));
@@ -382,6 +382,7 @@ namespace util {
                 if (std::holds_alternative<T>(index->second)) {
                     if (replace) {
                         index->second = value;
+                        return true;
                     }
                 }
                 else return false;

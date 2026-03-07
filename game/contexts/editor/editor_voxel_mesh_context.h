@@ -9,7 +9,7 @@
 //
 namespace game {
     struct EditorNodeVoxelMesh : public EditorNode {
-        voxel::SceneInterface::VoxelMeshPtr mesh;
+        core::SceneInterface::VoxelMeshPtr mesh;
         std::unordered_map<std::string, math::vector3i> animations;
         
         EditorNodeVoxelMesh(std::size_t typeIndex) : EditorNode(typeIndex) {}

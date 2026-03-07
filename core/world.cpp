@@ -2,14 +2,16 @@
 #include "world.h"
 #include <unordered_map>
 
-namespace voxel {
+namespace core {
     class ObjectImpl;
     class WorldImpl : public WorldInterface, public std::enable_shared_from_this<WorldImpl> {
     public:
         WorldImpl(
             const foundation::PlatformInterfacePtr &platform,
             const resource::ResourceProviderPtr &resources,
-            const voxel::SceneInterfacePtr &scene
+            const core::SceneInterfacePtr &scene,
+            const core::RaycastInterfacePtr &raycast,
+            const core::SimulationInterfacePtr &simulation
         );
         ~WorldImpl() override;
         
@@ -20,18 +22,22 @@ namespace voxel {
 
         foundation::PlatformInterface &getPlatform() const { return *_platform; }
         resource::ResourceProvider &getResources() const { return *_resourceProvider; }
-        voxel::SceneInterface &getScene() const { return *_scene; }
+        core::SceneInterface &getScene() const { return *_scene; }
+        core::RaycastInterface &getRaycast() const { return *_raycast; }
+        core::SimulationInterface &getSimulation() const { return *_simulation; }
         
     public:
         const foundation::PlatformInterfacePtr _platform;
         const resource::ResourceProviderPtr _resourceProvider;
-        const voxel::SceneInterfacePtr _scene;
+        const core::SceneInterfacePtr _scene;
+        const core::RaycastInterfacePtr _raycast;
+        const core::SimulationInterfacePtr _simulation;
         
         std::unordered_map<std::string, std::shared_ptr<ObjectImpl>> _objects;
     };
 }
 
-namespace voxel {
+namespace core {
     static math::transform3f g_identity;
 
     class ObjectNode {
@@ -49,16 +55,16 @@ namespace voxel {
 
     std::unique_ptr<ObjectNode> (*g_nodeConstructors[int(WorldInterface::NodeType::_count)])() = {};
     std::size_t getNextUniqueId() {
-        static std::size_t nextId = 0;
+        static std::size_t nextId = 1000000000;
         return nextId++;
     }
 }
 
-namespace voxel {
+namespace core {
     class ObjectImpl : public WorldInterface::Object, public std::enable_shared_from_this<ObjectImpl> {
     public:
         ObjectImpl(std::shared_ptr<WorldImpl> &&owner,  const util::Description &objDesc) : _id(getNextUniqueId()), _owner(std::move(owner)) {
-            const std::unordered_map<std::string, const util::Description *> descs = objDesc.getDescriptions();
+            const std::map<std::string, const util::Description *> descs = objDesc.getDescriptions();
             
             for (const auto &nodeDesc : descs) {
                 if (const std::int64_t *type = nodeDesc.second->getInteger("type")) {
@@ -66,8 +72,12 @@ namespace voxel {
                         _nameToNodeIndex.emplace(nodeDesc.first, _nodes.size());
                         _nodes.emplace_back(g_nodeConstructors[*type]());
                         _nodes.back()->localTransform = math::transform3f::identity().translated(nodeDesc.second->getVector3f("position", {}));
-                        _nodes.back()->resourcePath = nodeDesc.second->getString("resourcePath", "<Unknown>");
-                        
+                        if (const std::string *resourcePath = nodeDesc.second->getString("resourcePath")) {
+                            _nodes.back()->resourcePath = *resourcePath;
+                        }
+                        else {
+                            owner->getPlatform().logError("[ObjectImpl::ObjectImpl] Invalid resource path for = %s", nodeDesc.first.data());
+                        }
                         if (const std::int64_t *parentIndex = nodeDesc.second->getInteger("parentIndex")) {
                             _nodes.back()->parent = _nodes[*parentIndex].get();
                             _nodes.back()->worldTransform = _nodes.back()->localTransform * _nodes[*parentIndex]->worldTransform;
@@ -131,7 +141,9 @@ namespace voxel {
             
         }
         
-        void play(const char *animationName, util::callback<void(WorldInterface::Object &)> &&completion) override {}
+        void play(const char *animationName, util::callback<void(WorldInterface::Object &)> &&completion) override {
+            
+        }
         
         void update(float dtSec) {
             for (std::unique_ptr<ObjectNode> &node : _nodes) {
@@ -150,9 +162,9 @@ namespace voxel {
     };
 }
 
-namespace voxel {
+namespace core {
     struct VoxelMeshNode : public ObjectNode {
-        voxel::SceneInterface::VoxelMeshPtr mesh;
+        core::SceneInterface::VoxelMeshPtr mesh;
         
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
@@ -175,17 +187,17 @@ namespace voxel {
             }
         }
     };
-
+    
     struct ParticlesNode : public ObjectNode {
         float t = 0;
-        voxel::SceneInterface::ParticlesPtr particles;
+        core::SceneInterface::ParticlesPtr particles;
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
             res.getOrLoadEmitter(resourcePath.c_str(), [world, this, objweak](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
                 if (auto object = objweak.lock()) {
                     if (m && desc.empty() == false) {
-                        const voxel::ParticlesParams parameters (desc);
+                        const core::ParticlesParams parameters (desc);
                         particles = world->getScene().addParticles(t, m, parameters);
                         particles->setTransform(worldTransform);
                     }
@@ -205,17 +217,74 @@ namespace voxel {
             }
         }
     };
+    
+    struct RaycastNode : public ObjectNode {
+        float t = 0;
+        core::RaycastInterface::ShapePtr shape;
+
+        void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
+            resource::ResourceProvider &res = world->getResources();
+            res.getOrLoadDescription(resourcePath.c_str(), [world, this, objweak](const util::Description &desc) {
+                if (auto object = objweak.lock()) {
+                    if (desc.empty() == false) {
+                        shape = world->getRaycast().addShape(desc);
+                        shape->setTransform(worldTransform);
+                    }
+                    object->nodeLoadingComplete();
+                }
+            });
+        }
+        void unloadResources() override {
+            shape = nullptr;
+        }
+        void update(float dtSec) override {
+            if (shape) {
+                shape->setTransform(worldTransform);
+            }
+        }
+    };
+    
+    struct CollisionNode : public ObjectNode {
+        float t = 0;
+        core::SimulationInterface::BodyPtr body;
+
+        void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
+            resource::ResourceProvider &res = world->getResources();
+            res.getOrLoadDescription(resourcePath.c_str(), [world, this, objweak](const util::Description &desc) {
+                if (auto object = objweak.lock()) {
+                    if (desc.empty() == false) {
+                        body = world->getSimulation().addBody(desc);
+                        body->setTransform(worldTransform);
+                    }
+                    object->nodeLoadingComplete();
+                }
+            });
+        }
+        void unloadResources() override {
+            body = nullptr;
+        }
+        void update(float dtSec) override {
+            if (body) {
+                body->setTransform(worldTransform);
+            }
+        }
+    };
+
 }
 
-namespace voxel {
+namespace core {
     WorldImpl::WorldImpl(
         const foundation::PlatformInterfacePtr &platform,
         const resource::ResourceProviderPtr &resources,
-        const voxel::SceneInterfacePtr &scene
+        const core::SceneInterfacePtr &scene,
+        const core::RaycastInterfacePtr &raycast,
+        const core::SimulationInterfacePtr &simulation
     )
     : _platform(platform)
     , _resourceProvider(resources)
     , _scene(scene)
+    , _raycast(raycast)
+    , _simulation(simulation)
     {
         g_nodeConstructors[int(WorldInterface::NodeType::VOXEL)] = []() -> std::unique_ptr<ObjectNode> {
             return std::make_unique<VoxelMeshNode>();
@@ -262,14 +331,16 @@ namespace voxel {
     }
 }
 
-namespace voxel {
+namespace core {
     std::shared_ptr<WorldInterface> WorldInterface::instance(
         const foundation::PlatformInterfacePtr &platform,
         const resource::ResourceProviderPtr &resources,
-        const voxel::SceneInterfacePtr &scene
+        const core::SceneInterfacePtr &scene,
+        const core::RaycastInterfacePtr &raycast,
+        const core::SimulationInterfacePtr &simulation
     )
     {
-        return std::make_shared<WorldImpl>(platform, resources, scene);
+        return std::make_shared<WorldImpl>(platform, resources, scene, raycast, simulation);
     }
 }
 

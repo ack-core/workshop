@@ -56,7 +56,7 @@ namespace game {
         std::vector<math::vector3f> points;
         
         float getMaxSize() const;
-        void generate(const voxel::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
+        void generate(const core::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
     };
     
     class Emitter {
@@ -66,11 +66,11 @@ namespace game {
         
         void setParameters(const util::Description &desc);
         void setEndShapeOffset(const math::vector3f &offset);
-        void refresh(const foundation::RenderingInterfacePtr &rendering, const voxel::SceneInterface::LineSetPtr &shapeStart, const voxel::SceneInterface::LineSetPtr &shapeEnd);
+        void refresh(const core::SceneInterface::LineSetPtr &shapeStart, const core::SceneInterface::LineSetPtr &shapeEnd);
         
         auto getMap() const -> const foundation::RenderTexturePtr &;
         auto getMapRaw() const -> const std::uint8_t *;
-        auto getParams() const -> const voxel::ParticlesParams &;
+        auto getParams() const -> const core::ParticlesParams &;
         
     public:
         struct ActiveParticle {
@@ -111,7 +111,7 @@ namespace game {
 
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
-        voxel::ParticlesParams _ptcParams;
+        core::ParticlesParams _ptcParams;
         
     private:
         auto _getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) -> std::pair<math::vector3f, math::vector3f>;
@@ -125,7 +125,7 @@ namespace game {
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
         Emitter emitter;
-        voxel::SceneInterface::ParticlesPtr particles;
+        core::SceneInterface::ParticlesPtr particles;
         math::vector3f endShapeOffset = {0, 10, 0};
         float currentTime = 0.0f;
         
@@ -151,9 +151,9 @@ namespace game {
         std::unordered_map<std::string, bool (EditorParticlesContext::*)(const std::string &)> _handlers;
         
         std::unique_ptr<MovingTool> _endShapeTool; // not null when editing is in progress
-        voxel::SceneInterface::LineSetPtr _shapeConnectLineset;
-        voxel::SceneInterface::LineSetPtr _shapeStartLineset;
-        voxel::SceneInterface::LineSetPtr _shapeEndLineset;
+        core::SceneInterface::LineSetPtr _shapeConnectLineset;
+        core::SceneInterface::LineSetPtr _shapeStartLineset;
+        core::SceneInterface::LineSetPtr _shapeEndLineset;
         
         std::string _savingCfg;
         std::unique_ptr<std::uint8_t[]> _savingMap;

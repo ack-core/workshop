@@ -47,7 +47,7 @@ add_subdirectory("${m_source_root}/foundation")
 
 if (NOT APPTYPE STREQUAL "IS_TESTS")
 	add_subdirectory("${m_source_root}/providers")
-	add_subdirectory("${m_source_root}/voxel")
+	add_subdirectory("${m_source_root}/core")
 	add_subdirectory("${m_source_root}/ui")
 	add_subdirectory("${m_source_root}/datahub")
 	add_subdirectory("${m_source_root}/game")
@@ -67,7 +67,7 @@ target_link_libraries(workshop PUBLIC foundation)
 
 if (NOT APPTYPE STREQUAL "IS_TESTS")
 	target_link_libraries(workshop PUBLIC providers)
-	target_link_libraries(workshop PUBLIC voxel)
+	target_link_libraries(workshop PUBLIC core)
 	target_link_libraries(workshop PUBLIC ui)
 	target_link_libraries(workshop PUBLIC datahub)
 	target_link_libraries(workshop PUBLIC game)
@@ -106,7 +106,7 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 
 	message(STATUS "Generating palette...")
 	execute_process(
-		COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/voxel/palette.h
+		COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/core/palette.h
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
 	message(STATUS "Generating prefabs...")

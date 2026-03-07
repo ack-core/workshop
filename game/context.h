@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "providers/resource_provider.h"
-#include "voxel/scene.h"
-#include "voxel/world.h"
-#include "voxel/raycast.h"
+#include "core/scene.h"
+#include "core/world.h"
+#include "core/raycast.h"
 #include "ui/stage.h"
 #include "game/state_manager.h"
 #include "datahub/datahub.h"
@@ -13,11 +13,10 @@
 namespace game {
     struct API {
         const foundation::PlatformInterfacePtr &platform;
-        const foundation::RenderingInterfacePtr &rendering;
         const resource::ResourceProviderPtr &resources;
-        const voxel::SceneInterfacePtr &scene;
-        const voxel::WorldInterfacePtr &world;
-        const voxel::RaycastInterfacePtr &raycast;
+        const core::SceneInterfacePtr &scene;
+        const core::WorldInterfacePtr &world;
+        const core::RaycastInterfacePtr &raycast;
         const ui::StageInterfacePtr &ui;
         const dh::DataHubPtr &dh;
         const game::StateManagerPtr &stateManager;

@@ -10,20 +10,20 @@ namespace game {
     public:
         StateManagerImpl(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
             const resource::ResourceProviderPtr &resourceProvider,
-            const voxel::SceneInterfacePtr &scene,
-            const voxel::WorldInterfacePtr &world,
-            const voxel::RaycastInterfacePtr &raycast,
-            const voxel::SimulationInterfacePtr &simulation,
+            const core::SceneInterfacePtr &scene,
+            const core::WorldInterfacePtr &world,
+            const core::RaycastInterfacePtr &raycast,
+            const core::SimulationInterfacePtr &simulation,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
         )
         : _platform(platform)
-        , _rendering(rendering)
         , _resourceProvider(resourceProvider)
         , _scene(scene)
         , _world(world)
+        , _raycast(raycast)
+        , _simulation(simulation)
         , _ui(ui)
         , _dh(dh)
         {
@@ -37,9 +37,10 @@ namespace game {
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
         const resource::ResourceProviderPtr _resourceProvider;
-        const voxel::SceneInterfacePtr _scene;
-        const voxel::WorldInterfacePtr _world;
-        const voxel::RaycastInterfacePtr _raycast;
+        const core::SceneInterfacePtr _scene;
+        const core::WorldInterfacePtr _world;
+        const core::RaycastInterfacePtr _raycast;
+        const core::SimulationInterfacePtr _simulation;
         const ui::StageInterfacePtr _ui;
         const dh::DataHubPtr _dh;
         
@@ -49,17 +50,16 @@ namespace game {
     
     std::shared_ptr<StateManager> StateManager::instance(
         const foundation::PlatformInterfacePtr &platform,
-        const foundation::RenderingInterfacePtr &rendering,
         const resource::ResourceProviderPtr &resourceProvider,
-        const voxel::SceneInterfacePtr &scene,
-        const voxel::WorldInterfacePtr &world,
-        const voxel::RaycastInterfacePtr &raycast,
-        const voxel::SimulationInterfacePtr &simulation,
+        const core::SceneInterfacePtr &scene,
+        const core::WorldInterfacePtr &world,
+        const core::RaycastInterfacePtr &raycast,
+        const core::SimulationInterfacePtr &simulation,
         const ui::StageInterfacePtr &ui,
         const dh::DataHubPtr &dh
     )
     {
-        return std::make_shared<StateManagerImpl>(platform, rendering, resourceProvider, scene, world, raycast, simulation, ui, dh);
+        return std::make_shared<StateManagerImpl>(platform, resourceProvider, scene, world, raycast, simulation, ui, dh);
     }
     
     void StateManagerImpl::switchToState(const char *name) {
@@ -73,7 +73,7 @@ namespace game {
                     
                     auto index = _currentContextList.find(makeContextFunction);
                     if (index == _currentContextList.end()) {
-                        ctx = makeContextFunction(API { _platform, _rendering, _resourceProvider, _scene, _world, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
+                        ctx = makeContextFunction(API { _platform, _resourceProvider, _scene, _world, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
                     }
                     else {
                         ctx = index->second;

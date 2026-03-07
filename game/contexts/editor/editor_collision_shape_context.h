@@ -12,8 +12,8 @@ namespace game {
     struct EditorNodeCollisionShape : public EditorNode {
         util::Description description;
         
-        voxel::SimulationInterface::ShapeType shapeType;
-        voxel::SceneInterface::LineSetPtr visual;
+        core::SimulationInterface::ShapeType shapeType;
+        core::SceneInterface::LineSetPtr visual;
 
         // obstacle
         bool coordMask[3] = {false};

@@ -94,6 +94,8 @@ namespace {
         {GL_RGBA,  GL_RGBA16F, GL_HALF_FLOAT, 8},
         {GL_RGBA,  GL_RGBA32F, GL_FLOAT, 16},
     };
+
+    std::weak_ptr<foundation::RenderingInterface> g_instance;
 }
 
 namespace foundation {
@@ -761,7 +763,16 @@ namespace foundation {
 
 namespace foundation {
     std::shared_ptr<RenderingInterface> RenderingInterface::instance(const std::shared_ptr<PlatformInterface> &platform) {
-        return std::make_shared<WASMRendering>(platform);
+        std::shared_ptr<RenderingInterface> result;
+
+        if (g_instance.use_count() == 0) {
+            g_instance = result = std::make_shared<WASMRendering>(platform);
+        }
+        else {
+            result = g_instance.lock();
+        }
+
+        return result;
     }
 }
 

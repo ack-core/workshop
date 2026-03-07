@@ -4,23 +4,31 @@
 #include "foundation/math.h"
 #include "foundation/platform.h"
 #include "providers/resource_provider.h"
-#include "voxel/scene.h"
+#include "core/scene.h"
+#include "raycast.h"
+#include "simulation.h"
 
 #include <memory>
 #include <forward_list>
 
-namespace voxel {
+namespace core {
     class WorldInterface {
     public:
         enum class NodeType : std::size_t {
-            PREFAB = 0,
-            VOXEL = 1,
-            LOWPOLY = 2,
-            GROUND = 3,
-            PARTICLES = 10,
-            RAYCAST = 20,
-            COLLISION = 21,
-            ANIMATION = 30,
+            PREFAB    = 0,
+            ANIMATION = 1,
+            VOXEL     = 10, // TODO: 1/3 subdetail
+            LOWPOLY   = 11,
+            GROUND    = 12, // TODO: update minimal
+            PARTICLES = 20, // TODO: angle, rendering
+            TRAILS    = 21,
+            LIGHT     = 22,
+            DECALS    = 23,
+            RAYCAST   = 30, // TODO: impl, triangles, extended moving tool
+            COLLISION = 31, // TODO: impl
+            HELPER    = 32,
+            SOUND     = 40,
+            HAPTIC    = 41,
             _count
         };
         
@@ -28,7 +36,9 @@ namespace voxel {
         static std::shared_ptr<WorldInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const resource::ResourceProviderPtr &resources,
-            const voxel::SceneInterfacePtr &scene
+            const core::SceneInterfacePtr &scene,
+            const core::RaycastInterfacePtr &raycast,
+            const core::SimulationInterfacePtr &simulation
         );
         
     public:
@@ -38,7 +48,7 @@ namespace voxel {
         struct Object {
             virtual auto getId() const -> std::size_t = 0;
             
-            virtual void loadResources(util::callback<void(voxel::WorldInterface::Object &)> &&completion) = 0;
+            virtual void loadResources(util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
             virtual void unloadResources() = 0;
             
             virtual void setPosition(const math::vector3f &pos) = 0;
@@ -50,12 +60,13 @@ namespace voxel {
             
             // Play animation
             // @animationName - name of the animation node
-            //     or name of the particles node
             //     or name of the mesh animation concatenated with the node name. Example: 'root...voxelMeshNode.animationName'
+            //     or name of the particles node
+            //
             // @completion    - callback is called when animation ends or instantly if animation wasn't found.
             // callback is called at the end of every cycle of looped particles or looped animations
             //
-            virtual void play(const char *animationName, util::callback<void(voxel::WorldInterface::Object &)> &&completion) = 0;
+            virtual void play(const char *animationName, util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
             
             virtual ~Object() = default;
         };

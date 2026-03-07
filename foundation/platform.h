@@ -104,6 +104,8 @@ namespace foundation {
     //
     class PlatformInterface : public LoggerInterface {
     public:
+        // Gets or creates an instance. There can be only one instance
+        //
         static std::shared_ptr<PlatformInterface> instance();
         
     public:

@@ -12,13 +12,13 @@ namespace game {
     struct EditorNodeRaycastShape : public EditorNode {
         util::Description description;
         
-        voxel::RaycastInterface::ShapeType shapeType;
+        core::RaycastInterface::ShapeType shapeType;
         struct Point {
             math::vector3f position;
             math::vector3f args;
-            voxel::SceneInterface::BoundingSpherePtr sphere;
-            voxel::SceneInterface::OctahedronPtr point;
-            voxel::SceneInterface::BoundingBoxPtr box;
+            core::SceneInterface::BoundingSpherePtr sphere;
+            core::SceneInterface::OctahedronPtr point;
+            core::SceneInterface::BoundingBoxPtr box;
         };
         std::unordered_map<std::uint32_t, Point> points;
         
@@ -27,7 +27,7 @@ namespace game {
         
         void update(float dtSec) override;
         void setResourcePath(const API &api, const std::string &path) override;
-        void updateVisual(const API &api);
+        void updateVisual();
     };
 
     class EditorRaycastShapeContext : public Context {

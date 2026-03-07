@@ -10,6 +10,9 @@ namespace {
 namespace game {
     void EditorNodeCollisionShape::update(float dtSec) {
         globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
+        if (visual) {
+            visual->setPosition(globalPosition);
+        }
     }
     void EditorNodeCollisionShape::setResourcePath(const API &api, const std::string &path) {
         if (path.empty()) {
@@ -20,13 +23,13 @@ namespace game {
             resourcePath = path;
             api.resources->getOrLoadDescription(path.c_str(), [this, &api](const util::Description& desc) {
                 description = desc;
-                shapeType = static_cast<voxel::SimulationInterface::ShapeType>(desc.getInteger("type", 1));
+                shapeType = static_cast<core::SimulationInterface::ShapeType>(desc.getInteger("type", 1));
                                 
-                if (shapeType == voxel::SimulationInterface::ShapeType::CircleXZ) {
+                if (shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
                     mass = desc.getNumber("mass", 0.0f);
                     radius = desc.getNumber("radius", 1.0f);
                 }
-                else if (shapeType == voxel::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
+                else if (shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
                     obstaclePoints.clear();
                     coordMask[0] = coordMask[2] = true;
                     coordMask[1] = false;
@@ -47,34 +50,15 @@ namespace game {
             visual = api.scene->addLineSet();
         }
 
-        if (shapeType == voxel::SimulationInterface::ShapeType::CircleXZ) {
-            for (std::uint32_t i = 0; i < 24; i++) {
-                const float koeff0 = 2.0f * M_PI * float(i) / 24.0f;
-                const float koeff1 = 2.0f * M_PI * float(i + 1) / 24.0f;
-                const math::vector3f p0 = math::vector3f(radius * std::cosf(koeff0), 0.0f, radius * std::sinf(koeff0));
-                const math::vector3f p1 = math::vector3f(radius * std::cosf(koeff1), 0.0f, radius * std::sinf(koeff1));
-                visual->setLine(2 * i + 0, globalPosition + p0, globalPosition + p1, {0.0f, 1.0f, 1.0f, 0.7f});
-                visual->setLine(2 * i + 1, globalPosition + p0, globalPosition + p0 + math::vector3f(0, 0.5f, 0), {0.0f, 1.0f, 1.0f, 0.7f});
-            }
-            visual->capLineCount(48);
+        if (shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
+            core::SceneInterface::fillLineSetAsCircle(visual, 24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
         }
-        else if (shapeType == voxel::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
-            std::uint32_t lineIndex = 0;
-            for (auto index = obstaclePoints.begin(); index != obstaclePoints.end(); ++index) {
-                auto next = index;
-                if (++next == obstaclePoints.end()) {
-                    next = obstaclePoints.begin();
-                }
-                
-                visual->setLine(lineIndex++, globalPosition + index->second, globalPosition + next->second, {0.0f, 1.0f, 1.0f, 0.7f});
-                const float distance = index->second.distanceTo(next->second);
-                const std::uint32_t vcount = std::uint32_t(std::ceil(distance));
-                for (std::uint32_t i = 0; i < vcount; i++) {
-                    const math::vector3f vpos = index->second + (next->second - index->second) * float(i) / distance;
-                    visual->setLine(lineIndex++, globalPosition + vpos, globalPosition + vpos + math::vector3f(0, 0.5f, 0), {0.0f, 1.0f, 1.0f, 0.7f});
-                }
+        else if (shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
+            std::vector<math::vector3f> points;
+            for (auto &index : obstaclePoints) {
+                points.emplace_back(index.second);
             }
-            visual->capLineCount(lineIndex);
+            core::SceneInterface::fillLineSetAsСlosedСircuit(visual, points, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
     }
@@ -84,7 +68,7 @@ namespace game {
     , _nodeAccess(nodeAccess)
     , _cameraAccess(cameraAccess)
     {
-        EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::COLLISION)] = [](std::size_t typeIndex) {
+        EditorNode::makeByType[std::size_t(core::WorldInterface::NodeType::COLLISION)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodeCollisionShape>(typeIndex));
         };
         
@@ -169,12 +153,12 @@ namespace game {
     bool EditorCollisionShapeContext::_startEditing(const std::string &data) {
         std::shared_ptr<EditorNodeCollisionShape> node = std::dynamic_pointer_cast<EditorNodeCollisionShape>(_nodeAccess.getSelectedNode().lock());
         if (node && node->description.empty() == false) {
-            if (node->shapeType == voxel::SimulationInterface::ShapeType::CircleXZ) {
+            if (node->shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
                 std::string args = util::strstream::ftos(node->mass) + " " + util::strstream::ftos(node->radius) + " 0.0";
                 _api.platform->sendEditorMsg("engine.collision.editing", std::to_string(int(node->shapeType)) + " actor");
                 _api.platform->sendEditorMsg("engine.collision.circleXZ", args);
             }
-            else if (node->shapeType == voxel::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
+            else if (node->shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
                 _api.platform->sendEditorMsg("engine.collision.editing", std::to_string(int(node->shapeType)) + " obstacle");
                 const std::vector<math::vector3f> points = node->description.getVector3fs("points");
                 for (auto &item : node->obstaclePoints) {
@@ -213,11 +197,11 @@ namespace game {
         if (node) {
             node->description.clear();
             node->description.setInteger("type", int(node->shapeType));
-            if (node->shapeType == voxel::SimulationInterface::ShapeType::CircleXZ) {
+            if (node->shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
                 node->description.setNumber("radius", node->radius);
                 node->description.setNumber("mass", node->mass);
             }
-            else if (node->shapeType == voxel::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
+            else if (node->shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
                 for (const auto &item : node->obstaclePoints) {
                     node->description.setVector3f("points", item.second, false);
                 }
@@ -244,17 +228,17 @@ namespace game {
             util::strstream input(data.c_str(), data.length());
             int type = 0;
             if (input >> type) {
-                node->shapeType = voxel::SimulationInterface::ShapeType(type);
+                node->shapeType = core::SimulationInterface::ShapeType(type);
                 node->obstaclePoints.clear();
                 _movePointTool = nullptr;
                 _currentPoint = 0;
                 
-                if (node->shapeType == voxel::SimulationInterface::ShapeType::CircleXZ) {
+                if (node->shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
                     node->mass = 100.0f;
                     node->radius = 1.0f;
                     _api.platform->sendEditorMsg("engine.collision.circleXZ", "100.0 1.0 0.0");
                 }
-                else if (node->shapeType == voxel::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
+                else if (node->shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
                     node->coordMask[0] = node->coordMask[2] = true;
                     node->coordMask[1] = false;
                 }

@@ -578,7 +578,7 @@
                 uiEditor.sendMsg("editor.mesh.animationPlay", "1");
             };
 
-            $$("add_node_menu").add({ id: "1", value: "Add Voxel Mesh" });
+            $$("add_node_menu").add({ id: "10", value: "Add Voxel Mesh" });
             $$("inspect_panel").addView({
                 id: "voxel_mesh_edit_0", view: "accordionitem", hidden: true, header: "Edit Mesh", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -751,7 +751,7 @@
             };
 
 
-            $$("add_node_menu").add({ id: "10", value: "Add Particles" });
+            $$("add_node_menu").add({ id: "20", value: "Add Particles" });
             $$("inspect_panel").addView({
                 id: "particles_edit_0", view: "accordionitem", hidden: true, header: "Emission", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -951,7 +951,7 @@
                 uiEditor.sendMsg("editor.raycast.pointArgs", args);
             };
 
-            $$("add_node_menu").add({ id: "20", value: "Add Raycast Shape" });
+            $$("add_node_menu").add({ id: "30", value: "Add Raycast Shape" });
             $$("inspect_panel").addView({
                 id: "raycast_edit_0", view: "accordionitem", hidden: true, header: "Edit Raycast Shape", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -1081,7 +1081,7 @@
                 uiEditor.sendMsg("editor.collision.pointArgs", args);
             };
 
-            $$("add_node_menu").add({ id: "21", value: "Add Collision Shape" });
+            $$("add_node_menu").add({ id: "31", value: "Add Collision Shape" });
             $$("inspect_panel").addView({
                 id: "collision_edit_0", view: "accordionitem", hidden: true, header: "Edit Collision Shape", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -1198,9 +1198,6 @@
             }
             uiEditor["engine.prefab.editing"] = function(data) {
                 uiEditor.sendMsg("editor.stopEditing", "");
-            }
-            uiEditor["engine.prefab.saveFail"] = function(data) {
-                webix.alert(data);
             }
             uiEditor["engine.savePrefab"] = async function(data) {
                 try {

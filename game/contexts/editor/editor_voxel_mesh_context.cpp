@@ -4,8 +4,8 @@
 
 namespace game {
     void EditorNodeVoxelMesh::update(float dtSec) {
+        globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
         if (mesh) {
-            globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
             mesh->setPosition(globalPosition);
         }
     }
@@ -24,7 +24,7 @@ namespace game {
     }
 
     EditorVoxelMeshContext::EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess) : _api(std::move(api)), _nodeAccess(nodeAccess) {
-        EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::VOXEL)] = [](std::size_t typeIndex) {
+        EditorNode::makeByType[std::size_t(core::WorldInterface::NodeType::VOXEL)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodeVoxelMesh>(typeIndex));
         };
         

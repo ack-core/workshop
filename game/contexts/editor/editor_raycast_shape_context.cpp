@@ -10,6 +10,7 @@ namespace {
 namespace game {
     void EditorNodeRaycastShape::update(float dtSec) {
         globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
+        updateVisual();
     }
     void EditorNodeRaycastShape::setResourcePath(const API &api, const std::string &path) {
         if (path.empty()) {
@@ -22,34 +23,34 @@ namespace game {
                 description = desc;
                 points.clear();
                 
-                shapeType = static_cast<voxel::RaycastInterface::ShapeType>(description.getInteger("type", 1));
+                shapeType = static_cast<core::RaycastInterface::ShapeType>(description.getInteger("type", 1));
                 const std::vector<math::vector3f> p = description.getVector3fs("points");
                             
-                if (shapeType == voxel::RaycastInterface::ShapeType::SPHERES) {
+                if (shapeType == core::RaycastInterface::ShapeType::SPHERES) {
                     const std::vector<double> radiuses = description.getNumbers("radiuses");
                     for (std::size_t i = 0; i < p.size(); i++) {
                         points.emplace(getNextId(), Point {
                             p[i], math::vector3f(radiuses[i], 0, 0),
-                            api.scene->addBoundingSphere(math::vector4f(p[i], radiuses[i]), math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr, nullptr
+                            api.scene->addBoundingSphere(p[i], radiuses[i], math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr, nullptr
                         });
                     }
                 }
-                else if (shapeType == voxel::RaycastInterface::ShapeType::BOXES) {
+                else if (shapeType == core::RaycastInterface::ShapeType::BOXES) {
                     const std::vector<math::vector3f> sizes = description.getVector3fs("sizes");
                     for (std::size_t i = 0; i < p.size(); i++) {
-                        const math::vector3f bmin = p[i] - math::vector3f(0.5f);
-                        const math::vector3f bmax = p[i] + sizes[i] - math::vector3f(0.5f);
+                        const math::vector3f bmin = math::vector3f(0.5f);
+                        const math::vector3f bmax = sizes[i] - math::vector3f(0.5f);
                         points.emplace(getNextId(), Point {
                             p[i], sizes[i],
-                            nullptr, nullptr, api.scene->addBoundingBox({bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
+                            nullptr, nullptr, api.scene->addBoundingBox(p[i], {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
                         });
                     }
                 }
-                else if (shapeType == voxel::RaycastInterface::ShapeType::TRIANGLES) {
+                else if (shapeType == core::RaycastInterface::ShapeType::TRIANGLES) {
                     for (std::size_t i = 0; i < points.size(); i++) {
                         points.emplace(getNextId(), Point {
                             p[i], math::vector3f(0, 0, 0),
-                            nullptr, api.scene->addOctahedron(math::vector4f(p[i], 0.1f), math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
+                            nullptr, api.scene->addOctahedron(p[i], 0.2f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
                         });
                     }
                 }
@@ -57,28 +58,30 @@ namespace game {
                     api.platform->logError("[EditorNodeRaycastShape::setResourcePath] Unknown raycast shape type");
                 }
                 
-                updateVisual(api);
+                updateVisual();
+                api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             });
         }
     }
-    void EditorNodeRaycastShape::updateVisual(const API &api) {
+    void EditorNodeRaycastShape::updateVisual() {
         for (auto &item : points) {
             const math::vector3f pos = globalPosition + item.second.position;
             if (item.second.box) {
                 const math::bound3f bbox {
-                    pos.x - 0.5f, pos.y - 0.5f, pos.z - 0.5f,
-                    pos.x + item.second.args.x - 0.5f, pos.y + item.second.args.y - 0.5f, pos.z + item.second.args.z - 0.5f
+                    -0.5f, -0.5f, -0.5f,
+                    item.second.args.x - 0.5f, item.second.args.y - 0.5f, item.second.args.z - 0.5f
                 };
+                item.second.box->setPosition(pos);
                 item.second.box->setBBox(bbox);
             }
             else if (item.second.point) {
-                item.second.point->setPositionAndRadius(math::vector4f(pos, 0.1f));
+                item.second.point->setPosition(pos);
             }
             else if (item.second.sphere) {
-                item.second.sphere->setPositionAndRadius(math::vector4f(pos, item.second.args.x));
+                item.second.sphere->setPosition(pos);
+                item.second.sphere->setRadius(item.second.args.x);
             }
         }
-        api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
     }
 
     EditorRaycastShapeContext::EditorRaycastShapeContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess)
@@ -86,7 +89,7 @@ namespace game {
     , _nodeAccess(nodeAccess)
     , _cameraAccess(cameraAccess)
     {
-        EditorNode::makeByType[std::size_t(voxel::WorldInterface::NodeType::RAYCAST)] = [](std::size_t typeIndex) {
+        EditorNode::makeByType[std::size_t(core::WorldInterface::NodeType::RAYCAST)] = [](std::size_t typeIndex) {
             return std::static_pointer_cast<EditorNode>(std::make_shared<EditorNodeRaycastShape>(typeIndex));
         };
         
@@ -119,7 +122,7 @@ namespace game {
         if (std::shared_ptr<EditorNodeRaycastShape> node = std::dynamic_pointer_cast<EditorNodeRaycastShape>(_nodeAccess.getSelectedNode().lock())) {
             if (_movePointTool) {
                 _movePointTool->setBase(node->globalPosition);
-                node->updateVisual(_api);
+                node->updateVisual();
             }
         }
     }
@@ -205,17 +208,17 @@ namespace game {
             for (const auto &item : node->points) {
                 node->description.setVector3f("points", item.second.position, false);
             }
-            if (node->shapeType == voxel::RaycastInterface::ShapeType::SPHERES) {
+            if (node->shapeType == core::RaycastInterface::ShapeType::SPHERES) {
                 for (const auto &item : node->points) {
                     node->description.setNumber("radiuses", item.second.args.x, false);
                 }
             }
-            else if (node->shapeType == voxel::RaycastInterface::ShapeType::BOXES) {
+            else if (node->shapeType == core::RaycastInterface::ShapeType::BOXES) {
                 for (const auto &item : node->points) {
                     node->description.setVector3f("sizes", item.second.args, false);
                 }
             }
-            else if (node->shapeType == voxel::RaycastInterface::ShapeType::TRIANGLES) {
+            else if (node->shapeType == core::RaycastInterface::ShapeType::TRIANGLES) {
                 // TODO: indexes
             }
             const std::string extPath = node->resourcePath + ".txt";
@@ -236,7 +239,7 @@ namespace game {
             util::strstream input(data.c_str(), data.length());
             int type = 0;
             if (input >> type) {
-                node->shapeType = voxel::RaycastInterface::ShapeType(type);
+                node->shapeType = core::RaycastInterface::ShapeType(type);
                 node->points.clear();
                 _movePointTool = nullptr;
                 _currentPoint = 0;
@@ -248,24 +251,24 @@ namespace game {
     bool EditorRaycastShapeContext::_addPoint(const std::string &data) {
         std::shared_ptr<EditorNodeRaycastShape> node = std::dynamic_pointer_cast<EditorNodeRaycastShape>(_nodeAccess.getSelectedNode().lock());
         if (node) {
-            if (node->shapeType == voxel::RaycastInterface::ShapeType::SPHERES) {
+            if (node->shapeType == core::RaycastInterface::ShapeType::SPHERES) {
                 _currentPoint = getNextId();
                 node->points.emplace(_currentPoint, EditorNodeRaycastShape::Point {
-                    {0, 0, 0}, {1, 1, 1}, _api.scene->addBoundingSphere(math::vector4f({0, 0, 0}, 1.0f), math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr, nullptr
+                    {0, 0, 0}, {1, 1, 1}, _api.scene->addBoundingSphere({0, 0, 0}, 1.0f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr, nullptr
                 });
             }
-            else if (node->shapeType == voxel::RaycastInterface::ShapeType::BOXES) {
+            else if (node->shapeType == core::RaycastInterface::ShapeType::BOXES) {
                 _currentPoint = getNextId();
                 const math::vector3f bmin = {-0.5f, -0.5f, -0.5f};
                 const math::vector3f bmax = {+0.5f, +0.5f, +0.5f};
                 node->points.emplace(_currentPoint, EditorNodeRaycastShape::Point {
-                    {0, 0, 0}, {1, 1, 1}, nullptr, nullptr, _api.scene->addBoundingBox({bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
+                    {0, 0, 0}, {1, 1, 1}, nullptr, nullptr, _api.scene->addBoundingBox({0, 0, 0}, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
                 });
             }
-            else if (node->shapeType == voxel::RaycastInterface::ShapeType::TRIANGLES) {
+            else if (node->shapeType == core::RaycastInterface::ShapeType::TRIANGLES) {
                 _currentPoint = getNextId();
                 node->points.emplace(_currentPoint, EditorNodeRaycastShape::Point {
-                    {0, 0, 0}, {1, 1, 1}, nullptr, _api.scene->addOctahedron({0, 0, 0, 0.1f}, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
+                    {0, 0, 0}, {1, 1, 1}, nullptr, _api.scene->addOctahedron({0, 0, 0}, 0.2f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
                 });
             }
             _sendCurrentPointParameters(*node, true);

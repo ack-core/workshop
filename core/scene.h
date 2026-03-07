@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace voxel {
+namespace core {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 4;
 
     // TODO: remove and use just util::Description
@@ -37,22 +37,29 @@ namespace voxel {
         
     public:
         struct LineSet {
-            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow = false) = 0;
             virtual void capLineCount(std::uint32_t limit) = 0;
             virtual ~LineSet() = default;
         };
         struct Octahedron {
-            virtual void setPositionAndRadius(const math::vector4f &arg) = 0;
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
+            virtual void setRadius(float radius) = 0;
             virtual void setColor(const math::color &rgba) = 0;
             virtual ~Octahedron() = default;
         };
         struct BoundingSphere {
-            virtual void setPositionAndRadius(const math::vector4f &arg) = 0;
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
+            virtual void setRadius(float radius) = 0;
             virtual void setColor(const math::color &rgba) = 0;
             virtual ~BoundingSphere() = default;
         };
         struct BoundingBox {
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setBBox(const math::bound3f &bbox) = 0;
             virtual void setColor(const math::color &rgba) = 0;
             virtual ~BoundingBox() = default;
@@ -61,15 +68,16 @@ namespace voxel {
             virtual void resetOffset() = 0;
             virtual auto getCenterOffset() const -> math::vector3f = 0;
             virtual void setCenterOffset(const math::vector3f& offset) = 0;
-            virtual void setPosition(const math::vector3f &position) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setFrame(std::uint32_t index) = 0;
             virtual auto getFrameCount() const -> std::uint32_t = 0;
             virtual auto getDescription() const -> const util::Description & = 0;
             virtual ~VoxelMesh() = default;
         };
         struct TexturedMesh {
-            virtual void setPosition(const math::vector3f &position) = 0;
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
             virtual ~TexturedMesh() = default;
         };
         struct Particles {
@@ -96,9 +104,9 @@ namespace voxel {
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
         virtual auto addLineSet() -> LineSetPtr = 0;
-        virtual auto addOctahedron(const math::vector4f &args, const math::color &rgba) -> OctahedronPtr = 0;
-        virtual auto addBoundingSphere(const math::vector4f &args, const math::color &rgba) -> BoundingSpherePtr = 0;
-        virtual auto addBoundingBox(const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
+        virtual auto addOctahedron(const math::vector3f &position, float radius, const math::color &rgba) -> OctahedronPtr = 0;
+        virtual auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr = 0;
+        virtual auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
         virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;
         virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;
@@ -111,6 +119,10 @@ namespace voxel {
         virtual void updateAndDraw(float dtSec) = 0;
         
         virtual void setLinesDrawingEnabled(bool enabled) = 0;
+        
+    public:
+        static void fillLineSetAsCircle(const LineSetPtr &lineSet, std::uint32_t segCount, float radius, const math::color &rgba);
+        static void fillLineSetAsСlosedСircuit(const LineSetPtr &lineSet, const std::vector<math::vector3f> &points, const math::color &rgba);
         
     public:
         virtual ~SceneInterface() = default;

@@ -19,10 +19,10 @@ namespace game {
         math::vector2f _lockedCoordinates;
         math::vector3f _orbit = { 45, 45, 45 };
         
-        voxel::SceneInterface::LineSetPtr _axis;
-        voxel::SceneInterface::OctahedronPtr _point;
-        voxel::SceneInterface::BoundingSpherePtr _bsphere;
-        voxel::WorldInterface::ObjectPtr _object;
+        core::SceneInterface::LineSetPtr _axis;
+        core::SceneInterface::OctahedronPtr _point;
+        core::SceneInterface::BoundingSpherePtr _bsphere;
+        core::WorldInterface::ObjectPtr _object;
         
     };
 }

@@ -11,13 +11,13 @@
 
 #include <list>
 
-namespace voxel {
+namespace core {
     ParticlesParams::ParticlesParams(const util::Description &desc) {
         float bakingTimeTable[] = {
             0.0f, 0.010f, 0.020f, 0.050f, 0.100f
         };
         additiveBlend = desc.getBool("additiveBlend", false);
-        orientation = static_cast<voxel::ParticlesParams::ParticlesOrientation>(desc.getInteger("particleOrientation", 0));
+        orientation = static_cast<core::ParticlesParams::ParticlesOrientation>(desc.getInteger("particleOrientation", 0));
         bakingTimeSec = bakingTimeTable[desc.getInteger("bakingFrameType", 0)];
         minXYZ = desc.getVector3f("minXYZ", {});
         maxXYZ = desc.getVector3f("maxXYZ", {});
@@ -25,7 +25,7 @@ namespace voxel {
     }
 }
 
-namespace voxel {
+namespace core {
     class LineSetImpl : public SceneInterface::LineSet {
     public:
         struct Line {
@@ -49,6 +49,9 @@ namespace voxel {
     public:
         void setPosition(const math::vector3f &pos) override {
             position = pos;
+        }
+        void setTransform(const math::transform3f &trfm) override {
+            
         }
         void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow) override {
             if (index >= lines.size()) {
@@ -85,20 +88,31 @@ namespace voxel {
     struct OctahedronImpl : public SceneInterface::Octahedron {
     public:
         struct OctahedronData {
-            math::vector4f positionRadius;
+            math::transform3f transform;
+            math::vector4f radius;
             math::color color;
         }
         octahedronData;
 
     public:
-        void setPositionAndRadius(const math::vector4f &arg) override {
-            octahedronData.positionRadius = arg;
+        void setTransform(const math::transform3f &trfm) override {
+            octahedronData.transform = trfm;
+        }
+        void setPosition(const math::vector3f &pos) override {
+            octahedronData.transform = math::transform3f::identity().translated(pos);
+        }
+        void setRadius(float radius) override {
+            octahedronData.radius.x = radius;
         }
         void setColor(const math::color &rgba) override {
             octahedronData.color = rgba;
         }
     public:
-        OctahedronImpl(const math::vector4f& args, const math::color &rgba) : octahedronData{args, rgba} {}
+        OctahedronImpl(const math::vector3f &position, float radius, const math::color &rgba) {
+            octahedronData.transform = math::transform3f::identity().translated(position);
+            octahedronData.radius.x = radius;
+            octahedronData.color = rgba;
+        }
         ~OctahedronImpl() override {}
     };
     
@@ -107,20 +121,31 @@ namespace voxel {
     struct BoundingSphereImpl : public SceneInterface::BoundingSphere {
     public:
         struct BSphereData {
-            math::vector4f positionRadius;
+            math::transform3f transform;
+            math::vector4f radius;
             math::color color;
         }
         bsphereData;
 
     public:
-        void setPositionAndRadius(const math::vector4f &arg) override {
-            bsphereData.positionRadius = arg;
+        void setTransform(const math::transform3f &trfm) override {
+            bsphereData.transform = trfm;
+        }
+        void setPosition(const math::vector3f &pos) override {
+            bsphereData.transform = math::transform3f::identity().translated(pos);
+        }
+        void setRadius(float radius) override {
+            bsphereData.radius.x = radius;
         }
         void setColor(const math::color &rgba) override {
             bsphereData.color = rgba;
         }
     public:
-        BoundingSphereImpl(const math::vector4f& args, const math::color &rgba) : bsphereData{args, rgba} {}
+        BoundingSphereImpl(const math::vector3f &position, float radius, const math::color &rgba) {
+            bsphereData.transform = math::transform3f::identity().translated(position);
+            bsphereData.radius.x = radius;
+            bsphereData.color = rgba;
+        }
         ~BoundingSphereImpl() override {}
     };
 
@@ -130,6 +155,7 @@ namespace voxel {
     class BoundingBoxImpl : public SceneInterface::BoundingBox {
     public:
         struct BBoxData {
+            math::transform3f transform;
             math::color color;
             math::vector4f min;
             math::vector4f max;
@@ -137,6 +163,12 @@ namespace voxel {
         bboxData;
         
     public:
+        void setTransform(const math::transform3f &trfm) override {
+            bboxData.transform = trfm;
+        }
+        void setPosition(const math::vector3f &pos) override {
+            bboxData.transform = math::transform3f::identity().translated(pos);
+        }
         void setBBox(const math::bound3f &bbox) override {
             bboxData.min = math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 1.0f);
             bboxData.max = math::vector4f(bbox.xmax, bbox.ymax, bbox.zmax, 1.0f);
@@ -146,8 +178,10 @@ namespace voxel {
         }
         
     public:
-        BoundingBoxImpl(const math::bound3f &bbox, const math::color &rgba) : bboxData{rgba} {
+        BoundingBoxImpl(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) {
+            setPosition(position);
             setBBox(bbox);
+            setColor(rgba);
         }
         ~BoundingBoxImpl() override {}
     };
@@ -229,6 +263,9 @@ namespace voxel {
         math::vector4f position = {0, 0, 0, 1};
         
     public:
+        void setTransform(const math::transform3f &trfm) override {
+
+        }
         void setPosition(const math::vector3f &position) override {
             this->position = position.atv4start(1.0f);
         }
@@ -358,9 +395,9 @@ namespace voxel {
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
         auto addLineSet() -> LineSetPtr override;
-        auto addOctahedron(const math::vector4f &args, const math::color &rgba) -> OctahedronPtr override;
-        auto addBoundingSphere(const math::vector4f &args, const math::color &rgba) -> BoundingSpherePtr override;
-        auto addBoundingBox(const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
+        auto addOctahedron(const math::vector3f &position, float radius, const math::color &rgba) -> OctahedronPtr override;
+        auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr override;
+        auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
         auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
@@ -479,15 +516,16 @@ namespace {
                 [-1, 0, 0][0, 0, -1][0, 0, -1][1, 0, 0][1, 0, 0][0, 0, 1][0, 0, 1][-1, 0, 0]
         }
         const {
-            position_radius : float4
+            transform : matrix4
+            radius : float4
             color : float4
         }
         inout {
             color : float4
         }
         vssrc {
-            float3 position = fixed_lines[repeat_ID] * const_position_radius.w;
-            output_position = _transform(float4(const_position_radius.xyz + position, 1.0), frame_plmVPMatrix);
+            float4 position = float4(fixed_lines[repeat_ID] * const_radius.x, 1.0);
+            output_position = _transform(_transform(position, const_transform), frame_plmVPMatrix);
             output_color = const_color;
         }
         fssrc {
@@ -499,7 +537,8 @@ namespace {
             axis[3] : float4 = [1, 0, 0, 1][1, 0, 1, 0][0, 1, 0, 1]
         }
         const {
-            position_radius : float4
+            transform : matrix4
+            radius : float4
             color : float4
         }
         inout {
@@ -508,10 +547,10 @@ namespace {
         vssrc {
             float  koeff = 2.0 * 3.14159265359 * float(repeat_ID) / 31.0;
             float3 relPos = float3(0, 0, 0);
-            relPos.x = const_position_radius.w * _sin(koeff) * fixed_axis[vertex_ID].x;
-            relPos.y = const_position_radius.w * (_sin(koeff) * fixed_axis[vertex_ID].y + _cos(koeff) * fixed_axis[vertex_ID].z);
-            relPos.z = const_position_radius.w * _cos(koeff) * fixed_axis[vertex_ID].w;
-            output_position = _transform(float4(const_position_radius.xyz + relPos, 1.0f), frame_plmVPMatrix);
+            relPos.x = const_radius.x * _sin(koeff) * fixed_axis[vertex_ID].x;
+            relPos.y = const_radius.x * (_sin(koeff) * fixed_axis[vertex_ID].y + _cos(koeff) * fixed_axis[vertex_ID].z);
+            relPos.z = const_radius.x * _cos(koeff) * fixed_axis[vertex_ID].w;
+            output_position = _transform(_transform(float4(relPos, 1.0f), const_transform), frame_plmVPMatrix);
         }
         fssrc {
             output_color[0] = const_color;
@@ -528,13 +567,14 @@ namespace {
                 [0, 1, 0][0, 1, 1][1, 0, 1][1, 1, 1]
         }
         const {
+            transform : matrix4
             color : float4
             bbmin : float4
             bbmax : float4
         }
         vssrc {
             float4 position = _lerp(const_bbmin, const_bbmax, float4(fixed_lines[repeat_ID], 0.0));
-            output_position = _transform(position, frame_plmVPMatrix);
+            output_position = _transform(_transform(position, const_transform), frame_plmVPMatrix);
         }
         fssrc {
             output_color[0] = const_color;
@@ -708,7 +748,7 @@ namespace {
     )";
 }
 
-namespace voxel {
+namespace core {
     SceneInterfaceImpl::SceneInterfaceImpl(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering
@@ -776,16 +816,16 @@ namespace voxel {
         return _lineSets.emplace_back(std::make_shared<LineSetImpl>());
     }
     
-    SceneInterface::OctahedronPtr SceneInterfaceImpl::addOctahedron(const math::vector4f &args, const math::color &rgba) {
-        return _octahedrons.emplace_back(std::make_shared<OctahedronImpl>(args, rgba));
+    SceneInterface::OctahedronPtr SceneInterfaceImpl::addOctahedron(const math::vector3f &position, float radius, const math::color &rgba) {
+        return _octahedrons.emplace_back(std::make_shared<OctahedronImpl>(position, radius, rgba));
     }
     
-    SceneInterface::BoundingSpherePtr SceneInterfaceImpl::addBoundingSphere(const math::vector4f &args, const math::color &rgba) {
-        return _boundingSpheres.emplace_back(std::make_shared<BoundingSphereImpl>(args, rgba));
+    SceneInterface::BoundingSpherePtr SceneInterfaceImpl::addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) {
+        return _boundingSpheres.emplace_back(std::make_shared<BoundingSphereImpl>(position, radius, rgba));
     }
     
-    SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::bound3f &bbox, const math::color &rgba) {
-        return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(bbox, rgba));
+    SceneInterface::BoundingBoxPtr SceneInterfaceImpl::addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) {
+        return _boundingBoxes.emplace_back(std::make_shared<BoundingBoxImpl>(position, bbox, rgba));
     }
     
     SceneInterface::VoxelMeshPtr SceneInterfaceImpl::addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) {
@@ -922,6 +962,29 @@ namespace voxel {
 
     void SceneInterfaceImpl::setLinesDrawingEnabled(bool enabled) {
         _lineDrawingEnabled = enabled;
+    }
+
+    void SceneInterface::fillLineSetAsCircle(const SceneInterface::LineSetPtr &lineSet, std::uint32_t segCount, float radius, const math::color &rgba) {
+        for (std::uint32_t i = 0; i < segCount; i++) {
+            const float koeff0 = 2.0f * M_PI * float(i) / float(segCount);
+            const float koeff1 = 2.0f * M_PI * float(i + 1) / float(segCount);
+            const math::vector3f p0 = math::vector3f(radius * std::cosf(koeff0), 0.0f, radius * std::sinf(koeff0));
+            const math::vector3f p1 = math::vector3f(radius * std::cosf(koeff1), 0.0f, radius * std::sinf(koeff1));
+            lineSet->setLine(i, p0, p1, rgba);
+        }
+        lineSet->capLineCount(segCount);
+    }
+    void SceneInterface::fillLineSetAsСlosedСircuit(const SceneInterface::LineSetPtr &lineSet, const std::vector<math::vector3f> &points, const math::color &rgba) {
+        std::uint32_t lineIndex = 0;
+        for (auto index = points.begin(); index != points.end(); ++index) {
+            auto next = index;
+            if (++next == points.end()) {
+                next = points.begin();
+            }
+            
+            lineSet->setLine(lineIndex++, *index, *next, {0.0f, 1.0f, 1.0f, 0.7f});
+        }
+        lineSet->capLineCount(lineIndex);
     }
 }
 

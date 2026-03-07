@@ -26,6 +26,6 @@ namespace game {
         math::vector3f _orbit = {100, 100, 100};
         int movLR = 0, movBF = 0;
 
-        voxel::SceneInterface::LineSetPtr _axis;
+        core::SceneInterface::LineSetPtr _axis;
     };
 }

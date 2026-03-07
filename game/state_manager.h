@@ -2,10 +2,10 @@
 #pragma once
 #include <memory>
 
-#include "voxel/scene.h"
-#include "voxel/world.h"
-#include "voxel/raycast.h"
-#include "voxel/simulation.h"
+#include "core/scene.h"
+#include "core/world.h"
+#include "core/raycast.h"
+#include "core/simulation.h"
 #include "ui/stage.h"
 #include "datahub/datahub.h"
 
@@ -14,12 +14,11 @@ namespace game {
     public:
         static std::shared_ptr<StateManager> instance(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
             const resource::ResourceProviderPtr &resourceProvider,
-            const voxel::SceneInterfacePtr &scene,
-            const voxel::WorldInterfacePtr &world,
-            const voxel::RaycastInterfacePtr &raycast,
-            const voxel::SimulationInterfacePtr &simulation,
+            const core::SceneInterfacePtr &scene,
+            const core::WorldInterfacePtr &world,
+            const core::RaycastInterfacePtr &raycast,
+            const core::SimulationInterfacePtr &simulation,
             const ui::StageInterfacePtr &ui,
             const dh::DataHubPtr &dh
         );

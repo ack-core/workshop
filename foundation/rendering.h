@@ -123,6 +123,8 @@ namespace foundation {
     //
     class RenderingInterface {
     public:
+        // Gets or creates an instance. There can be only one instance
+        //
         static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
         
     public:

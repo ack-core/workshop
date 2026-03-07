@@ -14,6 +14,6 @@ set(
 	"${m_source_root}/simulation.cpp"
 )
 source_group("" FILES ${m_sources_list})
-add_library(voxel ${m_sources_list})
+add_library(core ${m_sources_list})
 
-set_property(TARGET voxel PROPERTY FOLDER "engine")
+set_property(TARGET core PROPERTY FOLDER "engine")

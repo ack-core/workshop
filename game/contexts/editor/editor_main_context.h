@@ -7,17 +7,14 @@
 #include "editor_moving_tool.h"
 
 // Ideas for the buttons at the top:
-// + center camera pivot to selected object
-// + enable/disable 30fps update
 //
 
 // Editor TODO:
 // + reload prefabs on resources change
 // + ask before deleting resource
-// + separate features in html/js for editor (everything about 'mesh' inside a single function)
 // + button in nodes panel are scrolling with panel -> separate them
 // BUGS:
-// + transform in 3+ hierarchy
+// +
 
 namespace game {
     class EditorMainContext : public Context, public NodeAccessInterface {
@@ -28,7 +25,7 @@ namespace game {
         const std::weak_ptr<EditorNode> &getSelectedNode() const override;
         bool hasNodeWithName(const std::string &name) const override;
         void forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) override;
-        void createNode(voxel::WorldInterface::NodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) override;
+        void createNode(core::WorldInterface::NodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) override;
         
         void update(float dtSec) override;
         
@@ -36,7 +33,7 @@ namespace game {
         const API _api;
         CameraAccessInterface &_cameraAccess;
         foundation::EventHandlerToken _editorEventsToken;
-        voxel::SceneInterface::LineSetPtr _axis;
+        core::SceneInterface::LineSetPtr _axis;
         
         std::unique_ptr<MovingTool> _movingTool;
         std::unordered_map<std::string, std::shared_ptr<EditorNode>> _nodes;
@@ -46,8 +43,8 @@ namespace game {
         bool _doUpdateEveryFrame = false;
         bool _isEditing = false;
         
-        voxel::SceneInterface::OctahedronPtr _point;
-        voxel::SceneInterface::BoundingSpherePtr _bsphere;
+        core::SceneInterface::OctahedronPtr _point;
+        core::SceneInterface::BoundingSpherePtr _bsphere;
 
         
     private:
