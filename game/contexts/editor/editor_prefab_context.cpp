@@ -4,17 +4,23 @@
 
 namespace game {
     void EditorNodePrefab::update(float dtSec) {
-
+        globalPosition = localPosition;
+        if (worldObject) {
+            worldObject->setPosition(globalPosition);
+        }
     }
 
     void EditorNodePrefab::setResourcePath(const API &api, const std::string &path) {
         if (path.empty()) {
             resourcePath = EDITOR_EMPTY_RESOURCE_PATH;
-            prefabDesc = {};
         }
         else {
             resourcePath = path;
-            prefabDesc = api.resources->getPrefab(path.c_str());
+            api.world->removeObject(name.data());
+            worldObject = api.world->createObject(name.data(), resourcePath.data());
+            worldObject->loadResources([&api](core::WorldInterface::Object &) {
+                api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
+            });
         }
     }
 
@@ -63,7 +69,8 @@ namespace game {
     
     bool EditorPrefabContext::_startEditing(const std::string &data) {
         if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
-            const std::map<std::string, const util::Description *> descs = node->prefabDesc.getDescriptions();
+            const util::Description &prefabDesc = _api.resources->getPrefab(node->resourcePath.c_str());
+            const std::map<std::string, const util::Description *> descs = prefabDesc.getDescriptions();
             for (auto &index : descs) {
                 math::vector3f position = index.second->getVector3f("position", {});
                 

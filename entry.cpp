@@ -29,9 +29,9 @@ extern "C" void initialize() {
         rendering = foundation::RenderingInterface::instance(platform);
         resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
         scene = core::SceneInterface::instance(platform, rendering);
-        world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
         raycast = core::RaycastInterface::instance(platform, scene);
         simulation = core::SimulationInterface::instance(platform, scene);
+        world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
         stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
         datahub = dh::DataHub::instance(platform, game::datahub);
         stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
@@ -42,6 +42,7 @@ extern "C" void initialize() {
             stateManager->update(dtSec);
             world->update(dtSec);
             simulation->update(dtSec);
+            raycast->update(dtSec);
             scene->updateAndDraw(dtSec);
             stage->updateAndDraw(dtSec);
             rendering->presentFrame();

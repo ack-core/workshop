@@ -23,7 +23,7 @@ namespace game {
     public:
         const API &_api;
         const CameraAccessInterface &_cameraAccess;
-        core::SceneInterface::LineSetPtr _lineset;
+        core::SceneInterface::ArrowsPtr _arrows;
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         util::callback<void()> _onDragEnd;
         math::vector3f *_target = nullptr;

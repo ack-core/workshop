@@ -14,7 +14,8 @@ namespace core {
             
         }
         void setTransform(const math::transform3f &trfm) override {
-            _position = math::vector3f(trfm.m41, trfm.m42, trfm.m43);
+            _position = math::vector3f(trfm.m41, 0.0f, trfm.m43);
+            _visual->setPosition(_position);
         }
         void setVelocity(const math::vector3f &v) override {
             
@@ -31,15 +32,16 @@ namespace core {
 namespace core {
     class ObstaclePolygonXZImpl : public SimulationInterface::Body {
     public:
-        ObstaclePolygonXZImpl(const core::SceneInterfacePtr &scene, std::vector<math::vector3f> &&points) : _points(std::move(points)) {
+        ObstaclePolygonXZImpl(const core::SceneInterfacePtr &scene, std::vector<math::vector3f> &&points) : _src(std::move(points)) {
             _visual = scene->addLineSet();
-            SceneInterface::fillLineSetAsСlosedСircuit(_visual, points, {0.0f, 1.0f, 1.0f, 0.7f});
+            SceneInterface::fillLineSetAsСlosedСircuit(_visual, _src, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         ~ObstaclePolygonXZImpl() override {
             
         }
         void setTransform(const math::transform3f &trfm) override {
             _transform = trfm;
+            _visual->setTransform(trfm);
         }
         void setVelocity(const math::vector3f &v) override {
             
@@ -47,6 +49,7 @@ namespace core {
 
     private:
         math::transform3f _transform;
+        std::vector<math::vector3f> _src;
         std::vector<math::vector3f> _points;
         core::SceneInterface::LineSetPtr _visual;
     };
@@ -60,7 +63,7 @@ namespace core {
         
     public:
         auto addBody(const util::Description &desc) -> BodyPtr override {
-            const core::SimulationInterface::ShapeType shapeType = static_cast<core::SimulationInterface::ShapeType>(desc.getInteger("type", 1));
+            const core::SimulationInterface::ShapeType shapeType = static_cast<core::SimulationInterface::ShapeType>(desc.getInteger("type", 0));
             BodyPtr result;
             
             if (shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
@@ -78,7 +81,8 @@ namespace core {
             return result;
         }
         void update(float dtSec) override {
-            
+            util::cleanupUnused(_circlesXZ);
+            util::cleanupUnused(_obstaclesXZ);
         }
 
     private:

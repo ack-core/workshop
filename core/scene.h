@@ -36,19 +36,19 @@ namespace core {
         );
         
     public:
+        struct Arrows {
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
+            virtual void setArrow(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
+            virtual void clear() = 0;
+            virtual ~Arrows() = default;
+        };
         struct LineSet {
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
-            virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow = false) = 0;
-            virtual void capLineCount(std::uint32_t limit) = 0;
+            virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
+            virtual void clear() = 0;
             virtual ~LineSet() = default;
-        };
-        struct Octahedron {
-            virtual void setTransform(const math::transform3f &trfm) = 0;
-            virtual void setPosition(const math::vector3f &pos) = 0;
-            virtual void setRadius(float radius) = 0;
-            virtual void setColor(const math::color &rgba) = 0;
-            virtual ~Octahedron() = default;
         };
         struct BoundingSphere {
             virtual void setTransform(const math::transform3f &trfm) = 0;
@@ -90,8 +90,8 @@ namespace core {
             virtual ~LightSource() = default;
         };
         
+        using ArrowsPtr = std::shared_ptr<Arrows>;
         using LineSetPtr = std::shared_ptr<LineSet>;
-        using OctahedronPtr = std::shared_ptr<Octahedron>;
         using BoundingSpherePtr = std::shared_ptr<BoundingSphere>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using VoxelMeshPtr = std::shared_ptr<VoxelMesh>;
@@ -103,8 +103,8 @@ namespace core {
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
+        virtual auto addArrows() -> ArrowsPtr = 0;
         virtual auto addLineSet() -> LineSetPtr = 0;
-        virtual auto addOctahedron(const math::vector3f &position, float radius, const math::color &rgba) -> OctahedronPtr = 0;
         virtual auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr = 0;
         virtual auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
         virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;

@@ -120,7 +120,7 @@ namespace resource {
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) override;
         
-        auto getPrefab(const char *prefabPath) -> util::Description override;
+        auto getPrefab(const char *prefabPath) -> const util::Description & override;
         
         void removeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
@@ -439,6 +439,7 @@ namespace resource {
                                 std::uint32_t w, h;
                             };
                             self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak, path, bin = std::move(mem), offset, len](AsyncContext &ctx) {
+                                //--- worker thread ---
                                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                                     const std::uint8_t *data = bin.get() + offset;
                                     upng_t *upng = upng_new_from_bytes(data, (unsigned long)(len - offset));
@@ -457,6 +458,7 @@ namespace resource {
                                         self->_platform->logError("[GroundProviderImpl::getOrLoadGround] '%s' does not contain valid image", path.data());
                                     }
                                 }
+                                //--- worker thread ---
                             },
                             [weak, path, completion = std::move(completion), gd = std::move(ground)](AsyncContext &ctx) mutable {
                                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
@@ -598,7 +600,7 @@ namespace resource {
         }
     }
     
-    util::Description ResourceProviderImpl::getPrefab(const char *prefabPath) {
+    const util::Description &ResourceProviderImpl::getPrefab(const char *prefabPath) {
         auto index = _prefabs.find(prefabPath);
         if (index != _prefabs.end()) {
             return index->second;
@@ -607,7 +609,7 @@ namespace resource {
             _platform->logError("[ResourceProviderImpl::getPrefab] Unable to find prefab '%s'", prefabPath);
         }
         
-        return {};
+        return util::Description::emptyDesc;
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {

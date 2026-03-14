@@ -17,12 +17,14 @@ namespace game {
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
-        math::vector3f _orbit = { 45, 45, 45 };
+        math::vector3f _orbit = { 25, 25, 25 };
         
         core::SceneInterface::LineSetPtr _axis;
-        core::SceneInterface::OctahedronPtr _point;
-        core::SceneInterface::BoundingSpherePtr _bsphere;
-        core::WorldInterface::ObjectPtr _object;
+        core::WorldInterface::ObjectPtr _knight;
+        core::WorldInterface::ObjectPtr _pilon;
         
+//        core::SceneInterface::BoundingSpherePtr _bsphere;
+//        core::SceneInterface::BoundingBoxPtr _bbox;
+        core::SceneInterface::LineSetPtr _rayOut;
     };
 }

@@ -18,6 +18,7 @@ namespace core {
     public:
         auto getObject(const char *name) -> ObjectPtr override;
         auto createObject(const char *name, const char *prefabPath) -> ObjectPtr override;
+        void removeObject(const char *name) override;
         void update(float dtSec) override;
 
         foundation::PlatformInterface &getPlatform() const { return *_platform; }
@@ -123,7 +124,7 @@ namespace core {
         
         void setPosition(const math::vector3f &pos) override {
             _nodes[0]->localTransform.rv3 = pos.atv4start(1.0f).block;
-            _nodes[0]->worldTransform.rv3 = pos.atv4start(1.0f).block;
+            _nodes[0]->worldTransform = _nodes[0]->localTransform;
         }
         void setTransform(const math::transform3f &trfm) override {
             _nodes[0]->localTransform = _nodes[0]->worldTransform = trfm;
@@ -219,7 +220,6 @@ namespace core {
     };
     
     struct RaycastNode : public ObjectNode {
-        float t = 0;
         core::RaycastInterface::ShapePtr shape;
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
@@ -245,7 +245,6 @@ namespace core {
     };
     
     struct CollisionNode : public ObjectNode {
-        float t = 0;
         core::SimulationInterface::BodyPtr body;
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
@@ -292,6 +291,12 @@ namespace core {
         g_nodeConstructors[int(WorldInterface::NodeType::PARTICLES)] = []() -> std::unique_ptr<ObjectNode> {
             return std::make_unique<ParticlesNode>();
         };
+        g_nodeConstructors[int(WorldInterface::NodeType::RAYCAST)] = []() -> std::unique_ptr<ObjectNode> {
+            return std::make_unique<RaycastNode>();
+        };
+        g_nodeConstructors[int(WorldInterface::NodeType::COLLISION)] = []() -> std::unique_ptr<ObjectNode> {
+            return std::make_unique<CollisionNode>();
+        };
     }
     WorldImpl::~WorldImpl() {
     
@@ -317,6 +322,9 @@ namespace core {
             _platform->logError("[WorldImpl::createObject] Prefab '%s' has no valid nodes", prefabPath);
         }
         return nullptr;
+    }
+    void WorldImpl::removeObject(const char *name) {
+        _objects.erase(name);
     }
     void WorldImpl::update(float dtSec) {
         for (auto index = _objects.begin(); index != _objects.end(); ) {

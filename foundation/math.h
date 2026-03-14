@@ -947,6 +947,30 @@ namespace math {
         scalar xmax;
         scalar ymax;
         scalar zmax;
+        
+        static math::bound3f getWorldBounds(const math::transform3f &sphereTransform, float sphereRadius) {
+            const math::vector3f center(sphereTransform.m41, sphereTransform.m42, sphereTransform.m43);
+            return {
+                center.x - sphereRadius, center.y - sphereRadius, center.z - sphereRadius,
+                center.x + sphereRadius, center.y + sphereRadius, center.z + sphereRadius
+            };
+        }
+
+        static math::bound3f getWorldBounds(const math::transform3f &boxTransform, const math::bound3f &bb) {
+            auto extent = [&bb](float r0, float r1, float r2, bool maxAxis) {
+                float x = (r0 >= 0.0f) == maxAxis ? bb.xmax : bb.xmin;
+                float y = (r1 >= 0.0f) == maxAxis ? bb.ymax : bb.ymin;
+                float z = (r2 >= 0.0f) == maxAxis ? bb.zmax : bb.zmin;
+                return x * r0 + y * r1 + z * r2;
+            };
+            float xmin = extent(boxTransform.m11, boxTransform.m12, boxTransform.m13, false) + boxTransform.m41;
+            float xmax = extent(boxTransform.m11, boxTransform.m12, boxTransform.m13, true)  + boxTransform.m41;
+            float ymin = extent(boxTransform.m21, boxTransform.m22, boxTransform.m23, false) + boxTransform.m42;
+            float ymax = extent(boxTransform.m21, boxTransform.m22, boxTransform.m23, true)  + boxTransform.m42;
+            float zmin = extent(boxTransform.m31, boxTransform.m32, boxTransform.m33, false) + boxTransform.m43;
+            float zmax = extent(boxTransform.m31, boxTransform.m32, boxTransform.m33, true)  + boxTransform.m43;
+            return { xmin, ymin, zmin, xmax, ymax, zmax };
+        }
     };
     
     //---

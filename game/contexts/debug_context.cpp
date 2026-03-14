@@ -31,8 +31,31 @@ namespace game {
                     }
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
-                    dbg_switch = !dbg_switch;
                     _pointerId = foundation::INVALID_POINTER_ID;
+                    
+                    const math::vector2f screenCoord = math::vector2f(args.coordinateX, args.coordinateY);
+                    math::vector3f camPos;
+                    math::vector3f worldDir = _api.scene->getWorldDirection(screenCoord, &camPos);
+                    auto result = _api.raycast->rayCast(camPos, worldDir, 100.0f);
+                    if (result.intersected) {
+                        _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
+                    }
+//                    {
+//                        math::transform3f sphereTransform = math::transform3f::identity().translated({10, 0, 0});
+//                        math::IntersectResult result = math::intersectRaySphere(camPos, worldDir, 100.0f, sphereTransform, 7);
+//                        if (result.intersected) {
+//                            _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
+//                        }
+//                    }
+//                    {
+//                        const math::vector3f bmin = {-1.5f, -1.5f, -1.5f};
+//                        const math::vector3f bmax = {3.0f +0.5f, 5.0 +0.5f, 7.0 +0.5f};
+//                        math::transform3f boxTransform = math::transform3f(math::vector3f(2, 1, 4).normalized(), M_PI - M_PI / 6.0f).translated({0, 0, 10});
+//                        math::IntersectResult result = math::intersectRayBox(camPos, worldDir, 100.0f, boxTransform, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z});
+//                        if (result.intersected) {
+//                            _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
+//                        }
+//                    }
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
                     _pointerId = foundation::INVALID_POINTER_ID;
@@ -51,8 +74,31 @@ namespace game {
         _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-        _point = _api.scene->addOctahedron({10, 0, 0}, 5, {1, 1, 0, 1});
-        _bsphere = _api.scene->addBoundingSphere({-10, 0, 0}, 10, {1, 0, 1, 1});
+        _rayOut = _api.scene->addLineSet();
+        _knight = _api.world->createObject("player", "prefabs/knight");
+        _knight->setPosition({10, 0, 0});
+        _knight->loadResources([](core::WorldInterface::Object &) {
+            printf("!!! completed !!!\n");
+        });
+        
+        const math::transform3f t1 = math::transform3f(math::vector3f(1, 0, 0).normalized(), M_PI / 6.0f).translated({0, 0, 10});
+        
+        _pilon = _api.world->createObject("obj00", "prefabs/pilon");
+        _pilon->setTransform(t1);
+        _pilon->loadResources([](core::WorldInterface::Object &) {
+            printf("!!! completed !!!\n");
+        });
+
+        
+        //        const math::transform3f trfm = math::transform3f({0, 1, 0}, M_PI_4);
+//        _object->setTransform(trfm);
+
+//        const math::vector3f bmin = {-1.5f, -1.5f, -1.5f};
+//        const math::vector3f bmax = {3.0f +0.5f, 5.0 +0.5f, 7.0 +0.5f};
+//        const math::transform3f rotation = math::transform3f(math::vector3f(2, 1, 4).normalized(), M_PI - M_PI / 6.0f).translated({0, 0, 10});
+//        _bbox = _api.scene->addBoundingBox({0, 0, 10}, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, {1, 0, 1, 1});
+//        _bbox->setTransform(rotation);
+//        _bsphere = _api.scene->addBoundingSphere({10, 0, 0}, 7, {1, 0, 1, 1});
     }
     
     DebugContext::~DebugContext() {
@@ -76,7 +122,10 @@ namespace game {
 //        }
 //
         _api.scene->setCameraLookAt(_orbit + math::vector3f{0, 0, 0}, {0, 0, 0});
+        
+        
+        
 //        dbg_rot += dtSec;
-//        printf("--->>> %f\n", dbg_rot);
+        //printf("--->>> %f %f\n", _screenCoord.x, _screenCoord.y);
     }
 }

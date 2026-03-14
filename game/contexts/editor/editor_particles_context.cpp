@@ -121,14 +121,8 @@ namespace game {
             }
             
             // lineset
-            for (std::uint32_t i = 0; i < 36; i++) {
-                const float koeff0 = 2.0f * M_PI * float(i) / 36.0f;
-                const float koeff1 = 2.0f * M_PI * float(i + 1) / 36.0f;
-                const math::vector3f p0 = math::vector3f(0.5f * args.x * std::cosf(koeff0), 0.0f, 0.5f * args.x * std::sinf(koeff0)).transformed(rotation);
-                const math::vector3f p1 = math::vector3f(0.5f * args.x * std::cosf(koeff1), 0.0f, 0.5f * args.x * std::sinf(koeff1)).transformed(rotation);
-                lineSet->setLine(i, p0, p1, {0.7f, 0.7f, 0.0f, 0.6f});
-            }
-            lineSet->capLineCount(36);
+            core::SceneInterface::fillLineSetAsCircle(lineSet, 36, 0.5f * args.x, {0.7f, 0.7f, 0.0f, 0.6f});
+            lineSet->setTransform(rotation);
         }
         else if (type == Type::BOX) {
             points.clear();
@@ -217,6 +211,7 @@ namespace game {
             const math::vector3f bbmin = -0.5f * args;
             const math::vector3f bbmax = 0.5f * args;
             const float alpha = 0.3f + 0.1 * float(std::max(dimCount, 1));
+            lineSet->clear();
             lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
             lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
             lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
@@ -229,8 +224,6 @@ namespace game {
             lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
             lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
             lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
-
-            lineSet->capLineCount(12);
         }
     }
     
@@ -560,7 +553,7 @@ namespace game {
                     _shapeStartLineset->setPosition(position);
                     _shapeEndLineset->setPosition(position + _endShapeTool->getPosition());
                     _shapeConnectLineset->setPosition(position);
-                    _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.7f, 0.7f, 0.0f, 0.6f}, false);
+                    _shapeConnectLineset->setLine(0, {0, 0, 0}, _endShapeTool->getPosition(), {0.7f, 0.7f, 0.0f, 0.6f});
                 }
             }
         }

@@ -272,6 +272,7 @@ namespace util {
         std::variant<Description, bool, std::int64_t, double, std::string, math::vector2f, math::vector3f, math::vector4f, math::vector2i, math::vector3i, math::vector4i>
     >
     {
+        static Description emptyDesc;
         static Description parse(const std::uint8_t *data, std::size_t length);
         static std::string serialize(const util::Description &desc);
         
@@ -427,6 +428,20 @@ namespace util {
         }
 
     };
+}
+
+namespace util {
+    template<typename T> void cleanupUnused(std::vector<T> &v) {
+        for (auto index = v.begin(); index != v.end(); ) {
+            if (index->use_count() <= 1) {
+                *index = v.back();
+                v.pop_back();
+            }
+            else {
+                ++index;
+            }
+        }
+    }
 }
 
 // TODO: move to dedicated shader generator

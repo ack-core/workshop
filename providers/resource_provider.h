@@ -86,7 +86,7 @@ namespace resource {
         // Get prefab description. All prefabs are loaded synchronously at start
         // @prefabPath - path without extension
         //
-        virtual auto getPrefab(const char *prefabPath) -> util::Description = 0;
+        virtual auto getPrefab(const char *prefabPath) -> const util::Description & = 0;
         
         // Force removing resources from internal storages
         //

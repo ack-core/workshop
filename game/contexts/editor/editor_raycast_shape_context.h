@@ -17,7 +17,6 @@ namespace game {
             math::vector3f position;
             math::vector3f args;
             core::SceneInterface::BoundingSpherePtr sphere;
-            core::SceneInterface::OctahedronPtr point;
             core::SceneInterface::BoundingBoxPtr box;
         };
         std::unordered_map<std::uint32_t, Point> points;

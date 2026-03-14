@@ -42,11 +42,7 @@ namespace game {
         std::weak_ptr<EditorNode> _currentNode;
         bool _doUpdateEveryFrame = false;
         bool _isEditing = false;
-        
-        core::SceneInterface::OctahedronPtr _point;
-        core::SceneInterface::BoundingSpherePtr _bsphere;
-
-        
+                
     private:
         std::unique_ptr<MovingTool> _makeMovingTool(math::vector3f &target);
         

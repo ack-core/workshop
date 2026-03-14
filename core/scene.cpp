@@ -26,19 +26,17 @@ namespace core {
 }
 
 namespace core {
-    class LineSetImpl : public SceneInterface::LineSet {
+    class ArrowsImpl : public SceneInterface::Arrows {
     public:
-        struct Line {
+        struct Arrow {
             math::color rgba;
             math::vector3f start;
             math::vector3f end;
-            bool arrowHead = false;
         };
-
-        std::vector<Line> lines;
-        math::vector3f position;
+        std::vector<Arrow> arrows;
         
         struct {
+            math::transform3f transform = math::transform3f::identity();
             math::color rgba;
             math::vector4f binormal;
             math::vector4f tangent;
@@ -48,34 +46,72 @@ namespace core {
         
     public:
         void setPosition(const math::vector3f &pos) override {
-            position = pos;
+            shaderConstants.transform.m41 = pos.x;
+            shaderConstants.transform.m42 = pos.y;
+            shaderConstants.transform.m43 = pos.z;
         }
         void setTransform(const math::transform3f &trfm) override {
-            
+            shaderConstants.transform = trfm;
         }
-        void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba, bool isArrow) override {
-            if (index >= lines.size()) {
-                lines.resize(index + 1);
+        void setArrow(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) override {
+            if (index >= arrows.size()) {
+                arrows.resize(index + 1);
             }
-            
-            lines[index].start = start;
-            lines[index].end = end;
-            lines[index].rgba = rgba;
-            lines[index].arrowHead = isArrow;
+            arrows[index] = Arrow { rgba, start, end };
         }
-        void capLineCount(std::uint32_t limit) override {
-            lines.resize(limit);
+        void clear() override {
+            arrows.clear();
         }
-        void fillShaderConstants(const Line &line) {
-            shaderConstants.rgba = line.rgba;
-            shaderConstants.positions[0].xyz = line.start + position;
-            shaderConstants.positions[1].xyz = line.end + position;
+        void fillShaderConstants(const Arrow &arrow) {
+            shaderConstants.rgba = arrow.rgba;
+            shaderConstants.positions[0].xyz = arrow.start;
+            shaderConstants.positions[1].xyz = arrow.end;
             
-            const math::vector3f lineDir = (line.end - line.start).normalized();
+            const math::vector3f lineDir = (arrow.end - arrow.start).normalized();
             const math::vector3f axis = lineDir.dot({0, 1, 0}) > 0.9f ? math::vector3f(0, 0, 1) : math::vector3f(0, 1, 0);
 
             shaderConstants.binormal.xyz = lineDir.cross(axis).normalized();
             shaderConstants.tangent.xyz = shaderConstants.binormal.xyz.cross(lineDir);
+        }
+        
+    public:
+        ArrowsImpl() {}
+        ~ArrowsImpl() override {}
+    };
+
+    //---
+    
+    class LineSetImpl : public SceneInterface::LineSet {
+    public:
+        struct Bucket {
+            math::transform3f transform;
+            math::color rgba[24] = {{0, 0, 0, 0}};
+            math::vector4f positions[48] = {{0, 0, 0, 0}};
+        };
+        math::transform3f transform = math::transform3f::identity();
+        std::vector<Bucket> buckets;
+        
+    public:
+        void setPosition(const math::vector3f &pos) override {
+            transform.m41 = pos.x;
+            transform.m42 = pos.y;
+            transform.m43 = pos.z;
+        }
+        void setTransform(const math::transform3f &trfm) override {
+            transform = trfm;
+        }
+        void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) override {
+            const std::uint32_t bucketIndex = index / 24;
+            const std::uint32_t lineIndex = index % 24;
+            if (bucketIndex >= buckets.size()) {
+                buckets.resize(bucketIndex + 1);
+            }
+            buckets[bucketIndex].positions[2 * lineIndex + 0] = math::vector4f(start, 1.0f);
+            buckets[bucketIndex].positions[2 * lineIndex + 1] = math::vector4f(end, 1.0f);
+            buckets[bucketIndex].rgba[lineIndex] = rgba;
+        }
+        void clear() override {
+            buckets.clear();
         }
         
     public:
@@ -84,44 +120,11 @@ namespace core {
     };
     
     //---
-
-    struct OctahedronImpl : public SceneInterface::Octahedron {
-    public:
-        struct OctahedronData {
-            math::transform3f transform;
-            math::vector4f radius;
-            math::color color;
-        }
-        octahedronData;
-
-    public:
-        void setTransform(const math::transform3f &trfm) override {
-            octahedronData.transform = trfm;
-        }
-        void setPosition(const math::vector3f &pos) override {
-            octahedronData.transform = math::transform3f::identity().translated(pos);
-        }
-        void setRadius(float radius) override {
-            octahedronData.radius.x = radius;
-        }
-        void setColor(const math::color &rgba) override {
-            octahedronData.color = rgba;
-        }
-    public:
-        OctahedronImpl(const math::vector3f &position, float radius, const math::color &rgba) {
-            octahedronData.transform = math::transform3f::identity().translated(position);
-            octahedronData.radius.x = radius;
-            octahedronData.color = rgba;
-        }
-        ~OctahedronImpl() override {}
-    };
-    
-    //---
     
     struct BoundingSphereImpl : public SceneInterface::BoundingSphere {
     public:
         struct BSphereData {
-            math::transform3f transform;
+            math::transform3f transform = math::transform3f::identity();
             math::vector4f radius;
             math::color color;
         }
@@ -132,7 +135,9 @@ namespace core {
             bsphereData.transform = trfm;
         }
         void setPosition(const math::vector3f &pos) override {
-            bsphereData.transform = math::transform3f::identity().translated(pos);
+            bsphereData.transform.m41 = pos.x;
+            bsphereData.transform.m42 = pos.y;
+            bsphereData.transform.m43 = pos.z;
         }
         void setRadius(float radius) override {
             bsphereData.radius.x = radius;
@@ -155,7 +160,7 @@ namespace core {
     class BoundingBoxImpl : public SceneInterface::BoundingBox {
     public:
         struct BBoxData {
-            math::transform3f transform;
+            math::transform3f transform = math::transform3f::identity();
             math::color color;
             math::vector4f min;
             math::vector4f max;
@@ -167,7 +172,9 @@ namespace core {
             bboxData.transform = trfm;
         }
         void setPosition(const math::vector3f &pos) override {
-            bboxData.transform = math::transform3f::identity().translated(pos);
+            bboxData.transform.m41 = pos.x;
+            bboxData.transform.m42 = pos.y;
+            bboxData.transform.m43 = pos.z;
         }
         void setBBox(const math::bound3f &bbox) override {
             bboxData.min = math::vector4f(bbox.xmin, bbox.ymin, bbox.zmin, 1.0f);
@@ -230,8 +237,10 @@ namespace core {
             currentVoxelOffset.y = offset.y - originVoxelOffset.y;
             currentVoxelOffset.z = offset.z - originVoxelOffset.z;
         }
-        void setPosition(const math::vector3f &position) override {
-            transform = math::transform3f::identity().translated(position);
+        void setPosition(const math::vector3f &pos) override {
+            transform.m41 = pos.x;
+            transform.m42 = pos.y;
+            transform.m43 = pos.z;
         }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
@@ -394,8 +403,8 @@ namespace core {
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
+        auto addArrows() -> ArrowsPtr override;
         auto addLineSet() -> LineSetPtr override;
-        auto addOctahedron(const math::vector3f &position, float radius, const math::color &rgba) -> OctahedronPtr override;
         auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr override;
         auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
@@ -410,18 +419,6 @@ namespace core {
         void setLinesDrawingEnabled(bool enabled) override;
         
     private:
-        template<typename T> void _cleanupUnused(std::vector<T> &v) {
-            for (auto index = v.begin(); index != v.end(); ) {
-                if (index->use_count() <= 1) {
-                    *index = v.back();
-                    v.pop_back();
-                }
-                else {
-                    ++index;
-                }
-            }
-        }
-        
         struct Camera {
             math::transform3f plmVPMatrix; // plm matrix transforms to clip space with platform-specific z-range
             math::transform3f stdVPMatrix; // std matrix transforms to clip space with z-range [0..1]
@@ -439,6 +436,7 @@ namespace core {
         
         foundation::RenderTexturePtr _palette;
         
+        foundation::RenderShaderPtr _arrowShader;
         foundation::RenderShaderPtr _lineShader;
         foundation::RenderShaderPtr _octahedronShader;
         foundation::RenderShaderPtr _boundingSphereShader;
@@ -450,8 +448,8 @@ namespace core {
         foundation::RenderTargetPtr _gbuffer;
         foundation::RenderShaderPtr _gbufferToScreenShader;
         
+        std::vector<std::shared_ptr<ArrowsImpl>> _arrows;
         std::vector<std::shared_ptr<LineSetImpl>> _lineSets;
-        std::vector<std::shared_ptr<OctahedronImpl>> _octahedrons;
         std::vector<std::shared_ptr<BoundingSphereImpl>> _boundingSpheres;
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<VoxelMeshImpl>> _voxelMeshes;
@@ -472,8 +470,7 @@ namespace core {
 // + fssrc [tex2d tex3d cube] {...} <- types of samplers
 //
 namespace {
-    // TODO: pack of 16-32 lines (256b block)
-    const char *g_lineShaderSrc = R"(
+    const char *g_arrowShaderSrc = R"(
         fixed {
             offset[34] : float3 =
                 [0.00, 0.00, 0][0.00, 0.00, 0]
@@ -487,6 +484,7 @@ namespace {
                 [0.00, 0.00, 0][-0.71, 0.71, 0.5][-0.71, 0.71, 0.5][0.00, 1.00, 0.5]
         }
         const {
+            transform : matrix4
             color : float4
             binormal : float4
             tangent : float4
@@ -501,35 +499,29 @@ namespace {
             float3 headDir = 0.15 * (fixed_offset[vertex_ID].x * const_binormal.xyz + fixed_offset[vertex_ID].y * const_tangent.xyz) + inrm;
             float3 position = const_positions[_min(vertex_ID, 1)].xyz + headScale * headDir;
             
-            output_position = _transform(float4(position, 1.0), frame_plmVPMatrix);
+            output_position = _transform(_transform(float4(position, 1.0), const_transform), frame_plmVPMatrix);
             output_color = const_color;
         }
         fssrc {
             output_color[0] = input_color;
         }
     )";
-    const char *g_octahedronShaderSrc = R"(
-        fixed {
-            lines[24] : float3 =
-                [0, -1, 0][-1, 0, 0][0, -1, 0][1, 0, 0][0, -1, 0][0, 0, -1][0, -1, 0][0, 0, 1]
-                [0, +1, 0][-1, 0, 0][0, +1, 0][1, 0, 0][0, +1, 0][0, 0, -1][0, +1, 0][0, 0, 1]
-                [-1, 0, 0][0, 0, -1][0, 0, -1][1, 0, 0][1, 0, 0][0, 0, 1][0, 0, 1][-1, 0, 0]
-        }
+    const char *g_lineShaderSrc = R"(
         const {
             transform : matrix4
-            radius : float4
-            color : float4
+            color[24] : float4
+            positions[48] : float4
         }
         inout {
             color : float4
         }
         vssrc {
-            float4 position = float4(fixed_lines[repeat_ID] * const_radius.x, 1.0);
+            float4 position = float4(const_positions[vertex_ID].xyz, 1.0);
             output_position = _transform(_transform(position, const_transform), frame_plmVPMatrix);
-            output_color = const_color;
+            output_color = const_color[vertex_ID / 2];
         }
         fssrc {
-            output_color[0] = const_color;
+            output_color[0] = input_color;
         }
     )";
     const char *g_boundingSphereShaderSrc = R"(
@@ -757,10 +749,8 @@ namespace core {
     , _rendering(rendering)
     {
         _palette = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, {resource::PALETTE});
+        _arrowShader = rendering->createShader("scene_arrows", g_arrowShaderSrc, foundation::InputLayout {});
         _lineShader = rendering->createShader("scene_lineset", g_lineShaderSrc, foundation::InputLayout {});
-        _octahedronShader = rendering->createShader("scene_octahedron", g_octahedronShaderSrc, foundation::InputLayout {
-            .repeat = 24
-        });
         _boundingSphereShader = rendering->createShader("scene_bounding_sphere", g_boundingSphereShaderSrc, foundation::InputLayout {
             .repeat = 62
         });
@@ -812,12 +802,12 @@ namespace core {
     
     }
     
-    SceneInterface::LineSetPtr SceneInterfaceImpl::addLineSet() {
-        return _lineSets.emplace_back(std::make_shared<LineSetImpl>());
+    SceneInterface::ArrowsPtr SceneInterfaceImpl::addArrows() {
+        return _arrows.emplace_back(std::make_shared<ArrowsImpl>());
     }
     
-    SceneInterface::OctahedronPtr SceneInterfaceImpl::addOctahedron(const math::vector3f &position, float radius, const math::color &rgba) {
-        return _octahedrons.emplace_back(std::make_shared<OctahedronImpl>(position, radius, rgba));
+    SceneInterface::LineSetPtr SceneInterfaceImpl::addLineSet() {
+        return _lineSets.emplace_back(std::make_shared<LineSetImpl>());
     }
     
     SceneInterface::BoundingSpherePtr SceneInterfaceImpl::addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) {
@@ -887,13 +877,13 @@ namespace core {
     //
     //
     void SceneInterfaceImpl::updateAndDraw(float dtSec) {
-        _cleanupUnused(_lineSets);
-        _cleanupUnused(_octahedrons);
-        _cleanupUnused(_boundingSpheres);
-        _cleanupUnused(_boundingBoxes);
-        _cleanupUnused(_voxelMeshes);
-        _cleanupUnused(_texturedMeshes);
-        _cleanupUnused(_particleEmitters);
+        util::cleanupUnused(_arrows);
+        util::cleanupUnused(_lineSets);
+        util::cleanupUnused(_boundingSpheres);
+        util::cleanupUnused(_boundingBoxes);
+        util::cleanupUnused(_voxelMeshes);
+        util::cleanupUnused(_texturedMeshes);
+        util::cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
@@ -933,12 +923,20 @@ namespace core {
                 rendering.draw(emitter->particleCount);
             }
             if (_lineDrawingEnabled) {
+                rendering.applyShader(_arrowShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                for (const auto &set : _arrows) {
+                    for (const auto &arrow : set->arrows) {
+                        set->fillShaderConstants(arrow);
+                        rendering.applyShaderConstants(&set->shaderConstants);
+                        rendering.draw(34);
+                    }
+                }
                 rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
                 for (const auto &set : _lineSets) {
-                    for (const auto &line : set->lines) {
-                        set->fillShaderConstants(line);
-                        rendering.applyShaderConstants(&set->shaderConstants);
-                        rendering.draw(2 + (line.arrowHead ? 32 : 0));
+                    for (auto &bucket : set->buckets) {
+                        bucket.transform = set->transform;
+                        rendering.applyShaderConstants(&bucket);
+                        rendering.draw(48);
                     }
                 }
                 rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
@@ -951,11 +949,6 @@ namespace core {
                     rendering.applyShaderConstants(&bsphere->bsphereData);
                     rendering.draw(3);
                 }
-                rendering.applyShader(_octahedronShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-                for (const auto &octahedron : _octahedrons) {
-                    rendering.applyShaderConstants(&octahedron->octahedronData);
-                    rendering.draw();
-                }
             }
         });
     }
@@ -965,6 +958,7 @@ namespace core {
     }
 
     void SceneInterface::fillLineSetAsCircle(const SceneInterface::LineSetPtr &lineSet, std::uint32_t segCount, float radius, const math::color &rgba) {
+        lineSet->clear();
         for (std::uint32_t i = 0; i < segCount; i++) {
             const float koeff0 = 2.0f * M_PI * float(i) / float(segCount);
             const float koeff1 = 2.0f * M_PI * float(i + 1) / float(segCount);
@@ -972,9 +966,9 @@ namespace core {
             const math::vector3f p1 = math::vector3f(radius * std::cosf(koeff1), 0.0f, radius * std::sinf(koeff1));
             lineSet->setLine(i, p0, p1, rgba);
         }
-        lineSet->capLineCount(segCount);
     }
     void SceneInterface::fillLineSetAsСlosedСircuit(const SceneInterface::LineSetPtr &lineSet, const std::vector<math::vector3f> &points, const math::color &rgba) {
+        lineSet->clear();
         std::uint32_t lineIndex = 0;
         for (auto index = points.begin(); index != points.end(); ++index) {
             auto next = index;
@@ -984,7 +978,6 @@ namespace core {
             
             lineSet->setLine(lineIndex++, *index, *next, {0.0f, 1.0f, 1.0f, 0.7f});
         }
-        lineSet->capLineCount(lineIndex);
     }
 }
 

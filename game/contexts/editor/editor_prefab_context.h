@@ -6,7 +6,7 @@
 
 namespace game {
     struct EditorNodePrefab : public EditorNode {
-        util::Description prefabDesc;
+        core::WorldInterface::ObjectPtr worldObject;
         
         EditorNodePrefab(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodePrefab() override {}

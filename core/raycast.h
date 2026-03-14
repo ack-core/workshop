@@ -11,9 +11,12 @@ namespace core {
     public:
         enum class ShapeType {
             SPHERES = 1,
-            BOXES,
-            TRIANGLES,
-            LANDSCAPE
+            BOXES = 2
+        };
+        struct RaycastResult {
+            bool intersected;
+            math::vector3f point;
+            math::vector3f normal;
         };
         
     public:
@@ -29,8 +32,8 @@ namespace core {
         
     public:
         virtual auto addShape(const util::Description &desc) -> ShapePtr = 0;
-        virtual bool rayCast(const math::vector3f &start, const math::vector3f &target, float length) const = 0;
-        virtual bool sphereCast(const math::vector3f &start, const math::vector3f &target, float radius, float length) const = 0;
+        virtual auto rayCast(const math::vector3f &start, const math::vector3f &target, float length) const -> RaycastResult = 0;
+        virtual void update(float dtSec) = 0;
         
     public:
         virtual ~RaycastInterface() = default;

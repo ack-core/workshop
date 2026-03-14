@@ -197,6 +197,7 @@ namespace util {
 }
 
 namespace util {
+    Description Description::emptyDesc = {};
     Description Description::parse(const std::uint8_t *data, std::size_t length) {
         struct fn {
             static bool parseScope(const std::string &src, Description& result) {

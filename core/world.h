@@ -74,6 +74,7 @@ namespace core {
     public:
         virtual auto getObject(const char *name) -> ObjectPtr = 0;
         virtual auto createObject(const char *name, const char *prefabPath) -> ObjectPtr = 0;
+        virtual void removeObject(const char *name) = 0;
         virtual void update(float dtSec) = 0;
         
     public:

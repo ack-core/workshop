@@ -25,32 +25,24 @@ namespace game {
                 
                 shapeType = static_cast<core::RaycastInterface::ShapeType>(description.getInteger("type", 1));
                 const std::vector<math::vector3f> p = description.getVector3fs("points");
-                            
+                
                 if (shapeType == core::RaycastInterface::ShapeType::SPHERES) {
                     const std::vector<double> radiuses = description.getNumbers("radiuses");
                     for (std::size_t i = 0; i < p.size(); i++) {
                         points.emplace(getNextId(), Point {
                             p[i], math::vector3f(radiuses[i], 0, 0),
-                            api.scene->addBoundingSphere(p[i], radiuses[i], math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr, nullptr
+                            api.scene->addBoundingSphere(p[i], radiuses[i], math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
                         });
                     }
                 }
                 else if (shapeType == core::RaycastInterface::ShapeType::BOXES) {
                     const std::vector<math::vector3f> sizes = description.getVector3fs("sizes");
                     for (std::size_t i = 0; i < p.size(); i++) {
-                        const math::vector3f bmin = math::vector3f(0.5f);
+                        const math::vector3f bmin = math::vector3f(-0.5f);
                         const math::vector3f bmax = sizes[i] - math::vector3f(0.5f);
                         points.emplace(getNextId(), Point {
                             p[i], sizes[i],
-                            nullptr, nullptr, api.scene->addBoundingBox(p[i], {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
-                        });
-                    }
-                }
-                else if (shapeType == core::RaycastInterface::ShapeType::TRIANGLES) {
-                    for (std::size_t i = 0; i < points.size(); i++) {
-                        points.emplace(getNextId(), Point {
-                            p[i], math::vector3f(0, 0, 0),
-                            nullptr, api.scene->addOctahedron(p[i], 0.2f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
+                            nullptr, api.scene->addBoundingBox(p[i], {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
                         });
                     }
                 }
@@ -73,9 +65,6 @@ namespace game {
                 };
                 item.second.box->setPosition(pos);
                 item.second.box->setBBox(bbox);
-            }
-            else if (item.second.point) {
-                item.second.point->setPosition(pos);
             }
             else if (item.second.sphere) {
                 item.second.sphere->setPosition(pos);
@@ -218,9 +207,6 @@ namespace game {
                     node->description.setVector3f("sizes", item.second.args, false);
                 }
             }
-            else if (node->shapeType == core::RaycastInterface::ShapeType::TRIANGLES) {
-                // TODO: indexes
-            }
             const std::string extPath = node->resourcePath + ".txt";
             const std::string serialized = util::Description::serialize(node->description);
             _api.platform->saveFile(extPath.c_str(), reinterpret_cast<const std::uint8_t *>(serialized.data()), serialized.length(), [this, path = node->resourcePath](bool result) {
@@ -254,7 +240,7 @@ namespace game {
             if (node->shapeType == core::RaycastInterface::ShapeType::SPHERES) {
                 _currentPoint = getNextId();
                 node->points.emplace(_currentPoint, EditorNodeRaycastShape::Point {
-                    {0, 0, 0}, {1, 1, 1}, _api.scene->addBoundingSphere({0, 0, 0}, 1.0f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr, nullptr
+                    {0, 0, 0}, {1, 1, 1}, _api.scene->addBoundingSphere({0, 0, 0}, 1.0f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
                 });
             }
             else if (node->shapeType == core::RaycastInterface::ShapeType::BOXES) {
@@ -262,13 +248,7 @@ namespace game {
                 const math::vector3f bmin = {-0.5f, -0.5f, -0.5f};
                 const math::vector3f bmax = {+0.5f, +0.5f, +0.5f};
                 node->points.emplace(_currentPoint, EditorNodeRaycastShape::Point {
-                    {0, 0, 0}, {1, 1, 1}, nullptr, nullptr, _api.scene->addBoundingBox({0, 0, 0}, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
-                });
-            }
-            else if (node->shapeType == core::RaycastInterface::ShapeType::TRIANGLES) {
-                _currentPoint = getNextId();
-                node->points.emplace(_currentPoint, EditorNodeRaycastShape::Point {
-                    {0, 0, 0}, {1, 1, 1}, nullptr, _api.scene->addOctahedron({0, 0, 0}, 0.2f, math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
+                    {0, 0, 0}, {1, 1, 1}, nullptr, _api.scene->addBoundingBox({0, 0, 0}, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, math::color(1.0f, 0.0f, 1.0f, 0.7f))
                 });
             }
             _sendCurrentPointParameters(*node, true);
