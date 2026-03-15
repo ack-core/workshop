@@ -1,5 +1,6 @@
 
 #include "debug_context.h"
+#include "ui/extensions.h"
 #include <list>
 
 bool dbg_switch = false;
@@ -37,7 +38,7 @@ namespace game {
                     math::vector3f camPos;
                     math::vector3f worldDir = _api.scene->getWorldDirection(screenCoord, &camPos);
                     auto result = _api.raycast->rayCast(camPos, worldDir, 100.0f);
-                    if (result.intersected) {
+                    if (result.uniqueId != core::RaycastInterface::INVALID_UNIQUE_ID) {
                         _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
                     }
 //                    {
@@ -75,15 +76,21 @@ namespace game {
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
         _rayOut = _api.scene->addLineSet();
-        _knight = _api.world->createObject("player", "prefabs/knight");
-        _knight->setPosition({10, 0, 0});
+        _knight = _api.world->createObject("prefabs/knight", core::RaycastInterface::MASK_ALL);
+        _knight->setPosition({0, 0, 0});
         _knight->loadResources([](core::WorldInterface::Object &) {
             printf("!!! completed !!!\n");
         });
+        _other = _api.world->createObject("prefabs/knight", core::RaycastInterface::MASK_ALL);
+        _other->setPosition({20.01f, 0, 0});
+        _other->loadResources([](core::WorldInterface::Object &) {
+            printf("!!! completed !!!\n");
+        });
+
         
-        const math::transform3f t1 = math::transform3f(math::vector3f(1, 0, 0).normalized(), M_PI / 6.0f).translated({0, 0, 10});
+        const math::transform3f t1 = math::transform3f(math::vector3f(1, 0.5f, 0).normalized(), M_PI / 6.0f).translated({0, 0, -20.01});
         
-        _pilon = _api.world->createObject("obj00", "prefabs/pilon");
+        _pilon = _api.world->createObject("prefabs/pilon", core::RaycastInterface::MASK_ALL);
         _pilon->setTransform(t1);
         _pilon->loadResources([](core::WorldInterface::Object &) {
             printf("!!! completed !!!\n");
@@ -99,6 +106,19 @@ namespace game {
 //        _bbox = _api.scene->addBoundingBox({0, 0, 10}, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, {1, 0, 1, 1});
 //        _bbox->setTransform(rotation);
 //        _bsphere = _api.scene->addBoundingSphere({10, 0, 0}, 7, {1, 0, 1, 1});
+        
+        _joystick = ui::extensions::addJoystick(_api.ui, _api.resources, nullptr, ui::extensions::JoystickParams {
+            .anchorOffset = math::vector2f(50.0f, 50.0f),
+            .anchorH = ui::HorizontalAnchor::RIGHT,
+            .anchorV = ui::VerticalAnchor::BOTTOM,
+            .textureBackground = "textures/ui/joystick_bg_00",
+            .textureThumb = "textures/ui/joystick_thumb",
+            .maxThumbOffset = 100.0f,
+            .handler = [this](const math::vector2f &direction) {
+                _knightVelocity = {0.4f * direction.y, 0.0f, 0.4f * direction.x};
+                //printf("%f %f\n", direction.x, direction.y);
+            }
+        });
     }
     
     DebugContext::~DebugContext() {
@@ -121,7 +141,9 @@ namespace game {
 //            _object->setTransform(trfm);
 //        }
 //
-        _api.scene->setCameraLookAt(_orbit + math::vector3f{0, 0, 0}, {0, 0, 0});
+        _knight->setVelocity(_knightVelocity);
+        _other->setVelocity({0, 0, 0});
+        _api.scene->setCameraLookAt(_orbit + _knight->getWorldPosition(), _knight->getWorldPosition());
         
         
         

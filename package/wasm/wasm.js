@@ -152,6 +152,7 @@ const imports = {
         sinf: Math.sin,
         cosf: Math.cos,
         acosf: Math.acos,
+        atan2f: Math.atan2,
         pow: Math.pow,
         js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
         js_log: function(str, len) {

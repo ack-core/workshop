@@ -3,56 +3,158 @@
 #include <vector>
 
 namespace core {
-    class CircleXZImpl : public SimulationInterface::Body {
+    class CollisionBodyBase : public SimulationInterface::Body {
     public:
-        CircleXZImpl(const core::SceneInterfacePtr &scene, float mass, float radius) : _mass(mass), _radius(radius) {
-            _position = {0, 0, 0};
+        ~CollisionBodyBase() override {}
+        virtual void update(float dtSec) = 0;
+    };
+}
+
+namespace core {
+    class CircleXZImpl : public CollisionBodyBase {
+    public:
+        const float invMass;
+        const float radius;
+        math::vector3f position;
+
+    public:
+        CircleXZImpl(const core::SceneInterfacePtr &scene, float m, float r) : invMass(m >= 1.0f ? 1.0f / m : 0.0f), radius(r), position(0, 0, 0) {
             _visual = scene->addLineSet();
             SceneInterface::fillLineSetAsCircle(_visual, 24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
         }
-        ~CircleXZImpl() override {
-            
+        ~CircleXZImpl() override {}
+        
+        const math::transform3f getTransform() const override {
+            math::transform3f result = math::transform3f::identity();
+            result.m41 = position.x;
+            result.m43 = position.z;
+            return result;
         }
         void setTransform(const math::transform3f &trfm) override {
-            _position = math::vector3f(trfm.m41, 0.0f, trfm.m43);
-            _visual->setPosition(_position);
+            _prevpos = position = math::vector3f(trfm.m41, trfm.m42, trfm.m43);
+            _visual->setPosition(position);
         }
         void setVelocity(const math::vector3f &v) override {
-            
+            _prevpos = position - math::vector3f(v.x, 0.0f, v.z);
+        }
+        void update(float dtSec) override {
+            const math::vector3f v = math::vector3f(position.x - _prevpos.x, 0.0f, position.z - _prevpos.z);
+            _prevpos = position;
+            position = position + v * (dtSec / _prevDt);
+            _visual->setPosition(position);
         }
         
     private:
-        const float _mass;
-        const float _radius;
-        math::vector3f _position;
+        float _prevDt = 0.033f;
+        math::vector3f _prevpos;
         core::SceneInterface::LineSetPtr _visual;
     };
 }
  
 namespace core {
-    class ObstaclePolygonXZImpl : public SimulationInterface::Body {
+    class ObstaclePolygonXZImpl : public CollisionBodyBase {
+    public:
+        std::vector<math::vector3f> points;
+        
     public:
         ObstaclePolygonXZImpl(const core::SceneInterfacePtr &scene, std::vector<math::vector3f> &&points) : _src(std::move(points)) {
+            for (auto &point : _src) {
+                points.emplace_back(point);
+            }
             _visual = scene->addLineSet();
             SceneInterface::fillLineSetAsСlosedСircuit(_visual, _src, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         ~ObstaclePolygonXZImpl() override {
             
         }
+        
+        const math::transform3f getTransform() const override {
+            return _transform;
+        }
         void setTransform(const math::transform3f &trfm) override {
-            _transform = trfm;
-            _visual->setTransform(trfm);
+            const math::vector3f translation = math::vector3f(trfm.m41, trfm.m42, trfm.m43);
+            const float yaw = std::atan2(trfm.m31, trfm.m33);
+            _transform = math::transform3f({0, 1, 0}, -yaw).translated(translation);
+            for (auto &point : _src) {
+                points.emplace_back(point.transformed(_transform, true));
+            }
+            _visual->setTransform(_transform);
         }
-        void setVelocity(const math::vector3f &v) override {
-            
-        }
+        void setVelocity(const math::vector3f &v) override {}
+        void update(float dtSec) override {}
 
     private:
         math::transform3f _transform;
         std::vector<math::vector3f> _src;
-        std::vector<math::vector3f> _points;
         core::SceneInterface::LineSetPtr _visual;
     };
+}
+
+namespace core {
+    struct CollisionInfo {
+        math::vector3f normal = {0, 0, 0};
+        float penetration = -1.0f;
+    };
+    
+    bool checkCollisionCircleCircleXZ(const CircleXZImpl &a, const CircleXZImpl &b, CollisionInfo &info) {
+        const math::vector3f d = b.position - a.position;
+        const float distSq = d.x * d.x + d.z * d.z;
+        const float minDist = a.radius + b.radius;
+        const float minDistSq = minDist * minDist;
+        
+        if (distSq < minDistSq && distSq > std::numeric_limits<float>::epsilon()) {
+            const float distance = std::sqrtf(distSq);
+            info.penetration = minDist - distance;
+            info.normal.x = d.x / distance;
+            info.normal.z = d.z / distance;
+            return true;
+        }
+        return false;
+    }
+    void resolveCollisionCircleCircleXZ(const CollisionInfo &info, CircleXZImpl &a, CircleXZImpl &b) {
+        const float invMassSumm = a.invMass + b.invMass;
+        a.position = a.position - info.normal * info.penetration * (a.invMass / invMassSumm);
+        b.position = b.position + info.normal * info.penetration * (b.invMass / invMassSumm);
+    }
+
+    bool checkCollisionCircleObstacleXZ(const CircleXZImpl &obj, const ObstaclePolygonXZImpl &obstacle, CollisionInfo &info) {
+        float minDistSq = std::numeric_limits<float>::max();
+        bool isInside = false;
+        math::vector3f closestPoint;
+        
+        for (std::size_t i = 0; i < obstacle.points.size(); i++) {
+            const math::vector3f &a = obstacle.points[i];
+            const math::vector3f &b = obstacle.points[(i + 1) % obstacle.points.size()];
+            const math::vector3f edge = b - a;
+            const math::vector3f toObj = obj.position - a;
+            const float t = std::max(0.0f, std::min(1.0f, (toObj.x * edge.x + toObj.z * edge.z) / edge.xz.lengthSq()));
+            const math::vector3f pointOnEdge = math::vector3f(a.x + t * edge.x, 0.0f, a.z + t * edge.z);
+            const float distSq = (obj.position.xz - pointOnEdge.xz).lengthSq();
+            if (minDistSq > distSq) {
+                minDistSq = distSq;
+                closestPoint = pointOnEdge;
+            }
+            if ((a.z > obj.position.z) != (b.z > obj.position.z) && (obj.position.x < edge.x * (obj.position.z - a.z) / edge.z + a.x)) {
+                isInside = !isInside;
+            }
+        }
+        
+        if (minDistSq < std::numeric_limits<float>::max()) {
+            const float distance = std::sqrtf(minDistSq);
+            if (isInside || distance < obj.radius) {
+                info.penetration = isInside ? distance + obj.radius : obj.radius - distance;
+                info.normal.x = (obj.position.x - closestPoint.x) / distance;
+                info.normal.z = (obj.position.z - closestPoint.z) / distance;
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    void resolveCollisionCircleObstacleXZ(const CollisionInfo &info, CircleXZImpl &obj, ObstaclePolygonXZImpl &obstacle) {
+        obj.position = obj.position + info.normal * info.penetration;
+    }
+
 }
 
 namespace core {
@@ -83,6 +185,24 @@ namespace core {
         void update(float dtSec) override {
             util::cleanupUnused(_circlesXZ);
             util::cleanupUnused(_obstaclesXZ);
+            
+            for (auto &obj : _circlesXZ) {
+                obj->update(dtSec);
+            }
+            
+            CollisionInfo info;
+            for (std::size_t i = 0; i < _circlesXZ.size(); i++) {
+                for (std::size_t c = i + 1; c < _circlesXZ.size(); c++) {
+                    if (checkCollisionCircleCircleXZ(*_circlesXZ[i], *_circlesXZ[c], info)) {
+                        resolveCollisionCircleCircleXZ(info, *_circlesXZ[i], *_circlesXZ[c]);
+                    }
+                }
+                for (std::size_t c = 0; c < _obstaclesXZ.size(); c++) {
+                    if (checkCollisionCircleObstacleXZ(*_circlesXZ[i], *_obstaclesXZ[c], info)) {
+                        resolveCollisionCircleObstacleXZ(info, *_circlesXZ[i], *_obstaclesXZ[c]);
+                    }
+                }
+            }
         }
 
     private:

@@ -3,6 +3,10 @@
 #include "utils.h"
 
 namespace game {
+    EditorNodePrefab::~EditorNodePrefab() {
+
+    }
+    
     void EditorNodePrefab::update(float dtSec) {
         globalPosition = localPosition;
         if (worldObject) {
@@ -17,7 +21,7 @@ namespace game {
         else {
             resourcePath = path;
             api.world->removeObject(name.data());
-            worldObject = api.world->createObject(name.data(), resourcePath.data());
+            worldObject = api.world->createObject(resourcePath.data(), core::RaycastInterface::MASK_ALL);
             worldObject->loadResources([&api](core::WorldInterface::Object &) {
                 api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             });
@@ -93,6 +97,7 @@ namespace game {
         return false;
     }
 
+    // TODO: + max one collision node at the root, parentness
     bool EditorPrefabContext::_validatePrefab(const EditorNode &rootNode) {
         struct fn {
             static bool validateNode(const EditorNode &node) {

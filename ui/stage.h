@@ -1,5 +1,7 @@
 
 // TODO: dpi-scaling
+// TODO: remove button abilitites from image (left only action + texture changing). button + joystick -> library
+// + scale inheritance
 
 #pragma once
 #include "foundation/platform.h"

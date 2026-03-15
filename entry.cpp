@@ -40,9 +40,9 @@ extern "C" void initialize() {
         platform->setLoop([](float dtSec) {
             datahub->update(dtSec);
             stateManager->update(dtSec);
-            world->update(dtSec);
-            simulation->update(dtSec);
             raycast->update(dtSec);
+            simulation->update(dtSec);
+            world->update(dtSec);
             scene->updateAndDraw(dtSec);
             stage->updateAndDraw(dtSec);
             rendering->presentFrame();

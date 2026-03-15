@@ -311,7 +311,7 @@ namespace math {
         transform2f scaled(const vector2f &v) const;
         transform2f inverted() const;
     };
-    struct transform3f {
+    struct transform3f { // TODO: subvectors with ability to get ref
         union {
             struct {
                 scalar m11, m12, m13, m14;

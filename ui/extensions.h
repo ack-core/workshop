@@ -22,12 +22,12 @@ namespace ui {
             util::callback<void(const math::vector2f &direction)> handler;
         };
             
-        auto addJoystick(const StageInterfacePtr &stage, const std::shared_ptr<Element> &parent, ui::StageInterface::JoystickParams &&params) -> std::shared_ptr<StageInterface::Element> {
+        auto addJoystick(const StageInterfacePtr &stage, const resource::ResourceProviderPtr &res, const std::shared_ptr<StageInterface::Element> &parent, JoystickParams &&params) -> std::shared_ptr<StageInterface::Element> {
             std::shared_ptr<StageInterface::Image> bg = nullptr;
             float maxOffset = params.maxThumbOffset;
             
-            if (const resource::TextureInfo *info = _textureProvider->getTextureInfo(params.textureBackground)) {
-                bg = stage->addImage(nullptr, ui::StageInterface::ImageParams {
+            if (const resource::TextureInfo *info = res->getTextureInfo(params.textureBackground)) {
+                bg = stage->addImage(nullptr, StageInterface::ImageParams {
                     .anchorTarget = params.anchorTarget,
                     .anchorOffset = params.anchorOffset,
                     .anchorH = params.anchorH,
@@ -37,11 +37,11 @@ namespace ui {
                     .activeAreaRadius = 0.75f * info->width,
                     .capturePointer = true,
                 });
-                auto pivot = stage->addPivot(bg, PivotParams {
+                auto pivot = stage->addPivot(bg, StageInterface::PivotParams {
                     .anchorH = HorizontalAnchor::CENTER,
                     .anchorV = VerticalAnchor::MIDDLE,
                 });
-                auto thumb = stage->addImage(pivot, ui::StageInterface::ImageParams {
+                auto thumb = stage->addImage(pivot, StageInterface::ImageParams {
                     .anchorH = HorizontalAnchor::CENTER,
                     .anchorV = VerticalAnchor::MIDDLE,
                     .textureBase = params.textureThumb,
@@ -55,7 +55,7 @@ namespace ui {
                     if (bg && pivot) {
                         if (reset) {
                             pivot->setScreenPosition(bg->getPosition() + 0.5f * bg->getSize());
-                            handler->operator()(math::vector2f(0, 0));
+                            if (*handler) handler->operator()(math::vector2f(0, 0));
                         }
                         else {
                             const math::vector2f center = bg->getPosition() + 0.5f * bg->getSize();
@@ -66,12 +66,12 @@ namespace ui {
                             }
                             
                             pivot->setScreenPosition(center + dir);
-                            handler->operator()(math::vector2f(dir.x, -dir.y) / maxOffset);
+                            if (*handler)  handler->operator()(math::vector2f(dir.x, -dir.y) / maxOffset);
                         }
                     }
                 };
                 
-                bg->setActionHandler(Action::CAPTURE, [action, weakBg, weakPivot](float x, float y) {
+                bg->setActionHandler(Action::PRESS, [action, weakBg, weakPivot](float x, float y) {
                     action(weakBg.lock(), weakPivot.lock(), x, y, false);
                 });
                 bg->setActionHandler(Action::MOVE, [action, weakBg, weakPivot](float x, float y) {

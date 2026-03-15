@@ -18,6 +18,7 @@ namespace core {
         
     public:
         struct Body {
+            virtual auto getTransform() const -> const math::transform3f = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setVelocity(const math::vector3f &v) = 0;
             virtual ~Body() = default;

@@ -19,12 +19,12 @@ namespace core {
             ANIMATION = 1,
             VOXEL     = 10, // TODO: 1/3 subdetail
             LOWPOLY   = 11,
-            GROUND    = 12, // TODO: update minimal
+            GROUND    = 12, // TODO: update async loading
             PARTICLES = 20, // TODO: angle, rendering
             TRAILS    = 21,
             LIGHT     = 22,
             DECALS    = 23,
-            RAYCAST   = 30, // TODO: impl, triangles, extended moving tool
+            RAYCAST   = 30, // TODO: extended moving tool
             COLLISION = 31, // TODO: impl
             HELPER    = 32,
             SOUND     = 40,
@@ -46,7 +46,8 @@ namespace core {
         using ObjectPtr = std::shared_ptr<Object>;
         
         struct Object {
-            virtual auto getId() const -> std::size_t = 0;
+            virtual auto getId() const -> std::uint64_t = 0;
+            virtual auto getTypeMask() const -> std::uint64_t = 0;
             
             virtual void loadResources(util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
             virtual void unloadResources() = 0;
@@ -54,8 +55,10 @@ namespace core {
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setLocalTransform(const char *nodeName, const math::transform3f &trfm) = 0;
-            virtual auto getLocalTransform(const char *nodeName) -> const math::transform3f & = 0;
-            virtual auto getWorldTransform(const char *nodeName) -> const math::transform3f & = 0;
+            virtual auto getLocalTransform(const char *nodeName) const -> const math::transform3f & = 0;
+            virtual auto getWorldTransform(const char *nodeName) const -> const math::transform3f & = 0;
+            virtual auto getWorldTransform() const -> const math::transform3f & = 0;
+            virtual auto getWorldPosition() const -> const math::vector3f = 0;
             virtual void setVelocity(const math::vector3f &v) = 0;
             
             // Play animation
@@ -73,7 +76,13 @@ namespace core {
         
     public:
         virtual auto getObject(const char *name) -> ObjectPtr = 0;
-        virtual auto createObject(const char *name, const char *prefabPath) -> ObjectPtr = 0;
+
+        // Create game object
+        // @prefabPath - name of the prefab
+        // @typeMask   - game specific type. Used as mask in raycast.
+        // @name       - object's name. Named objects stay in the world even if no pointers in the game code keep them.
+        //
+        virtual auto createObject(const char *prefabPath, std::uint64_t typeMask, const char *name = nullptr) -> ObjectPtr = 0;
         virtual void removeObject(const char *name) = 0;
         virtual void update(float dtSec) = 0;
         

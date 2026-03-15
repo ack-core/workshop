@@ -21,7 +21,11 @@ namespace {
 namespace core {
     class BaseShapeImpl : public RaycastInterface::Shape {
     public:
-        BaseShapeImpl() {}
+        const std::uint64_t uniqueId;
+        const std::uint64_t mask;
+        
+    public:
+        BaseShapeImpl(std::uint64_t id, std::uint64_t m) : uniqueId(id), mask(m) {}
         ~BaseShapeImpl() override {}
         
         const math::bound3f &getBounds() const {
@@ -36,7 +40,9 @@ namespace core {
 
     class SphereShapeImpl : public BaseShapeImpl {
     public:
-        SphereShapeImpl(const core::SceneInterfacePtr &scene, const std::vector<math::vector3f> &points, const std::vector<double> &radiuses) {
+        SphereShapeImpl(const core::SceneInterfacePtr &scene, const std::vector<math::vector3f> &points, const std::vector<double> &radiuses, std::uint64_t id, std::uint64_t m)
+        : BaseShapeImpl(id, m)
+        {
             for (std::size_t i = 0; i < points.size(); i++) {
                 Sphere &element = _spheres.emplace_back(Sphere {});
                 element.positionAndRadius = math::vector4f(points[i], radiuses[i]);
@@ -78,7 +84,7 @@ namespace core {
         }
         RaycastInterface::RaycastResult completeCast(const math::vector3f &start, const math::vector3f &dir, float length, const IntersectIntermediateInfo &im) const override {
             RaycastInterface::RaycastResult result;
-            result.intersected = true;
+            result.uniqueId = uniqueId;
             result.point = start + dir * im.t;
             result.normal = (result.point - im.spherePosition).normalized(1.0f);
             return result;
@@ -97,7 +103,9 @@ namespace core {
 namespace core {
     class BoxShapeImpl : public BaseShapeImpl {
     public:
-        BoxShapeImpl(const core::SceneInterfacePtr &scene, const std::vector<math::vector3f> &points, const std::vector<math::vector3f> &sizes) {
+        BoxShapeImpl(const core::SceneInterfacePtr &scene, const std::vector<math::vector3f> &points, const std::vector<math::vector3f> &sizes, std::uint64_t id, std::uint64_t m)
+        : BaseShapeImpl(id, m)
+        {
             for (std::size_t i = 0; i < points.size(); i++) {
                 Box &element = _boxes.emplace_back(Box {});
                 element.position = points[i];
@@ -191,7 +199,7 @@ namespace core {
             const float nz = im.boxSign * (im.boxAxis == 0 ? im.boxTransform->m13 : (im.boxAxis == 1 ? im.boxTransform->m23 : im.boxTransform->m33));
             result.normal = math::vector3f(nx, ny, nz).normalized(1.0f);
             result.point = start + dir * im.t;
-            result.intersected = true;
+            result.uniqueId = uniqueId;
             return result;
         }
         
@@ -213,29 +221,31 @@ namespace core {
         ~RaycastInterfaceImpl() override {}
         
     public:
-        auto addShape(const util::Description &desc) -> ShapePtr override {
+        auto addShape(const util::Description &desc, std::uint64_t uniqueId, std::uint64_t mask) -> ShapePtr override {
             const core::RaycastInterface::ShapeType shapeType = static_cast<core::RaycastInterface::ShapeType>(desc.getInteger("type", 0));
             const std::vector<math::vector3f> points = desc.getVector3fs("points");
             ShapePtr result;
             
             if (shapeType == core::RaycastInterface::ShapeType::SPHERES) {
                 const std::vector<double> radiuses = desc.getNumbers("radiuses");
-                result = _shapes.emplace_back(std::make_shared<SphereShapeImpl>(_scene, points, radiuses));
+                result = _shapes.emplace_back(std::make_shared<SphereShapeImpl>(_scene, points, radiuses, uniqueId, mask));
             }
             else if (shapeType == core::RaycastInterface::ShapeType::BOXES) {
                 const std::vector<math::vector3f> sizes = desc.getVector3fs("sizes");
-                result = _shapes.emplace_back(std::make_shared<BoxShapeImpl>(_scene, points, sizes));
+                result = _shapes.emplace_back(std::make_shared<BoxShapeImpl>(_scene, points, sizes, uniqueId, mask));
             }
             else {
                 _platform->logError("[RaycastInterfaceImpl::addShape] Unknown raycast shape type");
             }
             return result;
         }
-        auto rayCast(const math::vector3f &start, const math::vector3f &dir, float length) const -> RaycastResult override {
+        auto rayCast(const math::vector3f &start, const math::vector3f &dir, float length, std::uint64_t mask) const -> RaycastResult override {
             RaycastResult result;
             IntersectIntermediateInfo intermediate;
             for (auto &shape : _shapes) {
-                shape->preCast(start, dir, length, intermediate);
+                if (shape->mask & mask) {
+                    shape->preCast(start, dir, length, intermediate);
+                }
             }
             if (intermediate.shape) {
                 result = intermediate.shape->completeCast(start, dir, length, intermediate);

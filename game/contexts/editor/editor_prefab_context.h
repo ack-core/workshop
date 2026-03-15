@@ -9,7 +9,7 @@ namespace game {
         core::WorldInterface::ObjectPtr worldObject;
         
         EditorNodePrefab(std::size_t typeIndex) : EditorNode(typeIndex) {}
-        ~EditorNodePrefab() override {}
+        ~EditorNodePrefab() override;
         
         void update(float dtSec) override;
         void setResourcePath(const API &api, const std::string &path) override;

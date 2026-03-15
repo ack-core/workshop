@@ -189,7 +189,7 @@ namespace game {
         return false;
     }
 
-    bool EditorRaycastShapeContext::_save(const std::string &data) {
+    bool EditorRaycastShapeContext::_save(const std::string &data) { // TODO: validate points > 3, no zero edges
         std::shared_ptr<EditorNodeRaycastShape> node = std::dynamic_pointer_cast<EditorNodeRaycastShape>(_nodeAccess.getSelectedNode().lock());
         if (node) {
             node->description.clear();
