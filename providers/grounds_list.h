@@ -4,6 +4,7 @@
 
 namespace resource {
     const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {
-        {"grounds/white", { 64, 1, 64 }},
+        {"grounds/grass", { 256, 1, 256 }},
+        {"grounds/small", { 1, 1, 1 }},
     };
 }

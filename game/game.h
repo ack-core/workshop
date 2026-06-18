@@ -9,6 +9,7 @@
 #include "contexts/editor/editor_camera_context.h"
 #include "contexts/editor/editor_prefab_context.h"
 #include "contexts/editor/editor_voxel_mesh_context.h"
+#include "contexts/editor/editor_ground_context.h"
 #include "contexts/editor/editor_particles_context.h"
 #include "contexts/editor/editor_raycast_shape_context.h"
 #include "contexts/editor/editor_collision_shape_context.h"
@@ -35,6 +36,7 @@ namespace game {
             &makeContext<EditorMainContext, CameraAccessInterface>,
             &makeContext<EditorPrefabContext, NodeAccessInterface>,
             &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
+            &makeContext<EditorGroundContext, NodeAccessInterface>,
             &makeContext<EditorRaycastShapeContext, NodeAccessInterface, CameraAccessInterface>,
             &makeContext<EditorCollisionShapeContext, NodeAccessInterface, CameraAccessInterface>,
             &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>

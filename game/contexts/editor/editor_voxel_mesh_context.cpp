@@ -60,7 +60,7 @@ namespace game {
                 auto anim = node->animations.find(_currentAnimation);
                 if (anim != node->animations.end()) {
                     const float length = float(anim->second.y - anim->second.x + 1);
-                    float frameOffset = std::max(0.0f, length * (_currentAnimationTime.value() * 1000.0f / float(anim->second.z)));
+                    float frameOffset = std::max(0.0f, _currentAnimationTime.value() * length * (1000.0f / float(anim->second.z)));
                     if (frameOffset > length) {
                         frameOffset = 0.0f;
                         if (_animationLooped) {

@@ -673,6 +673,40 @@
                 });
             }
         }
+        function registerGroundResource() {
+            listResFunctions.push(async function() {
+                listResources["inspect_ground"] = await dirResources.getDirectoryHandle("grounds").then(r => utility.listFilesInDirectory("grounds", r, "png"));
+                listResources["inspect_ground"].sort();
+            });
+
+            uiInspectMappingEdit["inspect_ground"] = ["ground_edit_0"];
+            resourcesExtMapping["inspect_ground"] = [".png"];
+
+            // bindings
+
+            $$("add_node_menu").add({ id: "12", value: "Add Ground Mesh" });
+            $$("inspect_panel").addView({
+                id: "ground_edit_0", view: "accordionitem", hidden: true, header: "Edit Ground", headerHeight: 10, headerAltHeight: 10,
+                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+                body: {
+                    padding: 3,
+                    rows: [
+                        {cols: [
+                            elements.label("TODO"),
+                        ]},
+                        { height: 16 }
+                    ]
+                }
+            });
+            
+            uiEditor["engine.ground.editing"] = function(data) {
+                $$("node_1_resource_list").hide();
+                $$("edit_resource_buttons").show();
+                uiInspectMappingEdit["inspect_ground"].forEach(item => {
+                    $$(item).show();
+                });
+            }
+        }
         function registerParticlesResource() {
             const uiPtcFrameType = [
                 { id: 1, value: "10"}, 
@@ -1318,6 +1352,7 @@
 
             registerPrefabResource();
             registerMeshResource();
+            registerGroundResource();
             registerParticlesResource();
             registerRaycastShapeResource();
             registerCollisionShapeResource();

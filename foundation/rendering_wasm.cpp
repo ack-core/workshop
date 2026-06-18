@@ -492,7 +492,6 @@ namespace foundation {
                     shaderVS += "uniform int _instance_count;\n";
                     shaderVS += "\n#define repeat_ID gl_VertexID\n";
                     shaderVS += "\nvoid main() {\n    int vertex_ID = gl_InstanceID % _instance_count;\n    int instance_ID = gl_InstanceID / _instance_count;\n";
-                    //shaderVS += "\nvoid main() {\n    int vertex_ID = gl_InstanceID / _instance_count;\n    int instance_ID = gl_InstanceID % _instance_count;\n";
                 }
                 else {
                     shaderVS += "\n#define repeat_ID 0\n#define vertex_ID gl_VertexID\n#define instance_ID gl_InstanceID\n";

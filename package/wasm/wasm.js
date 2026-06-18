@@ -559,6 +559,7 @@ worker.onmessage = (msg) => {
         glcontext.bindVertexArray(null);
         glcontext.bindBuffer(glcontext.ARRAY_BUFFER, null);
         glcontext.depthFunc(glcontext.GREATER);
+        glcontext.drawingBufferColorSpace = "display-p3";
         
         recreateDefaultFBO();
         instance.exports.initialize();

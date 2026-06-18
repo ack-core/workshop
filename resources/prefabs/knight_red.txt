@@ -1,20 +1,20 @@
 root {
     position : vector3f = 0.0000 0.0000 0.0000
-    resourcePath : string = "collision/pilon"
+    resourcePath : string = "collision/knight"
     type : integer = 31
 }
 
 root.bound {
     parentIndex : integer = 0
     position : vector3f = 0.0000 0.0000 0.0000
-    resourcePath : string = "raycast/pilon"
+    resourcePath : string = "raycast/knight"
     type : integer = 30
 }
 
 root.mdl {
     parentIndex : integer = 0
     position : vector3f = 0.0000 0.0000 0.0000
-    resourcePath : string = "meshes/test/pillon"
+    resourcePath : string = "meshes/knight_red"
     type : integer = 10
 }
 

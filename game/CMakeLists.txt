@@ -17,29 +17,7 @@ set(
 )
 source_group("contexts" FILES ${m_contexts_list})
 
-set(
-    m_editor_contexts_list
-    "${m_source_root}/contexts/editor/utils.h"
-    "${m_source_root}/contexts/editor/utils.cpp"
-    "${m_source_root}/contexts/editor/camera_access_interface.h"
-    "${m_source_root}/contexts/editor/node_access_interface.h"
-    "${m_source_root}/contexts/editor/editor_moving_tool.h"
-    "${m_source_root}/contexts/editor/editor_moving_tool.cpp"
-    "${m_source_root}/contexts/editor/editor_main_context.h"
-    "${m_source_root}/contexts/editor/editor_main_context.cpp"
-    "${m_source_root}/contexts/editor/editor_camera_context.h"
-    "${m_source_root}/contexts/editor/editor_camera_context.cpp"
-    "${m_source_root}/contexts/editor/editor_prefab_context.h"
-    "${m_source_root}/contexts/editor/editor_prefab_context.cpp"
-    "${m_source_root}/contexts/editor/editor_voxel_mesh_context.h"
-    "${m_source_root}/contexts/editor/editor_voxel_mesh_context.cpp"
-    "${m_source_root}/contexts/editor/editor_particles_context.h"
-    "${m_source_root}/contexts/editor/editor_particles_context.cpp"
-    "${m_source_root}/contexts/editor/editor_raycast_shape_context.h"
-    "${m_source_root}/contexts/editor/editor_raycast_shape_context.cpp"
-    "${m_source_root}/contexts/editor/editor_collision_shape_context.h"
-    "${m_source_root}/contexts/editor/editor_collision_shape_context.cpp"
-)
+file(GLOB_RECURSE m_editor_contexts_list "${m_source_root}/contexts/*.h" "${m_source_root}/contexts/*.cpp")
 source_group("contexts/editor" FILES ${m_editor_contexts_list})
 
 add_library(game ${m_sources_list} ${m_contexts_list} ${m_editor_contexts_list})

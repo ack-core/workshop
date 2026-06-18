@@ -47,7 +47,7 @@ namespace util {
             };
         }
         
-        callback(callback &&other) : _data(other._data) {
+        callback(callback &&other) : _data(std::move(other._data)) {
             other._data = {};
         }
         callback& operator =(callback &&other) {
@@ -62,11 +62,23 @@ namespace util {
         }
         
         operator bool () const {
-            return _data.target != nullptr;
+            return _data.call != nullptr;
         }
         
         decltype(auto) operator ()(Args... args) const {
-            return _data.call(_data.target, std::forward<Args>(args)...);
+            return _data.call ? _data.call(_data.target, std::forward<Args>(args)...) : R();
+        }
+        
+        decltype(auto) callAndReset(Args... args) {
+            struct Guard {
+                Data &toClean;
+                ~Guard() {
+                    toClean.clean(toClean.target);
+                    toClean = {};
+                }
+            }
+            guard {_data};
+            return _data.call ? _data.call(_data.target, std::forward<Args>(args)...) : R();
         }
         
     private:

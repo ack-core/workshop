@@ -48,14 +48,17 @@ namespace core {
 
     class ObjectNode {
     public:
+        const WorldInterface::NodeType type;
         const ObjectNode *parent = nullptr;
         math::transform3f localTransform;
         math::transform3f worldTransform;
         std::string resourcePath;
         
+        ObjectNode(WorldInterface::NodeType type) : type(type) {}
         virtual ~ObjectNode() = default;
         virtual void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) = 0;
         virtual void unloadResources() = 0;
+        virtual void play(const char *animName, bool looped, util::callback<void()> &&completion) = 0;
         virtual void update(float dtSec) = 0;
     };
 
@@ -80,8 +83,11 @@ namespace core {
         std::uint64_t getTypeMask() const override {
             return _typeMask;
         }
+        bool isLoaded() const override {
+            return _loading == 0;
+        }
         
-        void loadResources(util::callback<void(WorldInterface::Object &)> &&completion) override {
+        void loadResources(util::callback<void()> &&completion) override {
             _loadingCompletion = std::move(completion);
             _loading = int(_nodes.size());
             const std::weak_ptr<ObjectImpl> weakself = weak_from_this();
@@ -96,8 +102,7 @@ namespace core {
         }
         void nodeLoadingComplete() {
             if (--_loading == 0) {
-                _loadingCompletion(*this);
-                _loadingCompletion = {};
+                _loadingCompletion.callAndReset();
             }
         }
         
@@ -109,7 +114,7 @@ namespace core {
         auto getWorldTransform() const -> const math::transform3f & override;
         auto getWorldPosition() const -> const math::vector3f override;
         void setVelocity(const math::vector3f &v) override;
-        void play(const char *animationName, util::callback<void(WorldInterface::Object &)> &&completion) override;
+        void play(const char *name, bool looped, util::callback<void()> &&completion) override;
         void update(float dtSec);
         
     private:
@@ -118,42 +123,99 @@ namespace core {
         std::shared_ptr<WorldImpl> _owner;
         std::vector<std::unique_ptr<ObjectNode>> _nodes;
         std::unordered_map<std::string, std::size_t> _nameToNodeIndex;
-        util::callback<void(WorldInterface::Object &)> _loadingCompletion;
+        util::callback<void()> _loadingCompletion;
         int _loading = 0;
         CollisionNode *_collisionNode = nullptr;
     };
 }
 
 namespace core {
-    struct VoxelMeshNode : public ObjectNode {
-        core::SceneInterface::VoxelMeshPtr mesh;
+    class VoxelMeshNode : public ObjectNode {
+    public:
+        VoxelMeshNode(WorldInterface::NodeType type) : ObjectNode(type) {}
         
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
             res.getOrLoadVoxelMesh(resourcePath.c_str(), [world, this, objweak](const std::vector<foundation::RenderDataPtr> &data, const util::Description& desc) {
                 if (auto object = objweak.lock()) {
                     if (data.size()) {
-                        mesh = world->getScene().addVoxelMesh(data, desc);
-                        mesh->setTransform(worldTransform);
+                        _mesh = world->getScene().addVoxelMesh(data, desc);
+                        _mesh->setTransform(worldTransform);
+                        
+                        if (const util::Description *anims = desc.getDescription("animations")) {
+                            _animations.clear();
+                            for (const auto &anim : anims->getVector3is()) {
+                                _animations.emplace(anim.first, Animation { anim.second.x, float(anim.second.y - anim.second.x + 1), anim.second.z / 1000.0f });
+                            }
+                        }
                     }
                     object->nodeLoadingComplete();
                 }
             });
         }
         void unloadResources() override {
-            mesh = nullptr;
+            _mesh = nullptr;
+            _animations.clear();
+            _currentAnimation = nullptr;
+            _animComplete = {};
+            _animTimeSec = 0.0f;
         }
-        void update(float dtSec) override {
-            if (mesh) {
-                mesh->setTransform(worldTransform);
+        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
+            _animTimeSec = 0.0f;
+            const auto index = _animations.find(animName);
+            if (index != _animations.end()) {
+                _currentAnimation = &index->second;
+                _animComplete = std::move(completion);
+                _isLooped = looped;
+            }
+            else {
+                _currentAnimation = nullptr;
+                completion();
             }
         }
+        void update(float dtSec) override {
+            if (_mesh) {
+                _mesh->setTransform(worldTransform);
+
+                if (_currentAnimation) {
+                    float frameOffset = std::max(0.0f, _currentAnimation->frameCount * _animTimeSec * _currentAnimation->timeLenSec);
+                    if (frameOffset < _currentAnimation->frameCount) {
+                        _mesh->setFrame(_currentAnimation->startFrame + int(frameOffset));
+                    }
+                    else if (_isLooped) {
+                        _animComplete();
+                        _animTimeSec -= _currentAnimation->timeLenSec;
+                    }
+                    else {
+                        _animComplete.callAndReset();
+                    }
+                    _animTimeSec += dtSec;
+                }
+            }
+        }
+        
+    private:
+        struct Animation {
+            int startFrame;
+            float frameCount;
+            float timeLenSec;
+        };
+        std::unordered_map<std::string, Animation> _animations;
+        core::SceneInterface::VoxelMeshPtr _mesh;
+        const Animation *_currentAnimation = nullptr;
+        float _animTimeSec = 0.0f;
+        util::callback<void()> _animComplete;
+        bool _isLooped = false;
     };
-    
+}
+
+namespace core {
     struct ParticlesNode : public ObjectNode {
         float t = 0;
         core::SceneInterface::ParticlesPtr particles;
 
+        ParticlesNode(WorldInterface::NodeType type) : ObjectNode(type) {}
+        
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
             res.getOrLoadEmitter(resourcePath.c_str(), [world, this, objweak](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
@@ -171,6 +233,9 @@ namespace core {
         void unloadResources() override {
             particles = nullptr;
         }
+        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
+            
+        }
         void update(float dtSec) override {
             if (particles) {
                 particles->setTransform(worldTransform);
@@ -179,9 +244,13 @@ namespace core {
             }
         }
     };
-    
+}
+ 
+namespace core {
     struct RaycastNode : public ObjectNode {
         core::RaycastInterface::ShapePtr shape;
+        
+        RaycastNode(WorldInterface::NodeType type) : ObjectNode(type) {}
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
@@ -198,15 +267,22 @@ namespace core {
         void unloadResources() override {
             shape = nullptr;
         }
+        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
+            completion();
+        }
         void update(float dtSec) override {
             if (shape) {
                 shape->setTransform(worldTransform);
             }
         }
     };
-    
+}
+
+namespace core {
     struct CollisionNode : public ObjectNode {
         core::SimulationInterface::BodyPtr body;
+        
+        CollisionNode(WorldInterface::NodeType type) : ObjectNode(type) {}
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
@@ -222,6 +298,9 @@ namespace core {
         }
         void unloadResources() override {
             body = nullptr;
+        }
+        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
+            completion();
         }
         void update(float dtSec) override {
             if (body) {
@@ -275,12 +354,14 @@ namespace core {
         _nodes[0]->worldTransform.rv3 = pos.atv4start(1.0f).block;
         if (_collisionNode && _collisionNode->body) {
             _collisionNode->body->setTransform(_nodes[0]->worldTransform);
+            _collisionNode->body->setVelocity({0, 0, 0});
         }
     }
     void ObjectImpl::setTransform(const math::transform3f &trfm) {
         _nodes[0]->worldTransform = trfm;
         if (_collisionNode && _collisionNode->body) {
             _collisionNode->body->setTransform(_nodes[0]->worldTransform);
+            _collisionNode->body->setVelocity({0, 0, 0});
         }
     }
     void ObjectImpl::setLocalTransform(const char *nodeName, const math::transform3f &trfm) {
@@ -303,8 +384,15 @@ namespace core {
             _collisionNode->body->setVelocity(v);
         }
     }
-    void ObjectImpl::play(const char *animationName, util::callback<void(WorldInterface::Object &)> &&completion) {
-        
+    void ObjectImpl::play(const char *name, bool looped, util::callback<void()> &&completion) {
+        const std::string src = name;
+        const auto colonPos = src.find(':');
+        const std::string nodeName = src.substr(0, colonPos);
+        const std::string animName = colonPos != std::string::npos ? src.substr(colonPos + 1, std::string::npos) : std::string();
+        const auto index = _nameToNodeIndex.find(nodeName);
+        if (index != _nameToNodeIndex.end()) {
+            _nodes[index->second]->play(animName.data(), looped, std::move(completion));
+        }
     }
     void ObjectImpl::update(float dtSec) {
         for (std::unique_ptr<ObjectNode> &node : _nodes) {
@@ -329,16 +417,16 @@ namespace core {
     , _simulation(simulation)
     {
         g_nodeConstructors[int(WorldInterface::NodeType::VOXEL)] = []() -> std::unique_ptr<ObjectNode> {
-            return std::make_unique<VoxelMeshNode>();
+            return std::make_unique<VoxelMeshNode>(WorldInterface::NodeType::VOXEL);
         };
         g_nodeConstructors[int(WorldInterface::NodeType::PARTICLES)] = []() -> std::unique_ptr<ObjectNode> {
-            return std::make_unique<ParticlesNode>();
+            return std::make_unique<ParticlesNode>(WorldInterface::NodeType::PARTICLES);
         };
         g_nodeConstructors[int(WorldInterface::NodeType::RAYCAST)] = []() -> std::unique_ptr<ObjectNode> {
-            return std::make_unique<RaycastNode>();
+            return std::make_unique<RaycastNode>(WorldInterface::NodeType::RAYCAST);
         };
         g_nodeConstructors[int(WorldInterface::NodeType::COLLISION)] = []() -> std::unique_ptr<ObjectNode> {
-            return std::make_unique<CollisionNode>();
+            return std::make_unique<CollisionNode>(WorldInterface::NodeType::COLLISION);
         };
     }
     WorldImpl::~WorldImpl() {

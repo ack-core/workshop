@@ -17,15 +17,16 @@ namespace core {
         enum class NodeType : std::size_t {
             PREFAB    = 0,
             ANIMATION = 1,
-            VOXEL     = 10, // TODO: 1/3 subdetail
+            VOXEL     = 10,
             LOWPOLY   = 11,
             GROUND    = 12, // TODO: update async loading
-            PARTICLES = 20, // TODO: angle, rendering
+            PARTICLES = 20, // TODO: angle, transparency rendering
             TRAILS    = 21,
             LIGHT     = 22,
             DECALS    = 23,
+            IMPOSTERS = 24,
             RAYCAST   = 30, // TODO: extended moving tool
-            COLLISION = 31, // TODO: impl
+            COLLISION = 31, // TODO: space-tree
             HELPER    = 32,
             SOUND     = 40,
             HAPTIC    = 41,
@@ -48,8 +49,9 @@ namespace core {
         struct Object {
             virtual auto getId() const -> std::uint64_t = 0;
             virtual auto getTypeMask() const -> std::uint64_t = 0;
+            virtual bool isLoaded() const = 0;
             
-            virtual void loadResources(util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
+            virtual void loadResources(util::callback<void()> &&completion) = 0;
             virtual void unloadResources() = 0;
             
             virtual void setPosition(const math::vector3f &pos) = 0;
@@ -62,14 +64,14 @@ namespace core {
             virtual void setVelocity(const math::vector3f &v) = 0;
             
             // Play animation
-            // @animationName - name of the animation node
-            //     or name of the mesh animation concatenated with the node name. Example: 'root...voxelMeshNode.animationName'
+            // @name - name of the animation node
+            //     or name of the mesh animation concatenated with the node name: 'root.voxel.mesh:animationName'
             //     or name of the particles node
             //
             // @completion    - callback is called when animation ends or instantly if animation wasn't found.
             // callback is called at the end of every cycle of looped particles or looped animations
             //
-            virtual void play(const char *animationName, util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
+            virtual void play(const char *name, bool looped, util::callback<void()> &&completion = {}) = 0;
             
             virtual ~Object() = default;
         };

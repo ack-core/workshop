@@ -28,6 +28,18 @@ namespace {
         util::Description description;
         std::vector<std::vector<VTXMVOX>> voxels;
     };
+    struct GroundAsyncContext {
+        struct Vertex {
+            float x, y, z;
+            float nx, ny, nz;
+            float u, v;
+        };
+
+        std::unique_ptr<std::uint8_t[]> data;
+        std::uint32_t w, h;
+        std::vector<Vertex> vertexes;
+        std::vector<std::uint32_t> indexes;
+    };
     
     bool readEmitter(const std::uint8_t *data, util::Description &desc, size_t &read) {
         const std::uint8_t *origin = data;
@@ -75,6 +87,50 @@ namespace {
                     }
                 }
             }
+        }
+    }
+
+    void readGround(GroundAsyncContext &ctx, const std::uint8_t *data, std::size_t len) {
+        const std::uint8_t *binstart = data;
+        
+        if (memcmp(data, "GROUND", 6) == 0) {
+            data += 16;
+            const int sizeX = *(int *)(data + 0);
+            const int sizeY = *(int *)(data + 4);
+            const int sizeZ = *(int *)(data + 8);
+            const int vxcnt = *(int *)(data + 12);
+            const int ixcnt = *(int *)(data + 16);
+            data += 20;
+            
+            ctx.vertexes.reserve(vxcnt);
+            ctx.indexes.reserve(ixcnt);
+            
+            for (int i = 0; i < vxcnt; i++) {
+                ctx.vertexes.emplace_back(reinterpret_cast<const GroundAsyncContext::Vertex *>(data)[i]);
+            }
+            data += sizeof(GroundAsyncContext::Vertex) * vxcnt;
+            for (int i = 0; i < ixcnt; i++) {
+                ctx.indexes.emplace_back(reinterpret_cast<const std::uint32_t *>(data)[i]);
+            }
+            data += sizeof(std::uint32_t) * ixcnt;
+            const std::uint32_t textureFlags = *(std::uint32_t *)data;
+            data += sizeof(std::uint32_t);
+            const std::size_t pngOffset = data - binstart;
+            
+            upng_t *upng = upng_new_from_bytes(data, (unsigned long)(len - pngOffset));
+            if (upng != nullptr && *reinterpret_cast<const unsigned *>(data) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
+                if (upng_get_format(upng) == UPNG_LUMINANCE8) {
+                    ctx.w = upng_get_width(upng);
+                    ctx.h = upng_get_height(upng);
+                    ctx.data = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h);
+                    std::memcpy(ctx.data.get(), upng_get_buffer(upng), ctx.w * ctx.h);
+                    return;
+                }
+            }
+
+            ctx.indexes.clear();
+            ctx.vertexes.clear();
+            ctx.data = nullptr;
         }
     }
 
@@ -394,98 +450,39 @@ namespace resource {
             _asyncInProgress = true;
             _platform->loadFile((path + ".grd").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<uint8_t[]> &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                    struct GroundData : public GroundInfo {
-                        struct Vertex {
-                            float x, y, z;
-                            float nx, ny, nz;
-                            float u, v;
-                        };
-
-                        std::vector<Vertex> vertexes;
-                        std::vector<std::uint32_t> indexes;
-                    };
-                    
                     if (len) {
-                        const std::uint8_t *data = mem.get();
-                        
-                        if (memcmp(data, "GROUND", 6) == 0) {
-                            std::unique_ptr<GroundData> ground = std::make_unique<GroundData>();
-                            
-                            data += 16;
-                            ground->sizeX = *(int *)(data + 0);
-                            ground->sizeY = *(int *)(data + 4);
-                            ground->sizeZ = *(int *)(data + 8);
-                            int vxcnt = *(int *)(data + 12);
-                            int ixcnt = *(int *)(data + 16);
-                            data += 20;
-                            
-                            ground->vertexes.reserve(vxcnt);
-                            ground->indexes.reserve(ixcnt);
-                            
-                            for (int i = 0; i < vxcnt; i++) {
-                                ground->vertexes.emplace_back(reinterpret_cast<const GroundData::Vertex *>(data)[i]);
+                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<GroundAsyncContext>>([weak, path, mem = std::move(mem), len](GroundAsyncContext &ctx) {
+                            //--- worker thread ---
+                            if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                readGround(ctx, mem.get(), len);
                             }
-                            data += sizeof(GroundData::Vertex) * vxcnt;
-                            for (int i = 0; i < ixcnt; i++) {
-                                ground->indexes.emplace_back(reinterpret_cast<const std::uint32_t *>(data)[i]);
-                            }
-                            data += sizeof(std::uint32_t) * ixcnt;
-                            std::uint32_t textureFlags = *(std::uint32_t *)data;
-                            data += sizeof(std::uint32_t);
-                            std::size_t offset = data - mem.get();
-                            
-                            struct AsyncContext {
-                                std::unique_ptr<std::uint8_t[]> data;
-                                std::uint32_t w, h;
-                            };
-                            self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak, path, bin = std::move(mem), offset, len](AsyncContext &ctx) {
-                                //--- worker thread ---
-                                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                    const std::uint8_t *data = bin.get() + offset;
-                                    upng_t *upng = upng_new_from_bytes(data, (unsigned long)(len - offset));
-                                    if (upng != nullptr && *reinterpret_cast<const unsigned *>(data) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-                                        if (upng_get_format(upng) == UPNG_LUMINANCE8) {
-                                            ctx.w = upng_get_width(upng);
-                                            ctx.h = upng_get_height(upng);
-                                            ctx.data = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h);
-                                            std::memcpy(ctx.data.get(), upng_get_buffer(upng), ctx.w * ctx.h);
-                                        }
-                                        else {
-                                            self->_platform->logError("[GroundProviderImpl::getOrLoadGround] '%s' must have lum8 image", path.data());
-                                        }
-                                    }
-                                    else {
-                                        self->_platform->logError("[GroundProviderImpl::getOrLoadGround] '%s' does not contain valid image", path.data());
-                                    }
-                                }
-                                //--- worker thread ---
-                            },
-                            [weak, path, completion = std::move(completion), gd = std::move(ground)](AsyncContext &ctx) mutable {
-                                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                    self->_asyncInProgress = false;
+                            //--- worker thread ---
+                        },
+                        [weak, path, completion = std::move(completion)](GroundAsyncContext &ctx) {
+                            if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                self->_asyncInProgress = false;
+
+                                if (ctx.data && ctx.indexes.size()) {
+                                    const std::uint32_t vcnt = std::uint32_t(ctx.vertexes.size());
+                                    const std::uint32_t icnt = std::uint32_t(ctx.indexes.size());
                                     
-                                    if (ctx.data && gd) {
-                                        std::uint32_t vcnt = std::uint32_t(gd->vertexes.size());
-                                        std::uint32_t icnt = std::uint32_t(gd->indexes.size());
-                                        
-                                        self->_grounds.erase(path);
-                                        GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
-                                        groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
-                                        groundMesh.data = self->_rendering->createData(gd->vertexes.data(), layouts::VTXNRMUV, vcnt, gd->indexes.data(), icnt);
-                                        completion(groundMesh.data, groundMesh.texture);
-                                    }
-                                    else {
-                                        completion(nullptr, nullptr);
-                                    }
+                                    self->_grounds.erase(path);
+                                    GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
+                                    groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
+                                    groundMesh.data = self->_rendering->createData(ctx.vertexes.data(), layouts::VTXNRMUV, vcnt, ctx.indexes.data(), icnt);
+                                    completion(groundMesh.data, groundMesh.texture);
                                 }
-                            }));
-                        }
-                        else {
-                            self->_platform->logError("[GroundProviderImpl::getOrLoadGround] '%s' is not a valid ground file", path.data());
-                        }
+                                else {
+                                    self->_platform->logError("[ResourceProviderImpl::getOrLoadGround] failed to load ground file '%s'", path.data());
+                                    completion(nullptr, nullptr);
+                                }
+                            }
+                        }));
+
                     }
                     else {
-                        self->_platform->logError("[MeshProviderImpl::getOrLoadGround] Unable to find file '%s'", path.data());
+                        self->_asyncInProgress = false;
+                        self->_platform->logError("[ResourceProviderImpl::getOrLoadGround] Unable to find file '%s'", path.data());
                         completion(nullptr, nullptr);
                     }
                 }
@@ -517,6 +514,7 @@ namespace resource {
                         std::size_t imgoff = 0;
                         util::Description desc;
                         
+                        // TODO: readEmitter -> async
                         if (readEmitter(mem.get(), desc, imgoff)) {
                             const std::string &texture = desc.getString("texture", "<Unknown>");
                             

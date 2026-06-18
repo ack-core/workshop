@@ -76,25 +76,30 @@ namespace game {
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
         _rayOut = _api.scene->addLineSet();
-        _knight = _api.world->createObject("prefabs/knight", core::RaycastInterface::MASK_ALL);
+        _knight = _api.world->createObject("prefabs/knight_red", core::RaycastInterface::MASK_ALL);
         _knight->setPosition({0, 0, 0});
-        _knight->loadResources([](core::WorldInterface::Object &) {
+        _knight->loadResources([this]() {
             printf("!!! completed !!!\n");
+            _knight->play("root.mdl:attack", false, [this]() {
+                printf("!!! attack !!!\n");
+                _knight->play("root.mdl:idle", true);
+            });
         });
-        _other = _api.world->createObject("prefabs/knight", core::RaycastInterface::MASK_ALL);
+        _other = _api.world->createObject("prefabs/knight_blue", core::RaycastInterface::MASK_ALL);
         _other->setPosition({20.01f, 0, 0});
-        _other->loadResources([](core::WorldInterface::Object &) {
+        _other->loadResources([]() {
             printf("!!! completed !!!\n");
         });
+        
 
         
-        const math::transform3f t1 = math::transform3f(math::vector3f(1, 0.5f, 0).normalized(), M_PI / 6.0f).translated({0, 0, -20.01});
-        
-        _pilon = _api.world->createObject("prefabs/pilon", core::RaycastInterface::MASK_ALL);
-        _pilon->setTransform(t1);
-        _pilon->loadResources([](core::WorldInterface::Object &) {
-            printf("!!! completed !!!\n");
-        });
+//        const math::transform3f t1 = math::transform3f(math::vector3f(1, 0.5f, 0).normalized(), M_PI / 6.0f).translated({0, 0, -20.01});
+//        
+//        _pilon = _api.world->createObject("prefabs/pilon", core::RaycastInterface::MASK_ALL);
+//        _pilon->setTransform(t1);
+//        _pilon->loadResources([](core::WorldInterface::Object &) {
+//            printf("!!! completed !!!\n");
+//        });
 
         
         //        const math::transform3f trfm = math::transform3f({0, 1, 0}, M_PI_4);

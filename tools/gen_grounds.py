@@ -12,8 +12,13 @@ import struct
 
 class Palette:
     def __init__(self, img: bytes):
-        self._data = {int.from_bytes(img[i * 4:i * 4 + 4]): i for i in range(0, 256)}
+        self._data = {}
+        for i in range(0, 256):
+            self._data[int.from_bytes(img[i * 4:i * 4 + 4])] = i;
         pass
+
+    def has_index(self, color: bytes):
+        return int.from_bytes(color) in self._data;
 
     def get_index(self, color: bytes):
         return self._data[int.from_bytes(color)]
@@ -24,16 +29,29 @@ def generate_place(src: str, dst: str, palette: Palette):
     try:
         src_reader = png.Reader(filename=src)
         src_w, src_h, src_data, _ = src_reader.asRGBA8()
+
+        if src_w % 3 != 0 or src_h % 3 != 0:
+            print("------ Image " + src + " has size that is not divisible by 3")
+            return
+
         src_data = bytes().join([bytes(e) for e in src_data])
-        idx_data = [palette.get_index(src_data[i * 4:i * 4 + 4]) for i in range(0, src_w * src_h)]
+        idx_data = [0 for _ in range(src_w * src_h)]
+        for i in range(0, src_w * src_h):
+            bb = src_data[i * 4:i * 4 + 4]
+            if palette.has_index(bb):
+                idx_data[i] = palette.get_index(bb)
+            else:
+                print("------ Pixel " + str(i // src_w) + " " + str(i % src_w) + "out of the palette")
+                return
 
         with open(dst, mode="wb") as f:
             f.write(b'GROUND\0\0\0\0\0\0\0\0\0\0')
 
+            mw = src_w // 3 - 1
+            mh = src_h // 3 - 1
+
             # size
-            f.write(struct.pack("<iii", src_w, 1, src_h))
-            mw = src_w - 1
-            mh = src_h - 1
+            f.write(struct.pack("<iii", mw + 1, 1, mh + 1))
 
             # vertexes and indexes
             f.write(struct.pack("<ii", 4, 6))

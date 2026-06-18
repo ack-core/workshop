@@ -14,7 +14,7 @@ root.bound {
 root.mdl {
     parentIndex : integer = 0
     position : vector3f = 0.0000 0.0000 0.0000
-    resourcePath : string = "meshes/knight"
+    resourcePath : string = "meshes/knight_blue"
     type : integer = 10
 }
 
