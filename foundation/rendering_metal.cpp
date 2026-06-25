@@ -101,6 +101,16 @@ namespace {
 }
 
 namespace foundation {
+    std::uint32_t InputLayout::getStride() const {
+        std::uint32_t stride = 0;
+        for (const InputLayout::Attribute &item : attributes) {
+            stride += g_formatConversionTable[int(item.format)].size;
+        }
+        return stride;
+    }
+}
+
+namespace foundation {
     MetalShader::MetalShader(const std::string &name, const InputLayout &layout, id<MTLLibrary> library, std::uint32_t constBufferLength)
         : _name(name)
         , _layout(layout)
@@ -115,6 +125,10 @@ namespace foundation {
     const InputLayout &MetalShader::getInputLayout() const {
         return _layout;
     }
+
+    std::uint32_t MetalShader::getConstBufferLength() const {
+        return _constBufferLength;
+    }
     
     id<MTLFunction> MetalShader::getVertexShader() const {
         return [_library newFunctionWithName:@"main_vertex"];
@@ -122,10 +136,6 @@ namespace foundation {
     
     id<MTLFunction> MetalShader::getFragmentShader() const {
         return [_library newFunctionWithName:@"main_fragment"];
-    }
-    
-    std::uint32_t MetalShader::getConstBufferLength() const {
-        return _constBufferLength;
     }
     
     const std::string &MetalShader::getName() const {
@@ -253,7 +263,7 @@ namespace foundation {
             
             _device = MTLCreateSystemDefaultDevice();
             _commandQueue = [_device newCommandQueue];
-            _constBufferSemaphore = dispatch_semaphore_create(CONSTANT_BUFFER_FRAMES_MAX);
+            _frameBufferingSemaphore = dispatch_semaphore_create(BUFFERED_FRAMES_MAX);
             
             MTLSamplerDescriptor *samplerDesc = [MTLSamplerDescriptor new];
             samplerDesc.minFilter = MTLSamplerMinMagFilterNearest;
@@ -277,8 +287,9 @@ namespace foundation {
             depthDesc.depthWriteEnabled = YES;
             _depthStates[int(foundation::DepthBehavior::TEST_AND_WRITE)] = [_device newDepthStencilStateWithDescriptor:depthDesc];
             
-            for (std::uint32_t i = 0; i < CONSTANT_BUFFER_FRAMES_MAX; i++) {
+            for (std::uint32_t i = 0; i < BUFFERED_FRAMES_MAX; i++) {
                 _constantsBuffers[i] = [_device newBufferWithLength:CONSTANT_BUFFER_OFFSET_MAX options:MTLResourceStorageModeShared];
+                _dynamicBuffers[i] = [_device newBufferWithLength:DYNAMIC_BUFFER_OFFSET_MAX options:MTLResourceStorageModeShared];
             }
             
             _currentCommandBuffer = [_commandQueue commandBuffer];
@@ -771,11 +782,8 @@ namespace foundation {
         }
     }
     
-    RenderDataPtr MetalRendering::createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
-        std::uint32_t stride = 0;
-        for (const InputLayout::Attribute &item : layout.attributes) {
-            stride += g_formatConversionTable[int(item.format)].size;
-        }
+    RenderDataPtr MetalRendering::createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
+        const std::uint32_t stride = layout.getStride();
         if (indexes && layout.repeat > 1) {
             _platform->logError("[MetalRendering::createData] Vertex repeat is incompatible with indexed data");
             return nullptr;
@@ -959,18 +967,18 @@ namespace foundation {
             }
         }
     }
-    
-    void MetalRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) {
+
+    void MetalRendering::_applyTextures(const std::pair<RenderTexturePtr, foundation::SamplerType> *textures, std::size_t size) {
         if (_currentRenderCommandEncoder && _currentShader) {
-            if (textures.size() <= MAX_TEXTURES) {
-                const NSRange range {0, textures.size()};
+            if (size <= MAX_TEXTURES) { // TODO: apply fisrt MAX_TEXTURES textures anyway
+                const NSRange range {0, size};
                 __unsafe_unretained id<MTLTexture> texarray[MAX_TEXTURES] = {nil};
                 __unsafe_unretained id<MTLSamplerState> smarray[MAX_TEXTURES] = {nil};
                 
                 std::uint32_t index = 0;
-                for (auto &item : textures) {
-                    texarray[index] = item.first ? static_cast<const MetalTexBase *>(item.first.get())->getNativeTexture() : nil;
-                    smarray[index] = _samplerStates[int(item.second)];
+                for (std::size_t i = 0; i < size; i++) {
+                    texarray[index] = textures[i].first ? static_cast<const MetalTexBase *>(textures[i].first.get())->getNativeTexture() : nil;
+                    smarray[index] = _samplerStates[int(textures[i].second)];
                     index++;
                 }
                 
@@ -980,6 +988,14 @@ namespace foundation {
                 [_currentRenderCommandEncoder setVertexTextures:texarray withRange:range];
             }
         }
+    }
+    
+    void MetalRendering::applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) {
+        _applyTextures(textures.begin(), textures.size());
+    }
+    
+    void MetalRendering::applyTextures(const std::vector<std::pair<RenderTexturePtr, foundation::SamplerType>> &textures) {
+        _applyTextures(textures.data(), textures.size());
     }
     
     void MetalRendering::draw(std::uint32_t vertexCount) {
@@ -1034,6 +1050,46 @@ namespace foundation {
             }
         }
     }
+
+    void MetalRendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
+        if (_currentRenderCommandEncoder && _currentShader) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
+            const std::uint32_t vlen = vcnt * layout.getStride();
+            const std::uint32_t roundedSize = roundTo256(vlen + icnt * sizeof(std::uint32_t));
+            
+            if (_dynamicBufferOffset + roundedSize < DYNAMIC_BUFFER_OFFSET_MAX) {
+                std::uint8_t *dynamicMemory = static_cast<std::uint8_t *>([_dynamicBuffers[_dynamicBuffersIndex] contents]);
+                std::memcpy(dynamicMemory + _dynamicBufferOffset, data, vlen);
+                if (indexes) {
+                    std::memcpy(dynamicMemory + _dynamicBufferOffset + vlen, indexes, icnt * sizeof(std::uint32_t));
+                }
+                
+                [_currentRenderCommandEncoder setVertexBuffer:_dynamicBuffers[_dynamicBuffersIndex] offset:_dynamicBufferOffset atIndex:VERTEX_IN_BINDING_START];
+            }
+            else {
+                _platform->logError("[MetalRendering::_appendConstantBuffer] Out of dynamic buffer length\n");
+                return;
+            }
+            
+            if (layout.repeat > 1) {
+                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
+                [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt];
+            }
+            else {
+                if (indexes) {
+                    const std::uint32_t ioff = _dynamicBufferOffset + vlen;
+                    [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:icnt indexType:MTLIndexTypeUInt32 indexBuffer:_dynamicBuffers[_dynamicBuffersIndex] indexBufferOffset:ioff];
+                }
+                else {
+                    [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vcnt];
+                }
+            }
+            
+            _dynamicBufferOffset += roundedSize;
+        }
+
+    }
         
     void MetalRendering::presentFrame() {
         _finishRenderCommandEncoder();
@@ -1043,14 +1099,18 @@ namespace foundation {
             
             [_currentCommandBuffer presentDrawable:_view.currentDrawable];
             [_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
-                dispatch_semaphore_signal(m->_constBufferSemaphore);
+                dispatch_semaphore_signal(m->_frameBufferingSemaphore);
             }];
             [_currentCommandBuffer commit];
             _currentCommandBuffer = [_commandQueue commandBuffer];
             
-            _constantsBuffersIndex = (_constantsBuffersIndex + 1) % CONSTANT_BUFFER_FRAMES_MAX;
+            _constantsBuffersIndex = (_constantsBuffersIndex + 1) % BUFFERED_FRAMES_MAX;
             _constantsBufferOffset = 0;
-            dispatch_semaphore_wait(_constBufferSemaphore, DISPATCH_TIME_FOREVER);
+
+            _dynamicBuffersIndex = (_dynamicBuffersIndex + 1) % BUFFERED_FRAMES_MAX;
+            _dynamicBufferOffset = 0;
+
+            dispatch_semaphore_wait(_frameBufferingSemaphore, DISPATCH_TIME_FOREVER);
         }
     }
     

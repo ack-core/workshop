@@ -103,6 +103,7 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 	file(COPY "${m_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
+	file(COPY "${m_resources_root}/arial.ttf" DESTINATION "${m_binary_root}/data")
 
 	message(STATUS "Generating palette...")
 	execute_process(

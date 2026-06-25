@@ -34,7 +34,12 @@ namespace ui {
         RIGHT,
         RIGHTSIDE
     };
-    
+    enum class TextAlign {
+        LEFT,
+        CENTER,
+        RIGHT,
+    };
+
     class StageInterface {
     public:
         static std::shared_ptr<StageInterface> instance(
@@ -50,7 +55,7 @@ namespace ui {
             virtual ~Element() = default;
         };
         struct Interactor : public virtual Element {
-            virtual void setActionHandler(ui::Action action, util::callback<void(float x, float y)> &&handler) = 0;
+            virtual void setActionHandler(util::callback<void(ui::Action action, float x, float y)> &&handler) = 0;
             virtual ~Interactor() = default;
         };
         struct Pivot : public virtual Element {
@@ -59,30 +64,68 @@ namespace ui {
         };
         struct Image : public virtual Interactor {
             virtual ~Image() = default;
+            virtual void setTexture(const char *texturePath) = 0;
+        };
+        struct Img9Slice : public virtual Interactor {
+            virtual ~Img9Slice() = default;
+            virtual void setTexture(const char *texturePath, const math::vector3f &sliceArgs) = 0;
         };
         
     public:
         struct PivotParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+        };
+        struct CropParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const math::vector2f size = math::vector2f(100.0f, 100.0f);
         };
         struct ImageParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
-            const char *textureBase = "";
-            const char *textureAction = "";
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const char *texture = "";
             const float activeAreaOffset = 0.0f;
             const float activeAreaRadius = 0.0f;
-            const bool capturePointer = false;
+        };
+        struct Img9SliceParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const math::vector2f size = math::vector2f(100.0f, 100.0f);
+            const char *texture = "";
+            const math::vector3f sliceArgs = 0.0f;
+            const float activeAreaOffset = 0.0f;
+            const float activeAreaRadius = 0.0f;
+        };
+        struct TextLineParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const std::uint8_t fontSize;
+        };
+        struct TextBlockParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const math::vector2f size = math::vector2f(100.0f, 100.0f);
+            const std::uint8_t fontSize;
+            const TextAlign textAlign = TextAlign::LEFT;
         };
         
     public:
         virtual auto addPivot(const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
         virtual auto addImage(const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
+        virtual auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
         
         virtual void clear() = 0;
         virtual void updateAndDraw(float dtSec) = 0;

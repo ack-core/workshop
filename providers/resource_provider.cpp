@@ -407,7 +407,7 @@ namespace resource {
                                 if (ctx.voxels.size()) {
                                     std::vector<foundation::RenderDataPtr> frames (ctx.voxels.size());
                                     for (std::size_t f = 0; f < ctx.voxels.size(); f++) {
-                                        frames[f] = self->_rendering->createData(ctx.voxels[f].data(), layouts::VTXMVOX, std::uint32_t(ctx.voxels[f].size()));
+                                        frames[f] = self->_rendering->createData(layouts::VTXMVOX, ctx.voxels[f].data(), std::uint32_t(ctx.voxels[f].size()));
                                     }
                                     
                                     self->_meshes.erase(path);
@@ -469,7 +469,7 @@ namespace resource {
                                     self->_grounds.erase(path);
                                     GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
                                     groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
-                                    groundMesh.data = self->_rendering->createData(ctx.vertexes.data(), layouts::VTXNRMUV, vcnt, ctx.indexes.data(), icnt);
+                                    groundMesh.data = self->_rendering->createData(layouts::VTXNRMUV, ctx.vertexes.data(), vcnt, ctx.indexes.data(), icnt);
                                     completion(groundMesh.data, groundMesh.texture);
                                 }
                                 else {

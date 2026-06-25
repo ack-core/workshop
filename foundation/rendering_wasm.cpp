@@ -99,6 +99,16 @@ namespace {
 }
 
 namespace foundation {
+    std::uint32_t InputLayout::getStride() const {
+        std::uint32_t stride = 0;
+        for (std::size_t i = 0; i < attributes.size(); i++) {
+            stride += g_formatConversionTable[int(layout.attributes[i].format)].size;
+        }
+        return stride;
+    }
+}
+
+namespace foundation {
     WASMShader::WASMShader(WebGLId shader, const InputLayout &layout, std::uint32_t constBufferLength)
         : _shader(shader)
         , _constBufferLength(constBufferLength)
@@ -597,7 +607,7 @@ namespace foundation {
         return result;
     }
     
-    RenderDataPtr WASMRendering::createData(const void *data, const foundation::InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
+    RenderDataPtr WASMRendering::createData(const foundation::InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
         RenderDataPtr result = nullptr;
         
         if (indexes && layout.repeat > 1) {
@@ -605,11 +615,7 @@ namespace foundation {
             return nullptr;
         }
         if (vcnt && layout.attributes.empty() == false) {
-            std::uint32_t stride = 0;
-            for (std::size_t i = 0; i < layout.attributes.size(); i++) {
-                stride += g_formatConversionTable[int(layout.attributes[i].format)].size;
-            }
-            
+            const std::uint32_t stride = layout.getStride();
             std::uint8_t *memory = _getUploadBuffer(layout.attributes.size() + stride * vcnt);
             for (std::size_t i = 0; i < layout.attributes.size(); i++) {
                 memory[i] = std::uint8_t(layout.attributes[i].format);
@@ -695,7 +701,16 @@ namespace foundation {
         }
     }
     
-    void WASMRendering::applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) {
+    void WASMRendering::applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) {
+        if (_currentShader) {
+            for (std::size_t i = 0; i < textures.size(); i++) {
+                const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first.get());
+                webgl_applyTexture(i, platformTexture ? platformTexture->getWebGLTexture() : 0, int(textures.begin()[i].second));
+            }
+        }
+    }
+    
+    void WASMRendering::applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) {
         if (_currentShader) {
             for (std::size_t i = 0; i < textures.size(); i++) {
                 const WASMTexture *platformTexture = static_cast<const WASMTexture *>(textures.begin()[i].first.get());
@@ -741,6 +756,10 @@ namespace foundation {
                 }
             }
         }
+    }
+    
+    void WASMRendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
+        
     }
     
     void WASMRendering::presentFrame() {

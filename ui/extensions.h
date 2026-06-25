@@ -13,9 +13,9 @@ namespace ui {
     namespace extensions {
         struct JoystickParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
-            const math::vector2f anchorOffset = math::vector2f(0, 0);
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
             const char *textureBackground = "";
             const char *textureThumb = "";
             const float maxThumbOffset = 50.0f;
@@ -32,10 +32,9 @@ namespace ui {
                     .anchorOffset = params.anchorOffset,
                     .anchorH = params.anchorH,
                     .anchorV = params.anchorV,
-                    .textureBase = params.textureBackground,
+                    .texture = params.textureBackground,
                     .activeAreaOffset = 0.5f * info->width,
-                    .activeAreaRadius = 0.75f * info->width,
-                    .capturePointer = true,
+                    .activeAreaRadius = 0.75f * info->width
                 });
                 auto pivot = stage->addPivot(bg, StageInterface::PivotParams {
                     .anchorH = HorizontalAnchor::CENTER,
@@ -44,41 +43,29 @@ namespace ui {
                 auto thumb = stage->addImage(pivot, StageInterface::ImageParams {
                     .anchorH = HorizontalAnchor::CENTER,
                     .anchorV = VerticalAnchor::MIDDLE,
-                    .textureBase = params.textureThumb,
+                    .texture = params.textureThumb,
                 });
                 
-                auto handler = std::make_shared<util::callback<void(const math::vector2f &direction)>>(std::move(params.handler));
-                std::weak_ptr<StageInterface::Image> weakBg = bg;
-                std::weak_ptr<StageInterface::Pivot> weakPivot = pivot;
-                
-                auto action = [handler, maxOffset](const std::shared_ptr<StageInterface::Image> &bg, const std::shared_ptr<StageInterface::Pivot> &pivot, float x, float y, bool reset) {
-                    if (bg && pivot) {
-                        if (reset) {
-                            pivot->setScreenPosition(bg->getPosition() + 0.5f * bg->getSize());
-                            if (*handler) handler->operator()(math::vector2f(0, 0));
-                        }
-                        else {
-                            const math::vector2f center = bg->getPosition() + 0.5f * bg->getSize();
-                            math::vector2f dir = (math::vector2f(x, y) - center);
-                            
-                            if (dir.length() > maxOffset) {
-                                dir = dir.normalized(maxOffset);
-                            }
-                            
-                            pivot->setScreenPosition(center + dir);
-                            if (*handler)  handler->operator()(math::vector2f(dir.x, -dir.y) / maxOffset);
+                bg->setActionHandler([handler = std::move(params.handler), maxOffset, bg, pivot](Action action, float x, float y) {
+                    if (action == Action::RELEASE) {
+                        pivot->setScreenPosition(bg->getPosition() + 0.5f * bg->getSize());
+                        if (handler) {
+                            handler(math::vector2f(0, 0));
                         }
                     }
-                };
-                
-                bg->setActionHandler(Action::PRESS, [action, weakBg, weakPivot](float x, float y) {
-                    action(weakBg.lock(), weakPivot.lock(), x, y, false);
-                });
-                bg->setActionHandler(Action::MOVE, [action, weakBg, weakPivot](float x, float y) {
-                    action(weakBg.lock(), weakPivot.lock(), x, y, false);
-                });
-                bg->setActionHandler(Action::RELEASE, [action, weakBg, weakPivot](float x, float y) {
-                    action(weakBg.lock(), weakPivot.lock(), x, y, true);
+                    else {
+                        const math::vector2f center = bg->getPosition() + 0.5f * bg->getSize();
+                        math::vector2f dir = (math::vector2f(x, y) - center);
+                        
+                        if (dir.length() > maxOffset) {
+                            dir = dir.normalized(maxOffset);
+                        }
+                        
+                        pivot->setScreenPosition(center + dir);
+                        if (handler) {
+                            handler(math::vector2f(dir.x, -dir.y) / maxOffset);
+                        }
+                    }
                 });
             }
             

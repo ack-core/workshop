@@ -1,7 +1,7 @@
 
 #pragma once
 #include <game/context.h>
-#include "editor/editor_particles_context.h"
+#include "../editor/editor_particles_context.h"
 
 namespace game {
     class DebugContext : public Context {

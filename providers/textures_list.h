@@ -7,6 +7,7 @@ namespace resource {
         { "textures/ui/joystick_bg", { 248, 248, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/button_down", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/joystick_thumb", { 77, 77, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/img9slice", { 128, 128, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/button_up", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/panel", { 358, 358, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/btn_square_down", { 96, 96, foundation::RenderTextureFormat::RGBA8UN }},

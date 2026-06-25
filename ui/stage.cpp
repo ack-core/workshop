@@ -1,15 +1,16 @@
 
 #include "stage.h"
+#include "foundation/layouts.h"
 
 #include <list>
 #include <memory>
 
 namespace ui {
-    struct ShaderConstants {
+    struct ElementInstance {
         math::vector4f positionAndSize;
-        math::vector4f textureCoords;
-        math::vector4f flags; // [is R component only, 0, 0, 0]
+        math::vector4f uvCoords;
         math::color color;
+        math::vector4f args; //[is R component only, 0, 0, 0]
     };
 
     class StageFacility {
@@ -116,9 +117,9 @@ namespace ui {
             
             return false;
         }
-        virtual void draw(ShaderConstants &constStorage) {
+        virtual void draw() {
             for (auto &item : _attachedElements) {
-                item->draw(constStorage);
+                item->draw();
             }
         }
         
@@ -144,15 +145,15 @@ namespace ui {
 namespace ui {
     class InteractorImpl : public ElementImpl, public virtual StageInterface::Interactor {
     public:
-        InteractorImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, bool capturePointer) : ElementImpl(facility, parent), _capturePointer(capturePointer) {}
+        InteractorImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : ElementImpl(facility, parent) {}
         ~InteractorImpl() override {}
         
         void setActiveArea(float offset, float radius) {
             _activeAreaOffset = offset;
             _activeAreaRadius = radius;
         }
-        void setActionHandler(ui::Action action, util::callback<void(float x, float y)> &&handler) override {
-            _handlers[int(action)] = std::move(handler);
+        void setActionHandler(util::callback<void(ui::Action action, float x, float y)> &&handler) override {
+            _handler = std::move(handler);
         }
         bool onInteraction(ui::Action action, std::size_t id, float x, float y) override {
             if (ElementImpl::onInteraction(action, id, x, y)) {
@@ -198,34 +199,30 @@ namespace ui {
             }
 
             if (isInArea && action == ui::Action::PRESS) {
-                if (_handlers[int(action)]) {
-                    _pointerId = id;
-                    _currentAction = action;
-                    _handlers[int(action)](x, y);
-                    return true;
-                }
-                if (_capturePointer) {
-                    _currentAction = action;
-                    _pointerId = id;
+                _pointerId = id;
+                _currentAction = action;
+
+                if (_handler) {
+                    _handler(action, x, y);
                     return true;
                 }
             }
             if (action == ui::Action::MOVE && _pointerId != foundation::INVALID_POINTER_ID) {
                 _currentAction = action;
                 
-                if (_handlers[int(action)]) {
-                    _handlers[int(action)](x, y);
+                if (_handler) {
+                    _handler(action, x, y);
+                    return true;
                 }
-
-                return true;
             }
-            if (action == ui::Action::RELEASE) {
-                if (_handlers[int(action)] && _pointerId != foundation::INVALID_POINTER_ID) {
-                    _handlers[int(action)](x, y);
-                }
-
+            if (action == ui::Action::RELEASE && _pointerId != foundation::INVALID_POINTER_ID) {
                 _pointerId = foundation::INVALID_POINTER_ID;
                 _currentAction = action;
+
+                if (_handler) {
+                    _handler(action, x, y);
+                    return true;
+                }
             }
             
             return false;
@@ -240,7 +237,7 @@ namespace ui {
         float _activeAreaOffset = 0.0f;
         float _activeAreaRadius = 0.0f;
         
-        util::callback<void(float x, float y)> _handlers[int(ui::Action::RELEASE) + 1];
+        util::callback<void(ui::Action action, float x, float y)> _handler;
     };
 }
 
@@ -310,64 +307,128 @@ namespace ui {
 namespace ui {
     class ImageImpl : public InteractorImpl, public std::enable_shared_from_this<ImageImpl>, public StageInterface::Image {
     public:
-        ImageImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size, bool capturePointer) : InteractorImpl(facility, parent, capturePointer) {
+        ImageImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size) : InteractorImpl(facility, parent) {
             _size = size;
         }
         ~ImageImpl() override {}
         
     public:
-        void setBaseTexture(const char *texturePath) {
+        void setTexture(const char *texturePath) override {
             std::string path = texturePath;
             _facility.getResourceProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const foundation::RenderTexturePtr &texture) {
                 if (std::shared_ptr<ImageImpl> self = weak.lock()) {
-                    if (texture->getWidth() == int(self->_size.x) && texture->getHeight() == int(self->_size.y)) {
-                        self->_baseTexture = texture;
-                    }
-                    else {
-                        self->_facility.getPlatform()->logError("[ImageImpl::setActionTexture] Texture '%s' doesn't fit image size\n", path.data());
-                    }
+                    self->_size.x = texture->getWidth();
+                    self->_size.y = texture->getHeight();
+                    self->_texture = texture;
                 }
             });
         }
-        void setActionTexture(const char *texturePath) {
-            std::string path = texturePath;
-            _facility.getResourceProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const foundation::RenderTexturePtr &texture) {
-                if (std::shared_ptr<ImageImpl> self = weak.lock()) {
-                    if (texture->getWidth() == int(self->_size.x) && texture->getHeight() == int(self->_size.y)) {
-                        self->_actionTexture = texture;
-                    }
-                    else {
-                        self->_facility.getPlatform()->logError("[ImageImpl::setActionTexture] Texture '%s' doesn't fit image size\n", path.data());
-                    }
-                }
-            });
-        }
-        void draw(ShaderConstants &constStorage) override {
+        void draw() override {
             const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
             
-            constStorage.positionAndSize = math::vector4f(_globalPosition, _size);
-            constStorage.textureCoords = math::vector4f(0, 0, 1, 1);
-            constStorage.flags = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
-            constStorage.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
-            
-            if (_currentAction != ui::Action::RELEASE && _actionTexture) {
-                rendering->applyTextures({{_actionTexture, foundation::SamplerType::NEAREST}});
-            }
-            else {
-                rendering->applyTextures({{_baseTexture, foundation::SamplerType::NEAREST}});
-            }
-            
-            rendering->applyShaderConstants(&constStorage);
-            rendering->draw();
-            
-            for (auto &item : _attachedElements) {
-                item->draw(constStorage);
+            if (_texture) {
+                ElementInstance instance;
+                
+                instance.positionAndSize = math::vector4f(_globalPosition, _size);
+                instance.uvCoords = math::vector4f(0, 0, 1, 1);
+                instance.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+                instance.args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+                
+                rendering->applyTextures({{_texture, foundation::SamplerType::NEAREST}});
+                rendering->draw(&instance, 1);
+                
+                for (auto &item : _attachedElements) {
+                    item->draw();
+                }
             }
         }
         
     private:
-        foundation::RenderTexturePtr _baseTexture;
-        foundation::RenderTexturePtr _actionTexture;
+        foundation::RenderTexturePtr _texture;
+    };
+}
+
+//---
+
+namespace ui {
+    class Img9SliceImpl : public InteractorImpl, public std::enable_shared_from_this<Img9SliceImpl>, public StageInterface::Img9Slice {
+    public:
+        Img9SliceImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size) : InteractorImpl(facility, parent) {
+            _size = size;
+        }
+        ~Img9SliceImpl() override {}
+        
+    public:
+        void setTexture(const char *texturePath, const math::vector3f &sliceArgs) override {
+            std::string path = texturePath;
+            _facility.getResourceProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path, sliceArgs](const foundation::RenderTexturePtr &texture) {
+                if (std::shared_ptr<Img9SliceImpl> self = weak.lock()) {
+                    self->_texture = texture;
+                    self->_sliceArgs = sliceArgs;
+                }
+            });
+        }
+        void draw() override {
+            const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
+            
+            if (_texture) {
+                const int EGDE_REPEAT_MAX = 10;
+                const int INSTANCES_MAX = EGDE_REPEAT_MAX * 4 + 5;
+                ElementInstance instances[INSTANCES_MAX] = {0};
+                
+                const math::vector2f rbSliceStart = math::vector2f(_size.x - _sliceArgs.z, _size.y - _sliceArgs.z);
+                const math::vector2f txSliceSize = _sliceArgs.z / math::vector2f(_texture->getWidth(), _texture->getHeight());
+
+                math::vector2f edgeLeft = math::vector2f(_size.x - 2.0f * _sliceArgs.z, _size.y - 2.0f * _sliceArgs.z);
+                math::vector2f edgeOffset = math::vector2f(_sliceArgs.z, _sliceArgs.z);
+
+                instances[0].positionAndSize = math::vector4f(_globalPosition, math::vector2f(_sliceArgs.z, _sliceArgs.z));
+                instances[0].uvCoords = math::vector4f(0, 0, txSliceSize.x, txSliceSize.y);
+                instances[1].positionAndSize = math::vector4f(_globalPosition + math::vector2f(rbSliceStart.x, 0), math::vector2f(_sliceArgs.z, _sliceArgs.z));
+                instances[1].uvCoords = math::vector4f(txSliceSize.x, 0, txSliceSize.x + txSliceSize.x, txSliceSize.y);
+                instances[2].positionAndSize = math::vector4f(_globalPosition + math::vector2f(0, rbSliceStart.y), math::vector2f(_sliceArgs.z, _sliceArgs.z));
+                instances[2].uvCoords = math::vector4f(0, txSliceSize.y, txSliceSize.x, txSliceSize.y + txSliceSize.y);
+                instances[3].positionAndSize = math::vector4f(_globalPosition + math::vector2f(rbSliceStart.x, rbSliceStart.y), math::vector2f(_sliceArgs.z, _sliceArgs.z));
+                instances[3].uvCoords = math::vector4f(txSliceSize.x, txSliceSize.y, txSliceSize.x + txSliceSize.x, txSliceSize.y + txSliceSize.y);
+                instances[4].positionAndSize = math::vector4f(_globalPosition + math::vector2f(_sliceArgs.z, _sliceArgs.z), edgeLeft);
+                instances[4].uvCoords = math::vector4f(2.0f * txSliceSize.x, 2.0f * txSliceSize.y, 3.0f * txSliceSize.x, 3.0f * txSliceSize.y);
+                int index = 5;
+                
+                for (int i = 0; i < EGDE_REPEAT_MAX && edgeLeft.x > 0.0f; i++) {
+                    const float repWidth = std::min(edgeLeft.x, _sliceArgs.x);
+                    instances[index].positionAndSize = math::vector4f(_globalPosition + math::vector2f(edgeOffset.x, 0), math::vector2f(repWidth, _sliceArgs.z));
+                    instances[index++].uvCoords = math::vector4f(2.0f * txSliceSize.x, 0, 2.0f * txSliceSize.x + (repWidth / _texture->getWidth()), txSliceSize.y);
+                    instances[index].positionAndSize = math::vector4f(_globalPosition + math::vector2f(edgeOffset.x, rbSliceStart.y), math::vector2f(repWidth, _sliceArgs.z));
+                    instances[index++].uvCoords = math::vector4f(2.0f * txSliceSize.x, txSliceSize.y, 2.0f * txSliceSize.x + (repWidth / _texture->getWidth()), 2.0f * txSliceSize.y);
+                    edgeLeft.x -= _sliceArgs.x;
+                    edgeOffset.x += _sliceArgs.x;
+                }
+                for (int i = 0; i < EGDE_REPEAT_MAX && edgeLeft.y > 0.0f; i++) {
+                    const float repHeight = std::min(edgeLeft.y, _sliceArgs.y);
+                    instances[index].positionAndSize = math::vector4f(_globalPosition + math::vector2f(0, edgeOffset.y), math::vector2f(_sliceArgs.z, repHeight));
+                    instances[index++].uvCoords = math::vector4f(0, 2.0f * txSliceSize.y, txSliceSize.x, 2.0f * txSliceSize.y + (repHeight / _texture->getHeight()));
+                    instances[index].positionAndSize = math::vector4f(_globalPosition + math::vector2f(rbSliceStart.x, edgeOffset.y), math::vector2f(_sliceArgs.z, repHeight));
+                    instances[index++].uvCoords = math::vector4f(txSliceSize.x, 2.0f * txSliceSize.y, 2.0f * txSliceSize.x, 2.0f * txSliceSize.y + (repHeight / _texture->getHeight()));
+                    edgeLeft.y -= _sliceArgs.y;
+                    edgeOffset.y += _sliceArgs.y;
+                }
+                for (int i = 0; i < index; i++) {
+                    instances[i].color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    instances[i].args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+                }
+                
+                rendering->applyTextures({{_texture, foundation::SamplerType::NEAREST}});
+                rendering->draw(instances, index);
+                
+                for (auto &item : _attachedElements) {
+                    item->draw();
+                }
+            }
+        }
+        
+    private:
+        foundation::RenderTexturePtr _texture;
+        math::vector3f _sliceArgs;
     };
 }
 
@@ -391,6 +452,7 @@ namespace ui {
     public:
         auto addPivot(const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> override;
         auto addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
+        auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> override;
 
         void clear() override;
         void updateAndDraw(float dtSec) override;
@@ -401,7 +463,6 @@ namespace ui {
         const resource::ResourceProviderPtr _resourceProvider;
         
         foundation::EventHandlerToken _touchEventsToken;
-        ShaderConstants _shaderConstants;
         foundation::RenderShaderPtr _uiShader;
         std::list<std::shared_ptr<ElementImpl>> _topLevelElements;
     };
@@ -417,24 +478,21 @@ namespace ui {
 
 namespace {
     const char *g_uiShaderSrc = R"(
-        const {
-            position_size : float4
-            texcoord : float4
-            flags : float4
-        }
         inout {
+            args : float4
             texcoord : float2
         }
         vssrc {
             float2 screenTransform = float2(2.0, -2.0) / frame_rtBounds.xy;
             float2 vertexCoord = float2(repeat_ID & 0x1, repeat_ID >> 0x1);
-            output_texcoord = _lerp(const_texcoord.xy, const_texcoord.zw, vertexCoord);
-            vertexCoord = vertexCoord * const_position_size.zw + const_position_size.xy;
+            output_texcoord = _lerp(vertex_uv.xy, vertex_uv.zw, vertexCoord);
+            vertexCoord = vertexCoord * vertex_position_size.zw + vertex_position_size.xy;
             output_position = float4(vertexCoord.xy * screenTransform + float2(-1.0, 1.0), 0.1, 1); //
+            output_args = vertex_args;
         }
         fssrc {
             float4 texcolor = _tex2d(0, input_texcoord);
-            output_color[0] = _lerp(texcolor, float4(1.0, 1.0, 1.0, texcolor.r), const_flags.r);
+            output_color[0] = _lerp(texcolor, float4(1.0, 1.0, 1.0, texcolor.r), input_args.x);
         }
     )";
 }
@@ -450,11 +508,7 @@ namespace ui {
     , _resourceProvider(resourceProvider)
     , _touchEventsToken(nullptr)
     {
-        _shaderConstants = ShaderConstants {};
-        _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, foundation::InputLayout {
-            .repeat = 4
-        });
-        
+        _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, layouts::VTXUIUV);
         _touchEventsToken = _platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) {
             ui::Action action = ui::Action::RELEASE;
             
@@ -496,16 +550,12 @@ namespace ui {
     std::shared_ptr<StageInterface::Image> StageInterfaceImpl::addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) {
         std::shared_ptr<ImageImpl> result;
         
-        if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.textureBase)) {
-            result = std::make_shared<ImageImpl>(*this, parent, math::vector2f(info->width, info->height), params.capturePointer);
+        if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
+            result = std::make_shared<ImageImpl>(*this, parent, math::vector2f(info->width, info->height));
             result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
             result->setActiveArea(params.activeAreaOffset, params.activeAreaRadius);
-            result->setBaseTexture(params.textureBase);
-            
-            if (params.textureAction && params.textureAction[0]) {
-                result->setActionTexture(params.textureAction);
-            }
-            
+            result->setTexture(params.texture);
+                        
             if (parent == nullptr) {
                 _topLevelElements.emplace_back(result);
             }
@@ -514,10 +564,34 @@ namespace ui {
             }
         }
         else {
-            _platform->logError("[StageInterfaceImpl::addImage] 'textureBase' is not existing texture '%s'\n", params.textureBase);
+            _platform->logError("[StageInterfaceImpl::addImage] '%s' is not existing texture\n", params.texture);
         }
         
         return result;
+    }
+
+    std::shared_ptr<StageInterfaceImpl::Img9Slice> StageInterfaceImpl::addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) {
+        std::shared_ptr<Img9SliceImpl> result;
+        
+        if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
+            result = std::make_shared<Img9SliceImpl>(*this, parent, params.size);
+            result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
+            result->setActiveArea(params.activeAreaOffset, params.activeAreaRadius);
+            result->setTexture(params.texture, params.sliceArgs);
+                        
+            if (parent == nullptr) {
+                _topLevelElements.emplace_back(result);
+            }
+            else {
+                std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
+            }
+        }
+        else {
+            _platform->logError("[StageInterfaceImpl::addImage] '%s' is not existing texture\n", params.texture);
+        }
+        
+        return result;
+
     }
     
     void StageInterfaceImpl::clear() {
@@ -529,7 +603,7 @@ namespace ui {
             rendering.applyShader(_uiShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
             for (const auto &topLevelElement : _topLevelElements) {
                 topLevelElement->updateCoordinates();
-                topLevelElement->draw(_shaderConstants);
+                topLevelElement->draw();
             }
         });
     }

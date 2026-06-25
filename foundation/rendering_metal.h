@@ -15,7 +15,7 @@ namespace foundation {
         id<MTLFunction> getVertexShader() const;
         id<MTLFunction> getFragmentShader() const;
         
-        std::uint32_t getConstBufferLength() const;
+        std::uint32_t getConstBufferLength() const override;
         const std::string &getName() const;
         
     private:
@@ -122,7 +122,7 @@ namespace foundation {
         RenderShaderPtr createShader(const char *name, const char *src, const InputLayout &layout) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
-        RenderDataPtr createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
+        RenderDataPtr createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
         
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
@@ -131,20 +131,24 @@ namespace foundation {
         void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
+        void applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
+        void applyTextures(const std::vector<std::pair<RenderTexturePtr, foundation::SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
+        void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override;
         void presentFrame() override;
         
     private:
         void _initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear);
         void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index);
         void _finishRenderCommandEncoder();
+        void _applyTextures(const std::pair<RenderTexturePtr, foundation::SamplerType> *textures, std::size_t size);
         
-        static const std::uint32_t CONSTANT_BUFFER_FRAMES_MAX = 3;
+        static const std::uint32_t BUFFERED_FRAMES_MAX = 3;
         static const std::uint32_t CONSTANT_BUFFER_OFFSET_MAX = 1024 * 1024;
-        
+        static const std::uint32_t DYNAMIC_BUFFER_OFFSET_MAX = 1024 * 1024;
+
         struct FrameConstants {
             math::transform3f plmVPMatrix = math::transform3f::identity();
             math::transform3f stdVPMatrix = math::transform3f::identity();
@@ -160,7 +164,7 @@ namespace foundation {
         
         id<MTLDevice> _device = nil;
         id<MTLCommandQueue> _commandQueue = nil;
-        dispatch_semaphore_t _constBufferSemaphore;
+        dispatch_semaphore_t _frameBufferingSemaphore;
         
         std::unordered_set<std::string> _shaderNames;
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _renderPipelineStates;
@@ -176,9 +180,13 @@ namespace foundation {
         id<MTLRenderCommandEncoder> _currentRenderCommandEncoder = nil;
         id<MTLComputeCommandEncoder> _currentComputeCommandEncoder = nil;
         
-        id<MTLBuffer> _constantsBuffers[CONSTANT_BUFFER_FRAMES_MAX];
+        id<MTLBuffer> _constantsBuffers[BUFFERED_FRAMES_MAX];
         std::uint32_t _constantsBuffersIndex = 0;
         std::uint32_t _constantsBufferOffset = 0;
+        
+        id<MTLBuffer> _dynamicBuffers[BUFFERED_FRAMES_MAX];
+        std::uint32_t _dynamicBuffersIndex = 0;
+        std::uint32_t _dynamicBufferOffset = 0;
         
         bool _isForTarget = false;
     };

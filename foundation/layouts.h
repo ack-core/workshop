@@ -16,5 +16,14 @@ namespace layouts {
                 {"uv", foundation::InputAttributeFormat::FLOAT2},
             }
         };
+        const foundation::InputLayout VTXUIUV = foundation::InputLayout {
+            .repeat = 4,
+            .attributes = {
+                {"position_size", foundation::InputAttributeFormat::FLOAT4},
+                {"uv", foundation::InputAttributeFormat::FLOAT4},
+                {"color", foundation::InputAttributeFormat::FLOAT4},
+                {"args", foundation::InputAttributeFormat::FLOAT4},
+            }
+        };
     }
 }

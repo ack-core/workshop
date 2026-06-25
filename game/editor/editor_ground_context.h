@@ -9,7 +9,7 @@
 //
 namespace game {
     struct EditorNodeGround : public EditorNode {
-        core::SceneInterface::TexturedMeshPtr mesh;
+        core::SceneInterface::GroundMeshPtr mesh;
         
         EditorNodeGround(std::size_t typeIndex) : EditorNode(typeIndex) {}
         ~EditorNodeGround() override {}

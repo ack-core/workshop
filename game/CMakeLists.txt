@@ -10,15 +10,14 @@ set(
 )
 source_group("" FILES ${m_sources_list})
 
-set(
-    m_contexts_list
-    "${m_source_root}/contexts/debug_context.h"
-    "${m_source_root}/contexts/debug_context.cpp"
-)
-source_group("contexts" FILES ${m_contexts_list})
+file(GLOB_RECURSE m_experimental_contexts_list "${m_source_root}/experimental/*.h" "${m_source_root}/experimental/*.cpp")
+source_group("experimental" FILES ${m_experimental_contexts_list})
 
-file(GLOB_RECURSE m_editor_contexts_list "${m_source_root}/contexts/*.h" "${m_source_root}/contexts/*.cpp")
-source_group("contexts/editor" FILES ${m_editor_contexts_list})
+file(GLOB_RECURSE m_editor_contexts_list "${m_source_root}/editor/*.h" "${m_source_root}/editor/*.cpp")
+source_group("editor" FILES ${m_editor_contexts_list})
 
-add_library(game ${m_sources_list} ${m_contexts_list} ${m_editor_contexts_list})
+file(GLOB_RECURSE m_game_contexts_list "${m_source_root}/game/*.h" "${m_source_root}/game/*.cpp")
+source_group("contexts" FILES ${m_game_contexts_list})
+
+add_library(game ${m_sources_list} ${m_game_contexts_list} ${m_editor_contexts_list} ${m_experimental_contexts_list})
 set_property(TARGET game PROPERTY FOLDER "workshop")

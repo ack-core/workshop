@@ -113,9 +113,9 @@ namespace game {
 //        _bsphere = _api.scene->addBoundingSphere({10, 0, 0}, 7, {1, 0, 1, 1});
         
         _joystick = ui::extensions::addJoystick(_api.ui, _api.resources, nullptr, ui::extensions::JoystickParams {
-            .anchorOffset = math::vector2f(50.0f, 50.0f),
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::BOTTOM,
+            .anchorOffset = math::vector2f(50.0f, 50.0f),
             .textureBackground = "textures/ui/joystick_bg_00",
             .textureThumb = "textures/ui/joystick_thumb",
             .maxThumbOffset = 100.0f,

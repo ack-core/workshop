@@ -4,15 +4,16 @@
 
 // Here are all context includes
 
-#include "contexts/debug_context.h"
-#include "contexts/editor/editor_main_context.h"
-#include "contexts/editor/editor_camera_context.h"
-#include "contexts/editor/editor_prefab_context.h"
-#include "contexts/editor/editor_voxel_mesh_context.h"
-#include "contexts/editor/editor_ground_context.h"
-#include "contexts/editor/editor_particles_context.h"
-#include "contexts/editor/editor_raycast_shape_context.h"
-#include "contexts/editor/editor_collision_shape_context.h"
+#include "editor/editor_main_context.h"
+#include "editor/editor_camera_context.h"
+#include "editor/editor_prefab_context.h"
+#include "editor/editor_voxel_mesh_context.h"
+#include "editor/editor_ground_context.h"
+#include "editor/editor_particles_context.h"
+#include "editor/editor_raycast_shape_context.h"
+#include "editor/editor_collision_shape_context.h"
+#include "experimental/debug_context.h"
+#include "experimental/render_dev.h"
 
 // Rule of states:
 // Context is created if the next state contains it and current state does not
@@ -43,8 +44,11 @@ namespace game {
         }}
 #endif
 #ifdef IS_GAME
+//        {"default", {
+//            &makeContext<DebugContext>
+//        }}
         {"default", {
-            &makeContext<DebugContext>
+            &makeContext<RenderDevContext>
         }}
 #endif
     };

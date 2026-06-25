@@ -75,10 +75,16 @@ namespace core {
             virtual auto getDescription() const -> const util::Description & = 0;
             virtual ~VoxelMesh() = default;
         };
-        struct TexturedMesh {
+        struct GroundMesh {
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
-            virtual ~TexturedMesh() = default;
+            virtual ~GroundMesh() = default;
+        };
+        struct CustomMesh {
+            virtual void setTextures(const std::initializer_list<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
+            virtual void updateMeshData(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
+            virtual void updateShaderConstants(const void *constants) = 0;
+            virtual ~CustomMesh() = default;
         };
         struct Particles {
             virtual void setTransform(const math::transform3f &trfm) = 0;
@@ -95,7 +101,8 @@ namespace core {
         using BoundingSpherePtr = std::shared_ptr<BoundingSphere>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using VoxelMeshPtr = std::shared_ptr<VoxelMesh>;
-        using TexturedMeshPtr = std::shared_ptr<TexturedMesh>;
+        using GroundMeshPtr = std::shared_ptr<GroundMesh>;
+        using CustomMeshPtr = std::shared_ptr<CustomMesh>;
         using LightSourcePtr = std::shared_ptr<LightSource>;
         using ParticlesPtr = std::shared_ptr<Particles>;
         
@@ -107,8 +114,9 @@ namespace core {
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr = 0;
         virtual auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
-        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;
-        virtual auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr = 0;
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0; // TODO: description should not be here
+        virtual auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr = 0;
+        virtual auto addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer = false) -> CustomMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         

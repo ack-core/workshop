@@ -4,6 +4,8 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
+        {"meshes/stool", { 5, 1, 256 }},
+        {"meshes/knight", { 15, 152, 1835626081 }},
         {"meshes/paltest", { 14, 1, 256 }},
         {"meshes/ruins", { 64, 1, 256 }},
         {"meshes/knight_red", { 15, 247, 1835626081 }},
@@ -11,5 +13,17 @@ namespace resource {
         {"meshes/knight_blue", { 15, 247, 1835626081 }},
         {"meshes/voxtest", { 3, 1, 256 }},
         {"meshes/1x1x1", { 1, 1, 256 }},
+        {"meshes/proto/16x16", { 16, 1, 256 }},
+        {"meshes/proto/5x8x5", { 5, 1, 256 }},
+        {"meshes/proto/32x32", { 32, 1, 256 }},
+        {"meshes/proto/8x8x8", { 8, 1, 256 }},
+        {"meshes/proto/64x64", { 64, 1, 256 }},
+        {"meshes/proto/17x24x17", { 17, 1, 256 }},
+        {"meshes/proto/48x48", { 48, 1, 256 }},
+        {"meshes/proto/24x24", { 24, 1, 256 }},
+        {"meshes/proto/9x16x9", { 9, 1, 256 }},
+        {"meshes/test/ruins", { 40, 1, 256 }},
+        {"meshes/test/pillon", { 8, 49, 1936090735 }},
+        {"meshes/test/tree", { 8, 1, 256 }},
     };
 }

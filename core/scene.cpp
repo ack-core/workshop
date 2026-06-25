@@ -198,9 +198,9 @@ namespace core {
     class VoxelMeshImpl : public SceneInterface::VoxelMesh {
     public:
         std::unique_ptr<foundation::RenderDataPtr[]> frames;
-        std::uint32_t frameIndex;
-        std::uint32_t frameCount;
-        math::transform3f transform;
+        std::uint32_t frameIndex = 0;
+        std::uint32_t frameCount = 0;
+        math::transform3f transform = math::transform3f::identity();
         util::Description description;
         
         // for editor
@@ -208,8 +208,7 @@ namespace core {
         math::vector3f currentVoxelOffset;
         
     public:
-        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count, const util::Description &desc) : transform(math::transform3f::identity()) {
-            frameIndex = 0;
+        VoxelMeshImpl(const foundation::RenderDataPtr *frameArray, std::uint32_t count, const util::Description &desc) {
             frameCount = count;
             frames = std::make_unique<foundation::RenderDataPtr[]>(count);
             description = desc;
@@ -265,23 +264,61 @@ namespace core {
     
     //---
     
-    class TexturedMeshImpl : public SceneInterface::TexturedMesh {
+    class GroundMeshImpl : public SceneInterface::GroundMesh {
     public:
         foundation::RenderDataPtr data;
         foundation::RenderTexturePtr texture;
-        math::vector4f position = {0, 0, 0, 1};
+        math::transform3f transform = math::transform3f::identity();
         
     public:
         void setTransform(const math::transform3f &trfm) override {
-
+            transform = trfm;
         }
         void setPosition(const math::vector3f &position) override {
-            this->position = position.atv4start(1.0f);
+            transform = math::transform3f::identity().translated(position);
         }
         
     public:
-        TexturedMeshImpl(const foundation::RenderDataPtr &idx, const foundation::RenderTexturePtr &tx) : data(idx), texture(tx) {}
-        ~TexturedMeshImpl() override {}
+        GroundMeshImpl(const foundation::RenderDataPtr &idx, const foundation::RenderTexturePtr &tx) : data(idx), texture(tx) {}
+        ~GroundMeshImpl() override {}
+    };
+
+    //---
+
+    class CustomMeshImpl : public SceneInterface::CustomMesh {
+    public:
+        foundation::RenderShaderPtr shader;
+        std::vector<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> textureList;
+        std::vector<std::uint8_t> shaderConst;
+        std::vector<std::uint8_t> vdata;
+        std::vector<std::uint32_t> idata;
+        std::uint32_t vcount = 0;
+        bool drawIntoGBuffer = false;
+        
+    public:
+        void setTextures(const std::initializer_list<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> &textures) override {
+            textureList.assign(textures.begin(), textures.end());
+        }
+        void updateMeshData(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override {
+            const std::uint32_t stride = shader->getInputLayout().getStride();
+            vdata.resize(vcnt * stride);
+            std::memcpy(vdata.data(), data, vcnt * stride);
+            vcount = vcnt;
+            if (indexes) {
+                idata.resize(icnt);
+                std::memcpy(idata.data(), indexes, icnt * sizeof(std::uint32_t));
+            }
+        }
+        void updateShaderConstants(const void *constants) override {
+            shaderConst.resize(shader->getConstBufferLength());
+            std::memcpy(shaderConst.data(), constants, shaderConst.size());
+        }
+        
+    public:
+        CustomMeshImpl(const foundation::RenderShaderPtr &shader, bool drawIntoGBuffer) : shader(shader), drawIntoGBuffer(drawIntoGBuffer) {
+            shaderConst.resize(shader->getConstBufferLength());
+        }
+        ~CustomMeshImpl() override {}
     };
     
     //---
@@ -408,7 +445,8 @@ namespace core {
         auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr override;
         auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
-        auto addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> TexturedMeshPtr override;
+        auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr override;
+        auto addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer) -> CustomMeshPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
@@ -442,7 +480,7 @@ namespace core {
         foundation::RenderShaderPtr _boundingSphereShader;
         foundation::RenderShaderPtr _boundingBoxShader;
         foundation::RenderShaderPtr _voxelMeshShader;
-        foundation::RenderShaderPtr _texturedMeshShader;
+        foundation::RenderShaderPtr _groundMeshShader;
         foundation::RenderShaderPtr _particlesShader;
         
         foundation::RenderTargetPtr _gbuffer;
@@ -453,8 +491,11 @@ namespace core {
         std::vector<std::shared_ptr<BoundingSphereImpl>> _boundingSpheres;
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<VoxelMeshImpl>> _voxelMeshes;
-        std::vector<std::shared_ptr<TexturedMeshImpl>> _texturedMeshes;
+        std::vector<std::shared_ptr<GroundMeshImpl>> _groundMeshes;
+        std::vector<std::shared_ptr<CustomMeshImpl>> _customMeshes;
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
+        
+        std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
         
         bool _lineDrawingEnabled = true;
     };
@@ -606,16 +647,16 @@ namespace {
             output_color[0] = input_normalc;
         }
     )";
-    const char *g_texturedMeshShaderSrc = R"(
+    const char *g_groundMeshShaderSrc = R"(
         const {
-            globalPosition : float4
+            modelTransform : matrix4
         }
         inout {
             uv : float2
             nrm : float3
         }
         vssrc {
-            output_position = _transform(float4(vertex_position.xyz + const_globalPosition.xyz, 1.0), frame_plmVPMatrix);
+            output_position = _transform(_transform(const_modelTransform, float4(vertex_position.xyz, 1.0)), frame_plmVPMatrix);
             output_uv = vertex_uv;
             output_nrm = vertex_normal.xyz;
         }
@@ -758,7 +799,7 @@ namespace core {
             .repeat = 24
         });
         _voxelMeshShader = rendering->createShader("scene_voxel_mesh", g_voxelMeshShaderSrc, layouts::VTXMVOX);
-        _texturedMeshShader = rendering->createShader("scene_textured_mesh", g_texturedMeshShaderSrc, layouts::VTXNRMUV);
+        _groundMeshShader = rendering->createShader("scene_textured_mesh", g_groundMeshShaderSrc, layouts::VTXNRMUV);
         _particlesShader = rendering->createShader("scene_particles", g_particlesShaderSrc, foundation::InputLayout {
             .repeat = 4
         });
@@ -823,9 +864,29 @@ namespace core {
         return _voxelMeshes.emplace_back(result);
     }
     
-    SceneInterface::TexturedMeshPtr SceneInterfaceImpl::addTexturedMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) {
-        std::shared_ptr<TexturedMeshImpl> result = std::make_shared<TexturedMeshImpl>(mesh, texture);
-        return _texturedMeshes.emplace_back(result);
+    SceneInterface::GroundMeshPtr SceneInterfaceImpl::addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) {
+        std::shared_ptr<GroundMeshImpl> result = std::make_shared<GroundMeshImpl>(mesh, texture);
+        return _groundMeshes.emplace_back(result);
+    }
+
+    SceneInterface::CustomMeshPtr SceneInterfaceImpl::addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer) {
+        if (shaderName == nullptr || shaderSrc == nullptr) {
+            std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(_groundMeshShader, false);
+            return _customMeshes.emplace_back(result);
+        }
+        else {
+            auto index = _customShaders.find(shaderName);
+            if (index != _customShaders.end()) {
+                std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(index->second, drawIntoGBuffer);
+                return _customMeshes.emplace_back(result);
+            }
+            else {
+                foundation::RenderShaderPtr shader = _rendering->createShader(shaderName, shaderSrc, layout);
+                auto newEntry = _customShaders.emplace(std::string(shaderName), shader);
+                std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(newEntry.first->second, drawIntoGBuffer);
+                return _customMeshes.emplace_back(result);
+            }
+        }
     }
     
     SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) {
@@ -882,25 +943,26 @@ namespace core {
         util::cleanupUnused(_boundingSpheres);
         util::cleanupUnused(_boundingBoxes);
         util::cleanupUnused(_voxelMeshes);
-        util::cleanupUnused(_texturedMeshes);
+        util::cleanupUnused(_groundMeshes);
+        util::cleanupUnused(_customMeshes);
         util::cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
+            rendering.applyShader(_groundMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &groundMesh : _groundMeshes) {
+                rendering.applyShaderConstants(&groundMesh->transform);
+                rendering.applyTextures({
+                    {groundMesh->texture, foundation::SamplerType::NEAREST}
+                });
+                rendering.draw(groundMesh->data);
+            }
+            
             rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &voxelMesh : _voxelMeshes) {
                 const math::transform3f transform = voxelMesh->getFinalTransform();
                 rendering.applyShaderConstants(&transform);
                 rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
-            }
-            
-            rendering.applyShader(_texturedMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &texturedMesh : _texturedMeshes) {
-                rendering.applyShaderConstants(&texturedMesh->position);
-                rendering.applyTextures({
-                    {texturedMesh->texture, foundation::SamplerType::NEAREST}
-                });
-                rendering.draw(texturedMesh->data);
             }
         });
         _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
@@ -913,6 +975,17 @@ namespace core {
             rendering.draw();
         });
         _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
+            for (const auto &customMesh : _customMeshes) {
+                if (customMesh->vcount && customMesh->drawIntoGBuffer == false) {
+                    rendering.applyShader(customMesh->shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_AND_WRITE);
+                    if (customMesh->shaderConst.size()) {
+                        rendering.applyShaderConstants(customMesh->shaderConst.data());
+                    }
+                    rendering.applyTextures(customMesh->textureList);
+                    rendering.draw(customMesh->vdata.data(), customMesh->vcount, customMesh->idata.size() ? customMesh->idata.data() : nullptr, std::uint32_t(customMesh->idata.size()));
+                }
+            }
+
             rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &emitter : _particleEmitters) {
                 rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));

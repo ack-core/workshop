@@ -70,12 +70,15 @@ namespace foundation {
 
         std::uint32_t repeat = 1;
         std::vector<Attribute> attributes;
+        
+        auto getStride() const -> std::uint32_t;
     };
     
     class RenderShader {
     public:
         virtual ~RenderShader() = default;
         virtual auto getInputLayout() const -> const InputLayout & = 0;
+        virtual auto getConstBufferLength() const -> std::uint32_t = 0;
     };
     
     class RenderTexture {
@@ -191,20 +194,22 @@ namespace foundation {
         //
         virtual auto createTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr = 0;
         
+        // TODO: create texture from as atlas region + getBase(), getAtlasSize() -> RenderTexture. For the upper levels atlas texture == common texture
+        
         // Create render target texture
         // @count       - color targets count
         // @w and @h    - width and height
         //
         virtual auto createRenderTarget(foundation::RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr = 0;
         
-        // Create vertex data buffer
-        // @data        - pointer to data (array of structures)
+        // Create static vertex data buffer
         // @layout      - vertex description. Should match the description in shader
+        // @data        - pointer to data (array of structures)
         // @vcnt        - count of structures in array
         // @indexes     - pointer to indexes
         // @return      - handle
         //
-        virtual auto createData(const void *data, const foundation::InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) -> RenderDataPtr = 0;
+        virtual auto createData(const foundation::InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) -> RenderDataPtr = 0;
         
         // Return actual rendering area size
         //
@@ -232,8 +237,9 @@ namespace foundation {
         // @textures    - texture can be nullptr (texture at i-th position will not be set)
         // @count       - number of textures
         //
-        virtual void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
-        
+        virtual void applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
+        virtual void applyTextures(const std::vector<std::pair<RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
+
         // Update constant buffer of the current shader
         // @constants   - pointer to data for 'const' block. Must have size in bytes according to 'const' block from shader source. Cannot be null
         //
@@ -247,7 +253,15 @@ namespace foundation {
         // @inputData layout has to match current shader's layout
         //
         virtual void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) = 0;
-        
+
+        // Draw dynamic data
+        // @data        - pointer to data (array of structures). Layout should be compatible with current shader
+        // @vcnt        - count of structures in array
+        // @indexes     - pointer to indexes
+        // @icnt        - index count
+        //
+        virtual void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
+
         // Frame finalization
         //
         virtual void presentFrame() = 0;

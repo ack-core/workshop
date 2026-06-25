@@ -11,7 +11,7 @@ namespace foundation {
         ~WASMShader() override;
         
         auto getInputLayout() const -> const InputLayout & override;
-        auto getConstBufferLength() const -> std::uint32_t;
+        auto getConstBufferLength() const -> std::uint32_t override;
         auto getWebGLShader() const -> WebGLId;
         
     private:
@@ -112,7 +112,7 @@ namespace foundation {
         auto createShader(const char *name, const char *src, const InputLayout &layout) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
-        auto createData(const void *data, const InputLayout &layout, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr override;
+        auto createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr override;
         
         auto getBackBufferWidth() const -> float override;
         auto getBackBufferHeight() const -> float override;
@@ -121,10 +121,12 @@ namespace foundation {
         void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
         void applyShaderConstants(const void *constants) override;
-        void applyTextures(const std::initializer_list<std::pair<const RenderTexturePtr, SamplerType>> &textures) override;
+        void applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
+        void applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
+        void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override;
         void presentFrame() override;
         
     private:

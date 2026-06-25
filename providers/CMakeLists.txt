@@ -8,8 +8,8 @@ set(
 	"${m_source_root}/grounds_list.h"
 	"${m_source_root}/resource_provider.h"
 	"${m_source_root}/resource_provider.cpp"
-	#"${m_source_root}/fontatlas_provider.h"
-	#"${m_source_root}/fontatlas_provider.cpp"
+	"${m_source_root}/fontatlas_provider.h"
+	"${m_source_root}/fontatlas_provider.cpp"
 )
 source_group("" FILES ${m_sources_list})
 add_library(providers ${m_sources_list})

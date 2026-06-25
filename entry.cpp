@@ -2,6 +2,7 @@
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
 #include "providers/resource_provider.h"
+#include "providers/fontatlas_provider.h"
 #include "core/scene.h"
 #include "core/world.h"
 #include "core/raycast.h"
@@ -15,6 +16,7 @@
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 resource::ResourceProviderPtr resourceProvider;
+resource::FontAtlasProviderPtr fontProvider;
 core::SceneInterfacePtr scene;
 core::WorldInterfacePtr world;
 core::RaycastInterfacePtr raycast;
@@ -26,27 +28,30 @@ dh::DataHubPtr datahub;
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
-        rendering = foundation::RenderingInterface::instance(platform);
-        resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
-        scene = core::SceneInterface::instance(platform, rendering);
-        raycast = core::RaycastInterface::instance(platform, scene);
-        simulation = core::SimulationInterface::instance(platform, scene);
-        world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
-        stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
-        datahub = dh::DataHub::instance(platform, game::datahub);
-        stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
-        stateManager->switchToState("default");
-        
-        platform->setLoop([](float dtSec) {
-            datahub->update(dtSec);
-            stateManager->update(dtSec);
-            raycast->update(dtSec);
-            simulation->update(dtSec);
-            world->update(dtSec);
-            scene->updateAndDraw(dtSec);
-            stage->updateAndDraw(dtSec);
-            rendering->presentFrame();
-            resourceProvider->update(dtSec);
+        platform->loadFile("arial.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t []> &&fontData, std::size_t fontSize) {
+            rendering = foundation::RenderingInterface::instance(platform);
+            resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
+            fontProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
+            scene = core::SceneInterface::instance(platform, rendering);
+            raycast = core::RaycastInterface::instance(platform, scene);
+            simulation = core::SimulationInterface::instance(platform, scene);
+            world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
+            stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
+            datahub = dh::DataHub::instance(platform, game::datahub);
+            stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
+            stateManager->switchToState("default");
+            
+            platform->setLoop([](float dtSec) {
+                datahub->update(dtSec);
+                stateManager->update(dtSec);
+                raycast->update(dtSec);
+                simulation->update(dtSec);
+                world->update(dtSec);
+                scene->updateAndDraw(dtSec);
+                stage->updateAndDraw(dtSec);
+                rendering->presentFrame();
+                resourceProvider->update(dtSec);
+            });
         });
     });
 }
