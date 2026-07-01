@@ -3,12 +3,13 @@
 #include "thirdparty/stb_mini_ttf/stb_mini_ttf.h"
 
 #include <list>
+#include <unordered_set>
 #include <unordered_map>
 #include <mutex>
 #include <bit>
 
 namespace {
-    static const int ATLAS_SIZE = 1024;
+    static const int ATLAS_SIZE = 512;
     static const int ATLAS_SPACE = 10;
 
     std::uint32_t utf8ToUTF16(const char *utf8Char, std::uint32_t &utf8Len) {
@@ -51,20 +52,52 @@ namespace {
         return (float)(int)(x + (x >= 0 ? 0.5f : -0.5f));
     }
 
+    std::uint64_t makeKey(std::uint32_t u16ch, std::uint8_t blur) {
+        return (std::uint64_t(blur) << 56) | std::uint64_t(u16ch);
+    }
+    std::uint32_t getU16Ch(std::uint64_t key) {
+        return std::uint32_t(key & 0xffffffff);
+    }
+    std::uint8_t getBlur(std::uint64_t key) {
+        return std::uint8_t(key >> 56);
+    }
+
 }
 
 namespace resource {
     class FontAtlasProviderImpl : public std::enable_shared_from_this<FontAtlasProviderImpl>, public FontAtlasProvider {
     public:
+        struct FontAtlas {
+            struct CharInfo {
+                math::vector2f txLT;
+                math::vector2f txRB;
+                math::vector2f pxSize;
+                float advance, lsb, voffset;
+                std::uint8_t blur;
+            };
+            
+            // --- used from worker thread ---
+            std::unique_ptr<std::uint8_t[]> txdata;
+            int offsetX = ATLAS_SPACE;
+            int offsetY = ATLAS_SPACE;
+
+            // --- used from main thread ---
+            std::unordered_map<std::uint64_t, CharInfo> chars;
+            foundation::RenderTexturePtr texture = nullptr;
+            std::uint8_t fontSize = 0;
+            float baseLine = 0.0f;
+        };
+        
+    public:
         FontAtlasProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, std::unique_ptr<std::uint8_t[]> &&ttfData, std::size_t ttfLen);
         ~FontAtlasProviderImpl() override;
         
-        float getTextWidth(const char *text, std::uint8_t fontSize) const override;
-        void getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&)> &&completion) override;
+        auto getTextWidth(const char *text, std::uint8_t fontSize) const -> math::vector2f override;
+        void getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&, const foundation::RenderTexturePtr &)> &&completion) override;
         void update(float dtSec) override;
         
     private:
-        std::uint32_t _calculateAtlasSize(std::uint32_t atlasStart, std::uint32_t fontSize);
+        FontAtlas *_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::unordered_set<std::uint64_t> &toLoad);
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
@@ -74,35 +107,16 @@ namespace resource {
         
         stbtt_fontinfo _ttfInfo;
         
-        struct FontAtlas {
-            struct CharInfo {
-                math::vector2f txLT;
-                math::vector2f txRB;
-                math::vector2f pxSize;
-                float advance, lsb, voffset;
-            };
-            
-            // --- used from worker thread ---
-            std::unique_ptr<std::uint8_t[]> txdata;
-            int offsetX = ATLAS_SPACE;
-            int offsetY = ATLAS_SPACE;
-
-            // --- used from main thread ---
-            std::unordered_map<std::uint32_t, CharInfo> chars;
-            foundation::RenderTexturePtr texture = nullptr;
-            std::uint8_t fontSize = 0;
-            std::uint8_t blur = 0;
-            float baseLine = 0.0f;
-        };
         struct QueueEntry {
             std::string text;
             std::uint8_t fontSize;
             std::uint8_t blur;
-            util::callback<void(std::vector<FontCharInfo> &&)> callback;
+            util::callback<void(std::vector<FontCharInfo> &&, const foundation::RenderTexturePtr &)> callback;
         };
         
         std::list<FontAtlas> _atlases;
         std::list<QueueEntry> _callsQueue;
+        std::list<QueueEntry> _postponedQueue;
         bool _asyncInProgress;
     };
     
@@ -127,8 +141,8 @@ namespace resource {
     
     }
     
-    float FontAtlasProviderImpl::getTextWidth(const char *text, std::uint8_t size) const {
-        const float scale = stbtt_ScaleForPixelHeight(&_ttfInfo, float(size));
+    math::vector2f FontAtlasProviderImpl::getTextWidth(const char *text, std::uint8_t size) const {
+        const float scale = stbtt_ScaleForMappingEmToPixels(&_ttfInfo, float(size));
         float result = 0.0f;
                 
         for (const char *src = text; *src; ) {
@@ -145,10 +159,10 @@ namespace resource {
             src += len;
         }
         
-        return result;
+        return math::vector2f(result, float(size));
     }
     
-    void FontAtlasProviderImpl::getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&)> &&completion) {
+    void FontAtlasProviderImpl::getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&, const foundation::RenderTexturePtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueue.emplace_back(QueueEntry{
                 .text = text,
@@ -156,73 +170,31 @@ namespace resource {
                 .blur = blur,
                 .callback = std::move(completion)
             });
-            
             return;
         }
         
         std::vector<FontCharInfo> readyChars;
-        std::vector<std::uint32_t> toLoad;
-        FontAtlas *suitable = nullptr;
-
-        for (const char *src = text; *src; ) {
-            std::uint32_t len = 0;
-            std::uint32_t u16ch = utf8ToUTF16(src, len);
-            auto atlasIt = _atlases.begin();
-            
-            for (; atlasIt != _atlases.end(); ++atlasIt) {
-                if (atlasIt->fontSize == fontSize && atlasIt->blur == blur) {
-                    suitable = &(*atlasIt);
-                    auto index = atlasIt->chars.find(u16ch);
-                    if (index != atlasIt->chars.end()) {
-                        readyChars.emplace_back(FontCharInfo {
-                            .texture = atlasIt->texture,
-                            .txLT = index->second.txLT,
-                            .txRB = index->second.txRB,
-                            .pxSize = index->second.pxSize,
-                            .advance = index->second.advance,
-                            .lsb = index->second.lsb,
-                            .voffset = index->second.voffset
-                        });
-                        break;
-                    }
-                }
-            }
-            
-            if (atlasIt == _atlases.end()) { // not found
-                toLoad.emplace_back(u16ch);
-            }
-            
-            src += len;
-        }
+        std::unordered_set<std::uint64_t> toLoad;
+        FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
         
         if (toLoad.empty()) {
-            completion(std::move(readyChars));
+            completion(std::move(readyChars), suitable->texture);
         }
         else {
             _asyncInProgress = true;
             
             struct AsyncContext {
-//                struct Atlas {
-//                    std::uint32_t index;
-//                    std::uint32_t textureSize;
-//                    std::unique_ptr<std::uint8_t[]> textureData;
-//                    std::unique_ptr<FontAtlas::CharInfo[]> chars;
-//                    float baseline;
-//                };
-//
-//                std::vector<Atlas> atlases;
-                std::unordered_map<std::uint32_t, FontAtlas::CharInfo> resultChars;
+                std::unordered_map<std::uint64_t, FontAtlas::CharInfo> resultChars;
             };
             
             if (suitable == nullptr) {
-                const float scale = stbtt_ScaleForPixelHeight(&_ttfInfo, float(fontSize));
+                const float scale = stbtt_ScaleForMappingEmToPixels(&_ttfInfo, float(fontSize));
                 int ascent, descent, lineGap;
                 stbtt_GetFontVMetrics(&_ttfInfo, &ascent, &descent, &lineGap);
                 
                 FontAtlas *newAtlas = &_atlases.emplace_front();
                 newAtlas->baseLine = std::roundf(float(ascent) * scale);
                 newAtlas->fontSize = fontSize;
-                newAtlas->blur = blur;
                 newAtlas->txdata = std::make_unique<std::uint8_t[]>(ATLAS_SIZE * ATLAS_SIZE);
                 suitable = newAtlas;
             }
@@ -231,7 +203,7 @@ namespace resource {
                 if (std::shared_ptr<FontAtlasProviderImpl> self = weak.lock()) {
                     //--- worker thread ---
                     const stbtt_fontinfo *ttf = &self->_ttfInfo;
-                    const float scale = stbtt_ScaleForPixelHeight(ttf, float(fontSize));
+                    const float scale = stbtt_ScaleForMappingEmToPixels(ttf, float(fontSize));
                     
                     int ascent, descent, lineGap;
                     stbtt_GetFontVMetrics(ttf, &ascent, &descent, &lineGap);
@@ -244,28 +216,53 @@ namespace resource {
 
                             stbtt_GetGlyphBitmapBox(ttf, glyph, scale, scale, &ix0, &iy0, &ix1, &iy1);
                             stbtt_GetGlyphHMetrics(ttf, glyph, &iadvance, &ilsb);
+                            
+                            ix0 -= blur; ix1 += blur;
+                            iy0 -= blur; iy1 += blur;
 
                             if (suitable->offsetX + ix1 - ix0 + 1 >= ATLAS_SIZE - ATLAS_SPACE) {
                                 suitable->offsetX = 10;
                                 suitable->offsetY = suitable->offsetY + lineHeight;
                                 
-                                if (suitable->offsetY >= ATLAS_SIZE - ATLAS_SPACE) {
+                                if (suitable->offsetY >= ATLAS_SIZE - ATLAS_SPACE) { // TODO: atlas growing 4096x32 -> 4096x64 ...
                                     self->_platform->logError("[FontAtlasProviderImpl::getTextFontAtlas] Atlas overflow");
                                     return;
                                 }
                             }
                             
-                            FontAtlas::CharInfo &chInfo = ctx.resultChars.emplace(u16ch, FontAtlas::CharInfo{}).first->second;
+                            FontAtlas::CharInfo &chInfo = ctx.resultChars.emplace(makeKey(u16ch, blur), FontAtlas::CharInfo{}).first->second;
                             chInfo.advance = ceilfloat(scale * float(iadvance));
                             chInfo.lsb = floorfloat(scale * float(ilsb));
                             chInfo.pxSize = math::vector2f(ix1 - ix0, iy1 - iy0);
-                            chInfo.txLT = math::vector2f(suitable->offsetX, suitable->offsetY + suitable->baseLine + iy0) / float(ATLAS_SIZE);
+                            chInfo.txLT = math::vector2f(suitable->offsetX - blur, suitable->offsetY + suitable->baseLine + iy0) / float(ATLAS_SIZE);
                             chInfo.txRB = chInfo.txLT + chInfo.pxSize / float(ATLAS_SIZE);
                             chInfo.voffset = suitable->baseLine + float(iy0);
+                            chInfo.blur = blur;
 
                             if (ix1 > ix0 && iy1 > iy0) {
-                                int offset = (suitable->offsetY + int(ceilfloat(suitable->baseLine)) + iy0) * ATLAS_SIZE + suitable->offsetX;
+                                int startY = suitable->offsetY + int(ceilfloat(suitable->baseLine)) + iy0;
+                                int startX = suitable->offsetX - blur;
+                                int offset = (startY + blur) * ATLAS_SIZE + startX;
                                 stbtt_MakeGlyphBitmap(ttf, suitable->txdata.get() + offset, ix1 - ix0, iy1 - iy0, ATLAS_SIZE, scale, scale, glyph);
+                                
+                                for (int b = 0; b < blur; b++) {
+                                    for (int bY = startY; bY < startY + iy1 - iy0; bY++) {
+                                        for (int bX = startX; bX < startX + ix1 - ix0; bX++) {
+                                            std::uint8_t &bpx = *(suitable->txdata.get() + bY * ATLAS_SIZE + bX);
+                                            int sum = 0;
+                                            sum += *(suitable->txdata.get() + (bY - 1) * ATLAS_SIZE + (bX - 1));
+                                            sum += *(suitable->txdata.get() + (bY - 1) * ATLAS_SIZE + (bX + 1));
+                                            sum += *(suitable->txdata.get() + (bY + 1) * ATLAS_SIZE + (bX - 1));
+                                            sum += *(suitable->txdata.get() + (bY + 1) * ATLAS_SIZE + (bX + 1));
+                                            sum += *(suitable->txdata.get() + (bY - 1) * ATLAS_SIZE + (bX + 0));
+                                            sum += *(suitable->txdata.get() + (bY + 1) * ATLAS_SIZE + (bX + 0));
+                                            sum += *(suitable->txdata.get() + (bY + 0) * ATLAS_SIZE + (bX - 1));
+                                            sum += *(suitable->txdata.get() + (bY + 0) * ATLAS_SIZE + (bX + 1));
+                                            bpx = std::max(bpx, std::uint8_t(sum >> 3));
+                                        }
+                                    }
+                                }
+                                
                                 suitable->offsetX += ix1 - ix0 + 1;
                             }
                         }
@@ -273,66 +270,71 @@ namespace resource {
                             self->_platform->logError("[FontAtlasProviderImpl::getTextFontAtlas] Char %d not found in TTF", int(u16ch));
                         }
                     }
-                    
                     //--- worker thread ---
-//                    for (std::uint32_t i = 0; i < fontsToLoad.size(); i++) {
-//                        ctx.atlases.emplace_back(AsyncContext::Atlas{ fontsToLoad[i] });
-//                    }
-                    
-//                    const stbtt_fontinfo *ttf = &self->_ttfInfo;
-//
-//                    for (AsyncContext::Atlas &atlas : ctx.atlases) {
-//                        atlas.textureSize = self->_calculateAtlasSize(atlas.index & 0xffffff00, atlas.index & 0xff);
-//                        atlas.textureData = std::make_unique<std::uint8_t[]>(atlas.textureSize * atlas.textureSize);
-//                        atlas.chars = std::make_unique<FontAtlas::CharInfo[]>(256);
-//
-//                        const float scale = stbtt_ScaleForPixelHeight(ttf, float(atlas.index & 0xff));
-//
-//                        int ascent, descent, lineGap, offsetX = 1, offsetY = 0;
-//                        stbtt_GetFontVMetrics(ttf, &ascent, &descent, &lineGap);
-//                        atlas.baseline = std::roundf(float(ascent) * scale);
-//
-//                        for (std::uint32_t i = 0; i < 0xff; i++) {
-//                            int glyph = stbtt_FindGlyphIndex(ttf, (atlas.index & 0xffffff00) + i);
-//                            if (glyph != 0) {
-//                                int ix0 = 0, ix1 = 0, iy0 = 0, iy1 = 0, iadvance, ilsb;
-//
-//                                stbtt_GetGlyphBitmapBox(ttf, glyph, scale, scale, &ix0, &iy0, &ix1, &iy1);
-//                                stbtt_GetGlyphHMetrics(ttf, glyph, &iadvance, &ilsb);
-//
-//                                if (offsetX + ix1 - ix0 + 1 >= atlas.textureSize) {
-//                                    offsetX = 1;
-//                                    offsetY += int(float(ascent - descent) * scale);
-//                                }
-//
-//                                atlas.chars[i].advance = std::ceilf(scale * float(iadvance));
-//                                atlas.chars[i].lsb = std::floorf(scale * float(ilsb));
-//                                atlas.chars[i].pxSize = math::vector2f(ix1 - ix0, iy1 - iy0);
-//                                atlas.chars[i].txLT = math::vector2f(offsetX, offsetY + atlas.baseline + iy0) / float(atlas.textureSize);
-//                                atlas.chars[i].txRB = atlas.chars[i].txLT + atlas.chars[i].pxSize / float(atlas.textureSize);
-//                                atlas.chars[i].voffset = atlas.baseline + float(iy0);
-//
-//                                if (ix1 > ix0 && iy1 > iy0) {
-//                                    int offset = (offsetY + int(std::ceilf(atlas.baseline)) + iy0) * atlas.textureSize + offsetX;
-//                                    stbtt_MakeGlyphBitmap(ttf, atlas.textureData.get() + offset, ix1 - ix0, iy1 - iy0, atlas.textureSize, scale, scale, glyph);
-//                                    offsetX += ix1 - ix0 + 1;
-//                                }
-//                            }
-//                        }
-//                    }
-                    
                 }
             },
             [weak = weak_from_this(), txt = std::string(text), fontSize, blur, suitable, completion = std::move(completion)](AsyncContext &ctx) mutable {
                 if (std::shared_ptr<FontAtlasProviderImpl> self = weak.lock()) {
-                    suitable->chars.merge(ctx.resultChars);
-                    suitable->texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ATLAS_SIZE, ATLAS_SIZE, { suitable->txdata.get() });
-
                     self->_asyncInProgress = false;
+                    suitable->chars.merge(ctx.resultChars);
+
+                    for (const auto &item : self->_callsQueue) {
+                        if (item.fontSize == fontSize) {
+                            self->_postponedQueue.emplace_back(QueueEntry{
+                                .text = txt,
+                                .fontSize = fontSize,
+                                .blur = blur,
+                                .callback = std::move(completion)
+                            });
+                            return;
+                        }
+                    }
+                    
+                    suitable->texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ATLAS_SIZE, ATLAS_SIZE, { suitable->txdata.get() });
                     self->getTextFontAtlas(txt.data(), fontSize, blur, std::move(completion));
                 }
             }));
         }
+    }
+
+    FontAtlasProviderImpl::FontAtlas *FontAtlasProviderImpl::_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::unordered_set<std::uint64_t> &toLoad) {
+        FontAtlas *suitable = nullptr;
+
+        for (auto atlasIt = _atlases.begin(); atlasIt != _atlases.end(); ++atlasIt) {
+            if (atlasIt->fontSize == fontSize) {
+                suitable = &(*atlasIt);
+                break;
+            }
+        }
+        
+        for (const char *src = text; *src; ) {
+            std::uint32_t len = 0;
+            std::uint32_t u16ch = utf8ToUTF16(src, len);
+
+            if (suitable) {
+                auto index = suitable->chars.find(makeKey(u16ch, blur));
+                if (index != suitable->chars.end()) {
+                    readyChars.emplace_back(FontCharInfo {
+                        .txLT = index->second.txLT,
+                        .txRB = index->second.txRB,
+                        .pxSize = index->second.pxSize,
+                        .advance = index->second.advance,
+                        .lsb = index->second.lsb,
+                        .voffset = index->second.voffset
+                    });
+                }
+                else {
+                    toLoad.emplace(makeKey(u16ch, blur));
+                }
+            }
+            else {
+                toLoad.emplace(makeKey(u16ch, blur));
+            }
+
+            src += len;
+        }
+        
+        return suitable;
     }
     
     void FontAtlasProviderImpl::update(float dtSec) {
@@ -340,6 +342,24 @@ namespace resource {
             QueueEntry &entry = _callsQueue.front();
             getTextFontAtlas(entry.text.data(), entry.fontSize, entry.blur, std::move(entry.callback));
             _callsQueue.pop_front();
+        }
+        if (_asyncInProgress == false && _callsQueue.empty()) {
+            while (_postponedQueue.size()) {
+                QueueEntry &entry = _postponedQueue.front();
+                
+                std::vector<FontCharInfo> readyChars;
+                std::unordered_set<std::uint64_t> toLoad;
+                FontAtlas *suitable = _collectChars(entry.text.data(), entry.fontSize, entry.blur, readyChars, toLoad);
+                
+                if (suitable && toLoad.empty()) {
+                    entry.callback(std::move(readyChars), suitable->texture);
+                }
+                else {
+                    _platform->logError("[FontAtlasProviderImpl::update] Atlas logic error");
+                }
+                
+                _postponedQueue.pop_front();
+            }
         }
     }
 }

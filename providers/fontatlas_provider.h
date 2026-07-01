@@ -10,7 +10,6 @@
 
 namespace resource {
     struct FontCharInfo {
-        foundation::RenderTexturePtr texture = nullptr;
         math::vector2f txLT;
         math::vector2f txRB;
         math::vector2f pxSize;
@@ -29,12 +28,12 @@ namespace resource {
     public:
         // Returns width of text in pixels
         //
-        virtual float getTextWidth(const char *text, std::uint8_t fontSize) const = 0;
+        virtual auto getTextWidth(const char *text, std::uint8_t fontSize) const -> math::vector2f = 0;
         
         // Rasterize font to atlases according to @text and @size
         // @return  - FontAtlasInfo with coordinates and textures
         //
-        virtual void getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&)> &&completion) = 0;
+        virtual void getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<resource::FontCharInfo> &&, const foundation::RenderTexturePtr &)> &&completion) = 0;
         
         // Provider tracks resources life time and tries to free them
         //

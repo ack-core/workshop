@@ -1,6 +1,5 @@
 
-// TODO: dpi-scaling
-// TODO: remove button abilitites from image (left only action + texture changing). button + joystick -> library
+// TODO: dpi-scaling, sub-tree full transform
 // + scale inheritance
 
 #pragma once
@@ -10,6 +9,7 @@
 #include "foundation/util.h"
 
 #include "providers/resource_provider.h"
+#include "providers/fontatlas_provider.h"
 
 #include <memory>
 #include <functional>
@@ -45,7 +45,8 @@ namespace ui {
         static std::shared_ptr<StageInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const resource::ResourceProviderPtr &resourceProvider
+            const resource::ResourceProviderPtr &resourceProvider,
+            const resource::FontAtlasProviderPtr &fontAtlasProvider
         );
         
     public:
@@ -65,10 +66,16 @@ namespace ui {
         struct Image : public virtual Interactor {
             virtual ~Image() = default;
             virtual void setTexture(const char *texturePath) = 0;
+            virtual void setTexture(const foundation::RenderTexturePtr &texture) = 0;
         };
         struct Img9Slice : public virtual Interactor {
             virtual ~Img9Slice() = default;
             virtual void setTexture(const char *texturePath, const math::vector3f &sliceArgs) = 0;
+        };
+        struct TextLine : public virtual Element {
+            virtual ~TextLine() = default;
+            virtual void setText(const char *utf8text) = 0;
+            virtual foundation::RenderTexturePtr getTexture() = 0;
         };
         
     public:
@@ -110,7 +117,11 @@ namespace ui {
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
-            const std::uint8_t fontSize;
+            const std::uint8_t fontSize = 20;
+            const math::color fontColor = math::color(1.0f, 1.0f, 1.0f, 1.0f);
+            const math::color shadowColor = math::color(0.0f, 0.0f, 0.0f, 0.0f);
+            const math::vector2f shadowOffset = {0, 0};
+            const std::uint8_t shadowBlur = 0;
         };
         struct TextBlockParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
@@ -126,6 +137,7 @@ namespace ui {
         virtual auto addPivot(const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
         virtual auto addImage(const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
         virtual auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
+        virtual auto addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
         
         virtual void clear() = 0;
         virtual void updateAndDraw(float dtSec) = 0;

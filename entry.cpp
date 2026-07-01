@@ -16,7 +16,7 @@
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
 resource::ResourceProviderPtr resourceProvider;
-resource::FontAtlasProviderPtr fontProvider;
+resource::FontAtlasProviderPtr fontAtlasProvider;
 core::SceneInterfacePtr scene;
 core::WorldInterfacePtr world;
 core::RaycastInterfacePtr raycast;
@@ -31,12 +31,12 @@ extern "C" void initialize() {
         platform->loadFile("arial.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t []> &&fontData, std::size_t fontSize) {
             rendering = foundation::RenderingInterface::instance(platform);
             resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
-            fontProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
+            fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
             scene = core::SceneInterface::instance(platform, rendering);
             raycast = core::RaycastInterface::instance(platform, scene);
             simulation = core::SimulationInterface::instance(platform, scene);
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
-            stage = ui::StageInterface::instance(platform, rendering, resourceProvider);
+            stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
             datahub = dh::DataHub::instance(platform, game::datahub);
             stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
             stateManager->switchToState("default");
@@ -51,6 +51,7 @@ extern "C" void initialize() {
                 stage->updateAndDraw(dtSec);
                 rendering->presentFrame();
                 resourceProvider->update(dtSec);
+                fontAtlasProvider->update(dtSec);
             });
         });
     });

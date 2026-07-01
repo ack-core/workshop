@@ -46,24 +46,31 @@ namespace ui {
                     .texture = params.textureThumb,
                 });
                 
-                bg->setActionHandler([handler = std::move(params.handler), maxOffset, bg, pivot](Action action, float x, float y) {
-                    if (action == Action::RELEASE) {
-                        pivot->setScreenPosition(bg->getPosition() + 0.5f * bg->getSize());
-                        if (handler) {
-                            handler(math::vector2f(0, 0));
-                        }
-                    }
-                    else {
-                        const math::vector2f center = bg->getPosition() + 0.5f * bg->getSize();
-                        math::vector2f dir = (math::vector2f(x, y) - center);
-                        
-                        if (dir.length() > maxOffset) {
-                            dir = dir.normalized(maxOffset);
-                        }
-                        
-                        pivot->setScreenPosition(center + dir);
-                        if (handler) {
-                            handler(math::vector2f(dir.x, -dir.y) / maxOffset);
+                std::weak_ptr<StageInterface::Image> weakBg = bg;
+                std::weak_ptr<StageInterface::Pivot> weakPivot = pivot;
+                
+                bg->setActionHandler([handler = std::move(params.handler), maxOffset, weakBg, weakPivot](Action action, float x, float y) {
+                    if (auto bg = weakBg.lock()) {
+                        if (auto pivot = weakPivot.lock()) {
+                            if (action == Action::RELEASE) {
+                                pivot->setScreenPosition(bg->getPosition() + 0.5f * bg->getSize());
+                                if (handler) {
+                                    handler(math::vector2f(0, 0));
+                                }
+                            }
+                            else {
+                                const math::vector2f center = bg->getPosition() + 0.5f * bg->getSize();
+                                math::vector2f dir = (math::vector2f(x, y) - center);
+                                
+                                if (dir.length() > maxOffset) {
+                                    dir = dir.normalized(maxOffset);
+                                }
+                                
+                                pivot->setScreenPosition(center + dir);
+                                if (handler) {
+                                    handler(math::vector2f(dir.x, -dir.y) / maxOffset);
+                                }
+                            }
                         }
                     }
                 });

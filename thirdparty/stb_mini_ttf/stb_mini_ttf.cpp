@@ -1520,6 +1520,12 @@ STBTT_DEF float stbtt_ScaleForPixelHeight(const stbtt_fontinfo *info, float heig
    return (float) height / fheight;
 }
 
+STBTT_DEF float stbtt_ScaleForMappingEmToPixels(const stbtt_fontinfo *info, float pixels)
+{
+   int unitsPerEm = ttUSHORT(info->data + info->head + 18);
+   return pixels / unitsPerEm;
+}
+
 STBTT_DEF void stbtt_GetFontVMetrics(const stbtt_fontinfo *info, int *ascent, int *descent, int *lineGap)
 {
    if (ascent ) *ascent  = ttSHORT(info->data+info->hhea + 4);

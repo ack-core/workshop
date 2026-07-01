@@ -3,9 +3,6 @@
 #include "ui/extensions.h"
 #include <list>
 
-#include "providers/fontatlas_provider.h"
-extern resource::FontAtlasProviderPtr fontProvider;
-
 namespace {
     const char *g_meshShaderSrc = R"(
         const {
@@ -111,14 +108,50 @@ namespace game {
         _img1 = _api.ui->addImg9Slice(nullptr, ui::StageInterface::Img9SliceParams {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 50.0f),
+            .anchorOffset = math::vector2f(0.0f, 250.0f),
             .size = math::vector2f(501.0f, 101.0f),
             .texture = "textures/ui/img9slice",
             .sliceArgs = math::vector3f(122.0f, 122.0f, 3.0f)
         });
-        _img1->setActionHandler([](ui::Action, float x, float y) {
-            printf("%f %f\n", x, y);
+        _img1->setActionHandler([this](ui::Action, float x, float y) {
+            //printf("%f %f\n", x, y);
+            _img0->setTexture(_txt0->getTexture());
         });
+        _txt0 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .fontSize = 20,
+            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
+            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
+            .shadowOffset = math::vector2f(1.0f, 1.0f),
+            .shadowBlur = 1
+        });
+        _txt1 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .anchorOffset = math::vector2f(0.0f, 50.0f),
+            .fontSize = 20,
+            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
+            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
+            .shadowOffset = math::vector2f(1.0f, 1.0f),
+            .shadowBlur = 1
+        });
+        _txt2 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .anchorOffset = math::vector2f(0.0f, 100.0f),
+            .fontSize = 20,
+            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
+            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
+            .shadowOffset = math::vector2f(1.0f, 1.0f),
+            .shadowBlur = 1
+        });
+
+        _txt0->setText("This is going to be awesome!");
+        _txt1->setText("Que que que");
+        _txt2->setText("[TOTALLY AWESOME]");
+
         
     }
     
