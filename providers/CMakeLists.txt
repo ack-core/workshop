@@ -3,9 +3,7 @@ get_filename_component(m_source_root "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 set(
 	m_sources_list
-	"${m_source_root}/textures_list.h"
-	"${m_source_root}/meshes_list.h"
-	"${m_source_root}/grounds_list.h"
+	"${m_source_root}/resource_list.h"
 	"${m_source_root}/resource_provider.h"
 	"${m_source_root}/resource_provider.cpp"
 	"${m_source_root}/fontatlas_provider.h"

@@ -87,14 +87,14 @@ namespace game {
             _mesh0->updateShaderConstants(&trfm);
         });
 
-        _joystick = ui::extensions::addJoystick(_api.ui, _api.resources, nullptr, ui::extensions::JoystickParams {
+        _joystick = _api.ui->addExtensionElement(nullptr, ui::extensions::JoystickParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::BOTTOM,
             .anchorOffset = math::vector2f(50.0f, 50.0f),
             .textureBackground = "textures/ui/joystick_bg_00",
             .textureThumb = "textures/ui/joystick_thumb",
             .maxThumbOffset = 100.0f,
-            .handler = [this](const math::vector2f &direction) {
+            .onChange = [this](const math::vector2f &direction) {
                 printf("%f %f\n", direction.x, direction.y);
             }
         });
@@ -109,7 +109,7 @@ namespace game {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 250.0f),
-            .size = math::vector2f(501.0f, 101.0f),
+            .size = math::vector2f(21.0f, 31.0f),
             .texture = "textures/ui/img9slice",
             .sliceArgs = math::vector3f(122.0f, 122.0f, 3.0f)
         });
@@ -118,7 +118,7 @@ namespace game {
             _img0->setTexture(_txt0->getTexture());
         });
         _txt0 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 0.0f),
             .fontSize = 20,
@@ -128,7 +128,7 @@ namespace game {
             .shadowBlur = 1
         });
         _txt1 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 50.0f),
             .fontSize = 20,
@@ -137,22 +137,50 @@ namespace game {
             .shadowOffset = math::vector2f(1.0f, 1.0f),
             .shadowBlur = 1
         });
-        _txt2 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
+
+        _tb0 = _api.ui->addTextBlock(nullptr, ui::StageInterface::TextBlockParams {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 100.0f),
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .size = math::vector2f(601.0f, 101.0f),
+            .textAlign = ui::TextAlign::CENTER,
             .fontSize = 20,
             .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
             .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
             .shadowOffset = math::vector2f(1.0f, 1.0f),
             .shadowBlur = 1
         });
-
-        _txt0->setText("This is going to be awesome!");
-        _txt1->setText("Que que que");
-        _txt2->setText("[TOTALLY AWESOME]");
-
         
+        _txt0->setText("This is going to be\nawesome!");
+        _txt1->setText("Que que que");
+        
+
+        _tb0->setText("The glyphs in Block Elements\neach share the same character width in most supported fonts, allowing them to be used graphically in row and column arrangements. However, the block does not contain a space character of its own and ASCII space may or may not render at the same width as Block Elements glyphs, as those characters are intended to be used exclusively for monospaced fonts.");
+        
+        _btn0 = _api.ui->addExtensionElement(nullptr, ui::extensions::Button9SliceParams {
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .anchorOffset = math::vector2f(0.0f, 350.0f),
+            .size = math::vector2f(101.0f, 51.0f),
+            .textureBase = "textures/ui/btn_slice_base",
+            .textureOver = "textures/ui/btn_slice_press",
+            .texturePress = "textures/ui/btn_slice_press",
+            .sliceArgs = math::vector3f(24.0f, 24.0f, 4.0f),
+            .onPress = []() {
+                printf("pressed!");
+            }
+        });
+        _txt2 = _api.ui->addTextLine(_btn0, ui::StageInterface::TextLineParams {
+            .anchorH = ui::HorizontalAnchor::CENTER,
+            .anchorV = ui::VerticalAnchor::MIDDLE,
+            .anchorOffset = math::vector2f(0.0f, -4.0f),
+            .fontSize = 20,
+            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
+            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
+            .shadowOffset = math::vector2f(1.0f, 1.0f),
+            .shadowBlur = 1
+        });
+        _txt2->setText("Battle!");
     }
     
     RenderDevContext::~RenderDevContext() {

@@ -16,7 +16,7 @@ source_group("experimental" FILES ${m_experimental_contexts_list})
 file(GLOB_RECURSE m_editor_contexts_list "${m_source_root}/editor/*.h" "${m_source_root}/editor/*.cpp")
 source_group("editor" FILES ${m_editor_contexts_list})
 
-file(GLOB_RECURSE m_game_contexts_list "${m_source_root}/game/*.h" "${m_source_root}/game/*.cpp")
+file(GLOB_RECURSE m_game_contexts_list "${m_source_root}/contexts/*.h" "${m_source_root}/contexts/*.cpp")
 source_group("contexts" FILES ${m_game_contexts_list})
 
 add_library(game ${m_sources_list} ${m_game_contexts_list} ${m_editor_contexts_list} ${m_experimental_contexts_list})

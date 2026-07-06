@@ -88,6 +88,7 @@ endif()
 
 get_filename_component(m_tools_root "${PROJECT_SOURCE_DIR}/tools" ABSOLUTE)
 get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLUTE)
+get_filename_component(m_game_resources_root "${PROJECT_SOURCE_DIR}/game/resources" ABSOLUTE)
 get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}" ABSOLUTE)
 
 #file(REMOVE_RECURSE "${m_binary_root}")
@@ -103,7 +104,7 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 	file(COPY "${m_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
-	file(COPY "${m_resources_root}/arial.ttf" DESTINATION "${m_binary_root}/data")
+	file(COPY "${m_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
 
 	message(STATUS "Generating palette...")
 	execute_process(

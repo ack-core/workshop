@@ -102,7 +102,7 @@ namespace foundation {
     std::uint32_t InputLayout::getStride() const {
         std::uint32_t stride = 0;
         for (std::size_t i = 0; i < attributes.size(); i++) {
-            stride += g_formatConversionTable[int(layout.attributes[i].format)].size;
+            stride += g_formatConversionTable[int(attributes[i].format)].size;
         }
         return stride;
     }

@@ -113,14 +113,14 @@ namespace foundation {
         // @task     - task to be executed
         virtual void executeAsync(std::unique_ptr<AsyncTask> &&task) = 0;
         
-        // Loads file to memory
+        // Loads file to memory. First looks into read-only (distribution) directory, then into writable
         // @filePath - file path. Example: "data/map1/test.png"
         // @return   - data != nullptr and size != 0 if file opened successfully.
         // @completion called from the main thread
         //
         virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
         
-        // Save file in resources directory. Usable in editors. If data is nullptr and size is 0 then file is deleted
+        // Save file in resources or writable directory. Usable in editors. If data is nullptr and size is 0 then file is deleted
         // @return   - true if file saved successfully.
         // @completion called from the main thread
         //

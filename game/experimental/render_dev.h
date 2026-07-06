@@ -23,8 +23,11 @@ namespace game {
         std::shared_ptr<ui::StageInterface::Element> _joystick;
         std::shared_ptr<ui::StageInterface::Image> _img0;
         std::shared_ptr<ui::StageInterface::Img9Slice> _img1;
+        std::shared_ptr<ui::StageInterface::Element> _btn0;
         std::shared_ptr<ui::StageInterface::TextLine> _txt0;
         std::shared_ptr<ui::StageInterface::TextLine> _txt1;
         std::shared_ptr<ui::StageInterface::TextLine> _txt2;
+        std::shared_ptr<ui::StageInterface::TextBlock> _tb0;
+
     };
 }

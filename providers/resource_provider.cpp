@@ -1,8 +1,6 @@
 
 #include "resource_provider.h"
-#include "textures_list.h"
-#include "meshes_list.h"
-#include "grounds_list.h"
+#include "resource_list.h"
 #include "foundation/layouts.h"
 
 #include "thirdparty/upng/upng.h"

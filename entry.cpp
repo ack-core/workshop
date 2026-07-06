@@ -28,7 +28,7 @@ dh::DataHubPtr datahub;
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
-        platform->loadFile("arial.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t []> &&fontData, std::size_t fontSize) {
+        platform->loadFile("primary.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t []> &&fontData, std::size_t fontSize) {
             rendering = foundation::RenderingInterface::instance(platform);
             resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
             fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
@@ -36,7 +36,7 @@ extern "C" void initialize() {
             raycast = core::RaycastInterface::instance(platform, scene);
             simulation = core::SimulationInterface::instance(platform, scene);
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
-            stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
+            stage = ui::StageInterface::instance(platform, rendering, resourceProvider/*, fontAtlasProvider*/);
             datahub = dh::DataHub::instance(platform, game::datahub);
             stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
             stateManager->switchToState("default");

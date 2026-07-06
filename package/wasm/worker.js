@@ -23,7 +23,7 @@ onmessage = (msg) => {
                 abort: function() {
                     throw "aborted";
                 },
-                js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
+                js_dbg: (arg0, arg1, arg2) => { throw "dbg in bg" },
                 js_log: function(str, len) {
                     const u16str = new Uint16Array(memory.buffer, str, len);
                     console.log(String.fromCharCode(...u16str));

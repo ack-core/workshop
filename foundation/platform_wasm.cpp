@@ -26,7 +26,7 @@ void fatal() {
 
 // Imported from js
 extern "C" {
-    void js_waiting();
+    void js_dbg(const void *ptr0, const void *ptr1, const void *ptr2);
     void js_log(const std::uint16_t *ptr, int length);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
@@ -113,17 +113,17 @@ extern "C" {
     }
     void *malloc(size_t size) {
         std::uint32_t expected = 0;
-        while (g_memoryLock.compare_exchange_strong(expected, 1) == false);
         
         void *result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         if (result == nullptr) {
-            size_t areaSize = PAGESIZE * (size / PAGESIZE + 1);
+            size_t areaSize = PAGESIZE * (2 * size / PAGESIZE + 1);
             tlsf::add_new_area(sbrk(areaSize), areaSize, g_dynamicMemoryStart);
             result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         }
         
-        g_memoryLock.store(0);
-        ::memset(result, 0, size);
+        if (result == nullptr) {
+            fatal();
+        }
         return result;
     }
     void *aligned_alloc(size_t alignment, size_t size) {
@@ -131,11 +131,7 @@ extern "C" {
     }
     void free(void *ptr) {
         if (ptr) {
-            std::uint32_t expected = 0;
-            while (g_memoryLock.compare_exchange_strong(expected, 1) == false);
-            
             tlsf::free_ex(ptr, g_dynamicMemoryStart);
-            g_memoryLock.store(0);
         }
     }
 }

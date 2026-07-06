@@ -112,14 +112,14 @@ namespace game {
 //        _bbox->setTransform(rotation);
 //        _bsphere = _api.scene->addBoundingSphere({10, 0, 0}, 7, {1, 0, 1, 1});
         
-        _joystick = ui::extensions::addJoystick(_api.ui, _api.resources, nullptr, ui::extensions::JoystickParams {
+        _joystick = _api.ui->addExtensionElement(nullptr, ui::extensions::JoystickParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::BOTTOM,
             .anchorOffset = math::vector2f(50.0f, 50.0f),
             .textureBackground = "textures/ui/joystick_bg_00",
             .textureThumb = "textures/ui/joystick_thumb",
             .maxThumbOffset = 100.0f,
-            .handler = [this](const math::vector2f &direction) {
+            .onChange = [this](const math::vector2f &direction) {
                 _knightVelocity = {0.4f * direction.y, 0.0f, 0.4f * direction.x};
                 //printf("%f %f\n", direction.x, direction.y);
             }

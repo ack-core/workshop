@@ -50,7 +50,7 @@ class EventType {
 }
 
 var instance = null;
-var memory = new WebAssembly.Memory({ initial: 4, maximum: 4096, shared: true });
+var memory = new WebAssembly.Memory({ initial: 4, maximum: 65536, shared: true });
 var worker = new Worker("worker.js");
 var canvas = document.getElementById("render_target");
 var eventSource = document.getElementById("editor") || document.getElementById("render_target");
@@ -154,7 +154,7 @@ const imports = {
         acosf: Math.acos,
         atan2f: Math.atan2,
         pow: Math.pow,
-        js_waiting: () => console.log("[PLATFORM] waiting for memory lock"),
+        js_dbg: (arg0, arg1, arg2) => console.log("!!!> " + arg0 + " | " + arg1 + " | " + arg2),
         js_log: function(str, len) {
             const u16str = new Uint16Array(memory.buffer, str, len);
             print(String.fromCharCode(...u16str));
@@ -175,7 +175,7 @@ const imports = {
                 const data = instance.exports.malloc(buffer.byteLength);
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
-                print("[WASM] " + path + " loaded successfully");
+                print("[WASM] " + path + " loaded successfully " + buffer.byteLength);
                 instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
             })
             .catch(error => {

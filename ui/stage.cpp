@@ -18,7 +18,7 @@ namespace ui {
         virtual const foundation::PlatformInterfacePtr &getPlatform() const = 0;
         virtual const foundation::RenderingInterfacePtr &getRendering() const = 0;
         virtual const resource::ResourceProviderPtr &getResourceProvider() const = 0;
-        virtual const resource::FontAtlasProviderPtr &getFontAtlasProvider() const = 0;
+        //virtual const resource::FontAtlasProviderPtr &getFontAtlasProvider() const = 0;
         virtual ~StageFacility() = default;
     };
 }
@@ -373,6 +373,10 @@ namespace ui {
                 }
             });
         }
+        void setTexture(const foundation::RenderTexturePtr &texture, const math::vector3f &sliceArgs) override {
+            _texture = texture;
+            _sliceArgs = sliceArgs;
+        }
         void draw() override {
             const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
             
@@ -447,7 +451,7 @@ namespace ui {
         
     public:
         void setText(const char *utf8text) override {
-            _size = _facility.getFontAtlasProvider()->getTextWidth(utf8text, _fontSize);
+            _size = 0;//_facility.getFontAtlasProvider()->getTextWidth(utf8text, _fontSize);
             _text = utf8text;
             _makeText();
         }
@@ -457,23 +461,49 @@ namespace ui {
         }
         
         void draw() override {
+            /*
+            auto fillInstances = [this](const std::vector<resource::FontCharInfo> &src, const math::color &color, const math::vector2f &offset, std::uint32_t &instanceCount) {
+                float offsetX = offset.x;
+                
+                for (const auto &ch : src) {
+                    if (ch.pxSize.x > std::numeric_limits<float>::epsilon()) {
+                        _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offset.y, ch.pxSize.x, ch.pxSize.y);
+                        _instances[instanceCount].uvCoords = math::vector4f(ch.txLT, ch.txRB);
+                        _instances[instanceCount].color = color;
+                        _instances[instanceCount].args = math::vector4f(1.0f, 0.0f, 0.0f, 0.0f);
+                        instanceCount++;
+                    }
+                    
+                    offsetX += ch.advance;
+                }
+            };
+            
+            if (_instances.empty() && _chars.size()) {
+                if (_shadowColor.a > 0.0f && _shadow.size()) {
+                    _instances.resize(2 * _shadow.size());
+                }
+                else {
+                    _instances.resize(_chars.size());
+                }
+            }
             if (_instances.size()) {
                 if (auto texture = _textureWeak.lock()) {
                     const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
                     
-                    std::uint32_t instanceCount = 0;
-                    _fillInstances(_shadow, _shadowColor, _shadowOffset, instanceCount);
-                    _fillInstances(_chars, _fontColor, {}, instanceCount);
-                    
-                    if (instanceCount) {
+                    if (_instanceCount == 0) {
+                        fillInstances(_shadow, _shadowColor, _shadowOffset, _instanceCount);
+                        fillInstances(_chars, _fontColor, {}, _instanceCount);
+                    }
+                    if (_instanceCount) {
                         rendering->applyTextures({{texture, foundation::SamplerType::NEAREST}});
-                        rendering->draw(_instances.data(), instanceCount);
+                        rendering->draw(_instances.data(), _instanceCount);
                     }
                 }
                 else {
                     _makeText();
                 }
             }
+             */
         }
         
         void setFontParameters(const math::color &fontColor, std::uint8_t fontSize, const math::vector2f &shadowOffset, const math::color &shadowColor, std::uint8_t shadowBlur) {
@@ -484,47 +514,36 @@ namespace ui {
             _shadowBlur = shadowBlur;
         }
         
-    private:
+    protected:
         void _makeText() {
             _instances.clear();
+            _instanceCount = 0;
+            //_shadow.clear();
+            //_chars.clear();
 
-            if (_shadowColor.a > 0.0f) {
-                _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, _shadowBlur, [weak = weak_from_this()](std::vector<resource::FontCharInfo> &&shadow, const foundation::RenderTexturePtr &) {
-                    if (shadow.size()) {
-                        if (std::shared_ptr<TextLineImpl> self = weak.lock()) {
-                            self->_shadow = std::move(shadow);
-                        }
-                    }
-                });
-            }
+            /*
             _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, [weak = weak_from_this()](std::vector<resource::FontCharInfo> &&chars, const foundation::RenderTexturePtr &texture) {
                 if (chars.size()) {
                     if (std::shared_ptr<TextLineImpl> self = weak.lock()) {
-                        self->_instances.resize(2 * chars.size());
                         self->_chars = std::move(chars);
                         self->_textureWeak = texture;
                     }
                 }
             });
-        }
-        void _fillInstances(const std::vector<resource::FontCharInfo> &src, const math::color &color, const math::vector2f &offset, std::uint32_t &instanceCount) {
-            float offsetX = offset.x;
-            
-            for (auto &ch : src) {
-                if (ch.pxSize.x > std::numeric_limits<float>::epsilon()) {
-                    _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offset.y, ch.pxSize.x, ch.pxSize.y);
-                    _instances[instanceCount].uvCoords = math::vector4f(ch.txLT, ch.txRB);
-                    _instances[instanceCount].color = color;
-                    _instances[instanceCount].args = math::vector4f(1.0f, 0.0f, 0.0f, 0.0f);
-                    instanceCount++;
-                }
-                
-                offsetX += ch.advance;
+            if (_shadowColor.a > 0.0f) {
+                _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, _shadowBlur, [weak = weak_from_this()](std::vector<resource::FontCharInfo> &&shadow, const foundation::RenderTexturePtr &texture) {
+                    if (shadow.size()) {
+                        if (std::shared_ptr<TextLineImpl> self = weak.lock()) {
+                            self->_shadow = std::move(shadow);
+                            self->_textureWeak = texture;
+                        }
+                    }
+                });
             }
+             */
         }
-
         
-    private:
+    protected:
         math::color _fontColor;
         std::uint8_t _fontSize = 0;
         math::color _shadowColor;
@@ -532,9 +551,122 @@ namespace ui {
         std::uint8_t _shadowBlur = 0;
         std::string _text;
         std::weak_ptr<foundation::RenderTexture> _textureWeak;
-        std::vector<resource::FontCharInfo> _chars;
-        std::vector<resource::FontCharInfo> _shadow;
+        //std::vector<resource::FontCharInfo> _chars;
+        //std::vector<resource::FontCharInfo> _shadow;
         std::vector<DrawingInstance> _instances;
+        std::uint32_t _instanceCount;
+    };
+}
+
+//---
+
+namespace ui {
+    class TextBlockImpl : public TextLineImpl, public StageInterface::TextBlock {
+    public:
+        TextBlockImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : TextLineImpl(facility, parent) {}
+        ~TextBlockImpl() override {}
+        
+    public:
+        void setText(const char *utf8text) override {
+            _text = utf8text;
+            _makeText();
+        }
+        
+        void setRectParameters(const math::vector2f &size, TextAlign align) {
+            _size = size;
+            _align = align;
+        }
+        
+        void draw() override {
+            /*
+            auto fillInstances = [this](const std::vector<resource::FontCharInfo> &src, const math::color &color, const math::vector2f &offset, std::uint32_t &instanceCount) {
+                float offsetX = offset.x;
+                float offsetY = offset.y;
+                std::size_t lineBreak = 0;
+                
+                for (std::size_t index = 0; index < src.size(); ) {
+                    float lineTotalWidth = 0.0f;
+                    float lineBreakWidth = 0.0f;
+                    std::size_t li = index, skip = 0;
+                    
+                    for (; li < src.size(); li++) {
+                        const resource::FontCharInfo &ch = src[li];
+                        if (ch.u16ch == ' ') {
+                            lineBreakWidth = lineTotalWidth;
+                            lineBreak = li;
+                            skip = 1;
+                        }
+                        if (ch.u16ch == '\n') {
+                            lineBreakWidth = lineTotalWidth;
+                            lineBreak = li;
+                            skip = 1;
+                            break;
+                        }
+                        if (_size.x < lineTotalWidth + ch.advance) {
+                            break;
+                        }
+                        lineTotalWidth += ch.advance;
+                    }
+                    if (li == src.size()) {
+                        lineBreakWidth = lineTotalWidth;
+                        lineBreak = src.size();
+                    }
+                    if (_align == TextAlign::CENTER) {
+                        offsetX += 0.5f * (_size.x - lineBreakWidth);
+                    }
+                    if (_align == TextAlign::RIGHT) {
+                        offsetX += _size.x - lineBreakWidth;
+                    }
+                    for (std::size_t li = index; li < lineBreak; li++) {
+                        const resource::FontCharInfo &ch = src[li];
+                        if (ch.pxSize.x > std::numeric_limits<float>::epsilon()) {
+                            _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offsetY, ch.pxSize.x, ch.pxSize.y);
+                            _instances[instanceCount].uvCoords = math::vector4f(ch.txLT, ch.txRB);
+                            _instances[instanceCount].color = color;
+                            _instances[instanceCount].args = math::vector4f(1.0f, 0.0f, 0.0f, 0.0f);
+                            instanceCount++;
+                        }
+                        offsetX += ch.advance;
+                    }
+                    lineBreak += skip;
+                    if (index == lineBreak) {
+                        break;
+                    }
+                    index = lineBreak;
+                    offsetX = offset.x;
+                    offsetY += float(_fontSize);
+                }
+            };
+            
+            if (_instances.empty() && _chars.size()) {
+                if (_shadowColor.a > 0.0f && _shadow.size()) {
+                    _instances.resize(2 * _shadow.size());
+                }
+                else {
+                    _instances.resize(_chars.size());
+                }
+            }
+            if (_instances.size()) {
+                if (auto texture = _textureWeak.lock()) {
+                    const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
+                    
+                    if (_instanceCount == 0) {
+                        fillInstances(_shadow, _shadowColor, _shadowOffset, _instanceCount);
+                        fillInstances(_chars, _fontColor, {}, _instanceCount);
+                    }
+                    if (_instanceCount) {
+                        rendering->applyTextures({{texture, foundation::SamplerType::NEAREST}});
+                        rendering->draw(_instances.data(), _instanceCount);
+                    }
+                }
+                else {
+                    _makeText();
+                }
+            }*/
+        }
+        
+    private:
+        TextAlign _align = TextAlign::LEFT;
     };
 }
 
@@ -547,8 +679,8 @@ namespace ui {
         StageInterfaceImpl(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const resource::ResourceProviderPtr &resourceProvider,
-            const resource::FontAtlasProviderPtr &fontAtlasProvider
+            const resource::ResourceProviderPtr &resourceProvider//,
+            //const resource::FontAtlasProviderPtr &fontAtlasProvider
         );
         ~StageInterfaceImpl() override;
         
@@ -556,13 +688,14 @@ namespace ui {
         const foundation::PlatformInterfacePtr &getPlatform() const override { return _platform; }
         const foundation::RenderingInterfacePtr &getRendering() const override { return _rendering; }
         const resource::ResourceProviderPtr &getResourceProvider() const override { return _resourceProvider; }
-        const resource::FontAtlasProviderPtr &getFontAtlasProvider() const override { return _fontAtlasProvider; }
+        //const resource::FontAtlasProviderPtr &getFontAtlasProvider() const override { return _fontAtlasProvider; }
         
     public:
         auto addPivot(const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> override;
         auto addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
         auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> override;
         auto addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> override;
+        auto addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> override;
 
         void clear() override;
         void updateAndDraw(float dtSec) override;
@@ -571,7 +704,7 @@ namespace ui {
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
         const resource::ResourceProviderPtr _resourceProvider;
-        const resource::FontAtlasProviderPtr _fontAtlasProvider;
+        //const resource::FontAtlasProviderPtr _fontAtlasProvider;
         
         foundation::EventHandlerToken _touchEventsToken;
         foundation::RenderShaderPtr _uiShader;
@@ -581,11 +714,11 @@ namespace ui {
     std::shared_ptr<StageInterface> StageInterface::instance(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const resource::ResourceProviderPtr &resourceProvider,
-        const resource::FontAtlasProviderPtr &fontAtlasProvider
+        const resource::ResourceProviderPtr &resourceProvider//,
+        //const resource::FontAtlasProviderPtr &fontAtlasProvider
     )
     {
-        return std::make_shared<StageInterfaceImpl>(platform, rendering, resourceProvider, fontAtlasProvider);
+        return std::make_shared<StageInterfaceImpl>(platform, rendering, resourceProvider/*, fontAtlasProvider*/);
     }
 }
 
@@ -616,13 +749,13 @@ namespace ui {
     StageInterfaceImpl::StageInterfaceImpl(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const resource::ResourceProviderPtr &resourceProvider,
-        const resource::FontAtlasProviderPtr &fontAtlasProvider
+        const resource::ResourceProviderPtr &resourceProvider//,
+        //const resource::FontAtlasProviderPtr &fontAtlasProvider
     )
     : _platform(platform)
     , _rendering(rendering)
     , _resourceProvider(resourceProvider)
-    , _fontAtlasProvider(fontAtlasProvider)
+    //, _fontAtlasProvider(fontAtlasProvider)
     , _touchEventsToken(nullptr)
     {
         _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, layouts::VTXUIUV);
@@ -726,12 +859,28 @@ namespace ui {
         return result;
     }
     
+    std::shared_ptr<StageInterfaceImpl::TextBlock> StageInterfaceImpl::addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) {
+        std::shared_ptr<TextBlockImpl> result = std::make_shared<TextBlockImpl>(*this, parent);
+        result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
+        result->setFontParameters(params.fontColor, params.fontSize, params.shadowOffset, params.shadowColor, params.shadowBlur);
+        result->setRectParameters(params.size, params.textAlign);
+
+        if (parent == nullptr) {
+            _topLevelElements.emplace_back(result);
+        }
+        else {
+            std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
+        }
+
+        return result;
+    }
+    
     void StageInterfaceImpl::clear() {
     
     }
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
-        _rendering->forTarget(nullptr, nullptr, math::color(0.3f, 0.3f, 0.3f, 1.0f), [&](foundation::RenderingInterface &rendering) {
+        _rendering->forTarget(nullptr, nullptr, std::nullopt, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_uiShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
             for (const auto &topLevelElement : _topLevelElements) {
                 topLevelElement->updateCoordinates();

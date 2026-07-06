@@ -14,6 +14,7 @@ namespace resource {
         math::vector2f txRB;
         math::vector2f pxSize;
         float advance, lsb, voffset;
+        std::uint32_t u16ch;
     };
 
     class FontAtlasProvider {

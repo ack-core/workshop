@@ -9,7 +9,7 @@
 #include "foundation/util.h"
 
 #include "providers/resource_provider.h"
-#include "providers/fontatlas_provider.h"
+//#include "providers/fontatlas_provider.h"
 
 #include <memory>
 #include <functional>
@@ -45,8 +45,9 @@ namespace ui {
         static std::shared_ptr<StageInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const resource::ResourceProviderPtr &resourceProvider,
-            const resource::FontAtlasProviderPtr &fontAtlasProvider
+            const resource::ResourceProviderPtr &resourceProvider
+                                                        //,
+            //const resource::FontAtlasProviderPtr &fontAtlasProvider
         );
         
     public:
@@ -71,11 +72,16 @@ namespace ui {
         struct Img9Slice : public virtual Interactor {
             virtual ~Img9Slice() = default;
             virtual void setTexture(const char *texturePath, const math::vector3f &sliceArgs) = 0;
+            virtual void setTexture(const foundation::RenderTexturePtr &texture, const math::vector3f &sliceArgs) = 0;
         };
         struct TextLine : public virtual Element {
             virtual ~TextLine() = default;
             virtual void setText(const char *utf8text) = 0;
             virtual foundation::RenderTexturePtr getTexture() = 0;
+        };
+        struct TextBlock : public virtual Element {
+            virtual ~TextBlock() = default;
+            virtual void setText(const char *utf8text) = 0;
         };
         
     public:
@@ -108,7 +114,7 @@ namespace ui {
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             const math::vector2f size = math::vector2f(100.0f, 100.0f);
             const char *texture = "";
-            const math::vector3f sliceArgs = 0.0f;
+            const math::vector3f sliceArgs = math::vector3f(0, 0, 0);
             const float activeAreaOffset = 0.0f;
             const float activeAreaRadius = 0.0f;
         };
@@ -129,15 +135,25 @@ namespace ui {
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             const math::vector2f size = math::vector2f(100.0f, 100.0f);
-            const std::uint8_t fontSize;
             const TextAlign textAlign = TextAlign::LEFT;
+            const std::uint8_t fontSize;
+            const math::color fontColor = math::color(1.0f, 1.0f, 1.0f, 1.0f);
+            const math::color shadowColor = math::color(0.0f, 0.0f, 0.0f, 0.0f);
+            const math::vector2f shadowOffset = {0, 0};
+            const std::uint8_t shadowBlur = 0;
         };
         
     public:
+        virtual auto getResourceProvider() const -> const resource::ResourceProviderPtr & = 0;        
         virtual auto addPivot(const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
         virtual auto addImage(const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
         virtual auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
         virtual auto addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
+        virtual auto addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> = 0;
+        
+        template<typename T> auto addExtensionElement(const std::shared_ptr<Element> &parent, T &&params) -> std::shared_ptr<Element> {
+            return T::make(*this, parent, std::move(params));
+        }
         
         virtual void clear() = 0;
         virtual void updateAndDraw(float dtSec) = 0;
