@@ -15,6 +15,17 @@
 #include "experimental/debug_context.h"
 #include "experimental/render_dev.h"
 
+#include "contexts/game_data_interface.h"
+#include "contexts/castle_interface.h"
+
+#include "contexts/loading_context.h"
+#include "contexts/common_ui_context.h"
+#include "contexts/construction_ui_context.h"
+#include "contexts/castle_context.h"
+#include "contexts/battle_ui_context.h"
+#include "contexts/battle_context.h"
+#include "contexts/game_data_context.h"
+
 // Rule of states:
 // Context is created if the next state contains it and current state does not
 // Context is deleted if the next state does not contain it
@@ -47,9 +58,28 @@ namespace game {
 //        {"default", {
 //            &makeContext<DebugContext>
 //        }}
+//        {"default", {
+//            &makeContext<RenderDevContext>
+//        }}
+        
         {"default", {
-            &makeContext<RenderDevContext>
+            &makeContext<GameDataContext>,
+            &makeContext<LoadingContext, GameDataInterface>
+        }},
+        {"castle", {
+            &makeContext<GameDataContext>,
+            &makeContext<CommonUIContext>,
+            &makeContext<CastleContext, GameDataInterface>,
+            &makeContext<ConstructionUIContext, CastleInterface>,
+        }},
+        {"battle", {
+            &makeContext<GameDataContext>,
+            &makeContext<CommonUIContext>,
+            &makeContext<CastleContext, GameDataInterface>,
+            &makeContext<BattleUIContext, CastleInterface>,
+            &makeContext<BattleContext, GameDataInterface, CastleInterface>,
         }}
+
 #endif
     };
 };

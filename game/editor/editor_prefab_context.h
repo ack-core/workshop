@@ -20,6 +20,7 @@ namespace game {
         EditorPrefabContext(API &&api, NodeAccessInterface &nodeAccess);
         ~EditorPrefabContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

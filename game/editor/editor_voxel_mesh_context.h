@@ -24,6 +24,7 @@ namespace game {
         EditorVoxelMeshContext(API &&api, NodeAccessInterface &nodeAccess);
         ~EditorVoxelMeshContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

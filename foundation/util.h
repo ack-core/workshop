@@ -5,23 +5,12 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <unordered_map>
 #include <variant>
 #include <any>
 #include "math.h"
-
-/*
-TODO:
-            template <class C> callback(const std::weak_ptr<C> &weak, R(C::*method)(Args...)) : callback([weak, method](Args... args) -> R {
-                if (auto target = weak.lock()) {
-                    return (target.get()->*method)(args...);
-                }
-                
-                return {};
-            }) {}
-
- */
 
 namespace util {
     template <typename M> class callback final {};
@@ -46,7 +35,22 @@ namespace util {
                 delete static_cast<L *>(ptr);
             };
         }
-        
+        template <class C0, class C1> callback(const std::weak_ptr<C0> &weak, R(C1::*method)(Args...)) {
+            _data.target = new std::pair<std::weak_ptr<C1>, R(C1::*)(Args...)>(std::static_pointer_cast<C1>(weak.lock()), method);
+            _data.call = [](void *ptr, Args... args) {
+                auto *pair = static_cast<std::pair<std::weak_ptr<C1>, R(C1::*)(Args...)> *>(ptr);
+                if (auto target = pair->first.lock()) {
+                    return (target.get()->*(pair->second))(std::forward<Args>(args)...);
+                }
+                if constexpr (std::is_void_v<R> == false) {
+                    return R{};
+                }
+            };
+            _data.clean = [](void *ptr) {
+                delete static_cast<std::pair<std::weak_ptr<C1>, R(C1::*)(Args...)> *>(ptr);
+            };
+        }
+
         callback(callback &&other) : _data(std::move(other._data)) {
             other._data = {};
         }
@@ -93,6 +97,8 @@ namespace util {
         callback(const callback &) = delete;
         callback& operator =(const callback &) = delete;
     };
+
+    template <class C0, class C1, typename R, typename... Args> callback(const std::weak_ptr<C0> &ptr, R(C1::*method)(Args...)) -> callback<R(Args...)>;
 }
 
 namespace util {
@@ -454,6 +460,95 @@ namespace util {
             }
         }
     }
+    template<typename T> void cleanupUnused(std::list<T> &l) {
+        for (auto index = l.begin(); index != l.end(); ) {
+            if (index->use_count() <= 1) {
+                index = l.erase(index);
+            }
+            else {
+                ++index;
+            }
+        }
+    }
+}
+
+// TODO: easings and bumps to core namespace
+namespace util {
+    class Easing {
+    public:
+        enum class Formula {
+            INOUT2,
+            OUTCUBIC,
+        };
+        
+        Easing(Formula f, float lengthSec) : _length(lengthSec) {
+            if (f == Formula::INOUT2) {
+                _func = [](float x) {
+                    const float x2 = x * x;
+                    const float m1x = 1 - x;
+                    return x2 / (x2 + m1x * m1x);
+                };
+            }
+            if (f == Formula::OUTCUBIC) {
+                _func = [](float x) {
+                    const float m1x = 1 - x;
+                    return 1.0f - m1x * m1x * m1x;
+                };
+            }
+        }
+        
+        float getKoeff() const {
+            return _func(_koeff);
+        }
+        
+        void goTo_0() {
+            _direction = false;
+        }
+        void goTo_1() {
+            _direction = true;
+        }
+        void update(float dtSec) {
+            if (_direction) {
+                if (_koeff < 1.0f) {
+                    _koeff += dtSec / _length;
+                    if (_koeff >= 1.0f) {
+                        _koeff = 1.0f;
+                        _reached = true;
+                    }
+                }
+            }
+            else {
+                if (_koeff > 0.0f) {
+                    _koeff -= dtSec / _length;
+                    if (_koeff <= 0.0f) {
+                        _koeff = 0.0f;
+                        _reached = true;
+                    }
+                }
+            }
+        }
+        bool hasReached_0() {
+            if (_direction == false && _reached) {
+                _reached = false;
+                return true;
+            }
+            return false;
+        }
+        bool hasReached_1() {
+            if (_direction == true && _reached) {
+                _reached = false;
+                return true;
+            }
+            return false;
+        }
+        
+    private:
+        float (*_func)(float) = [](float x) { return x; };
+        float _length = 0.0f;
+        float _koeff = 0.0f;
+        bool  _direction = false;
+        bool  _reached = false;
+    };
 }
 
 // TODO: move to dedicated shader generator

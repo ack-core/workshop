@@ -36,12 +36,13 @@ extern "C" void initialize() {
             raycast = core::RaycastInterface::instance(platform, scene);
             simulation = core::SimulationInterface::instance(platform, scene);
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
-            stage = ui::StageInterface::instance(platform, rendering, resourceProvider/*, fontAtlasProvider*/);
+            stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
             datahub = dh::DataHub::instance(platform, game::datahub);
             stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
             stateManager->switchToState("default");
             
             platform->setLoop([](float dtSec) {
+                dtSec = std::min(dtSec, 0.035f);
                 datahub->update(dtSec);
                 stateManager->update(dtSec);
                 raycast->update(dtSec);

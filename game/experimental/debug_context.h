@@ -9,6 +9,7 @@ namespace game {
         DebugContext(API &&api);
         ~DebugContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

@@ -21,7 +21,7 @@ namespace ui {
             const float maxThumbOffset = 50.0f;
             util::callback<void(const math::vector2f &direction)> onChange;
 
-            static auto make(StageInterface &stage, const std::shared_ptr<StageInterface::Element> &parent, JoystickParams &&params) -> std::shared_ptr<StageInterface::Element> {
+            static auto make(StageInterface &stage, const std::shared_ptr<StageInterface::Element> &parent, JoystickParams &&params) -> std::shared_ptr<StageInterface::Interactor> {
                 std::shared_ptr<StageInterface::Image> bg = nullptr;
                 const resource::ResourceProviderPtr res = stage.getResourceProvider();
                 float maxOffset = params.maxThumbOffset;
@@ -96,7 +96,7 @@ namespace ui {
             const float activeAreaRadius = 0.0f;
             util::callback<void()> onPress;
             
-            static auto make(StageInterface &stage, const std::shared_ptr<StageInterface::Element> &parent, Button9SliceParams &&params) -> std::shared_ptr<StageInterface::Element> {
+            static auto make(StageInterface &stage, const std::shared_ptr<StageInterface::Element> &parent, Button9SliceParams &&params) -> std::shared_ptr<StageInterface::Interactor> {
                 const resource::ResourceProviderPtr res = stage.getResourceProvider();
                 std::shared_ptr<StageInterface::Img9Slice> base = stage.addImg9Slice(nullptr, ui::StageInterface::Img9SliceParams {
                     .anchorH = params.anchorH,

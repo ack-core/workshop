@@ -9,7 +9,7 @@
 #include "foundation/util.h"
 
 #include "providers/resource_provider.h"
-//#include "providers/fontatlas_provider.h"
+#include "providers/fontatlas_provider.h"
 
 #include <memory>
 #include <functional>
@@ -45,19 +45,20 @@ namespace ui {
         static std::shared_ptr<StageInterface> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const resource::ResourceProviderPtr &resourceProvider
-                                                        //,
-            //const resource::FontAtlasProviderPtr &fontAtlasProvider
+            const resource::ResourceProviderPtr &resourceProvider,
+            const resource::FontAtlasProviderPtr &fontAtlasProvider
         );
         
     public:
         struct Element {
             virtual auto getPosition() const -> const math::vector2f & = 0;
             virtual auto getSize() const -> const math::vector2f & = 0;
+            virtual void setAnchorOffset(const math::vector2f &offset) = 0;
             virtual ~Element() = default;
         };
         struct Interactor : public virtual Element {
             virtual void setActionHandler(util::callback<void(ui::Action action, float x, float y)> &&handler) = 0;
+            virtual void setLocked(bool locked) = 0;
             virtual ~Interactor() = default;
         };
         struct Pivot : public virtual Element {
@@ -68,11 +69,13 @@ namespace ui {
             virtual ~Image() = default;
             virtual void setTexture(const char *texturePath) = 0;
             virtual void setTexture(const foundation::RenderTexturePtr &texture) = 0;
+            virtual void setSize(const math::vector2f &size) = 0;
         };
         struct Img9Slice : public virtual Interactor {
             virtual ~Img9Slice() = default;
             virtual void setTexture(const char *texturePath, const math::vector3f &sliceArgs) = 0;
             virtual void setTexture(const foundation::RenderTexturePtr &texture, const math::vector3f &sliceArgs) = 0;
+            virtual void setSize(const math::vector2f &size) = 0;
         };
         struct TextLine : public virtual Element {
             virtual ~TextLine() = default;
@@ -151,7 +154,7 @@ namespace ui {
         virtual auto addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
         virtual auto addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> = 0;
         
-        template<typename T> auto addExtensionElement(const std::shared_ptr<Element> &parent, T &&params) -> std::shared_ptr<Element> {
+        template<typename T> auto addExtensionElement(const std::shared_ptr<Element> &parent, T &&params) -> std::shared_ptr<Interactor> {
             return T::make(*this, parent, std::move(params));
         }
         
@@ -164,7 +167,11 @@ namespace ui {
     
     using StageInterfacePtr = std::shared_ptr<StageInterface>;
     using ElementPtr = std::shared_ptr<StageInterface::Element>;
+    using InteractorPtr = std::shared_ptr<StageInterface::Interactor>;
     using PivotPtr = std::shared_ptr<StageInterface::Pivot>;
     using ImagePtr = std::shared_ptr<StageInterface::Image>;
+    using Img9SlicePtr = std::shared_ptr<StageInterface::Img9Slice>;
+    using TextLinePtr = std::shared_ptr<StageInterface::TextLine>;
+    using TextBlockPtr = std::shared_ptr<StageInterface::TextBlock>;
 }
 

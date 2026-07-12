@@ -34,6 +34,7 @@ namespace game {
         EditorRaycastShapeContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess);
         ~EditorRaycastShapeContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

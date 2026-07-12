@@ -107,7 +107,7 @@ namespace core {
         using ParticlesPtr = std::shared_ptr<Particles>;
         
     public:
-        virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) = 0;
+        virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift = {0, 0, 0}) = 0;
         virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
         
         virtual auto addArrows() -> ArrowsPtr = 0;

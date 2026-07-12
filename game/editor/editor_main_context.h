@@ -27,6 +27,7 @@ namespace game {
         void forEachNode(util::callback<void(const std::shared_ptr<EditorNode> &)> &&handler) override;
         void createNode(core::WorldInterface::NodeType type, const std::string &name, const math::vector3f &position, const std::string &resourcePath) override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

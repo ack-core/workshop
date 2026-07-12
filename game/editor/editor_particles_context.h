@@ -141,6 +141,7 @@ namespace game {
         EditorParticlesContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess);
         ~EditorParticlesContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

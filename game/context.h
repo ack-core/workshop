@@ -12,28 +12,32 @@
 
 namespace game {
     struct API {
+        const game::StateManagerPtr stateManager;
         const foundation::PlatformInterfacePtr &platform;
         const resource::ResourceProviderPtr &resources;
         const core::SceneInterfacePtr &scene;
         const core::WorldInterfacePtr &world;
         const core::RaycastInterfacePtr &raycast;
         const ui::StageInterfacePtr &ui;
-        const dh::DataHubPtr &dh;
-        const game::StateManagerPtr &stateManager;
     };
     
     class Interface {
     public:
         virtual ~Interface() = default;
     };
-    
-    // TODO: need to get shared_ptr to context during init -> void init();
+
     class Context {
+        template <typename Ctx, typename... Interfaces> friend std::shared_ptr<Context> makeContext(API &&api, Interface **existInterfaces, std::size_t count);
+        
     public:
+        virtual void init() = 0;
         virtual void update(float dtSec) = 0;
         
     public:
         virtual ~Context() = default;
+        
+    protected:
+        std::weak_ptr<Context> thisweak;
     };
 
     template <typename I> I& makeArg(Interface **existInterfaces, std::size_t count) {
@@ -47,8 +51,12 @@ namespace game {
         
         return *ptr;
     }
+
     template <typename Ctx, typename... Interfaces> std::shared_ptr<Context> makeContext(API &&api, Interface **existInterfaces, std::size_t count) {
-        return std::make_shared<Ctx>(std::move(api), makeArg<Interfaces>(existInterfaces, count)...);
+        auto result = std::make_shared<Ctx>(std::move(api), makeArg<Interfaces>(existInterfaces, count)...);
+        result->thisweak = result;
+        result->init();
+        return result;
     }
     
     using MakeContextFunc = std::shared_ptr<Context>(*)(API &&api, Interface **existInterfaces, std::size_t count);

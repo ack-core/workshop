@@ -23,6 +23,7 @@ namespace game {
         EditorGroundContext(API &&api, NodeAccessInterface &nodeAccess);
         ~EditorGroundContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

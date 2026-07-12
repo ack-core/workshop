@@ -22,7 +22,7 @@ namespace game {
             resourcePath = path;
             api.world->removeObject(name.data());
             worldObject = api.world->createObject(resourcePath.data(), core::RaycastInterface::MASK_ALL);
-            worldObject->loadResources([&api]() {
+            worldObject->loadResources([&api](core::WorldInterface::Object &obj) {
                 api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             });
         }

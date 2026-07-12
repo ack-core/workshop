@@ -73,7 +73,7 @@ namespace game {
                     
                     auto index = _currentContextList.find(makeContextFunction);
                     if (index == _currentContextList.end()) {
-                        ctx = makeContextFunction(API { _platform, _resourceProvider, _scene, _world, _raycast, _ui, _dh, shared_from_this() }, interfaces.data(), interfaces.size());
+                        ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _scene, _world, _raycast, _ui }, interfaces.data(), interfaces.size());
                     }
                     else {
                         ctx = index->second;
@@ -91,6 +91,7 @@ namespace game {
                     }
                 }
 
+                _currentStateName = name;
                 std::swap(_currentContextList, newContextList);
                 return;
             }
@@ -100,8 +101,13 @@ namespace game {
     }
     
     void StateManagerImpl::update(float dtSec) {
+        std::string state = _currentStateName;
         for (auto& contextEntry : _currentContextList) {
-            contextEntry.second->update(dtSec);
+            std::shared_ptr<Context> ctx = contextEntry.second;
+            ctx->update(dtSec);
+            if (state != _currentStateName) {
+                break;
+            }
         }
     }
 }

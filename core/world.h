@@ -51,7 +51,7 @@ namespace core {
             virtual auto getTypeMask() const -> std::uint64_t = 0;
             virtual bool isLoaded() const = 0;
             
-            virtual void loadResources(util::callback<void()> &&completion) = 0;
+            virtual void loadResources(util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
             virtual void unloadResources() = 0;
             
             virtual void setPosition(const math::vector3f &pos) = 0;
@@ -71,7 +71,7 @@ namespace core {
             // @completion    - callback is called when animation ends or instantly if animation wasn't found.
             // callback is called at the end of every cycle of looped particles or looped animations
             //
-            virtual void play(const char *name, bool looped, util::callback<void()> &&completion = {}) = 0;
+            virtual void play(const char *name, bool looped, util::callback<void(WorldInterface::Object &)> &&completion = {}) = 0;
             
             virtual ~Object() = default;
         };

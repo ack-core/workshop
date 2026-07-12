@@ -437,7 +437,7 @@ namespace core {
         );
         ~SceneInterfaceImpl() override;
         
-        void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) override;
+        void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift = {0, 0, 0}) override;
         void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
         
         auto addArrows() -> ArrowsPtr override;
@@ -819,7 +819,7 @@ namespace core {
         
     }
     
-    void SceneInterfaceImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter) {
+    void SceneInterfaceImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift) {
         _camera.position = position;
         _camera.target = sceneCenter;
         
@@ -832,7 +832,11 @@ namespace core {
         
         float aspect = _platform->getScreenWidth() / _platform->getScreenHeight();
 
-        math::transform3f viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up);
+        math::transform3f mm = math::transform3f::identity().translated(shift);
+        math::transform3f viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up) * mm;
+        //_camera.position = position;
+        _camera.position = position - _camera.right * shift.x - _camera.up * shift.y + _camera.forward * shift.z;
+        //viewMatrix = viewMatrix * mm;
         
         _camera.plmVPMatrix = viewMatrix * math::transform3f::platformPerspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
         _camera.stdVPMatrix = viewMatrix * math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);

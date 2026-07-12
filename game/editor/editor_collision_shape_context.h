@@ -36,6 +36,7 @@ namespace game {
         EditorCollisionShapeContext(API &&api, NodeAccessInterface &nodeAccess, CameraAccessInterface &cameraAccess);
         ~EditorCollisionShapeContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:

@@ -58,7 +58,7 @@ namespace core {
         virtual ~ObjectNode() = default;
         virtual void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) = 0;
         virtual void unloadResources() = 0;
-        virtual void play(const char *animName, bool looped, util::callback<void()> &&completion) = 0;
+        virtual void play(const char *animName, bool looped, const std::weak_ptr<ObjectImpl> &objweak, util::callback<void(WorldInterface::Object &)> &&completion);
         virtual void update(float dtSec) = 0;
     };
 
@@ -87,7 +87,7 @@ namespace core {
             return _loading == 0;
         }
         
-        void loadResources(util::callback<void()> &&completion) override {
+        void loadResources(util::callback<void(WorldInterface::Object &)> &&completion) override {
             _loadingCompletion = std::move(completion);
             _loading = int(_nodes.size());
             const std::weak_ptr<ObjectImpl> weakself = weak_from_this();
@@ -102,7 +102,7 @@ namespace core {
         }
         void nodeLoadingComplete() {
             if (--_loading == 0) {
-                _loadingCompletion.callAndReset();
+                _loadingCompletion.callAndReset(*this);
             }
         }
         
@@ -114,7 +114,7 @@ namespace core {
         auto getWorldTransform() const -> const math::transform3f & override;
         auto getWorldPosition() const -> const math::vector3f override;
         void setVelocity(const math::vector3f &v) override;
-        void play(const char *name, bool looped, util::callback<void()> &&completion) override;
+        void play(const char *name, bool looped, util::callback<void(WorldInterface::Object &)> &&completion) override;
         void update(float dtSec);
         
     private:
@@ -123,10 +123,16 @@ namespace core {
         std::shared_ptr<WorldImpl> _owner;
         std::vector<std::unique_ptr<ObjectNode>> _nodes;
         std::unordered_map<std::string, std::size_t> _nameToNodeIndex;
-        util::callback<void()> _loadingCompletion;
+        util::callback<void(WorldInterface::Object &)> _loadingCompletion;
         int _loading = 0;
         CollisionNode *_collisionNode = nullptr;
     };
+}
+
+namespace core {
+    void ObjectNode::play(const char *animName, bool looped, const std::weak_ptr<ObjectImpl> &objweak, util::callback<void(WorldInterface::Object &)> &&completion) {
+        completion(*objweak.lock());
+    }
 }
 
 namespace core {
@@ -139,6 +145,7 @@ namespace core {
             res.getOrLoadVoxelMesh(resourcePath.c_str(), [world, this, objweak](const std::vector<foundation::RenderDataPtr> &data, const util::Description& desc) {
                 if (auto object = objweak.lock()) {
                     if (data.size()) {
+                        _objweak = objweak;
                         _mesh = world->getScene().addVoxelMesh(data, desc);
                         _mesh->setTransform(worldTransform);
                         
@@ -160,7 +167,7 @@ namespace core {
             _animComplete = {};
             _animTimeSec = 0.0f;
         }
-        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
+        void play(const char *animName, bool looped, const std::weak_ptr<ObjectImpl> &objweak, util::callback<void(WorldInterface::Object &)> &&completion) override {
             _animTimeSec = 0.0f;
             const auto index = _animations.find(animName);
             if (index != _animations.end()) {
@@ -170,7 +177,7 @@ namespace core {
             }
             else {
                 _currentAnimation = nullptr;
-                completion();
+                completion(*objweak.lock());
             }
         }
         void update(float dtSec) override {
@@ -178,16 +185,16 @@ namespace core {
                 _mesh->setTransform(worldTransform);
 
                 if (_currentAnimation) {
-                    float frameOffset = std::max(0.0f, _currentAnimation->frameCount * _animTimeSec * _currentAnimation->timeLenSec);
+                    float frameOffset = std::max(0.0f, _currentAnimation->frameCount * (_animTimeSec / _currentAnimation->timeLenSec));
                     if (frameOffset < _currentAnimation->frameCount) {
                         _mesh->setFrame(_currentAnimation->startFrame + int(frameOffset));
                     }
                     else if (_isLooped) {
-                        _animComplete();
+                        _animComplete(*_objweak.lock());
                         _animTimeSec -= _currentAnimation->timeLenSec;
                     }
                     else {
-                        _animComplete.callAndReset();
+                        _animComplete.callAndReset(*_objweak.lock());
                     }
                     _animTimeSec += dtSec;
                 }
@@ -200,11 +207,12 @@ namespace core {
             float frameCount;
             float timeLenSec;
         };
+        std::weak_ptr<ObjectImpl> _objweak;
         std::unordered_map<std::string, Animation> _animations;
         core::SceneInterface::VoxelMeshPtr _mesh;
         const Animation *_currentAnimation = nullptr;
         float _animTimeSec = 0.0f;
-        util::callback<void()> _animComplete;
+        util::callback<void(WorldInterface::Object &)> _animComplete;
         bool _isLooped = false;
     };
 }
@@ -232,9 +240,6 @@ namespace core {
         }
         void unloadResources() override {
             particles = nullptr;
-        }
-        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
-            
         }
         void update(float dtSec) override {
             if (particles) {
@@ -267,9 +272,6 @@ namespace core {
         void unloadResources() override {
             shape = nullptr;
         }
-        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
-            completion();
-        }
         void update(float dtSec) override {
             if (shape) {
                 shape->setTransform(worldTransform);
@@ -298,9 +300,6 @@ namespace core {
         }
         void unloadResources() override {
             body = nullptr;
-        }
-        void play(const char *animName, bool looped, util::callback<void()> &&completion) override {
-            completion();
         }
         void update(float dtSec) override {
             if (body) {
@@ -384,14 +383,14 @@ namespace core {
             _collisionNode->body->setVelocity(v);
         }
     }
-    void ObjectImpl::play(const char *name, bool looped, util::callback<void()> &&completion) {
+    void ObjectImpl::play(const char *name, bool looped, util::callback<void(WorldInterface::Object &)> &&completion) {
         const std::string src = name;
         const auto colonPos = src.find(':');
         const std::string nodeName = src.substr(0, colonPos);
         const std::string animName = colonPos != std::string::npos ? src.substr(colonPos + 1, std::string::npos) : std::string();
         const auto index = _nameToNodeIndex.find(nodeName);
         if (index != _nameToNodeIndex.end()) {
-            _nodes[index->second]->play(animName.data(), looped, std::move(completion));
+            _nodes[index->second]->play(animName.data(), looped, weak_from_this(), std::move(completion));
         }
     }
     void ObjectImpl::update(float dtSec) {

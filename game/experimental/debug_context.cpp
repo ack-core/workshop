@@ -78,16 +78,16 @@ namespace game {
         _rayOut = _api.scene->addLineSet();
         _knight = _api.world->createObject("prefabs/knight_red", core::RaycastInterface::MASK_ALL);
         _knight->setPosition({0, 0, 0});
-        _knight->loadResources([this]() {
+        _knight->loadResources([this](core::WorldInterface::Object &obj) {
             printf("!!! completed !!!\n");
-            _knight->play("root.mdl:attack", false, [this]() {
+            _knight->play("root.mdl:attack", false, [this](core::WorldInterface::Object &obj) {
                 printf("!!! attack !!!\n");
                 _knight->play("root.mdl:idle", true);
             });
         });
         _other = _api.world->createObject("prefabs/knight_blue", core::RaycastInterface::MASK_ALL);
         _other->setPosition({20.01f, 0, 0});
-        _other->loadResources([]() {
+        _other->loadResources([](core::WorldInterface::Object &obj) {
             printf("!!! completed !!!\n");
         });
         

@@ -88,6 +88,8 @@ namespace resource {
         //
         virtual auto getPrefab(const char *prefabPath) -> const util::Description & = 0;
         
+        // TODO: preload prefab resources
+        
         // Force removing resources from internal storages
         //
         virtual void removeTexture(const char *texturePath) = 0;

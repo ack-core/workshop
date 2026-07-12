@@ -10,10 +10,14 @@ namespace game {
         EditorCameraContext(API &&api);
         ~EditorCameraContext() override;
         
+        bool pointerEventHandler(const foundation::PlatformPointerEventArgs &args);
+        bool keyboardEventHandler(const foundation::PlatformKeyboardEventArgs &args);
+        
         auto getOrbitSize() const -> float override;
         auto getTarget() const -> math::vector3f override;
         void setTarget(const math::vector3f &position) override;
         
+        void init() override;
         void update(float dtSec) override;
         
     private:

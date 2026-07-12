@@ -335,6 +335,12 @@ namespace math {
                 decltype(vector4f::block) rv3;
             };
             struct {
+                vector4f v0;
+                vector4f v1;
+                vector4f v2;
+                vector4f v3;
+            };
+            struct {
                 scalar data[16];
             }
             block;

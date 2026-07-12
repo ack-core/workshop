@@ -8,6 +8,7 @@ namespace game {
         RenderDevContext(API &&api);
         ~RenderDevContext() override;
         
+        void init() override {}
         void update(float dtSec) override;
         
     private:
