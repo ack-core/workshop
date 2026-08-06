@@ -98,7 +98,7 @@ namespace game {
         return 0.0f;
     }
     void Shape::generate(const core::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
-        editor::RandomSource rnd = editor::RandomSource(randomSeed, RND_SHAPE_FILL);
+        util::RandomSource rnd = util::RandomSource(randomSeed, RND_SHAPE_FILL);
         if (type == Type::DISK) {
             points.clear();
             std::size_t random = randomSeed;
@@ -274,7 +274,7 @@ namespace game {
     void Emitter::refresh(const core::SceneInterface::LineSetPtr &shapeStart, const core::SceneInterface::LineSetPtr &shapeEnd) {
         // WARNING: editor can only be single-threaded
         foundation::RenderingInterfacePtr rendering = foundation::RenderingInterface::instance(foundation::PlatformInterface::instance());
-        _shapeGetRandom = editor::RandomSource(_randomSeed, RND_SHAPE_GET);
+        _shapeGetRandom = util::RandomSource(_randomSeed, RND_SHAPE_GET);
         
         const math::vector3f emitterDir = _endShapeOffset.lengthSq() > 0.1f ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
         const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
@@ -306,7 +306,7 @@ namespace game {
         _ptcParams.maxXYZ = {0, 0, 0};
         _ptcParams.maxSize = {_widthGraph.getMaxValue(), _heightGraph.getMaxValue()};
 
-        editor::RandomSource rndSpread = editor::RandomSource(RND_GRAPH_SPREAD, _randomSeed);
+        util::RandomSource rndSpread = util::RandomSource(RND_GRAPH_SPREAD, _randomSeed);
         
         // second loop is needed to bake old particles from previous cycle (_isLooped)
         for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //

@@ -24,12 +24,18 @@ namespace core {
         }
         ~CircleXZImpl() override {}
         
+        float getRadius() const override {
+            return radius;
+        }
         const math::transform3f getTransform() const override {
             return transform;
         }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
             _prevpos = transform.v3.xyz;
+        }
+        const math::vector3f getVelocity() const override {
+            return transform.v3.xyz - _prevpos;
         }
         void setVelocity(const math::vector3f &v) override {
             _prevpos = transform.v3.xyz - math::vector3f(v.x, 0.0f, v.z);
@@ -65,6 +71,9 @@ namespace core {
             
         }
         
+        float getRadius() const override {
+            return 0.0f;
+        }
         const math::transform3f getTransform() const override {
             return _transform;
         }
@@ -77,6 +86,9 @@ namespace core {
             }
             _transform = trfm;
             _visual->setTransform(ctransform);
+        }
+        const math::vector3f getVelocity() const override {
+            return {};
         }
         void setVelocity(const math::vector3f &v) override {}
         void update(float dtSec) override {}

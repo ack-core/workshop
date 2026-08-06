@@ -93,13 +93,13 @@ namespace game {
         
 
         
-//        const math::transform3f t1 = math::transform3f(math::vector3f(1, 0.5f, 0).normalized(), M_PI / 6.0f).translated({0, 0, -20.01});
+        const math::transform3f t1 = math::transform3f::identity().translated({0, 0, -20.01});
 //        
-//        _pilon = _api.world->createObject("prefabs/pilon", core::RaycastInterface::MASK_ALL);
-//        _pilon->setTransform(t1);
-//        _pilon->loadResources([](core::WorldInterface::Object &) {
-//            printf("!!! completed !!!\n");
-//        });
+        _pilon = _api.world->createObject("prefabs/coltest", core::RaycastInterface::MASK_ALL);
+        _pilon->setTransform(t1);
+        _pilon->loadResources([](core::WorldInterface::Object &) {
+            printf("!!! completed !!!\n");
+        });
 
         
         //        const math::transform3f trfm = math::transform3f({0, 1, 0}, M_PI_4);
@@ -146,6 +146,9 @@ namespace game {
 //            _object->setTransform(trfm);
 //        }
 //
+        auto v = _knight->getVelocity();
+        printf("--->>> %f %f\n", v.x, v.z);
+        _knight->setPosition(_knight->getWorldPosition());
         _knight->setVelocity(_knightVelocity);
         _other->setVelocity({0, 0, 0});
         _api.scene->setCameraLookAt(_orbit + _knight->getWorldPosition(), _knight->getWorldPosition());

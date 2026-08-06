@@ -2,22 +2,7 @@
 #include "utils.h"
 
 namespace editor {
-    RandomSource::RandomSource(std::uint64_t seed, std::uint64_t seq) {
-        _state = 0U;
-        _inc = (seq << 1u) | 1u;
-        getNextRandom();
-        _state += seed;
-        getNextRandom();
-    }
-    std::uint32_t RandomSource::getNextRandom() {
-        uint64_t oldstate = _state;
-        _state = oldstate * 6364136223846793005ULL + (_inc | 1);
-        uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
-        uint32_t rot = oldstate >> 59u;
-        return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
-    }
-
-    RandomSource g_defaultRandomSource = RandomSource(100, 100);
+    util::RandomSource g_defaultRandomSource = util::RandomSource(100, 100);
 
     std::string getRandomName() {
         std::string result = "aaaaaa";

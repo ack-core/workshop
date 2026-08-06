@@ -88,7 +88,7 @@ namespace game {
         bool _isLooped = true;
         
         std::size_t _randomSeed = 100;
-        editor::RandomSource _shapeGetRandom;
+        util::RandomSource _shapeGetRandom;
 
         ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
         Shape _startShape = {Shape::Type::DISK, false, {0.0f, 0.0f, 0.0f}};

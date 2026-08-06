@@ -69,7 +69,7 @@ namespace core {
                 if (d < 0.0f) {
                     continue;
                 }
-                const float sqrtD = std::sqrt(d);
+                const float sqrtD = std::sqrtf(d);
                 float t = -halfB - sqrtD;
                 if (t < 0.0f) {
                     t = -halfB + sqrtD;

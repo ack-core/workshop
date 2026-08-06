@@ -17,8 +17,10 @@
 
 #include "contexts/game_data_interface.h"
 #include "contexts/castle_interface.h"
+#include "contexts/battle_interface.h"
 
 #include "contexts/loading_context.h"
+#include "contexts/menu_ui_context.h"
 #include "contexts/common_ui_context.h"
 #include "contexts/construction_ui_context.h"
 #include "contexts/castle_context.h"
@@ -66,6 +68,11 @@ namespace game {
             &makeContext<GameDataContext>,
             &makeContext<LoadingContext, GameDataInterface>
         }},
+        {"menu", {
+            &makeContext<GameDataContext>,
+            &makeContext<CastleContext, GameDataInterface>,
+            &makeContext<MenuUIContext, CastleInterface>,
+        }},
         {"castle", {
             &makeContext<GameDataContext>,
             &makeContext<CommonUIContext>,
@@ -76,8 +83,8 @@ namespace game {
             &makeContext<GameDataContext>,
             &makeContext<CommonUIContext>,
             &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<BattleUIContext, CastleInterface>,
-            &makeContext<BattleContext, GameDataInterface, CastleInterface>,
+            &makeContext<BattleContext, GameDataInterface>,
+            &makeContext<BattleUIContext, CastleInterface, BattleInterface>,
         }}
 
 #endif

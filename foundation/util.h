@@ -102,6 +102,60 @@ namespace util {
 }
 
 namespace util {
+    template <typename M> class signal final {};
+    template <typename... Args> class signal <void(Args...)> final {
+    public:
+        signal() {}
+        template <class C0, class C1> void subscribe(const std::weak_ptr<C0> &weak, void(C1::*method)(Args...)) {
+            Subscription sb;
+            sb.target = new std::pair<std::weak_ptr<C1>, void(C1::*)(Args...)>(std::static_pointer_cast<C1>(weak.lock()), method);
+            sb.call = [](void *ptr, Args... args) {
+                auto *pair = static_cast<std::pair<std::weak_ptr<C1>, void(C1::*)(Args...)> *>(ptr);
+                if (auto target = pair->first.lock()) {
+                    (target.get()->*(pair->second))(std::forward<Args>(args)...);
+                }
+            };
+            sb.clean = [](void *ptr) {
+                delete static_cast<std::pair<std::weak_ptr<C1>, void(C1::*)(Args...)> *>(ptr);
+            };
+            _subscriptions.emplace_back(sb);
+        }
+        
+        ~signal() {
+            for (auto &item : _subscriptions) {
+                item.clean(item.target);
+            }
+            //_data.clean(_data.target);
+        }
+        
+        void operator ()(Args... args) const {
+            for (auto &item : _subscriptions) {
+                item.call(item.target, std::forward<Args>(args)...);
+            }
+//            if (_data.call) {
+//                _data.call(_data.target, );
+//            }
+        }
+                
+    private:
+        struct Subscription {
+            void(*call)(void *ptr, Args...) = nullptr;
+            void (*clean)(void *ptr) = [](void *){};
+            void *target = nullptr;
+        };
+        std::vector <Subscription> _subscriptions;
+        
+    private:
+        signal(signal &&) = delete;
+        signal(const signal &) = delete;
+        signal& operator =(signal &&) = delete;
+        signal& operator =(const signal &) = delete;
+    };
+
+    template <class C0, class C1, typename R, typename... Args> signal(const std::weak_ptr<C0> &ptr, R(C1::*method)(Args...)) -> signal<R(Args...)>;
+}
+
+namespace util {
     class strstream {
     public:
         strstream(const char *start, std::size_t length) : _current(start), _end(start + length), _error(false) {}
@@ -477,16 +531,28 @@ namespace util {
     class Easing {
     public:
         enum class Formula {
+            INOUT1,
             INOUT2,
+            INCUBIC,
             OUTCUBIC,
         };
         
         Easing(Formula f, float lengthSec) : _length(lengthSec) {
+            if (f == Formula::INOUT1) {
+                _func = [](float x) {
+                    return x * x * (3.0f - 2.0f * x);
+                };
+            }
             if (f == Formula::INOUT2) {
                 _func = [](float x) {
                     const float x2 = x * x;
                     const float m1x = 1 - x;
                     return x2 / (x2 + m1x * m1x);
+                };
+            }
+            if (f == Formula::INCUBIC) {
+                _func = [](float x) {
+                    return x * x * x;
                 };
             }
             if (f == Formula::OUTCUBIC) {
@@ -508,6 +574,7 @@ namespace util {
             _direction = true;
         }
         void update(float dtSec) {
+            _reached = false;
             if (_direction) {
                 if (_koeff < 1.0f) {
                     _koeff += dtSec / _length;
@@ -548,6 +615,33 @@ namespace util {
         float _koeff = 0.0f;
         bool  _direction = false;
         bool  _reached = false;
+    };
+}
+
+namespace util {
+    class RandomSource {
+    public:
+        RandomSource() = default;
+        RandomSource(std::uint64_t seed, std::uint64_t seq);
+        std::uint32_t getNextRandom();
+        
+        // [-1; 1]
+        float getNextRandomF();
+        
+    private:
+        std::uint64_t _state = 0;
+        std::uint64_t _inc = 0;
+    };
+    class GaussRandomSource {
+    public:
+        GaussRandomSource() = default;
+        GaussRandomSource(std::uint64_t seed, std::uint64_t seq);
+        
+        // [-1; 1]
+        float getNextRandomF();
+        
+    private:
+        RandomSource _rnd;
     };
 }
 

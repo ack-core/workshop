@@ -62,6 +62,9 @@ namespace core {
             virtual auto getWorldTransform() const -> const math::transform3f & = 0;
             virtual auto getWorldPosition() const -> const math::vector3f = 0;
             virtual void setVelocity(const math::vector3f &v) = 0;
+            virtual auto getVelocity() const -> const math::vector3f = 0;
+            virtual void setAnimationScale(float scale) = 0;
+            virtual auto getCollisionRadius() const -> float = 0;
             
             // Play animation
             // @name - name of the animation node

@@ -58,8 +58,8 @@ namespace core {
         virtual ~ObjectNode() = default;
         virtual void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) = 0;
         virtual void unloadResources() = 0;
-        virtual void play(const char *animName, bool looped, const std::weak_ptr<ObjectImpl> &objweak, util::callback<void(WorldInterface::Object &)> &&completion);
-        virtual void update(float dtSec) = 0;
+        virtual void play(const char *animName, bool looped, ObjectImpl &obj, util::callback<void(WorldInterface::Object &)> &&completion);
+        virtual void update(ObjectImpl &obj, float dtSec) = 0;
     };
 
     std::unique_ptr<ObjectNode> (*g_nodeConstructors[int(WorldInterface::NodeType::_count)])() = {};
@@ -86,6 +86,9 @@ namespace core {
         bool isLoaded() const override {
             return _loading == 0;
         }
+        float getAnimScale() const {
+            return _animScale;
+        }
         
         void loadResources(util::callback<void(WorldInterface::Object &)> &&completion) override {
             _loadingCompletion = std::move(completion);
@@ -105,6 +108,9 @@ namespace core {
                 _loadingCompletion.callAndReset(*this);
             }
         }
+        void setCollisionNode(CollisionNode *ptr) {
+            _collisionNode = ptr;
+        }
         
         void setPosition(const math::vector3f &pos) override;
         void setTransform(const math::transform3f &trfm) override;
@@ -114,6 +120,10 @@ namespace core {
         auto getWorldTransform() const -> const math::transform3f & override;
         auto getWorldPosition() const -> const math::vector3f override;
         void setVelocity(const math::vector3f &v) override;
+        auto getVelocity() const -> const math::vector3f override;
+        void setAnimationScale(float scale) override;
+        auto getCollisionRadius() const -> float override;
+        
         void play(const char *name, bool looped, util::callback<void(WorldInterface::Object &)> &&completion) override;
         void update(float dtSec);
         
@@ -125,13 +135,14 @@ namespace core {
         std::unordered_map<std::string, std::size_t> _nameToNodeIndex;
         util::callback<void(WorldInterface::Object &)> _loadingCompletion;
         int _loading = 0;
+        float _animScale = 1.0f;
         CollisionNode *_collisionNode = nullptr;
     };
 }
 
 namespace core {
-    void ObjectNode::play(const char *animName, bool looped, const std::weak_ptr<ObjectImpl> &objweak, util::callback<void(WorldInterface::Object &)> &&completion) {
-        completion(*objweak.lock());
+    void ObjectNode::play(const char *animName, bool looped, ObjectImpl &obj, util::callback<void(WorldInterface::Object &)> &&completion) {
+        completion(obj);
     }
 }
 
@@ -167,7 +178,7 @@ namespace core {
             _animComplete = {};
             _animTimeSec = 0.0f;
         }
-        void play(const char *animName, bool looped, const std::weak_ptr<ObjectImpl> &objweak, util::callback<void(WorldInterface::Object &)> &&completion) override {
+        void play(const char *animName, bool looped, ObjectImpl &obj, util::callback<void(WorldInterface::Object &)> &&completion) override {
             _animTimeSec = 0.0f;
             const auto index = _animations.find(animName);
             if (index != _animations.end()) {
@@ -177,10 +188,10 @@ namespace core {
             }
             else {
                 _currentAnimation = nullptr;
-                completion(*objweak.lock());
+                completion(obj);
             }
         }
-        void update(float dtSec) override {
+        void update(ObjectImpl &obj, float dtSec) override {
             if (_mesh) {
                 _mesh->setTransform(worldTransform);
 
@@ -196,7 +207,7 @@ namespace core {
                     else {
                         _animComplete.callAndReset(*_objweak.lock());
                     }
-                    _animTimeSec += dtSec;
+                    _animTimeSec += dtSec * obj.getAnimScale();
                 }
             }
         }
@@ -241,7 +252,7 @@ namespace core {
         void unloadResources() override {
             particles = nullptr;
         }
-        void update(float dtSec) override {
+        void update(ObjectImpl &obj, float dtSec) override {
             if (particles) {
                 particles->setTransform(worldTransform);
                 particles->setTime(t, 0.0f);
@@ -272,7 +283,7 @@ namespace core {
         void unloadResources() override {
             shape = nullptr;
         }
-        void update(float dtSec) override {
+        void update(ObjectImpl &obj, float dtSec) override {
             if (shape) {
                 shape->setTransform(worldTransform);
             }
@@ -294,6 +305,7 @@ namespace core {
                         body = world->getSimulation().addBody(desc);
                         body->setTransform(worldTransform);
                     }
+                    object->setCollisionNode(this);
                     object->nodeLoadingComplete();
                 }
             });
@@ -301,7 +313,7 @@ namespace core {
         void unloadResources() override {
             body = nullptr;
         }
-        void update(float dtSec) override {
+        void update(ObjectImpl &obj, float dtSec) override {
             if (body) {
                 worldTransform = body->getTransform();
             }
@@ -313,6 +325,7 @@ namespace core {
 namespace core {
     ObjectImpl::ObjectImpl(std::shared_ptr<WorldImpl> &&owner,  std::uint64_t id, const util::Description &objDesc, std::size_t mask) : _id(id), _typeMask(mask), _owner(std::move(owner)) {
         const std::map<std::string, const util::Description *> descs = objDesc.getDescriptions();
+        CollisionNode *collision = nullptr;
         
         for (const auto &nodeDesc : descs) {
             if (const std::int64_t *type = nodeDesc.second->getInteger("type")) {
@@ -334,8 +347,8 @@ namespace core {
                         _nodes.back()->worldTransform = _nodes.back()->localTransform;
                     }
                     if (*type == std::int64_t(WorldInterface::NodeType::COLLISION)) {
-                        if (_collisionNode == nullptr) {
-                            _collisionNode = static_cast<CollisionNode *>(_nodes.back().get());
+                        if (collision == nullptr) {
+                            collision = static_cast<CollisionNode *>(_nodes.back().get());
                         }
                         else {
                             owner->getPlatform().logError("[ObjectImpl::ObjectImpl] There can be only one collision node at the root");
@@ -351,14 +364,14 @@ namespace core {
     }
     void ObjectImpl::setPosition(const math::vector3f &pos) {
         _nodes[0]->worldTransform.rv3 = pos.atv4start(1.0f).block;
-        if (_collisionNode && _collisionNode->body) {
+        if (_collisionNode) {
             _collisionNode->body->setTransform(_nodes[0]->worldTransform);
             _collisionNode->body->setVelocity({0, 0, 0});
         }
     }
     void ObjectImpl::setTransform(const math::transform3f &trfm) {
         _nodes[0]->worldTransform = trfm;
-        if (_collisionNode && _collisionNode->body) {
+        if (_collisionNode) {
             _collisionNode->body->setTransform(_nodes[0]->worldTransform);
             _collisionNode->body->setVelocity({0, 0, 0});
         }
@@ -379,9 +392,26 @@ namespace core {
         return math::vector3f(_nodes[0]->worldTransform.m41, _nodes[0]->worldTransform.m42, _nodes[0]->worldTransform.m43);
     }
     void ObjectImpl::setVelocity(const math::vector3f &v) {
-        if (_collisionNode && _collisionNode->body) {
+        if (_collisionNode) {
             _collisionNode->body->setVelocity(v);
         }
+    }
+    const math::vector3f ObjectImpl::getVelocity() const {
+        if (_collisionNode) {
+            return _collisionNode->body->getVelocity();
+        }
+
+        return {};
+    }
+    void ObjectImpl::setAnimationScale(float scale) {
+        _animScale = scale;
+    }
+    float ObjectImpl::getCollisionRadius() const {
+        if (_collisionNode) {
+            return _collisionNode->body->getRadius();
+        }
+
+        return 0.0f;
     }
     void ObjectImpl::play(const char *name, bool looped, util::callback<void(WorldInterface::Object &)> &&completion) {
         const std::string src = name;
@@ -390,13 +420,13 @@ namespace core {
         const std::string animName = colonPos != std::string::npos ? src.substr(colonPos + 1, std::string::npos) : std::string();
         const auto index = _nameToNodeIndex.find(nodeName);
         if (index != _nameToNodeIndex.end()) {
-            _nodes[index->second]->play(animName.data(), looped, weak_from_this(), std::move(completion));
+            _nodes[index->second]->play(animName.data(), looped, *this, std::move(completion));
         }
     }
     void ObjectImpl::update(float dtSec) {
         for (std::unique_ptr<ObjectNode> &node : _nodes) {
             node->worldTransform = node->parent ? node->localTransform * node->parent->worldTransform : node->worldTransform;
-            node->update(dtSec);
+            node->update(*this, dtSec);
         }
     }
 }

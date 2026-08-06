@@ -432,3 +432,33 @@ namespace util {
     }
 }
 
+namespace util {
+    RandomSource::RandomSource(std::uint64_t seed, std::uint64_t seq) {
+        _state = 0U;
+        _inc = (seq << 1u) | 1u;
+        getNextRandom();
+        _state += seed;
+        getNextRandom();
+    }
+    std::uint32_t RandomSource::getNextRandom() {
+        uint64_t oldstate = _state;
+        _state = oldstate * 6364136223846793005ULL + (_inc | 1);
+        uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
+        uint32_t rot = oldstate >> 59u;
+        return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+    }
+    float RandomSource::getNextRandomF() {
+        return std::int32_t(getNextRandom()) * 4.6566129e-10f;
+    }
+
+    GaussRandomSource::GaussRandomSource(std::uint64_t seed, std::uint64_t seq) : _rnd(seed, seq) {}
+    float GaussRandomSource::getNextRandomF() {
+        const float u1 = _rnd.getNextRandomF();
+        const float u2 = _rnd.getNextRandomF();
+        float r = std::sqrtf(-2.0f * std::logf(u1));
+        float theta = 2.0f * M_PI * u2;
+        return r * std::cosf(theta);
+    }
+
+}
+

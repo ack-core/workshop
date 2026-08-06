@@ -13,7 +13,7 @@ namespace resource {
         {"meshes/knight_red", { 15, 278, 1835626081 }},
         {"meshes/b-bows-0", { 12, 58, 1835626081 }},
         {"meshes/3x3x3", { 3, 1, 256 }},
-        {"meshes/knight_blue", { 15, 247, 1835626081 }},
+        {"meshes/knight_blue", { 15, 278, 1835626081 }},
         {"meshes/b-blacksmith-0", { 12, 58, 1835626081 }},
         {"meshes/castle-01-base", { 80, 1, 256 }},
         {"meshes/castle-00-base", { 64, 1, 256 }},
