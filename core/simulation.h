@@ -18,6 +18,8 @@ namespace core {
         
     public:
         struct Body {
+            virtual void setEnabled(bool enabled) = 0;
+            virtual void setMovable(bool movable) = 0;
             virtual auto getRadius() const -> float = 0;
             virtual auto getTransform() const -> const math::transform3f = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;

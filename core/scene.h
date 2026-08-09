@@ -37,6 +37,7 @@ namespace core {
         
     public:
         struct Arrows {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setArrow(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
@@ -44,6 +45,7 @@ namespace core {
             virtual ~Arrows() = default;
         };
         struct LineSet {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
@@ -51,6 +53,7 @@ namespace core {
             virtual ~LineSet() = default;
         };
         struct BoundingSphere {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setRadius(float radius) = 0;
@@ -58,6 +61,7 @@ namespace core {
             virtual ~BoundingSphere() = default;
         };
         struct BoundingBox {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setBBox(const math::bound3f &bbox) = 0;
@@ -68,6 +72,7 @@ namespace core {
             virtual void resetOffset() = 0;
             virtual auto getCenterOffset() const -> math::vector3f = 0;
             virtual void setCenterOffset(const math::vector3f& offset) = 0;
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setFrame(std::uint32_t index) = 0;
@@ -76,22 +81,26 @@ namespace core {
             virtual ~VoxelMesh() = default;
         };
         struct GroundMesh {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual ~GroundMesh() = default;
         };
         struct CustomMesh {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTextures(const std::initializer_list<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
             virtual void updateMeshData(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
             virtual void updateShaderConstants(const void *constants) = 0;
             virtual ~CustomMesh() = default;
         };
         struct Particles {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setTime(float totalTimeSec, float fadingTimeSec) = 0;
             virtual ~Particles() = default;
         };
         struct LightSource {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setPosition(const math::vector3f &position) = 0;
             virtual ~LightSource() = default;
         };
@@ -114,7 +123,7 @@ namespace core {
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr = 0;
         virtual auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
-        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0; // TODO: description should not be here
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;
         virtual auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr = 0;
         virtual auto addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer = false) -> CustomMeshPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;

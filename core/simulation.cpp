@@ -5,8 +5,11 @@
 namespace core {
     class CollisionBodyBase : public SimulationInterface::Body {
     public:
+        bool enabled = true;
+        bool movable = false;
+        
+    public:
         ~CollisionBodyBase() override {}
-        virtual void update(float dtSec) = 0;
     };
 }
 
@@ -19,11 +22,18 @@ namespace core {
 
     public:
         CircleXZImpl(const core::SceneInterfacePtr &scene, float m, float r) : invMass(m >= 1.0f ? 1.0f / m : 0.0f), radius(r), transform(math::transform3f::identity()) {
+            movable = true;
             _visual = scene->addLineSet();
             SceneInterface::fillLineSetAsCircle(_visual, 24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         ~CircleXZImpl() override {}
         
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
+        void setMovable(bool value) override {
+            movable = value;
+        }
         float getRadius() const override {
             return radius;
         }
@@ -40,7 +50,7 @@ namespace core {
         void setVelocity(const math::vector3f &v) override {
             _prevpos = transform.v3.xyz - math::vector3f(v.x, 0.0f, v.z);
         }
-        void update(float dtSec) override {
+        void update(float dtSec) {
             const math::vector3f v = math::vector3f(transform.v3.x - _prevpos.x, 0.0f, transform.v3.z - _prevpos.z);
             _prevpos = transform.v3.xyz;
             transform.v3.xyz = transform.v3.xyz + v * (dtSec / _prevDt);
@@ -67,10 +77,12 @@ namespace core {
             _visual = scene->addLineSet();
             SceneInterface::fillLineSetAsСlosedСircuit(_visual, _src, {0.0f, 1.0f, 1.0f, 0.7f});
         }
-        ~ObstaclePolygonXZImpl() override {
-            
-        }
+        ~ObstaclePolygonXZImpl() override {}
         
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
+        void setMovable(bool value) override {}
         float getRadius() const override {
             return 0.0f;
         }
@@ -91,7 +103,6 @@ namespace core {
             return {};
         }
         void setVelocity(const math::vector3f &v) override {}
-        void update(float dtSec) override {}
 
     private:
         math::transform3f _transform;
@@ -123,8 +134,12 @@ namespace core {
     }
     void resolveCollisionCircleCircleXZ(const CollisionInfo &info, CircleXZImpl &a, CircleXZImpl &b) {
         const float invMassSumm = a.invMass + b.invMass;
-        a.transform.v3.xyz = a.transform.v3.xyz - info.normal * info.penetration * (a.invMass / invMassSumm);
-        b.transform.v3.xyz = b.transform.v3.xyz + info.normal * info.penetration * (b.invMass / invMassSumm);
+        if (a.movable) {
+            a.transform.v3.xyz = a.transform.v3.xyz - info.normal * info.penetration * (a.invMass / invMassSumm);
+        }
+        if (b.movable) {
+            b.transform.v3.xyz = b.transform.v3.xyz + info.normal * info.penetration * (b.invMass / invMassSumm);
+        }
     }
 
     bool checkCollisionCircleObstacleXZ(const CircleXZImpl &obj, const ObstaclePolygonXZImpl &obstacle, CollisionInfo &info) {
@@ -153,9 +168,10 @@ namespace core {
         if (minDistSq < std::numeric_limits<float>::max()) {
             const float distance = std::sqrtf(minDistSq);
             if (isInside || distance < obj.radius) {
+                const float sign = isInside ? -1.0f : 1.0f;
                 info.penetration = isInside ? distance + obj.radius : obj.radius - distance;
-                info.normal.x = (objpos.x - closestPoint.x) / distance;
-                info.normal.z = (objpos.z - closestPoint.z) / distance;
+                info.normal.x = sign * (objpos.x - closestPoint.x) / distance;
+                info.normal.z = sign * (objpos.z - closestPoint.z) / distance;
                 return true;
             }
         }
@@ -198,19 +214,25 @@ namespace core {
             util::cleanupUnused(_obstaclesXZ);
             
             for (auto &obj : _circlesXZ) {
-                obj->update(dtSec);
+                if (obj->enabled && obj->movable) {
+                    obj->update(dtSec);
+                }
             }
             
             CollisionInfo info;
             for (std::size_t i = 0; i < _circlesXZ.size(); i++) {
                 for (std::size_t c = i + 1; c < _circlesXZ.size(); c++) {
-                    if (checkCollisionCircleCircleXZ(*_circlesXZ[i], *_circlesXZ[c], info)) {
-                        resolveCollisionCircleCircleXZ(info, *_circlesXZ[i], *_circlesXZ[c]);
+                    if (_circlesXZ[c]->enabled) {
+                        if (checkCollisionCircleCircleXZ(*_circlesXZ[i], *_circlesXZ[c], info)) {
+                            resolveCollisionCircleCircleXZ(info, *_circlesXZ[i], *_circlesXZ[c]);
+                        }
                     }
                 }
                 for (std::size_t c = 0; c < _obstaclesXZ.size(); c++) {
-                    if (checkCollisionCircleObstacleXZ(*_circlesXZ[i], *_obstaclesXZ[c], info)) {
-                        resolveCollisionCircleObstacleXZ(info, *_circlesXZ[i], *_obstaclesXZ[c]);
+                    if (_obstaclesXZ[c]->enabled) {
+                        if (checkCollisionCircleObstacleXZ(*_circlesXZ[i], *_obstaclesXZ[c], info)) {
+                            resolveCollisionCircleObstacleXZ(info, *_circlesXZ[i], *_obstaclesXZ[c]);
+                        }
                     }
                 }
             }

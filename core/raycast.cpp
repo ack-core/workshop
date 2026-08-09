@@ -23,6 +23,7 @@ namespace core {
     public:
         const std::uint64_t uniqueId;
         const std::uint64_t mask;
+        bool enabled = true;
         
     public:
         BaseShapeImpl(std::uint64_t id, std::uint64_t m) : uniqueId(id), mask(m) {}
@@ -52,6 +53,9 @@ namespace core {
         }
         ~SphereShapeImpl() override {
             
+        }
+        void setEnabled(bool value) override {
+            enabled = value;
         }
         void setTransform(const math::transform3f &trfm) override {
             for (auto &sphere : _spheres) {
@@ -118,6 +122,9 @@ namespace core {
         }
         ~BoxShapeImpl() override {
             
+        }
+        void setEnabled(bool value) override {
+            enabled = value;
         }
         void setTransform(const math::transform3f &trfm) override {
             for (auto &box : _boxes) {
@@ -243,7 +250,7 @@ namespace core {
             RaycastResult result;
             IntersectIntermediateInfo intermediate;
             for (auto &shape : _shapes) {
-                if (shape->mask & mask) {
+                if (shape->enabled && (shape->mask & mask)) {
                     shape->preCast(start, dir, length, intermediate);
                 }
             }

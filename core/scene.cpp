@@ -43,12 +43,16 @@ namespace core {
             math::vector4f positions[2];
         }
         shaderConstants;
+        bool enabled = true;
         
     public:
         void setPosition(const math::vector3f &pos) override {
             shaderConstants.transform.m41 = pos.x;
             shaderConstants.transform.m42 = pos.y;
             shaderConstants.transform.m43 = pos.z;
+        }
+        void setEnabled(bool value) override {
+            enabled = value;
         }
         void setTransform(const math::transform3f &trfm) override {
             shaderConstants.transform = trfm;
@@ -90,12 +94,16 @@ namespace core {
         };
         math::transform3f transform = math::transform3f::identity();
         std::vector<Bucket> buckets;
+        bool enabled = true;
         
     public:
         void setPosition(const math::vector3f &pos) override {
             transform.m41 = pos.x;
             transform.m42 = pos.y;
             transform.m43 = pos.z;
+        }
+        void setEnabled(bool value) override {
+            enabled = value;
         }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
@@ -129,8 +137,12 @@ namespace core {
             math::color color;
         }
         bsphereData;
+        bool enabled = true;
 
     public:
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
         void setTransform(const math::transform3f &trfm) override {
             bsphereData.transform = trfm;
         }
@@ -166,8 +178,12 @@ namespace core {
             math::vector4f max;
         }
         bboxData;
+        bool enabled = true;
         
     public:
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
         void setTransform(const math::transform3f &trfm) override {
             bboxData.transform = trfm;
         }
@@ -197,6 +213,7 @@ namespace core {
     
     class VoxelMeshImpl : public SceneInterface::VoxelMesh {
     public:
+        bool enabled = true;
         std::unique_ptr<foundation::RenderDataPtr[]> frames;
         std::uint32_t frameIndex = 0;
         std::uint32_t frameCount = 0;
@@ -241,6 +258,9 @@ namespace core {
             transform.m42 = pos.y;
             transform.m43 = pos.z;
         }
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
         }
@@ -266,11 +286,15 @@ namespace core {
     
     class GroundMeshImpl : public SceneInterface::GroundMesh {
     public:
+        bool enabled = true;
         foundation::RenderDataPtr data;
         foundation::RenderTexturePtr texture;
         math::transform3f transform = math::transform3f::identity();
         
     public:
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
         }
@@ -293,9 +317,13 @@ namespace core {
         std::vector<std::uint8_t> vdata;
         std::vector<std::uint32_t> idata;
         std::uint32_t vcount = 0;
+        bool enabled = true;
         bool drawIntoGBuffer = false;
         
     public:
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
         void setTextures(const std::initializer_list<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> &textures) override {
             textureList.assign(textures.begin(), textures.end());
         }
@@ -328,6 +356,9 @@ namespace core {
         LightSourceImpl() {}
         ~LightSourceImpl() override {}
         
+        void setEnabled(bool value) override {
+            
+        }
         void setPosition(const math::vector3f &position) override {
 
         }
@@ -341,6 +372,7 @@ namespace core {
         static constexpr float TYPE_MASK_ALL = 3.0f;
 
     public:
+        bool enabled = true;
         bool additiveBlend;
         std::uint32_t particleCount;
         foundation::RenderTexturePtr texture;
@@ -388,6 +420,9 @@ namespace core {
         void *getUpdatedConstants(const math::vector3f &camDir, const math::vector3f &camRight) {
             _updateOrientation(*this, camDir, camRight);
             return &_constants;
+        }
+        void setEnabled(bool value) override {
+            enabled = value;
         }
         void setTransform(const math::transform3f &trfm) override {
             _constants.transform = trfm;
@@ -834,10 +869,8 @@ namespace core {
 
         math::transform3f mm = math::transform3f::identity().translated(shift);
         math::transform3f viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up) * mm;
-        //_camera.position = position;
+
         _camera.position = position - _camera.right * shift.x - _camera.up * shift.y + _camera.forward * shift.z;
-        //viewMatrix = viewMatrix * mm;
-        
         _camera.plmVPMatrix = viewMatrix * math::transform3f::platformPerspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
         _camera.stdVPMatrix = viewMatrix * math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
         _camera.invVPMatrix = _camera.stdVPMatrix.inverted();
@@ -955,18 +988,22 @@ namespace core {
         _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_groundMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &groundMesh : _groundMeshes) {
-                rendering.applyShaderConstants(&groundMesh->transform);
-                rendering.applyTextures({
-                    {groundMesh->texture, foundation::SamplerType::NEAREST}
-                });
-                rendering.draw(groundMesh->data);
+                if (groundMesh->enabled) {
+                    rendering.applyShaderConstants(&groundMesh->transform);
+                    rendering.applyTextures({
+                        {groundMesh->texture, foundation::SamplerType::NEAREST}
+                    });
+                    rendering.draw(groundMesh->data);
+                }
             }
             
             rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &voxelMesh : _voxelMeshes) {
-                const math::transform3f transform = voxelMesh->getFinalTransform();
-                rendering.applyShaderConstants(&transform);
-                rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
+                if (voxelMesh->enabled) {
+                    const math::transform3f transform = voxelMesh->getFinalTransform();
+                    rendering.applyShaderConstants(&transform);
+                    rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
+                }
             }
         });
         _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
@@ -980,7 +1017,7 @@ namespace core {
         });
         _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
             for (const auto &customMesh : _customMeshes) {
-                if (customMesh->vcount && customMesh->drawIntoGBuffer == false) {
+                if (customMesh->enabled && customMesh->vcount && customMesh->drawIntoGBuffer == false) {
                     rendering.applyShader(customMesh->shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_AND_WRITE);
                     if (customMesh->shaderConst.size()) {
                         rendering.applyShaderConstants(customMesh->shaderConst.data());
@@ -992,39 +1029,49 @@ namespace core {
 
             rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &emitter : _particleEmitters) {
-                rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));
-                rendering.applyTextures({
-                    {emitter->map, foundation::SamplerType::NEAREST},
-                    {emitter->texture, foundation::SamplerType::NEAREST}
-                });
-                rendering.draw(emitter->particleCount);
+                if (emitter->enabled) {
+                    rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));
+                    rendering.applyTextures({
+                        {emitter->map, foundation::SamplerType::NEAREST},
+                        {emitter->texture, foundation::SamplerType::NEAREST}
+                    });
+                    rendering.draw(emitter->particleCount);
+                }
             }
             if (_lineDrawingEnabled) {
                 rendering.applyShader(_arrowShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
                 for (const auto &set : _arrows) {
-                    for (const auto &arrow : set->arrows) {
-                        set->fillShaderConstants(arrow);
-                        rendering.applyShaderConstants(&set->shaderConstants);
-                        rendering.draw(34);
+                    if (set->enabled) {
+                        for (const auto &arrow : set->arrows) {
+                            set->fillShaderConstants(arrow);
+                            rendering.applyShaderConstants(&set->shaderConstants);
+                            rendering.draw(34);
+                        }
                     }
                 }
                 rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
                 for (const auto &set : _lineSets) {
-                    for (auto &bucket : set->buckets) {
-                        bucket.transform = set->transform;
-                        rendering.applyShaderConstants(&bucket);
-                        rendering.draw(48);
+                    if (set->enabled) {
+                        for (auto &bucket : set->buckets) {
+                            bucket.transform = set->transform;
+                            rendering.applyShaderConstants(&bucket);
+                            rendering.draw(48);
+                        }
                     }
                 }
                 rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
                 for (const auto &bbox : _boundingBoxes) {
-                    rendering.applyShaderConstants(&bbox->bboxData);
-                    rendering.draw();
+                    if (bbox->enabled) {
+                        rendering.applyShaderConstants(&bbox->bboxData);
+                        rendering.draw();
+                    }
                 }
                 rendering.applyShader(_boundingSphereShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
                 for (const auto &bsphere : _boundingSpheres) {
-                    rendering.applyShaderConstants(&bsphere->bsphereData);
-                    rendering.draw(3);
+                    if (bsphere->enabled) {
+                        rendering.applyShaderConstants(&bsphere->bsphereData);
+                        rendering.draw(3);
+                    }
                 }
             }
         });

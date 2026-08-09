@@ -58,8 +58,12 @@ namespace core {
         virtual ~ObjectNode() = default;
         virtual void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) = 0;
         virtual void unloadResources() = 0;
+        virtual void setEnabled(bool enabled) = 0;
         virtual void play(const char *animName, bool looped, ObjectImpl &obj, util::callback<void(WorldInterface::Object &)> &&completion);
         virtual void update(ObjectImpl &obj, float dtSec) = 0;
+
+    protected:
+        bool _enabled = true;
     };
 
     std::unique_ptr<ObjectNode> (*g_nodeConstructors[int(WorldInterface::NodeType::_count)])() = {};
@@ -74,7 +78,7 @@ namespace core {
     public:
         ObjectImpl(std::shared_ptr<WorldImpl> &&owner,  std::uint64_t id, const util::Description &objDesc, std::size_t mask);
         ~ObjectImpl() override {
-            
+            unloadResources();
         }
         
         std::uint64_t getId() const override {
@@ -112,6 +116,7 @@ namespace core {
             _collisionNode = ptr;
         }
         
+        void setEnabled(const char *nodeName, bool enabled) override;
         void setPosition(const math::vector3f &pos) override;
         void setTransform(const math::transform3f &trfm) override;
         void setLocalTransform(const char *nodeName, const math::transform3f &trfm) override;
@@ -122,6 +127,7 @@ namespace core {
         void setVelocity(const math::vector3f &v) override;
         auto getVelocity() const -> const math::vector3f override;
         void setAnimationScale(float scale) override;
+        void setImmovable(bool immovable) override;
         auto getCollisionRadius() const -> float override;
         
         void play(const char *name, bool looped, util::callback<void(WorldInterface::Object &)> &&completion) override;
@@ -178,6 +184,10 @@ namespace core {
             _animComplete = {};
             _animTimeSec = 0.0f;
         }
+        void setEnabled(bool enabled) override {
+            _enabled = enabled;
+            _mesh->setEnabled(enabled);
+        }
         void play(const char *animName, bool looped, ObjectImpl &obj, util::callback<void(WorldInterface::Object &)> &&completion) override {
             _animTimeSec = 0.0f;
             const auto index = _animations.find(animName);
@@ -192,7 +202,7 @@ namespace core {
             }
         }
         void update(ObjectImpl &obj, float dtSec) override {
-            if (_mesh) {
+            if (_enabled && _mesh) {
                 _mesh->setTransform(worldTransform);
 
                 if (_currentAnimation) {
@@ -229,10 +239,8 @@ namespace core {
 }
 
 namespace core {
-    struct ParticlesNode : public ObjectNode {
-        float t = 0;
-        core::SceneInterface::ParticlesPtr particles;
-
+    class ParticlesNode : public ObjectNode {
+    public:
         ParticlesNode(WorldInterface::NodeType type) : ObjectNode(type) {}
         
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
@@ -241,8 +249,8 @@ namespace core {
                 if (auto object = objweak.lock()) {
                     if (m && desc.empty() == false) {
                         const core::ParticlesParams parameters (desc);
-                        particles = world->getScene().addParticles(t, m, parameters);
-                        particles->setTransform(worldTransform);
+                        _particles = world->getScene().addParticles(t, m, parameters);
+                        _particles->setTransform(worldTransform);
                     }
                     object->nodeLoadingComplete();
                 }
@@ -250,22 +258,29 @@ namespace core {
 
         }
         void unloadResources() override {
-            particles = nullptr;
+            _particles = nullptr;
+        }
+        void setEnabled(bool enabled) override {
+            _enabled = enabled;
+            _particles->setEnabled(enabled);
         }
         void update(ObjectImpl &obj, float dtSec) override {
-            if (particles) {
-                particles->setTransform(worldTransform);
-                particles->setTime(t, 0.0f);
-                t += dtSec;
+            if (_enabled && _particles) {
+                _particles->setTransform(worldTransform);
+                _particles->setTime(_t, 0.0f);
+                _t += dtSec;
             }
         }
+        
+    private:
+        float _t = 0;
+        core::SceneInterface::ParticlesPtr _particles;
     };
 }
  
 namespace core {
-    struct RaycastNode : public ObjectNode {
-        core::RaycastInterface::ShapePtr shape;
-        
+    class RaycastNode : public ObjectNode {
+    public:
         RaycastNode(WorldInterface::NodeType type) : ObjectNode(type) {}
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
@@ -273,28 +288,37 @@ namespace core {
             res.getOrLoadDescription(resourcePath.c_str(), [world, this, objweak](const util::Description &desc) {
                 if (auto object = objweak.lock()) {
                     if (desc.empty() == false) {
-                        shape = world->getRaycast().addShape(desc, object->getId(), object->getTypeMask());
-                        shape->setTransform(worldTransform);
+                        _shape = world->getRaycast().addShape(desc, object->getId(), object->getTypeMask());
+                        _shape->setTransform(worldTransform);
                     }
                     object->nodeLoadingComplete();
                 }
             });
         }
         void unloadResources() override {
-            shape = nullptr;
+            _shape = nullptr;
+        }
+        void setEnabled(bool enabled) override {
+            _enabled = enabled;
+            _shape->setEnabled(enabled);
         }
         void update(ObjectImpl &obj, float dtSec) override {
-            if (shape) {
-                shape->setTransform(worldTransform);
+            if (_enabled && _shape) {
+                _shape->setTransform(worldTransform);
             }
         }
+        
+    private:
+        core::RaycastInterface::ShapePtr _shape;
     };
 }
 
 namespace core {
-    struct CollisionNode : public ObjectNode {
+    class CollisionNode : public ObjectNode {
+    public:
         core::SimulationInterface::BodyPtr body;
         
+    public:
         CollisionNode(WorldInterface::NodeType type) : ObjectNode(type) {}
 
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
@@ -313,8 +337,12 @@ namespace core {
         void unloadResources() override {
             body = nullptr;
         }
+        void setEnabled(bool enabled) override {
+            _enabled = enabled;
+            body->setEnabled(enabled);
+        }
         void update(ObjectImpl &obj, float dtSec) override {
-            if (body) {
+            if (_enabled && body) {
                 worldTransform = body->getTransform();
             }
         }
@@ -362,6 +390,12 @@ namespace core {
             }
         }
     }
+    void ObjectImpl::setEnabled(const char *nodeName, bool enabled) {
+        const auto index = _nameToNodeIndex.find(nodeName);
+        if (index != _nameToNodeIndex.end()) {
+            _nodes[index->second]->setEnabled(enabled);
+        }
+    }
     void ObjectImpl::setPosition(const math::vector3f &pos) {
         _nodes[0]->worldTransform.rv3 = pos.atv4start(1.0f).block;
         if (_collisionNode) {
@@ -405,6 +439,11 @@ namespace core {
     }
     void ObjectImpl::setAnimationScale(float scale) {
         _animScale = scale;
+    }
+    void ObjectImpl::setImmovable(bool immovable) {
+        if (_collisionNode) {
+            _collisionNode->body->setMovable(!immovable);
+        }
     }
     float ObjectImpl::getCollisionRadius() const {
         if (_collisionNode) {

@@ -27,6 +27,7 @@ namespace core {
 
     public:
         struct Shape {
+            virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual ~Shape() = default;
         };

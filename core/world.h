@@ -52,7 +52,8 @@ namespace core {
             virtual bool isLoaded() const = 0;
             
             virtual void loadResources(util::callback<void(core::WorldInterface::Object &)> &&completion) = 0;
-            virtual void unloadResources() = 0;
+            virtual void unloadResources() = 0;            
+            virtual void setEnabled(const char *nodeName, bool enabled) = 0;
             
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
@@ -64,6 +65,7 @@ namespace core {
             virtual void setVelocity(const math::vector3f &v) = 0;
             virtual auto getVelocity() const -> const math::vector3f = 0;
             virtual void setAnimationScale(float scale) = 0;
+            virtual void setImmovable(bool immovable) = 0;
             virtual auto getCollisionRadius() const -> float = 0;
             
             // Play animation
