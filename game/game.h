@@ -84,7 +84,7 @@ namespace game {
             &makeContext<CommonUIContext>,
             &makeContext<CastleContext, GameDataInterface>,
             &makeContext<BattleContext, GameDataInterface>,
-            &makeContext<BattleUIContext, CastleInterface, BattleInterface>,
+            &makeContext<BattleUIContext, GameDataInterface, BattleInterface>,
         }}
 
 #endif

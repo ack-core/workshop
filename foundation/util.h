@@ -125,16 +125,12 @@ namespace util {
             for (auto &item : _subscriptions) {
                 item.clean(item.target);
             }
-            //_data.clean(_data.target);
         }
         
-        void operator ()(Args... args) const {
+        void notify(Args... args) const {
             for (auto &item : _subscriptions) {
                 item.call(item.target, std::forward<Args>(args)...);
             }
-//            if (_data.call) {
-//                _data.call(_data.target, );
-//            }
         }
                 
     private:

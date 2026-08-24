@@ -20,7 +20,6 @@ elseif (${PLATFORM} STREQUAL "PLATFORM_WASM")
 
 else()
 	message(FATAL_ERROR "Unsupported platform")
-
 endif()
 
 add_definitions(-D${PLATFORM})
@@ -101,37 +100,67 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 	file(COPY "${m_resources_root}/meshes" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/emitters" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/grounds" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
+	file(COPY "${m_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
+	file(COPY "${m_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
+
 	file(COPY "${m_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
-	file(COPY "${m_resources_root}/base" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.*" PATTERN "*")
 	file(COPY "${m_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
+
+	file(COPY "${m_game_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
+	file(COPY "${m_game_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
+	file(COPY "${m_game_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
+	file(COPY "${m_game_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
+	
+	if (EXISTS ${m_game_resources_root}/base)
+		file(COPY "${m_game_resources_root}/base" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.*" PATTERN "*")
+	endif()
 
 	message(STATUS "Generating palette...")
 	execute_process(
-		COMMAND python ${m_tools_root}/palette.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/core/palette.h
+		COMMAND python ${m_tools_root}/palette2code.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/core/palette.h
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
+
 	message(STATUS "Generating prefabs...")
 	execute_process(
-		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin
+		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -g ${m_game_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
+
 	message(STATUS "Generating grounds...")
 	execute_process(
 		COMMAND python ${m_tools_root}/gen_grounds.py -s ${m_resources_root}/grounds -d ${m_binary_root}/data/grounds -p ${m_resources_root}/palette.png
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
+	if (EXISTS ${m_game_resources_root}/grounds)
+		execute_process(
+			COMMAND python ${m_tools_root}/gen_grounds.py -s ${m_game_resources_root}/grounds -d ${m_binary_root}/data/grounds -p ${m_resources_root}/palette.png
+			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+		)
+	endif()	
+
 	message(STATUS "Generating optimized meshes...")
 	execute_process(
-		COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1
-		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+		COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
+	if (EXISTS ${m_game_resources_root}/grounds)
+		execute_process(
+			COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_game_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+		)
+	endif()	
+
 	message(STATUS "Generating emitters...")
 	execute_process(
-		COMMAND python ${m_tools_root}/gen_emitters.py -s ${m_resources_root}/emitters -d ${m_binary_root}/data/emitters
-		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+		COMMAND python ${m_tools_root}/gen_emitters.py -s ${m_resources_root}/emitters -d ${m_binary_root}/data/emitters WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
+	if (EXISTS ${m_game_resources_root}/grounds)
+		execute_process(
+			COMMAND python ${m_tools_root}/gen_emitters.py -s ${m_game_resources_root}/emitters -d ${m_binary_root}/data/emitters WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+		)
+	endif()	
+
 	message(STATUS "Generating resource lists...")
 	execute_process(
 		COMMAND python ${m_tools_root}/resource_list.py -r ${m_binary_root}/data -d ${PROJECT_SOURCE_DIR}/providers

@@ -3,34 +3,16 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
-        {"meshes/stool", { 5, 1, 256 }},
-        {"meshes/castle-00", { 64, 60, 1835626081 }},
-        {"meshes/castle-01", { 80, 60, 1835626081 }},
-        {"meshes/knight", { 15, 152, 1835626081 }},
-        {"meshes/paltest", { 14, 1, 256 }},
+        {"meshes/a-knight-blue", { 15, 187, 1835626081 }},
+        {"meshes/a-knight-red", { 15, 187, 1835626081 }},
+        {"meshes/castle-00", { 50, 60, 1835626081 }},
+        {"meshes/castle-01", { 62, 60, 1835626081 }},
         {"meshes/b-tavern-0", { 13, 58, 1835626081 }},
         {"meshes/ruins", { 64, 1, 256 }},
-        {"meshes/knight_red", { 15, 278, 1835626081 }},
-        {"meshes/b-bows-0", { 12, 58, 1835626081 }},
-        {"meshes/3x3x3", { 3, 1, 256 }},
-        {"meshes/knight_blue", { 15, 278, 1835626081 }},
+        {"meshes/b-bows-0", { 15, 58, 1835626081 }},
         {"meshes/b-blacksmith-0", { 12, 58, 1835626081 }},
-        {"meshes/castle-01-base", { 80, 1, 256 }},
-        {"meshes/castle-00-base", { 64, 1, 256 }},
         {"meshes/voxtest", { 3, 1, 256 }},
         {"meshes/1x1x1", { 1, 1, 256 }},
-        {"meshes/proto/16x16", { 16, 1, 256 }},
-        {"meshes/proto/5x8x5", { 5, 1, 256 }},
-        {"meshes/proto/32x32", { 32, 1, 256 }},
-        {"meshes/proto/8x8x8", { 8, 1, 256 }},
-        {"meshes/proto/64x64", { 64, 1, 256 }},
-        {"meshes/proto/17x24x17", { 17, 1, 256 }},
-        {"meshes/proto/48x48", { 48, 1, 256 }},
-        {"meshes/proto/24x24", { 24, 1, 256 }},
-        {"meshes/proto/9x16x9", { 9, 1, 256 }},
-        {"meshes/test/ruins", { 40, 1, 256 }},
-        {"meshes/test/pillon", { 8, 49, 1936090735 }},
-        {"meshes/test/tree", { 8, 1, 256 }},
     };
 }
 namespace resource {
@@ -41,22 +23,16 @@ namespace resource {
         { "textures/ui/joystick_thumb", { 77, 77, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/img9slice", { 128, 128, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/button_up", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/panel", { 358, 358, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/btn_slice_press", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_square_down", { 96, 96, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/joystick_bg_00", { 256, 256, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/joystick_st_00", { 96, 96, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/btn_circle_down", { 64, 64, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/btn_circle_up", { 64, 64, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_square_up", { 96, 96, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/btn_slice_base", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/particles/test", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
     };
 }
 namespace resource {
     const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {
-        {"grounds/grass", { 256, 1, 256 }},
-        {"grounds/small", { 1, 1, 1 }},
-        {"grounds/white", { 64, 1, 64 }},
     };
 }

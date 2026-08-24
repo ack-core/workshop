@@ -177,7 +177,8 @@ namespace resource {
         FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
         
         if (toLoad.empty()) {
-            if (_callsQueue.empty() && suitable->texture == nullptr) {
+            if (_callsQueue.empty()) {
+                // TODO: unnecessary re-creation
                 suitable->texture = _rendering->createTexture(foundation::RenderTextureFormat::R8UN, ATLAS_SIZE, ATLAS_SIZE, { suitable->txdata.get() });
                 completion(std::move(readyChars), suitable->texture);
             }

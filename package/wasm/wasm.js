@@ -166,7 +166,7 @@ const imports = {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
             
-            fetch(path).then(response => {
+            fetch(path, {cache: "no-store"}).then(response => {
                 if (response.ok) {
                     return response.arrayBuffer();
                 }
@@ -483,7 +483,7 @@ const imports = {
 
 //navigator.serviceWorker.controller != null && 
 if (glcontext != null) {
-    WebAssembly.instantiateStreaming(fetch(WASM_BINARY), imports).then(m => {
+    WebAssembly.instantiateStreaming(fetch(WASM_BINARY, {cache: "no-store"}), imports).then(m => {
         instance = m.instance;
         instance.exports.__init();
 

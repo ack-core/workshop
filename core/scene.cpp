@@ -1081,6 +1081,7 @@ namespace core {
         _lineDrawingEnabled = enabled;
     }
 
+    // TODO: move to lineset as methods
     void SceneInterface::fillLineSetAsCircle(const SceneInterface::LineSetPtr &lineSet, std::uint32_t segCount, float radius, const math::color &rgba) {
         lineSet->clear();
         for (std::uint32_t i = 0; i < segCount; i++) {
