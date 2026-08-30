@@ -1,6 +1,7 @@
 
 // TODO: dpi-scaling, sub-tree full transform
 // + scale inheritance
+// + ImageSector
 
 #pragma once
 #include "foundation/platform.h"
@@ -147,15 +148,16 @@ namespace ui {
         };
         
     public:
-        virtual auto getResourceProvider() const -> const resource::ResourceProviderPtr & = 0;        
-        virtual auto addPivot(const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
-        virtual auto addImage(const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
-        virtual auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
-        virtual auto addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
-        virtual auto addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> = 0;
+        virtual auto getResourceProvider() const -> const resource::ResourceProviderPtr & = 0;
+        virtual auto getNamedElement(const std::string &name) -> std::shared_ptr<Element> = 0;
+        virtual auto addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
+        virtual auto addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
+        virtual auto addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
+        virtual auto addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
+        virtual auto addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> = 0;
         
-        template<typename T> auto addExtensionElement(const std::shared_ptr<Element> &parent, T &&params) -> std::shared_ptr<Interactor> {
-            return T::make(*this, parent, std::move(params));
+        template<typename T> auto addExtensionElement(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, T &&params) -> std::shared_ptr<Interactor> {
+            return T::make(*this, name, parent, std::move(params));
         }
         
         virtual void clear() = 0;

@@ -21,13 +21,13 @@ namespace ui {
             const float maxThumbOffset = 50.0f;
             util::callback<void(const math::vector2f &direction)> onChange;
 
-            static auto make(StageInterface &stage, const std::shared_ptr<StageInterface::Element> &parent, JoystickParams &&params) -> std::shared_ptr<StageInterface::Interactor> {
+            static auto make(StageInterface &stage, const std::optional<std::string> &name, const std::shared_ptr<StageInterface::Element> &parent, JoystickParams &&params) -> InteractorPtr {
                 std::shared_ptr<StageInterface::Image> bg = nullptr;
                 const resource::ResourceProviderPtr res = stage.getResourceProvider();
                 float maxOffset = params.maxThumbOffset;
                 
                 if (const resource::TextureInfo *info = res->getTextureInfo(params.textureBackground)) {
-                    bg = stage.addImage(nullptr, StageInterface::ImageParams {
+                    bg = stage.addImage(name, parent, StageInterface::ImageParams {
                         .anchorTarget = params.anchorTarget,
                         .anchorH = params.anchorH,
                         .anchorV = params.anchorV,
@@ -36,11 +36,11 @@ namespace ui {
                         .activeAreaOffset = 0.5f * info->width,
                         .activeAreaRadius = 0.75f * info->width
                     });
-                    auto pivot = stage.addPivot(bg, StageInterface::PivotParams {
+                    auto pivot = stage.addPivot(std::nullopt, bg, StageInterface::PivotParams {
                         .anchorH = HorizontalAnchor::CENTER,
                         .anchorV = VerticalAnchor::MIDDLE,
                     });
-                    auto thumb = stage.addImage(pivot, StageInterface::ImageParams {
+                    auto thumb = stage.addImage(std::nullopt, pivot, StageInterface::ImageParams {
                         .anchorH = HorizontalAnchor::CENTER,
                         .anchorV = VerticalAnchor::MIDDLE,
                         .texture = params.textureThumb,
@@ -96,9 +96,9 @@ namespace ui {
             const float activeAreaRadius = 0.0f;
             util::callback<void()> onPress;
             
-            static auto make(StageInterface &stage, const std::shared_ptr<StageInterface::Element> &parent, Button9SliceParams &&params) -> std::shared_ptr<StageInterface::Interactor> {
+            static auto make(StageInterface &stage, const std::optional<std::string> &name, const std::shared_ptr<StageInterface::Element> &parent, Button9SliceParams &&params) -> InteractorPtr {
                 const resource::ResourceProviderPtr res = stage.getResourceProvider();
-                std::shared_ptr<StageInterface::Img9Slice> base = stage.addImg9Slice(nullptr, ui::StageInterface::Img9SliceParams {
+                std::shared_ptr<StageInterface::Img9Slice> base = stage.addImg9Slice(name, parent, ui::StageInterface::Img9SliceParams {
                     .anchorH = params.anchorH,
                     .anchorV = params.anchorV,
                     .anchorOffset = params.anchorOffset,

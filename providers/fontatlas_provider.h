@@ -30,11 +30,15 @@ namespace resource {
         // Returns width of text in pixels
         //
         virtual auto getTextWidth(const char *text, std::uint8_t fontSize) const -> math::vector2f = 0;
-        
+
         // Rasterize font to atlases according to @text and @size
+        //
+        virtual void prepareFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void()> &&completion) = 0;
+        
+        // Returns rasterized text with @text and @size
         // @return  - FontAtlasInfo with coordinates and textures
         //
-        virtual void getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<resource::FontCharInfo> &&, const foundation::RenderTexturePtr &)> &&completion) = 0;
+        virtual auto getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<resource::FontCharInfo> &outInfo) -> const foundation::RenderTexturePtr & = 0;
         
         // Provider tracks resources life time and tries to free them
         //

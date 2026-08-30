@@ -6,6 +6,8 @@
 #include <unordered_set>
 #include <unordered_map>
 
+// TODO: if requested with blur, precache with blur = 0 as well
+
 namespace {
     static const int ATLAS_SIZE = 512;
     static const int ATLAS_SPACE = 10;
@@ -92,7 +94,8 @@ namespace resource {
         ~FontAtlasProviderImpl() override;
         
         auto getTextWidth(const char *text, std::uint8_t fontSize) const -> math::vector2f override;
-        void getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&, const foundation::RenderTexturePtr &)> &&completion) override;
+        void prepareFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void()> &&completion) override;
+        auto getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<resource::FontCharInfo> &outInfo) -> const foundation::RenderTexturePtr & override;
         void update(float dtSec) override;
         
     private:
@@ -110,12 +113,11 @@ namespace resource {
             std::string text;
             std::uint8_t fontSize;
             std::uint8_t blur;
-            util::callback<void(std::vector<FontCharInfo> &&, const foundation::RenderTexturePtr &)> callback;
+            util::callback<void()> callback;
         };
         
         std::list<FontAtlas> _atlases;
         std::list<QueueEntry> _callsQueue;
-        std::list<QueueEntry> _postponedQueue;
         bool _asyncInProgress;
     };
     
@@ -161,7 +163,7 @@ namespace resource {
         return math::vector2f(result, float(size));
     }
     
-    void FontAtlasProviderImpl::getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void(std::vector<FontCharInfo> &&, const foundation::RenderTexturePtr &)> &&completion) {
+    void FontAtlasProviderImpl::prepareFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void()> &&completion) {
         if (_asyncInProgress) {
             _callsQueue.emplace_back(QueueEntry{
                 .text = text,
@@ -177,19 +179,7 @@ namespace resource {
         FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
         
         if (toLoad.empty()) {
-            if (_callsQueue.empty()) {
-                // TODO: unnecessary re-creation
-                suitable->texture = _rendering->createTexture(foundation::RenderTextureFormat::R8UN, ATLAS_SIZE, ATLAS_SIZE, { suitable->txdata.get() });
-                completion(std::move(readyChars), suitable->texture);
-            }
-            else {
-                _postponedQueue.emplace_back(QueueEntry{
-                    .text = text,
-                    .fontSize = fontSize,
-                    .blur = blur,
-                    .callback = std::move(completion)
-                });
-            }
+            completion();
         }
         else {
             _asyncInProgress = true;
@@ -290,13 +280,28 @@ namespace resource {
             [weak = weak_from_this(), txt = std::string(text), fontSize, blur, suitable, completion = std::move(completion)](AsyncContext &ctx) mutable {
                 if (std::shared_ptr<FontAtlasProviderImpl> self = weak.lock()) {
                     suitable->chars.merge(ctx.resultChars);
+                    suitable->texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ATLAS_SIZE, ATLAS_SIZE, { suitable->txdata.get() });
                     self->_asyncInProgress = false;
-                    self->getTextFontAtlas(txt.data(), fontSize, blur, std::move(completion));
+                    completion();
                 }
             }));
         }
-    }
 
+    }
+    
+    const foundation::RenderTexturePtr &FontAtlasProviderImpl::getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<resource::FontCharInfo> &outInfo) {
+        std::vector<FontCharInfo> readyChars;
+        std::unordered_set<std::uint64_t> toLoad;
+        FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
+        if (toLoad.empty()) {
+            outInfo = std::move(readyChars);
+            return suitable->texture;
+        }
+        else {
+            _platform->logError("[FontAtlasProviderImpl::getTextFontAtlas] Missing pre-cached entries for the text '%s'", text);
+        }
+    }
+    
     FontAtlasProviderImpl::FontAtlas *FontAtlasProviderImpl::_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::unordered_set<std::uint64_t> &toLoad) {
         FontAtlas *suitable = nullptr;
 
@@ -342,25 +347,7 @@ namespace resource {
         while (_asyncInProgress == false && _callsQueue.size()) {
             QueueEntry entry = std::move(_callsQueue.front());
             _callsQueue.pop_front();
-            getTextFontAtlas(entry.text.data(), entry.fontSize, entry.blur, std::move(entry.callback));
-        }
-        if (_callsQueue.empty()) {
-            while (_asyncInProgress == false && _postponedQueue.size()) {
-                QueueEntry &entry = _postponedQueue.front();
-
-                std::vector<FontCharInfo> readyChars;
-                std::unordered_set<std::uint64_t> toLoad;
-                FontAtlas *suitable = _collectChars(entry.text.data(), entry.fontSize, entry.blur, readyChars, toLoad);
-                
-                if (suitable && toLoad.empty()) {
-                    entry.callback(std::move(readyChars), suitable->texture);
-                }
-                else {
-                    _platform->logError("[FontAtlasProviderImpl::update] Atlas logic error");
-                }
-                
-                _postponedQueue.pop_front();
-            }
+            prepareFontAtlas(entry.text.data(), entry.fontSize, entry.blur, std::move(entry.callback));
         }
     }
 }

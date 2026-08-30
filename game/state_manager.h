@@ -15,6 +15,7 @@ namespace game {
         static std::shared_ptr<StateManager> instance(
             const foundation::PlatformInterfacePtr &platform,
             const resource::ResourceProviderPtr &resourceProvider,
+            const resource::FontAtlasProviderPtr &fontAtlasProvider,
             const core::SceneInterfacePtr &scene,
             const core::WorldInterfacePtr &world,
             const core::RaycastInterfacePtr &raycast,

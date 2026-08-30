@@ -87,7 +87,7 @@ namespace game {
             _mesh0->updateShaderConstants(&trfm);
         });
 
-        _joystick = _api.ui->addExtensionElement(nullptr, ui::extensions::JoystickParams {
+        _joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::BOTTOM,
             .anchorOffset = math::vector2f(50.0f, 50.0f),
@@ -99,13 +99,13 @@ namespace game {
             }
         });
         
-        _img0 = _api.ui->addImage(nullptr, ui::StageInterface::ImageParams {
+        _img0 = _api.ui->addImage(std::nullopt, nullptr, ui::StageInterface::ImageParams {
             .anchorH = ui::HorizontalAnchor::LEFT,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(50.0f, 50.0f),
             .texture = "textures/ui/joystick_thumb",
         });
-        _img1 = _api.ui->addImg9Slice(nullptr, ui::StageInterface::Img9SliceParams {
+        _img1 = _api.ui->addImg9Slice(std::nullopt, nullptr, ui::StageInterface::Img9SliceParams {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 250.0f),
@@ -117,7 +117,7 @@ namespace game {
             //printf("%f %f\n", x, y);
             _img0->setTexture(_txt0->getTexture());
         });
-        _txt0 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
+        _txt0 = _api.ui->addTextLine(std::nullopt, nullptr, ui::StageInterface::TextLineParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 0.0f),
@@ -127,7 +127,7 @@ namespace game {
             .shadowOffset = math::vector2f(1.0f, 1.0f),
             .shadowBlur = 1
         });
-        _txt1 = _api.ui->addTextLine(nullptr, ui::StageInterface::TextLineParams {
+        _txt1 = _api.ui->addTextLine(std::nullopt, nullptr, ui::StageInterface::TextLineParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 50.0f),
@@ -138,7 +138,7 @@ namespace game {
             .shadowBlur = 1
         });
 
-        _tb0 = _api.ui->addTextBlock(nullptr, ui::StageInterface::TextBlockParams {
+        _tb0 = _api.ui->addTextBlock(std::nullopt, nullptr, ui::StageInterface::TextBlockParams {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 0.0f),
@@ -157,7 +157,7 @@ namespace game {
 
         _tb0->setText("The glyphs in Block Elements\neach share the same character width in most supported fonts, allowing them to be used graphically in row and column arrangements. However, the block does not contain a space character of its own and ASCII space may or may not render at the same width as Block Elements glyphs, as those characters are intended to be used exclusively for monospaced fonts.");
         
-        _btn0 = _api.ui->addExtensionElement(nullptr, ui::extensions::Button9SliceParams {
+        _btn0 = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::Button9SliceParams {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::TOP,
             .anchorOffset = math::vector2f(0.0f, 350.0f),
@@ -170,7 +170,7 @@ namespace game {
                 printf("pressed!");
             }
         });
-        _txt2 = _api.ui->addTextLine(_btn0, ui::StageInterface::TextLineParams {
+        _txt2 = _api.ui->addTextLine(std::nullopt, _btn0, ui::StageInterface::TextLineParams {
             .anchorH = ui::HorizontalAnchor::CENTER,
             .anchorV = ui::VerticalAnchor::MIDDLE,
             .anchorOffset = math::vector2f(0.0f, -4.0f),

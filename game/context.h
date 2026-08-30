@@ -15,6 +15,7 @@ namespace game {
         const game::StateManagerPtr stateManager;
         const foundation::PlatformInterfacePtr &platform;
         const resource::ResourceProviderPtr &resources;
+        const resource::FontAtlasProviderPtr &fonts;
         const core::SceneInterfacePtr &scene;
         const core::WorldInterfacePtr &world;
         const core::RaycastInterfacePtr &raycast;

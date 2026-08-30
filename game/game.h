@@ -68,23 +68,18 @@ namespace game {
             &makeContext<GameDataContext>,
             &makeContext<LoadingContext, GameDataInterface>
         }},
-        {"menu", {
-            &makeContext<GameDataContext>,
-            &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<MenuUIContext, CastleInterface>,
-        }},
         {"castle", {
             &makeContext<GameDataContext>,
-            &makeContext<CommonUIContext>,
+            &makeContext<CommonUIContext, GameDataInterface>,
             &makeContext<CastleContext, GameDataInterface>,
             &makeContext<ConstructionUIContext, CastleInterface>,
         }},
         {"battle", {
             &makeContext<GameDataContext>,
-            &makeContext<CommonUIContext>,
+            &makeContext<CommonUIContext, GameDataInterface>,
             &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<BattleContext, GameDataInterface>,
-            &makeContext<BattleUIContext, GameDataInterface, BattleInterface>,
+            &makeContext<BattleContext, GameDataInterface, CastleInterface>,
+            &makeContext<BattleUIContext, GameDataInterface, BattleInterface, CastleInterface>,
         }}
 
 #endif

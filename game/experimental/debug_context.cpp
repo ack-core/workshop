@@ -112,7 +112,7 @@ namespace game {
 //        _bbox->setTransform(rotation);
 //        _bsphere = _api.scene->addBoundingSphere({10, 0, 0}, 7, {1, 0, 1, 1});
         
-        _joystick = _api.ui->addExtensionElement(nullptr, ui::extensions::JoystickParams {
+        _joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
             .anchorV = ui::VerticalAnchor::BOTTOM,
             .anchorOffset = math::vector2f(50.0f, 50.0f),

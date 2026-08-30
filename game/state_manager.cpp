@@ -11,6 +11,7 @@ namespace game {
         StateManagerImpl(
             const foundation::PlatformInterfacePtr &platform,
             const resource::ResourceProviderPtr &resourceProvider,
+            const resource::FontAtlasProviderPtr &fontAtlasProvider,
             const core::SceneInterfacePtr &scene,
             const core::WorldInterfacePtr &world,
             const core::RaycastInterfacePtr &raycast,
@@ -20,6 +21,7 @@ namespace game {
         )
         : _platform(platform)
         , _resourceProvider(resourceProvider)
+        , _fontAtlasProvider(fontAtlasProvider)
         , _scene(scene)
         , _world(world)
         , _raycast(raycast)
@@ -37,6 +39,7 @@ namespace game {
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
         const resource::ResourceProviderPtr _resourceProvider;
+        const resource::FontAtlasProviderPtr _fontAtlasProvider;
         const core::SceneInterfacePtr _scene;
         const core::WorldInterfacePtr _world;
         const core::RaycastInterfacePtr _raycast;
@@ -51,6 +54,7 @@ namespace game {
     std::shared_ptr<StateManager> StateManager::instance(
         const foundation::PlatformInterfacePtr &platform,
         const resource::ResourceProviderPtr &resourceProvider,
+        const resource::FontAtlasProviderPtr &fontAtlasProvider,
         const core::SceneInterfacePtr &scene,
         const core::WorldInterfacePtr &world,
         const core::RaycastInterfacePtr &raycast,
@@ -59,7 +63,7 @@ namespace game {
         const dh::DataHubPtr &dh
     )
     {
-        return std::make_shared<StateManagerImpl>(platform, resourceProvider, scene, world, raycast, simulation, ui, dh);
+        return std::make_shared<StateManagerImpl>(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, ui, dh);
     }
     
     void StateManagerImpl::switchToState(const char *name) {
@@ -73,7 +77,7 @@ namespace game {
                     
                     auto index = _currentContextList.find(makeContextFunction);
                     if (index == _currentContextList.end()) {
-                        ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _scene, _world, _raycast, _ui }, interfaces.data(), interfaces.size());
+                        ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _fontAtlasProvider, _scene, _world, _raycast, _ui }, interfaces.data(), interfaces.size());
                     }
                     else {
                         ctx = index->second;

@@ -524,6 +524,10 @@ namespace ui {
                     _makeText();
                 }
             }
+            
+            for (auto &item : _attachedElements) {
+                item->draw();
+            }
         }
         
         void setFontParameters(const math::color &fontColor, std::uint8_t fontSize, const math::vector2f &shadowOffset, const math::color &shadowColor, std::uint8_t shadowBlur) {
@@ -538,26 +542,10 @@ namespace ui {
         void _makeText() {
             _instances.clear();
             _instanceCount = 0;
-            _shadow.clear();
-            _chars.clear();
             
-            _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, [weak = weak_from_this()](std::vector<resource::FontCharInfo> &&chars, const foundation::RenderTexturePtr &texture) {
-                if (chars.size()) {
-                    if (std::shared_ptr<TextLineImpl> self = weak.lock()) {
-                        self->_chars = std::move(chars);
-                        self->_textureWeak = texture;
-                    }
-                }
-            });
+            _textureWeak = _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, _chars);
             if (_shadowColor.a > 0.0f) {
-                _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, _shadowBlur, [weak = weak_from_this()](std::vector<resource::FontCharInfo> &&shadow, const foundation::RenderTexturePtr &texture) {
-                    if (shadow.size()) {
-                        if (std::shared_ptr<TextLineImpl> self = weak.lock()) {
-                            self->_shadow = std::move(shadow);
-                            self->_textureWeak = texture;
-                        }
-                    }
-                });
+                _textureWeak = _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, _shadow);
             }
         }
         
@@ -684,6 +672,10 @@ namespace ui {
                     _makeText();
                 }
             }
+            
+            for (auto &item : _attachedElements) {
+                item->draw();
+            }
         }
         
     private:
@@ -712,11 +704,12 @@ namespace ui {
         const resource::FontAtlasProviderPtr &getFontAtlasProvider() const override { return _fontAtlasProvider; }
         
     public:
-        auto addPivot(const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> override;
-        auto addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
-        auto addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> override;
-        auto addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> override;
-        auto addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> override;
+        auto getNamedElement(const std::string &name) -> std::shared_ptr<Element> override;
+        auto addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> override;
+        auto addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
+        auto addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> override;
+        auto addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> override;
+        auto addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> override;
 
         void clear() override;
         void updateAndDraw(float dtSec) override;
@@ -730,6 +723,7 @@ namespace ui {
         foundation::EventHandlerToken _touchEventsToken;
         foundation::RenderShaderPtr _uiShader;
         std::list<std::shared_ptr<ElementImpl>> _topLevelElements;
+        std::unordered_map<std::string, std::weak_ptr<ElementImpl>> _namedElements;
     };
     
     std::shared_ptr<StageInterface> StageInterface::instance(
@@ -804,7 +798,18 @@ namespace ui {
         _platform->removeEventHandler(_touchEventsToken);
     }
     
-    std::shared_ptr<StageInterface::Pivot> StageInterfaceImpl::addPivot(const std::shared_ptr<Element> &parent, PivotParams &&params) {
+    std::shared_ptr<StageInterface::Element> StageInterfaceImpl::getNamedElement(const std::string &name) {
+        auto index = _namedElements.find(name);
+        if (index != _namedElements.end()) {
+            if (auto ptr = index->second.lock()) {
+                return ptr;
+            }
+        }
+        
+        return {};
+    }
+    
+    std::shared_ptr<StageInterface::Pivot> StageInterfaceImpl::addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, PivotParams &&params) {
         std::shared_ptr<PivotImpl> result = std::make_shared<PivotImpl>(*this, parent);
         result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
         
@@ -814,11 +819,14 @@ namespace ui {
         else {
             std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
         }
+        if (name.has_value()) {
+            _namedElements.emplace(*name, result);
+        }
         
         return result;
     }
     
-    std::shared_ptr<StageInterface::Image> StageInterfaceImpl::addImage(const std::shared_ptr<Element> &parent, ImageParams &&params) {
+    std::shared_ptr<StageInterface::Image> StageInterfaceImpl::addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ImageParams &&params) {
         std::shared_ptr<ImageImpl> result;
         
         if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
@@ -833,6 +841,9 @@ namespace ui {
             else {
                 std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
             }
+            if (name.has_value()) {
+                _namedElements.emplace(*name, result);
+            }
         }
         else {
             _platform->logError("[StageInterfaceImpl::addImage] '%s' is not existing texture\n", params.texture);
@@ -841,7 +852,7 @@ namespace ui {
         return result;
     }
 
-    std::shared_ptr<StageInterfaceImpl::Img9Slice> StageInterfaceImpl::addImg9Slice(const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) {
+    std::shared_ptr<StageInterfaceImpl::Img9Slice> StageInterfaceImpl::addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) {
         std::shared_ptr<Img9SliceImpl> result;
         
         if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
@@ -856,6 +867,9 @@ namespace ui {
             else {
                 std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
             }
+            if (name.has_value()) {
+                _namedElements.emplace(*name, result);
+            }
         }
         else {
             _platform->logError("[StageInterfaceImpl::addImage] '%s' is not existing texture\n", params.texture);
@@ -865,7 +879,7 @@ namespace ui {
 
     }
 
-    std::shared_ptr<StageInterfaceImpl::TextLine> StageInterfaceImpl::addTextLine(const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) {
+    std::shared_ptr<StageInterfaceImpl::TextLine> StageInterfaceImpl::addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) {
         std::shared_ptr<TextLineImpl> result = std::make_shared<TextLineImpl>(*this, parent);
         result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
         result->setFontParameters(params.fontColor, params.fontSize, params.shadowOffset, params.shadowColor, params.shadowBlur);
@@ -876,11 +890,14 @@ namespace ui {
         else {
             std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
         }
+        if (name.has_value()) {
+            _namedElements.emplace(*name, result);
+        }
 
         return result;
     }
     
-    std::shared_ptr<StageInterfaceImpl::TextBlock> StageInterfaceImpl::addTextBlock(const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) {
+    std::shared_ptr<StageInterfaceImpl::TextBlock> StageInterfaceImpl::addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) {
         std::shared_ptr<TextBlockImpl> result = std::make_shared<TextBlockImpl>(*this, parent);
         result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
         result->setFontParameters(params.fontColor, params.fontSize, params.shadowOffset, params.shadowColor, params.shadowBlur);
@@ -892,6 +909,9 @@ namespace ui {
         else {
             std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
         }
+        if (name.has_value()) {
+            _namedElements.emplace(*name, result);
+        }
 
         return result;
     }
@@ -902,6 +922,15 @@ namespace ui {
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
         util::cleanupUnused(_topLevelElements);
+        
+        for (auto index = _namedElements.begin(); index != _namedElements.end(); ) {
+            if (index->second.expired()) {
+                index = _namedElements.erase(index);
+            }
+            else {
+                ++index;
+            }
+        }
         
         _rendering->forTarget(nullptr, nullptr, std::nullopt, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_uiShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);

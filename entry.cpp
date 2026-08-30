@@ -38,7 +38,7 @@ extern "C" void initialize() {
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
             stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
             datahub = dh::DataHub::instance(platform, game::datahub);
-            stateManager = game::StateManager::instance(platform, resourceProvider, scene, world, raycast, simulation, stage, datahub);
+            stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage, datahub);
             stateManager->switchToState("default");
             
             platform->setLoop([](float dtSec) {
