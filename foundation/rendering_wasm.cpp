@@ -744,6 +744,8 @@ namespace foundation {
                 id = platformData->getWebGLData();
                 vcount = platformData->getVertexCount();
             }
+            else return;
+            
             if (layout.repeat > 1) {
                 webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, vcount * instanceCount, g_topologies[int(_topology)]);
             }

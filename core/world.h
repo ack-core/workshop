@@ -19,7 +19,7 @@ namespace core {
             ANIMATION = 1,
             VOXEL     = 10,
             LOWPOLY   = 11,
-            GROUND    = 12, // TODO: update async loading
+            GROUND    = 12, 
             PARTICLES = 20, // TODO: angle, transparency rendering
             TRAILS    = 21,
             LIGHT     = 22,

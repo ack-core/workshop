@@ -12,20 +12,6 @@
 #include <list>
 
 namespace core {
-    ParticlesParams::ParticlesParams(const util::Description &desc) {
-        float bakingTimeTable[] = {
-            0.0f, 0.010f, 0.020f, 0.050f, 0.100f
-        };
-        additiveBlend = desc.getBool("additiveBlend", false);
-        orientation = static_cast<core::ParticlesParams::ParticlesOrientation>(desc.getInteger("particleOrientation", 0));
-        bakingTimeSec = bakingTimeTable[desc.getInteger("bakingFrameType", 0)];
-        minXYZ = desc.getVector3f("minXYZ", {});
-        maxXYZ = desc.getVector3f("maxXYZ", {});
-        maxSize = desc.getVector2f("maxSize", {});
-    }
-}
-
-namespace core {
     class ArrowsImpl : public SceneInterface::Arrows {
     public:
         struct Arrow {
@@ -121,6 +107,29 @@ namespace core {
         void clear() override {
             buckets.clear();
         }
+        void fillAsCircle(std::uint32_t segCount, float radius, const math::color &rgba) override {
+            buckets.clear();
+            for (std::uint32_t i = 0; i < segCount; i++) {
+                const float koeff0 = 2.0f * M_PI * float(i) / float(segCount);
+                const float koeff1 = 2.0f * M_PI * float(i + 1) / float(segCount);
+                const math::vector3f p0 = math::vector3f(radius * std::cosf(koeff0), 0.0f, radius * std::sinf(koeff0));
+                const math::vector3f p1 = math::vector3f(radius * std::cosf(koeff1), 0.0f, radius * std::sinf(koeff1));
+                setLine(i, p0, p1, rgba);
+            }
+        }
+        void fillAsСlosedPolygon(const std::vector<math::vector3f> &points, const math::color &rgba) override {
+            buckets.clear();
+            std::uint32_t lineIndex = 0;
+            for (auto index = points.begin(); index != points.end(); ++index) {
+                auto next = index;
+                if (++next == points.end()) {
+                    next = points.begin();
+                }
+                
+                setLine(lineIndex++, *index, *next, rgba);
+            }
+        }
+
         
     public:
         LineSetImpl() {}
@@ -287,7 +296,7 @@ namespace core {
     class GroundMeshImpl : public SceneInterface::GroundMesh {
     public:
         bool enabled = true;
-        foundation::RenderDataPtr data;
+        foundation::RenderDataPtr mesh;
         foundation::RenderTexturePtr texture;
         math::transform3f transform = math::transform3f::identity();
         
@@ -303,50 +312,8 @@ namespace core {
         }
         
     public:
-        GroundMeshImpl(const foundation::RenderDataPtr &idx, const foundation::RenderTexturePtr &tx) : data(idx), texture(tx) {}
+        GroundMeshImpl(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &tx) : mesh(mesh), texture(tx) {}
         ~GroundMeshImpl() override {}
-    };
-
-    //---
-
-    class CustomMeshImpl : public SceneInterface::CustomMesh {
-    public:
-        foundation::RenderShaderPtr shader;
-        std::vector<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> textureList;
-        std::vector<std::uint8_t> shaderConst;
-        std::vector<std::uint8_t> vdata;
-        std::vector<std::uint32_t> idata;
-        std::uint32_t vcount = 0;
-        bool enabled = true;
-        bool drawIntoGBuffer = false;
-        
-    public:
-        void setEnabled(bool value) override {
-            enabled = value;
-        }
-        void setTextures(const std::initializer_list<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> &textures) override {
-            textureList.assign(textures.begin(), textures.end());
-        }
-        void updateMeshData(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override {
-            const std::uint32_t stride = shader->getInputLayout().getStride();
-            vdata.resize(vcnt * stride);
-            std::memcpy(vdata.data(), data, vcnt * stride);
-            vcount = vcnt;
-            if (indexes) {
-                idata.resize(icnt);
-                std::memcpy(idata.data(), indexes, icnt * sizeof(std::uint32_t));
-            }
-        }
-        void updateShaderConstants(const void *constants) override {
-            shaderConst.resize(shader->getConstBufferLength());
-            std::memcpy(shaderConst.data(), constants, shaderConst.size());
-        }
-        
-    public:
-        CustomMeshImpl(const foundation::RenderShaderPtr &shader, bool drawIntoGBuffer) : shader(shader), drawIntoGBuffer(drawIntoGBuffer) {
-            shaderConst.resize(shader->getConstBufferLength());
-        }
-        ~CustomMeshImpl() override {}
     };
     
     //---
@@ -361,6 +328,110 @@ namespace core {
         }
         void setPosition(const math::vector3f &position) override {
 
+        }
+    };
+
+    //---
+    
+    class VegetationImpl : public SceneInterface::Vegetation {
+    public:
+        bool enabled = true;
+        foundation::RenderDataPtr mesh;
+        foundation::RenderTexturePtr texture;
+        math::transform3f transform = math::transform3f::identity();
+
+    public:
+        VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &desc)
+        : texture(tx)
+        {
+            const math::vector2f size = desc.getVector2f("size", {});
+            const int geometryType = int(desc.getInteger("geometry", 0));
+            const float voffset = float(desc.getNumber("voffset", 0.0f));
+
+            struct VTXVEG {
+                math::vector4f posdyn;
+                math::vector2f uv;
+            };
+            std::vector<VTXVEG> vertices;
+            std::vector<std::uint32_t> indexes;
+            
+            for (int y = 0; y < msize.y; y++) {
+                for (int x = 0; x < msize.x; x++) {
+                    if (map[4 * (y * msize.x + x) + 1] == mvalue) {
+                        const std::uint32_t currv = std::uint32_t(vertices.size());
+                        const std::uint32_t curri = std::uint32_t(indexes.size());
+                        const float px = float(x);
+                        const float pz = float(y);
+
+                        if (geometryType == 0) { // grass
+                            vertices.resize(vertices.size() + 5);
+                            indexes.resize(indexes.size() + 6);
+                            
+                            vertices[currv + 0].posdyn = math::vector4f(px - 0.5f * size.x, -0.5f, pz, 0.0f);
+                            vertices[currv + 0].uv = math::vector2f(0.0f, 1.0f);
+                            vertices[currv + 1].posdyn = math::vector4f(px, -0.5f, pz - 0.5f * size.x, 0.0f);
+                            vertices[currv + 1].uv = math::vector2f(0.0f, 1.0f);
+                            vertices[currv + 2].posdyn = math::vector4f(px + 0.5f * size.x, -0.5f, pz, 0.0f);
+                            vertices[currv + 2].uv = math::vector2f(1.0f, 1.0f);
+                            vertices[currv + 3].posdyn = math::vector4f(px, -0.5f, pz + 0.5f * size.x, 0.0f);
+                            vertices[currv + 3].uv = math::vector2f(1.0f, 1.0f);
+                            vertices[currv + 4].posdyn = math::vector4f(px, size.y - 0.5f, pz, 0.0f);
+                            vertices[currv + 4].uv = math::vector2f(0.5f, 0.0f);
+                            
+                            indexes[curri + 0] = currv + 0;
+                            indexes[curri + 1] = currv + 4;
+                            indexes[curri + 2] = currv + 2;
+                            indexes[curri + 3] = currv + 1;
+                            indexes[curri + 4] = currv + 4;
+                            indexes[curri + 5] = currv + 3;
+                        }
+                        if (geometryType == 1) { // top-down tree
+                            const int vsegments = tx->getWidth() / tx->getHeight();
+                            const float vinc = vsegments > 1 ? size.y / float(vsegments - 1) : 0.0f;
+                            const float tw = vsegments > 1 ? 1.0f / float(vsegments) : 1.0f;
+                            
+                            vertices.resize(vertices.size() + vsegments * 4);
+                            indexes.resize(indexes.size() + vsegments * 6);
+                            
+                            for (int i = 0; i < vsegments; i++) {
+                                const float ts = float(i) * tw;
+                                const float voff = -0.5f + voffset + float(i) * vinc;
+                                const int vblock = i * 4;
+                                const int iblock = i * 6;
+                                
+                                vertices[currv + vblock + 0].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
+                                vertices[currv + vblock + 0].uv = math::vector2f(ts, 0.0f);
+                                vertices[currv + vblock + 1].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
+                                vertices[currv + vblock + 1].uv = math::vector2f(ts + tw, 0.0f);
+                                vertices[currv + vblock + 2].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
+                                vertices[currv + vblock + 2].uv = math::vector2f(ts + tw, 1.0f);
+                                vertices[currv + vblock + 3].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
+                                vertices[currv + vblock + 3].uv = math::vector2f(ts, 1.0f);
+                                
+                                indexes[curri + iblock + 0] = currv + vblock + 0;
+                                indexes[curri + iblock + 1] = currv + vblock + 1;
+                                indexes[curri + iblock + 2] = currv + vblock + 3;
+                                indexes[curri + iblock + 3] = currv + vblock + 3;
+                                indexes[curri + iblock + 4] = currv + vblock + 1;
+                                indexes[curri + iblock + 5] = currv + vblock + 2;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (indexes.size()) {
+                mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
+            }
+        }
+        ~VegetationImpl() override {}
+
+    public:
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
+        void setTransform(const math::transform3f &trfm) override {
+            transform = trfm;
         }
     };
     
@@ -378,22 +449,32 @@ namespace core {
         foundation::RenderTexturePtr texture;
         foundation::RenderTexturePtr map;
                 
-        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const ParticlesParams &particlesParams)
-        : additiveBlend(particlesParams.additiveBlend)
-        , particleCount(map->getHeight() / VERTICAL_PIXELS_PER_PARTICLE)
+        ParticleEmitterImpl(const foundation::RenderTexturePtr &texture, const foundation::RenderTexturePtr &map, const util::Description &desc)
+        : particleCount(map->getHeight() / VERTICAL_PIXELS_PER_PARTICLE)
         , texture(texture)
         , map(map)
-        , _secondsPerTextureWidth(particlesParams.bakingTimeSec * float(map->getWidth()))
-        , _bakingTimeSec(particlesParams.bakingTimeSec)
         {
-            if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::AXIS) {
+            enum class ParticlesOrientation {
+                CAMERA = 1, AXIS, WORLD
+            };
+            const float bakingTimeTable[] = {
+                0.0f, 0.010f, 0.020f, 0.050f, 0.100f
+            };
+            const ParticlesOrientation orientation = static_cast<ParticlesOrientation>(desc.getInteger("particleOrientation", 0));
+            const math::vector2f maxSize = desc.getVector2f("maxSize", {});
+            
+            additiveBlend = desc.getBool("additiveBlend", false);
+            _bakingTimeSec = bakingTimeTable[desc.getInteger("bakingFrameType", 0)];
+            _secondsPerTextureWidth = (_bakingTimeSec * float(map->getWidth()));
+            
+            if (orientation == ParticlesOrientation::AXIS) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.right = camRight;
                     self._constants.normal = -1.0 * camDir;
                     self._constants.swtch = 1.0;
                 };
             }
-            else if (particlesParams.orientation == ParticlesParams::ParticlesOrientation::WORLD) {
+            else if (orientation == ParticlesOrientation::WORLD) {
                 _updateOrientation = [](ParticleEmitterImpl &self, const math::vector3f &camDir, const math::vector3f &camRight) {
                     self._constants.right = math::vector3f(self._constants.transform.m11, self._constants.transform.m12, self._constants.transform.m13);
                     self._constants.normal = math::vector3f(self._constants.transform.m21, self._constants.transform.m22, self._constants.transform.m23);
@@ -410,10 +491,10 @@ namespace core {
             _constants.t0_t1_mask_cap = math::vector4f {0, 0, TYPE_MASK_NEWBORN, 1.0f};
             _constants.hpix = 1.0f / float(map->getWidth());
             _constants.vpix = 1.0f / float(map->getHeight());
-            _constants.minXYZ = particlesParams.minXYZ;
-            _constants.maxXYZ = particlesParams.maxXYZ;
-            _constants.maxW = particlesParams.maxSize.x;
-            _constants.maxH = particlesParams.maxSize.y;
+            _constants.minXYZ = desc.getVector3f("minXYZ", {});
+            _constants.maxXYZ = desc.getVector3f("maxXYZ", {});
+            _constants.maxW = maxSize.x;
+            _constants.maxH = maxSize.y;
         }
         ~ParticleEmitterImpl() override {}
         
@@ -445,8 +526,8 @@ namespace core {
         }
         
     private:
-        const float _secondsPerTextureWidth;
-        const float _bakingTimeSec;
+        float _secondsPerTextureWidth;
+        float _bakingTimeSec;
 
         struct Constants {
             math::transform3f transform = math::transform3f::identity();
@@ -481,8 +562,8 @@ namespace core {
         auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
         auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr override;
-        auto addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer) -> CustomMeshPtr override;
-        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr override;
+        auto addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &description) -> VegetationPtr override;
+        auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
         auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f override;
@@ -516,6 +597,7 @@ namespace core {
         foundation::RenderShaderPtr _boundingBoxShader;
         foundation::RenderShaderPtr _voxelMeshShader;
         foundation::RenderShaderPtr _groundMeshShader;
+        foundation::RenderShaderPtr _vegetationShader;
         foundation::RenderShaderPtr _particlesShader;
         
         foundation::RenderTargetPtr _gbuffer;
@@ -527,7 +609,7 @@ namespace core {
         std::vector<std::shared_ptr<BoundingBoxImpl>> _boundingBoxes;
         std::vector<std::shared_ptr<VoxelMeshImpl>> _voxelMeshes;
         std::vector<std::shared_ptr<GroundMeshImpl>> _groundMeshes;
-        std::vector<std::shared_ptr<CustomMeshImpl>> _customMeshes;
+        std::vector<std::shared_ptr<VegetationImpl>> _vegetations;
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
         
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
@@ -691,13 +773,32 @@ namespace {
             nrm : float3
         }
         vssrc {
-            output_position = _transform(_transform(const_modelTransform, float4(vertex_position.xyz, 1.0)), frame_plmVPMatrix);
+            output_position = _transform(float4(vertex_position.xyz, 1.0), _transform(const_modelTransform, frame_plmVPMatrix));
             output_uv = vertex_uv;
             output_nrm = vertex_normal.xyz;
         }
         fssrc {
             float paletteIndex = _tex2d(0, input_uv).r; //
             output_color[0] = float4(input_nrm * 0.5 + 0.5, paletteIndex);
+        }
+    )";
+    const char *g_vegetationShaderSrc = R"(
+        const {
+            modelTransform : matrix4
+        }
+        inout {
+            uv : float2
+        }
+        vssrc {
+            output_position = _transform(float4(vertex_position_dynamicity.xyz, 1.0), _transform(const_modelTransform, frame_plmVPMatrix));
+            output_uv = vertex_uv;
+        }
+        fssrc {
+            float4 rgba = _tex2d(0, input_uv);
+            if (rgba.a < 0.99) {
+                discard_fragment();
+            }
+            output_color[0] = rgba;
         }
     )";
     const char *g_particlesShaderSrc = R"(
@@ -834,7 +935,8 @@ namespace core {
             .repeat = 24
         });
         _voxelMeshShader = rendering->createShader("scene_voxel_mesh", g_voxelMeshShaderSrc, layouts::VTXMVOX);
-        _groundMeshShader = rendering->createShader("scene_textured_mesh", g_groundMeshShaderSrc, layouts::VTXNRMUV);
+        _groundMeshShader = rendering->createShader("scene_ground_mesh", g_groundMeshShaderSrc, layouts::VTXNRMUV);
+        _vegetationShader = rendering->createShader("scene_vegetation", g_vegetationShaderSrc, layouts::VTXVEG);
         _particlesShader = rendering->createShader("scene_particles", g_particlesShaderSrc, foundation::InputLayout {
             .repeat = 4
         });
@@ -905,29 +1007,14 @@ namespace core {
         std::shared_ptr<GroundMeshImpl> result = std::make_shared<GroundMeshImpl>(mesh, texture);
         return _groundMeshes.emplace_back(result);
     }
-
-    SceneInterface::CustomMeshPtr SceneInterfaceImpl::addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer) {
-        if (shaderName == nullptr || shaderSrc == nullptr) {
-            std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(_groundMeshShader, false);
-            return _customMeshes.emplace_back(result);
-        }
-        else {
-            auto index = _customShaders.find(shaderName);
-            if (index != _customShaders.end()) {
-                std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(index->second, drawIntoGBuffer);
-                return _customMeshes.emplace_back(result);
-            }
-            else {
-                foundation::RenderShaderPtr shader = _rendering->createShader(shaderName, shaderSrc, layout);
-                auto newEntry = _customShaders.emplace(std::string(shaderName), shader);
-                std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(newEntry.first->second, drawIntoGBuffer);
-                return _customMeshes.emplace_back(result);
-            }
-        }
+    
+    SceneInterface::VegetationPtr SceneInterfaceImpl::addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &description) {
+        std::shared_ptr<VegetationImpl> result = std::make_shared<VegetationImpl>(_rendering, tx, map, msize, mvalue, description);
+        return _vegetations.emplace_back(result);
     }
     
-    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) {
-        std::shared_ptr<ParticleEmitterImpl> result = std::make_shared<ParticleEmitterImpl>(tx, map, params);
+    SceneInterface::ParticlesPtr SceneInterfaceImpl::addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) {
+        std::shared_ptr<ParticleEmitterImpl> result = std::make_shared<ParticleEmitterImpl>(tx, map, description);
         return _particleEmitters.emplace_back(result);
     }
     
@@ -981,7 +1068,6 @@ namespace core {
         util::cleanupUnused(_boundingBoxes);
         util::cleanupUnused(_voxelMeshes);
         util::cleanupUnused(_groundMeshes);
-        util::cleanupUnused(_customMeshes);
         util::cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
@@ -993,7 +1079,7 @@ namespace core {
                     rendering.applyTextures({
                         {groundMesh->texture, foundation::SamplerType::NEAREST}
                     });
-                    rendering.draw(groundMesh->data);
+                    rendering.draw(groundMesh->mesh);
                 }
             }
             
@@ -1016,14 +1102,14 @@ namespace core {
             rendering.draw();
         });
         _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
-            for (const auto &customMesh : _customMeshes) {
-                if (customMesh->enabled && customMesh->vcount && customMesh->drawIntoGBuffer == false) {
-                    rendering.applyShader(customMesh->shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_AND_WRITE);
-                    if (customMesh->shaderConst.size()) {
-                        rendering.applyShaderConstants(customMesh->shaderConst.data());
-                    }
-                    rendering.applyTextures(customMesh->textureList);
-                    rendering.draw(customMesh->vdata.data(), customMesh->vcount, customMesh->idata.size() ? customMesh->idata.data() : nullptr, std::uint32_t(customMesh->idata.size()));
+            rendering.applyShader(_vegetationShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &vegetation : _vegetations) {
+                if (vegetation->enabled) {
+                    rendering.applyShaderConstants(&vegetation->transform);
+                    rendering.applyTextures({
+                        {vegetation->texture, foundation::SamplerType::NEAREST}
+                    });
+                    rendering.draw(vegetation->mesh);
                 }
             }
 
@@ -1079,30 +1165,6 @@ namespace core {
 
     void SceneInterfaceImpl::setLinesDrawingEnabled(bool enabled) {
         _lineDrawingEnabled = enabled;
-    }
-
-    // TODO: move to lineset as methods
-    void SceneInterface::fillLineSetAsCircle(const SceneInterface::LineSetPtr &lineSet, std::uint32_t segCount, float radius, const math::color &rgba) {
-        lineSet->clear();
-        for (std::uint32_t i = 0; i < segCount; i++) {
-            const float koeff0 = 2.0f * M_PI * float(i) / float(segCount);
-            const float koeff1 = 2.0f * M_PI * float(i + 1) / float(segCount);
-            const math::vector3f p0 = math::vector3f(radius * std::cosf(koeff0), 0.0f, radius * std::sinf(koeff0));
-            const math::vector3f p1 = math::vector3f(radius * std::cosf(koeff1), 0.0f, radius * std::sinf(koeff1));
-            lineSet->setLine(i, p0, p1, rgba);
-        }
-    }
-    void SceneInterface::fillLineSetAsСlosedСircuit(const SceneInterface::LineSetPtr &lineSet, const std::vector<math::vector3f> &points, const math::color &rgba) {
-        lineSet->clear();
-        std::uint32_t lineIndex = 0;
-        for (auto index = points.begin(); index != points.end(); ++index) {
-            auto next = index;
-            if (++next == points.end()) {
-                next = points.begin();
-            }
-            
-            lineSet->setLine(lineIndex++, *index, *next, {0.0f, 1.0f, 1.0f, 0.7f});
-        }
     }
 }
 

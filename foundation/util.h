@@ -502,7 +502,7 @@ namespace util {
     template<typename T> void cleanupUnused(std::vector<T> &v) {
         for (auto index = v.begin(); index != v.end(); ) {
             if (index->use_count() <= 1) {
-                *index = v.back();
+                *index = std::move(v.back());
                 v.pop_back();
             }
             else {

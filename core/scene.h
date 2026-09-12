@@ -12,22 +12,6 @@
 namespace core {
     const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 4;
 
-    // TODO: remove and use just util::Description
-    struct ParticlesParams {
-        ParticlesParams() = default;
-        ParticlesParams(const util::Description &emitterDesc);
-        
-        enum class ParticlesOrientation {
-            CAMERA = 1, AXIS, WORLD
-        };
-        bool additiveBlend = false;
-        float bakingTimeSec = 0.0f;
-        ParticlesOrientation orientation = ParticlesOrientation::CAMERA;
-        math::vector3f minXYZ = {0, 0, 0};
-        math::vector3f maxXYZ = {0, 0, 0};
-        math::vector2f maxSize = {0, 0};
-    };
-
     class SceneInterface {
     public:
         static std::shared_ptr<SceneInterface> instance(
@@ -49,6 +33,8 @@ namespace core {
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
+            virtual void fillAsCircle(std::uint32_t segCount, float radius, const math::color &rgba) = 0;
+            virtual void fillAsСlosedPolygon(const std::vector<math::vector3f> &points, const math::color &rgba) = 0;
             virtual void clear() = 0;
             virtual ~LineSet() = default;
         };
@@ -86,12 +72,10 @@ namespace core {
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual ~GroundMesh() = default;
         };
-        struct CustomMesh {
+        struct Vegetation {
             virtual void setEnabled(bool enabled) = 0;
-            virtual void setTextures(const std::initializer_list<std::pair<foundation::RenderTexturePtr, foundation::SamplerType>> &textures) = 0;
-            virtual void updateMeshData(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
-            virtual void updateShaderConstants(const void *constants) = 0;
-            virtual ~CustomMesh() = default;
+            virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual ~Vegetation() = default;
         };
         struct Particles {
             virtual void setEnabled(bool enabled) = 0;
@@ -111,8 +95,8 @@ namespace core {
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using VoxelMeshPtr = std::shared_ptr<VoxelMesh>;
         using GroundMeshPtr = std::shared_ptr<GroundMesh>;
-        using CustomMeshPtr = std::shared_ptr<CustomMesh>;
         using LightSourcePtr = std::shared_ptr<LightSource>;
+        using VegetationPtr = std::shared_ptr<Vegetation>;
         using ParticlesPtr = std::shared_ptr<Particles>;
         
     public:
@@ -123,10 +107,10 @@ namespace core {
         virtual auto addLineSet() -> LineSetPtr = 0;
         virtual auto addBoundingSphere(const math::vector3f &position, float radius, const math::color &rgba) -> BoundingSpherePtr = 0;
         virtual auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
-        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr = 0;
+        virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) -> VoxelMeshPtr = 0;
         virtual auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr = 0;
-        virtual auto addCustomMesh(const char *shaderName, const char *shaderSrc, const foundation::InputLayout &layout, bool drawIntoGBuffer = false) -> CustomMeshPtr = 0;
-        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const ParticlesParams &params) -> ParticlesPtr = 0;
+        virtual auto addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &desc) -> VegetationPtr = 0;
+        virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &desc) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual auto getCameraPosition() const -> math::vector3f = 0;
@@ -136,10 +120,6 @@ namespace core {
         virtual void updateAndDraw(float dtSec) = 0;
         
         virtual void setLinesDrawingEnabled(bool enabled) = 0;
-        
-    public:
-        static void fillLineSetAsCircle(const LineSetPtr &lineSet, std::uint32_t segCount, float radius, const math::color &rgba);
-        static void fillLineSetAsСlosedСircuit(const LineSetPtr &lineSet, const std::vector<math::vector3f> &points, const math::color &rgba);
         
     public:
         virtual ~SceneInterface() = default;

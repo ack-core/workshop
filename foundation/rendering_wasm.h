@@ -144,7 +144,7 @@ namespace foundation {
         const std::shared_ptr<PlatformInterface> _platform;
         
         std::unique_ptr<FrameConstants> _frameConstants;
-        std::unique_ptr<std::uint8_t[]> _uploadBufferData;
+        ByteDataPtr _uploadBufferData;
         std::size_t _uploadBufferLength;
         
         std::unordered_set<std::string> _shaderNames;

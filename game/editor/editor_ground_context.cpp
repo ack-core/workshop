@@ -16,8 +16,8 @@ namespace game {
         }
         else {
             resourcePath = path;
-            api.resources->getOrLoadGround(path.c_str(), [this, &api](const foundation::RenderDataPtr &m, const foundation::RenderTexturePtr &t) {
-                mesh = api.scene->addGroundMesh(m, t);
+            api.resources->getOrLoadGround(path.c_str(), [this, &api](const foundation::RenderDataPtr &msh, const foundation::RenderTexturePtr &t, const resource::GroundMapDescriptionPtr &desc) {
+                mesh = api.scene->addGroundMesh(msh, t);
                 api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
             });
         }

@@ -22,7 +22,7 @@ namespace resource {
         static std::shared_ptr<FontAtlasProvider> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            std::unique_ptr<std::uint8_t[]> &&ttfData,
+            ByteDataPtr &&ttfData,
             std::size_t ttfLen
         );
         

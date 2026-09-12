@@ -153,6 +153,45 @@ namespace core {
 }
 
 namespace core {
+    class GroundMeshNode : public ObjectNode {
+    public:
+        GroundMeshNode(WorldInterface::NodeType type) : ObjectNode(type) {}
+        
+        void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
+            resource::ResourceProvider &res = world->getResources();
+            res.getOrLoadGround(resourcePath.c_str(), [world, this, objweak](const foundation::RenderDataPtr &msh, const foundation::RenderTexturePtr &t, const resource::GroundMapDescriptionPtr &desc) {
+                if (auto object = objweak.lock()) {
+                    if (msh) {
+                        _objweak = objweak;
+                        _mesh = world->getScene().addGroundMesh(msh, t);
+                    }
+                    object->nodeLoadingComplete();
+                }
+            });
+        }
+        void unloadResources() override {
+            _mesh = nullptr;
+        }
+        void setEnabled(bool enabled) override {
+            _enabled = enabled;
+            if (_mesh) {
+                _mesh->setEnabled(enabled);
+            }
+        }
+        void update(ObjectImpl &obj, float dtSec) override {
+            if (_enabled && _mesh) {
+                _mesh->setTransform(worldTransform);
+            }
+        }
+        
+    private:
+        std::weak_ptr<ObjectImpl> _objweak;
+        core::SceneInterface::GroundMeshPtr _mesh;
+    };
+}
+
+
+namespace core {
     class VoxelMeshNode : public ObjectNode {
     public:
         VoxelMeshNode(WorldInterface::NodeType type) : ObjectNode(type) {}
@@ -186,7 +225,9 @@ namespace core {
         }
         void setEnabled(bool enabled) override {
             _enabled = enabled;
-            _mesh->setEnabled(enabled);
+            if (_mesh) {
+                _mesh->setEnabled(enabled);
+            }
         }
         void play(const char *animName, bool looped, ObjectImpl &obj, util::callback<void(WorldInterface::Object &)> &&completion) override {
             _animTimeSec = 0.0f;
@@ -248,8 +289,7 @@ namespace core {
             res.getOrLoadEmitter(resourcePath.c_str(), [world, this, objweak](const util::Description &desc, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
                 if (auto object = objweak.lock()) {
                     if (m && desc.empty() == false) {
-                        const core::ParticlesParams parameters (desc);
-                        _particles = world->getScene().addParticles(t, m, parameters);
+                        _particles = world->getScene().addParticles(t, m, desc);
                         _particles->setTransform(worldTransform);
                     }
                     object->nodeLoadingComplete();
@@ -262,7 +302,9 @@ namespace core {
         }
         void setEnabled(bool enabled) override {
             _enabled = enabled;
-            _particles->setEnabled(enabled);
+            if (_particles) {
+                _particles->setEnabled(enabled);
+            }
         }
         void update(ObjectImpl &obj, float dtSec) override {
             if (_enabled && _particles) {
@@ -300,7 +342,9 @@ namespace core {
         }
         void setEnabled(bool enabled) override {
             _enabled = enabled;
-            _shape->setEnabled(enabled);
+            if (_shape) {
+                _shape->setEnabled(enabled);
+            }
         }
         void update(ObjectImpl &obj, float dtSec) override {
             if (_enabled && _shape) {
@@ -339,7 +383,9 @@ namespace core {
         }
         void setEnabled(bool enabled) override {
             _enabled = enabled;
-            body->setEnabled(enabled);
+            if (body) {
+                body->setEnabled(enabled);
+            }
         }
         void update(ObjectImpl &obj, float dtSec) override {
             if (_enabled && body) {
@@ -484,6 +530,9 @@ namespace core {
     , _raycast(raycast)
     , _simulation(simulation)
     {
+        g_nodeConstructors[int(WorldInterface::NodeType::GROUND)] = []() -> std::unique_ptr<ObjectNode> {
+            return std::make_unique<GroundMeshNode>(WorldInterface::NodeType::GROUND);
+        };
         g_nodeConstructors[int(WorldInterface::NodeType::VOXEL)] = []() -> std::unique_ptr<ObjectNode> {
             return std::make_unique<VoxelMeshNode>(WorldInterface::NodeType::VOXEL);
         };

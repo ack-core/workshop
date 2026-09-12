@@ -66,26 +66,26 @@ namespace game {
         _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-        _mesh0 = _api.scene->addCustomMesh("mesh", g_meshShaderSrc, layouts::VTXNRMUV);
-        _api.resources->getOrLoadTexture("textures/ui/joystick_bg_00", [this](const foundation::RenderTexturePtr &t) {
-            _mesh0->setTextures({
-                {t, foundation::SamplerType::LINEAR}
-            });
-            struct Vertex {
-                float x, y, z;
-                float nx, ny, nz;
-                float u, v;
-            };
-            Vertex va[] = {
-                {0, 0, 0, 0, 1, 0, 0.5, 0.5},
-                {10, 0, 0, 0, 1, 0, 0.5, 0.5},
-                {0, 0, 10, 0, 1, 0, 0.5, 0.5},
-            };
-            
-            _mesh0->updateMeshData(va, 3);
-            const math::transform3f trfm = math::transform3f::identity();
-            _mesh0->updateShaderConstants(&trfm);
-        });
+//        _mesh0 = _api.scene->addCustomMesh("mesh", g_meshShaderSrc, layouts::VTXNRMUV);
+//        _api.resources->getOrLoadTexture("textures/ui/joystick_bg_00", [this](const foundation::RenderTexturePtr &t) {
+//            _mesh0->setTextures({
+//                {t, foundation::SamplerType::LINEAR}
+//            });
+//            struct Vertex {
+//                float x, y, z;
+//                float nx, ny, nz;
+//                float u, v;
+//            };
+//            Vertex va[] = {
+//                {0, 0, 0, 0, 1, 0, 0.5, 0.5},
+//                {10, 0, 0, 0, 1, 0, 0.5, 0.5},
+//                {0, 0, 10, 0, 1, 0, 0.5, 0.5},
+//            };
+//
+//            _mesh0->updateMeshData(va, 3);
+//            const math::transform3f trfm = math::transform3f::identity();
+//            _mesh0->updateShaderConstants(&trfm);
+//        });
 
         _joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
             .anchorH = ui::HorizontalAnchor::RIGHT,
@@ -98,89 +98,38 @@ namespace game {
                 printf("%f %f\n", direction.x, direction.y);
             }
         });
-        
-        _img0 = _api.ui->addImage(std::nullopt, nullptr, ui::StageInterface::ImageParams {
-            .anchorH = ui::HorizontalAnchor::LEFT,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(50.0f, 50.0f),
-            .texture = "textures/ui/joystick_thumb",
-        });
-        _img1 = _api.ui->addImg9Slice(std::nullopt, nullptr, ui::StageInterface::Img9SliceParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 250.0f),
-            .size = math::vector2f(21.0f, 31.0f),
-            .texture = "textures/ui/img9slice",
-            .sliceArgs = math::vector3f(122.0f, 122.0f, 3.0f)
-        });
-        _img1->setActionHandler([this](ui::Action, float x, float y) {
-            //printf("%f %f\n", x, y);
-            _img0->setTexture(_txt0->getTexture());
-        });
-        _txt0 = _api.ui->addTextLine(std::nullopt, nullptr, ui::StageInterface::TextLineParams {
-            .anchorH = ui::HorizontalAnchor::RIGHT,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 0.0f),
-            .fontSize = 20,
-            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
-            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
-            .shadowOffset = math::vector2f(1.0f, 1.0f),
-            .shadowBlur = 1
-        });
-        _txt1 = _api.ui->addTextLine(std::nullopt, nullptr, ui::StageInterface::TextLineParams {
-            .anchorH = ui::HorizontalAnchor::RIGHT,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 50.0f),
-            .fontSize = 20,
-            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
-            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
-            .shadowOffset = math::vector2f(1.0f, 1.0f),
-            .shadowBlur = 1
-        });
-
-        _tb0 = _api.ui->addTextBlock(std::nullopt, nullptr, ui::StageInterface::TextBlockParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 0.0f),
-            .size = math::vector2f(601.0f, 101.0f),
-            .textAlign = ui::TextAlign::CENTER,
-            .fontSize = 20,
-            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
-            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
-            .shadowOffset = math::vector2f(1.0f, 1.0f),
-            .shadowBlur = 1
+        _api.resources->getOrLoadVoxelMesh("meshes/a-knight-blue", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
+            _knight = _api.scene->addVoxelMesh(frames, desc);
+            _knight->setPosition({5, 0, 5});
         });
         
-        _txt0->setText("This is going to be\nawesome!");
-        _txt1->setText("Que que que");
-        
-
-        _tb0->setText("The glyphs in Block Elements\neach share the same character width in most supported fonts, allowing them to be used graphically in row and column arrangements. However, the block does not contain a space character of its own and ASCII space may or may not render at the same width as Block Elements glyphs, as those characters are intended to be used exclusively for monospaced fonts.");
-        
-        _btn0 = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::Button9SliceParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 350.0f),
-            .size = math::vector2f(101.0f, 51.0f),
-            .textureBase = "textures/ui/btn_slice_base",
-            .textureOver = "textures/ui/btn_slice_press",
-            .texturePress = "textures/ui/btn_slice_press",
-            .sliceArgs = math::vector3f(24.0f, 24.0f, 4.0f),
-            .onPress = []() {
-                printf("pressed!");
+        _api.resources->getOrLoadGround("grounds/test", [this](const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture, const resource::GroundMapDescriptionPtr &desc) {
+            _ground = _api.scene->addGroundMesh(mesh, texture);
+            if (const util::Description *vg = desc->cfg.getDescription("vegetation")) {
+                const std::vector<const util::Description *> vgTypes = vg->getDescriptions("type");
+                const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
+                
+                //for (std::uint8_t i = 0; i < std::uint8_t(vgTypes.size()); i++) {
+                {
+                    const util::Description *type = vgTypes[0];
+                    if (const std::string *texture = type->getString("source")) {
+                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
+                            _grass = _api.scene->addVegetation(tx, desc->map, msize, 0, *type);
+                        });
+                    }
+                }
+                {
+                    const util::Description *type = vgTypes[1];
+                    if (const std::string *texture = type->getString("source")) {
+                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
+                            _api.scene->addVegetation(tx, desc->map, msize, 1, *type);
+                        });
+                    }
+                }
             }
         });
-        _txt2 = _api.ui->addTextLine(std::nullopt, _btn0, ui::StageInterface::TextLineParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
-            .anchorV = ui::VerticalAnchor::MIDDLE,
-            .anchorOffset = math::vector2f(0.0f, -4.0f),
-            .fontSize = 20,
-            .fontColor = math::color(1.0f, 0.5f, 0.0f, 1.0f),
-            .shadowColor = math::color(0.0f, 0.0f, 0.0f, 1.0f),
-            .shadowOffset = math::vector2f(1.0f, 1.0f),
-            .shadowBlur = 1
-        });
-        _txt2->setText("Battle!");
+        
+        
     }
     
     RenderDevContext::~RenderDevContext() {

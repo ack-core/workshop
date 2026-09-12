@@ -17,10 +17,14 @@ namespace game {
         foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
         std::size_t _pointerId = foundation::INVALID_POINTER_ID;
         math::vector2f _lockedCoordinates;
-        math::vector3f _orbit = { 25, 35, 25 };
+        math::vector3f _orbit = { 35, 85, 35 };
         core::SceneInterface::LineSetPtr _axis;
 
-        core::SceneInterface::CustomMeshPtr _mesh0;        
+        core::SceneInterface::VoxelMeshPtr _knight;
+        core::SceneInterface::GroundMeshPtr _ground;
+        core::SceneInterface::VegetationPtr _grass;
+        core::SceneInterface::VegetationPtr _trees;
+        
         std::shared_ptr<ui::StageInterface::Element> _joystick;
         std::shared_ptr<ui::StageInterface::Image> _img0;
         std::shared_ptr<ui::StageInterface::Img9Slice> _img1;

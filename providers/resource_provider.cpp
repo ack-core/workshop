@@ -10,7 +10,7 @@
 
 namespace {
     struct TextureAsyncContext {
-        std::unique_ptr<std::uint8_t[]> data;
+        ByteDataPtr data;
         std::uint32_t w, h;
         foundation::RenderTextureFormat format;
     };
@@ -33,10 +33,12 @@ namespace {
             float u, v;
         };
 
-        std::unique_ptr<std::uint8_t[]> data;
+        ByteDataPtr textureData;
+        ByteDataPtr mapData;
         std::uint32_t w, h;
         std::vector<Vertex> vertexes;
         std::vector<std::uint32_t> indexes;
+        util::Description description;
     };
     
     bool readEmitter(const std::uint8_t *data, util::Description &desc, size_t &read) {
@@ -96,9 +98,15 @@ namespace {
             const int sizeX = *(int *)(data + 0);
             const int sizeY = *(int *)(data + 4);
             const int sizeZ = *(int *)(data + 8);
-            const int vxcnt = *(int *)(data + 12);
-            const int ixcnt = *(int *)(data + 16);
-            data += 20;
+            data += 12;
+            
+            const int descLen = *(int *)(data + 0);
+            ctx.description = util::Description::parse((const std::uint8_t *)(data + 4), descLen);
+            data += 4 + descLen;
+            
+            const int vxcnt = *(int *)(data + 0);
+            const int ixcnt = *(int *)(data + 4);
+            data += 8;
             
             ctx.vertexes.reserve(vxcnt);
             ctx.indexes.reserve(ixcnt);
@@ -111,24 +119,45 @@ namespace {
                 ctx.indexes.emplace_back(reinterpret_cast<const std::uint32_t *>(data)[i]);
             }
             data += sizeof(std::uint32_t) * ixcnt;
-            const std::uint32_t textureFlags = *(std::uint32_t *)data;
-            data += sizeof(std::uint32_t);
-            const std::size_t pngOffset = data - binstart;
+            const std::uint32_t textureOffset = *(std::uint32_t *)(data + 0);
+            const std::uint32_t textureSize = *(std::uint32_t *)(data + 4);
+            const std::uint32_t mapOffset = *(std::uint32_t *)(data + 8);
+            const std::uint32_t mapSize = *(std::uint32_t *)(data + 12);
+            data += 4 * sizeof(std::uint32_t);
             
-            upng_t *upng = upng_new_from_bytes(data, (unsigned long)(len - pngOffset));
-            if (upng != nullptr && *reinterpret_cast<const unsigned *>(data) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-                if (upng_get_format(upng) == UPNG_LUMINANCE8) {
+            upng_t *upng = upng_new_from_bytes(binstart + textureOffset, (unsigned long)textureSize);
+            if (upng != nullptr) {
+                if (*reinterpret_cast<const unsigned *>(binstart + textureOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_LUMINANCE8) {
                     ctx.w = upng_get_width(upng);
                     ctx.h = upng_get_height(upng);
-                    ctx.data = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h);
-                    std::memcpy(ctx.data.get(), upng_get_buffer(upng), ctx.w * ctx.h);
-                    return;
+                    ctx.textureData = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h);
+                    std::memcpy(ctx.textureData.get(), upng_get_buffer(upng), ctx.w * ctx.h);
                 }
+                
+                upng_free(upng);
+            }
+            
+            if (ctx.textureData) {
+                upng_t *upng = upng_new_from_bytes(binstart + mapOffset, (unsigned long)mapSize);
+                if (upng != nullptr) {
+                    int mw = ctx.w + 1;
+                    int mh = ctx.h + 1;
+                    
+                    if (*reinterpret_cast<const unsigned *>(binstart + textureOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_RGBA8) {
+                        ctx.mapData = std::make_unique<std::uint8_t[]>(mw * mh * 4);
+                        std::memcpy(ctx.mapData.get(), upng_get_buffer(upng), mw * mh * 4);
+                    }
+                    
+                    upng_free(upng);
+                }
+                
+                return;
             }
 
             ctx.indexes.clear();
             ctx.vertexes.clear();
-            ctx.data = nullptr;
+            ctx.textureData = nullptr;
+            ctx.mapData = nullptr;
         }
     }
 
@@ -159,7 +188,7 @@ namespace resource {
         ResourceProviderImpl(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+            const ByteDataPtr &prefabSrcData,
             std::size_t prefabSrcLength
         );
         ~ResourceProviderImpl() override;
@@ -170,7 +199,7 @@ namespace resource {
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) override;
-        void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) override;
+        void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescriptionPtr &)> &&completion) override;
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) override;
         
@@ -201,6 +230,7 @@ namespace resource {
         struct GroundMesh {
             foundation::RenderDataPtr data;
             foundation::RenderTexturePtr texture;
+            GroundMapDescriptionPtr mapDesc;
             bool outdated = false;
         };
         struct Emitter {
@@ -232,7 +262,7 @@ namespace resource {
         };
         struct QueueEntryGround {
             std::string groundPath;
-            util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> callback;
+            util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescriptionPtr &)> callback;
         };
         struct QueueEntryEmitter {
             std::string descPath;
@@ -255,7 +285,7 @@ namespace resource {
     ResourceProviderImpl::ResourceProviderImpl(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+        const ByteDataPtr &prefabSrcData,
         std::size_t prefabSrcLength
     )
     : _platform(platform)
@@ -304,7 +334,7 @@ namespace resource {
         }
         else {
             _asyncInProgress = true;
-            _platform->loadFile((path + ".png").data(), [weak = weak_from_this(), path, completion = std::move(completion)](std::unique_ptr<std::uint8_t[]> &&mem, std::size_t len) mutable {
+            _platform->loadFile((path + ".png").data(), [weak = weak_from_this(), path, completion = std::move(completion)](ByteDataPtr &&mem, std::size_t len) mutable {
                 if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                     if (len) {
                         self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<TextureAsyncContext>>([weak, path, mem = std::move(mem), len](TextureAsyncContext &ctx) {
@@ -428,7 +458,7 @@ namespace resource {
         }
     }
     
-    void ResourceProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) {
+    void ResourceProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescriptionPtr &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueGround.emplace_back(QueueEntryGround {
                 .groundPath = groundPath,
@@ -442,7 +472,7 @@ namespace resource {
         
         auto index = _grounds.find(path);
         if (index != _grounds.end() && index->second.outdated == false) {
-            completion(index->second.data, index->second.texture);
+            completion(index->second.data, index->second.texture, index->second.mapDesc);
         }
         else {
             _asyncInProgress = true;
@@ -460,19 +490,22 @@ namespace resource {
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
                                 self->_asyncInProgress = false;
 
-                                if (ctx.data && ctx.indexes.size()) {
+                                if (ctx.textureData && ctx.indexes.size()) {
                                     const std::uint32_t vcnt = std::uint32_t(ctx.vertexes.size());
                                     const std::uint32_t icnt = std::uint32_t(ctx.indexes.size());
                                     
                                     self->_grounds.erase(path);
                                     GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
-                                    groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.data.get()});
+                                    groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.textureData.get()});
                                     groundMesh.data = self->_rendering->createData(layouts::VTXNRMUV, ctx.vertexes.data(), vcnt, ctx.indexes.data(), icnt);
-                                    completion(groundMesh.data, groundMesh.texture);
+                                    groundMesh.mapDesc = std::make_shared<GroundMapDescription>();
+                                    groundMesh.mapDesc->cfg = std::move(ctx.description);
+                                    groundMesh.mapDesc->map = std::move(ctx.mapData);
+                                    completion(groundMesh.data, groundMesh.texture, groundMesh.mapDesc);
                                 }
                                 else {
                                     self->_platform->logError("[ResourceProviderImpl::getOrLoadGround] failed to load ground file '%s'", path.data());
-                                    completion(nullptr, nullptr);
+                                    completion(nullptr, nullptr, nullptr);
                                 }
                             }
                         }));
@@ -481,7 +514,7 @@ namespace resource {
                     else {
                         self->_asyncInProgress = false;
                         self->_platform->logError("[ResourceProviderImpl::getOrLoadGround] Unable to find file '%s'", path.data());
-                        completion(nullptr, nullptr);
+                        completion(nullptr, nullptr, nullptr);
                     }
                 }
             });
@@ -683,7 +716,7 @@ namespace resource {
     std::shared_ptr<ResourceProvider> ResourceProvider::instance(
         const foundation::PlatformInterfacePtr &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+        const ByteDataPtr &prefabSrcData,
         std::size_t prefabSrcLength
     )
     {

@@ -7,17 +7,35 @@ namespace util {
         const char *input = s;
         std::int64_t sign = 1;
         std::int64_t out = 0;
-        
+
         if (*input == '+') input++;
         if (*input == '-' && std::isdigit(*(input + 1))) {
             sign = -1;
             input++;
         }
-        while (std::isdigit(*input)) {
-            out = out * 10 + (*input - '0');
+
+        int base = 10;
+        if (input[0] == '0' && input[1] == 'x') {
+            base = 16;
+            input += 2;
+        }
+
+        while (true) {
+            int digit;
+
+            if (std::isdigit(*input))
+                digit = *input - '0';
+            else if (base == 16 && *input >= 'a' && *input <= 'f')
+                digit = *input - 'a' + 10;
+            else if (base == 16 && *input >= 'A' && *input <= 'F')
+                digit = *input - 'A' + 10;
+            else
+                break;
+
+            out = out * base + digit;
             input++;
         }
-        
+
         len = input - s;
         return out * sign;
     }

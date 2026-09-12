@@ -68,9 +68,14 @@ namespace game {
         void setEndShapeOffset(const math::vector3f &offset);
         void refresh(const core::SceneInterface::LineSetPtr &shapeStart, const core::SceneInterface::LineSetPtr &shapeEnd);
         
-        auto getMap() const -> const foundation::RenderTexturePtr &;
-        auto getMapRaw() const -> const std::uint8_t *;
-        auto getParams() const -> const core::ParticlesParams &;
+        auto getMap() const -> const foundation::RenderTexturePtr & { return _mapTexture; }
+        auto getMapRaw() const -> const std::uint8_t * { return _mapData.data(); }
+        auto getDescription() const -> const util::Description & { return _description; }
+        
+        auto getMinXYZ() const -> const math::vector3f & { return _minXYZ; }
+        auto getMaxXYZ() const -> const math::vector3f & { return _maxXYZ; }
+        auto getMaxSize() const -> const math::vector2f & { return _maxSize; }
+        //auto getParams() const -> const core::ParticlesParams &;
         
     public:
         struct ActiveParticle {
@@ -111,7 +116,12 @@ namespace game {
 
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
-        core::ParticlesParams _ptcParams;
+        util::Description _description;
+        //core::ParticlesParams _ptcParams;
+        
+        math::vector3f _minXYZ = {0, 0, 0};
+        math::vector3f _maxXYZ = {0, 0, 0};
+        math::vector2f _maxSize = {0, 0};
         
     private:
         auto _getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) -> std::pair<math::vector3f, math::vector3f>;

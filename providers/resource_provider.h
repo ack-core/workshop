@@ -24,13 +24,19 @@ namespace resource {
         std::uint32_t sizeY;
         std::uint32_t sizeZ;
     };
+
+    struct GroundMapDescription {
+        ByteDataPtr map;
+        util::Description cfg;
+    };
+    using GroundMapDescriptionPtr = std::shared_ptr<GroundMapDescription>;
     
     class ResourceProvider {
     public:
         static std::shared_ptr<ResourceProvider> instance(
             const foundation::PlatformInterfacePtr &platform,
             const foundation::RenderingInterfacePtr &rendering,
-            const std::unique_ptr<std::uint8_t[]> &prefabSrcData,
+            const ByteDataPtr &prefabSrcData,
             std::size_t prefabSrcLength
         );
         
@@ -69,7 +75,7 @@ namespace resource {
         // @groundPath - path to file without extension
         // @return - primitives to construct ground object or nullptr's
         //
-        virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
+        virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const resource::GroundMapDescriptionPtr &)> &&completion) = 0;
 
         // Asynchronously Load emitter from txt file and textures if it isn't loaded yet
         // @descPath - path to file without extension

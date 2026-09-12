@@ -32,14 +32,15 @@ def collect_prefabs(src: str, game: str, dst: str):
                 with open(fullpath_from, mode="r", encoding="utf-8") as src_file:
                    prefabs[relpath_from.replace(".txt", "")] = src_file.read()
 
-    for path, _, files in os.walk(game):
-        for file in files:
-            if file.endswith(".txt"):
-                fullpath_from = os.path.join(path, file)
-                relpath_from = os.path.normpath(os.path.join(os.path.basename(game), os.path.join(os.path.relpath(path, game), file)))
-                print("---- ", fullpath_from)
-                with open(fullpath_from, mode="r", encoding="utf-8") as src_file:
-                   prefabs[relpath_from.replace(".txt", "")] = src_file.read()                   
+    if game:
+        for path, _, files in os.walk(game):
+            for file in files:
+                if file.endswith(".txt"):
+                    fullpath_from = os.path.join(path, file)
+                    relpath_from = os.path.normpath(os.path.join(os.path.basename(game), os.path.join(os.path.relpath(path, game), file)))
+                    print("---- ", fullpath_from)
+                    with open(fullpath_from, mode="r", encoding="utf-8") as src_file:
+                       prefabs[relpath_from.replace(".txt", "")] = src_file.read()                   
 
     with open(dst, mode="wb") as dst_file:
         dst_file.write(b'PREFABS!')
@@ -54,7 +55,7 @@ def collect_prefabs(src: str, game: str, dst: str):
 
 def main(src: str, game: str, dst: str):
     src = os.path.abspath(src)
-    game = os.path.abspath(game)
+    game = os.path.abspath(game) if game else None
     dst = os.path.abspath(dst)
 
     collect_prefabs(src, game, dst)
@@ -62,7 +63,7 @@ def main(src: str, game: str, dst: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tool to put all prefabs into the single file prefabs.bin")
     parser.add_argument("-s", "--src", type=str, required=True, help="Directory containing *.txt descriptions")
-    parser.add_argument("-g", "--game", type=str, required=True, help="Game directory containing *.txt descriptions")
+    parser.add_argument("-g", "--game", type=str, required=False, help="Game directory containing *.txt descriptions")
     parser.add_argument("-d", "--dst", type=str, required=True, help="Directory to output")
     args = parser.parse_args()
     main(**vars(args))

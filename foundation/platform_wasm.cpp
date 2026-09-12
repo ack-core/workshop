@@ -161,8 +161,8 @@ namespace foundation {
         js_task(task.release());
     }
     
-    void WASMPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
-        using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
+    void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+        using cbtype = util::callback<void(ByteDataPtr &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
         const std::size_t len = fullPath.length() + 1;
         
@@ -404,9 +404,9 @@ extern "C" {
         }
     }
     void fileLoaded(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {
-        using cbtype = util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)>;
+        using cbtype = util::callback<void(ByteDataPtr &&, std::size_t)>;
         cbtype *cb = reinterpret_cast<cbtype *>(reinterpret_cast<std::uint8_t *>(block) - sizeof(cbtype));
-        cb->operator()(std::unique_ptr<std::uint8_t[]>(data), length);
+        cb->operator()(ByteDataPtr(data), length);
         cb->~cbtype();
         ::free(cb);
     }

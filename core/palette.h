@@ -2,7 +2,7 @@
 
 namespace resource {
     const std::uint32_t PALETTE[256] = {
-        0xff000000,
+        0x00000000,
         0xff000000,
         0xff000000,
         0xff000000,

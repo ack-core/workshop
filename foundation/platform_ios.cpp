@@ -278,7 +278,7 @@ namespace foundation {
         
         class FileLoadTask : public AsyncTask {
         public:
-            FileLoadTask(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)> &&completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
+            FileLoadTask(const char *filePath, util::callback<void(ByteDataPtr &&, std::size_t)> &&completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
             ~FileLoadTask() {}
             
         public:
@@ -299,9 +299,9 @@ namespace foundation {
             
         private:
             std::string _path;
-            std::unique_ptr<std::uint8_t[]> _data;
+            ByteDataPtr _data;
             std::size_t _size;
-            util::callback<void(std::unique_ptr<std::uint8_t[]> &&, std::size_t)> _completion;
+            util::callback<void(ByteDataPtr &&, std::size_t)> _completion;
         };
     }
 }
@@ -335,7 +335,7 @@ namespace foundation {
         g_worker.notifier.notify_one();
     }
     
-    void IOSPlatform::loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) {
+    void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
         {
             std::lock_guard<std::mutex> guard(g_io.mutex);
             g_io.queue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));

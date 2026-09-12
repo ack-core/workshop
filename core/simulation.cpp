@@ -24,7 +24,7 @@ namespace core {
         CircleXZImpl(const core::SceneInterfacePtr &scene, float m, float r) : invMass(m >= 1.0f ? 1.0f / m : 0.0f), radius(r), transform(math::transform3f::identity()) {
             movable = true;
             _visual = scene->addLineSet();
-            SceneInterface::fillLineSetAsCircle(_visual, 24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
+            _visual->fillAsCircle(24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         ~CircleXZImpl() override {}
         
@@ -75,7 +75,7 @@ namespace core {
                 points.emplace_back(point);
             }
             _visual = scene->addLineSet();
-            SceneInterface::fillLineSetAsСlosedСircuit(_visual, _src, {0.0f, 1.0f, 1.0f, 0.7f});
+            _visual->fillAsСlosedPolygon(_src, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         ~ObstaclePolygonXZImpl() override {}
         

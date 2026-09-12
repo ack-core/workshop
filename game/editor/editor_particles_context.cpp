@@ -121,7 +121,7 @@ namespace game {
             }
             
             // lineset
-            core::SceneInterface::fillLineSetAsCircle(lineSet, 36, 0.5f * args.x, {0.7f, 0.7f, 0.0f, 0.6f});
+            lineSet->fillAsCircle(36, 0.5f * args.x, {0.7f, 0.7f, 0.0f, 0.6f});
             lineSet->setTransform(rotation);
         }
         else if (type == Type::BOX) {
@@ -228,11 +228,11 @@ namespace game {
     }
     
     Emitter::Emitter() {
-        _ptcParams.additiveBlend = false;
-        _ptcParams.orientation = core::ParticlesParams::ParticlesOrientation::CAMERA;
-        _ptcParams.minXYZ = {-10, 0, -10};
-        _ptcParams.maxXYZ = {10, 10, 10};
-        _ptcParams.maxSize = {1.0f, 1.0f};
+//        _ptcParams.additiveBlend = false;
+//        _ptcParams.orientation = core::ParticlesParams::ParticlesOrientation::CAMERA;
+//        _ptcParams.minXYZ = {-10, 0, -10};
+//        _ptcParams.maxXYZ = {10, 10, 10};
+//        _ptcParams.maxSize = {1.0f, 1.0f};
         _randomSeed = 0;
     }
     Emitter::~Emitter() {
@@ -258,13 +258,14 @@ namespace game {
         _endShape.args = params.getVector3f("endShapeArgs", {});
         _endShapeOffset = params.getVector3f("endShapeOffset", {});
         _shapeDistribution = static_cast<ShapeDistribution>(params.getInteger("shapeDistributionType", 0));
-        _ptcParams.orientation = static_cast<core::ParticlesParams::ParticlesOrientation>(params.getInteger("particleOrientation", 0));
-        _ptcParams.additiveBlend = params.getBool("additiveBlend", false);
+        //_ptcParams.orientation = static_cast<core::ParticlesParams::ParticlesOrientation>(params.getInteger("particleOrientation", 0));
+        //_ptcParams.additiveBlend = params.getBool("additiveBlend", false);
         _emissionGraph.setPointsFromString(params.getString("emissionGraphData", ""));
         _widthGraph.setPointsFromString(params.getString("widthGraphData", ""));
         _heightGraph.setPointsFromString(params.getString("heightGraphData", ""));
         _speedGraph.setPointsFromString(params.getString("speedGraphData", ""));
         _alphaGraph.setPointsFromString(params.getString("alphaGraphData", ""));
+        _description = params;
     }
     
     void Emitter::setEndShapeOffset(const math::vector3f &offset) {
@@ -302,9 +303,9 @@ namespace game {
         std::list<ActiveParticle> activeParticles;
         std::size_t bornParticleCount = 0;
         
-        _ptcParams.minXYZ = {0, 0, 0};
-        _ptcParams.maxXYZ = {0, 0, 0};
-        _ptcParams.maxSize = {_widthGraph.getMaxValue(), _heightGraph.getMaxValue()};
+        _minXYZ = {0, 0, 0};
+        _maxXYZ = {0, 0, 0};
+        _maxSize = {_widthGraph.getMaxValue(), _heightGraph.getMaxValue()};
 
         util::RandomSource rndSpread = util::RandomSource(RND_GRAPH_SPREAD, _randomSeed);
         
@@ -353,12 +354,12 @@ namespace game {
 
                     element.position = ptc->currentPosition;
 
-                    if (ptc->currentPosition.x > _ptcParams.maxXYZ.x) _ptcParams.maxXYZ.x = ptc->currentPosition.x;
-                    if (ptc->currentPosition.y > _ptcParams.maxXYZ.y) _ptcParams.maxXYZ.y = ptc->currentPosition.y;
-                    if (ptc->currentPosition.z > _ptcParams.maxXYZ.z) _ptcParams.maxXYZ.z = ptc->currentPosition.z;
-                    if (ptc->currentPosition.x < _ptcParams.minXYZ.x) _ptcParams.minXYZ.x = ptc->currentPosition.x;
-                    if (ptc->currentPosition.y < _ptcParams.minXYZ.y) _ptcParams.minXYZ.y = ptc->currentPosition.y;
-                    if (ptc->currentPosition.z < _ptcParams.minXYZ.z) _ptcParams.minXYZ.z = ptc->currentPosition.z;
+                    if (ptc->currentPosition.x > _maxXYZ.x) _maxXYZ.x = ptc->currentPosition.x;
+                    if (ptc->currentPosition.y > _maxXYZ.y) _maxXYZ.y = ptc->currentPosition.y;
+                    if (ptc->currentPosition.z > _maxXYZ.z) _maxXYZ.z = ptc->currentPosition.z;
+                    if (ptc->currentPosition.x < _minXYZ.x) _minXYZ.x = ptc->currentPosition.x;
+                    if (ptc->currentPosition.y < _minXYZ.y) _minXYZ.y = ptc->currentPosition.y;
+                    if (ptc->currentPosition.z < _minXYZ.z) _minXYZ.z = ptc->currentPosition.z;
 
                     
                     const math::vector3f direction = (ptc->end - ptc->start).normalized();
@@ -391,15 +392,15 @@ namespace game {
             for (std::uint32_t i = 0; i < mapTextureWidth; i++) {
                 const MapElement &element = tmpMap[c * mapTextureWidth + i];
                 const std::size_t tvoff = c * core::VERTICAL_PIXELS_PER_PARTICLE;
-                const math::vector3f positionKoeff = 255.0f * (element.position - _ptcParams.minXYZ) / (_ptcParams.maxXYZ - _ptcParams.minXYZ);
+                const math::vector3f positionKoeff = 255.0f * (element.position - _minXYZ) / (_maxXYZ - _minXYZ);
                 
                 std::uint8_t *m0 = &_mapData[(tvoff + 0) * mapTextureWidth * 4 + i * 4];
                 std::uint8_t *m1 = &_mapData[(tvoff + 1) * mapTextureWidth * 4 + i * 4];
                 std::uint8_t *m2 = &_mapData[(tvoff + 2) * mapTextureWidth * 4 + i * 4];
                 std::uint8_t *m3 = &_mapData[(tvoff + 3) * mapTextureWidth * 4 + i * 4];
                 
-                const float widthKoeff = 255.0f * element.width / _ptcParams.maxSize.x;
-                const float heightKoeff = 255.0f * element.height / _ptcParams.maxSize.y;
+                const float widthKoeff = 255.0f * element.width / _maxSize.x;
+                const float heightKoeff = 255.0f * element.height / _maxSize.y;
 
                 m0[0] = std::uint8_t(positionKoeff.x);                  // X hi
                 m0[1] = std::uint8_t(255.0f * fract(positionKoeff.x));  // X low
@@ -431,18 +432,12 @@ namespace game {
 //        printf("\n!!!\n");
         
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
-        _ptcParams.bakingTimeSec = float(_bakingFrameTimeMs) / 1000.0f;
+        //_ptcParams.bakingTimeSec = float(_bakingFrameTimeMs) / 1000.0f;
     }
 
-    const foundation::RenderTexturePtr &Emitter::getMap() const {
-        return _mapTexture;
-    }
-    const std::uint8_t * Emitter::getMapRaw() const {
-        return _mapData.data();
-    }
-    const core::ParticlesParams &Emitter::getParams() const {
-        return _ptcParams;
-    }
+//    const core::ParticlesParams &Emitter::getParams() const {
+//        return _ptcParams;
+//    }
 
     std::pair<math::vector3f, math::vector3f> Emitter::_getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) {
         switch (_shapeDistribution) {
@@ -497,8 +492,8 @@ namespace game {
                     map = m;
                     
                     if (map) {
-                        core::ParticlesParams parameters (*originDesc);
-                        particles = api.scene->addParticles(texture, map, parameters);
+                        //core::ParticlesParams parameters (*originDesc);
+                        particles = api.scene->addParticles(texture, map, *originDesc);
                         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     }
                 }
@@ -579,11 +574,11 @@ namespace game {
 
     void EditorParticlesContext::_recreateParticles(EditorNodeParticles &node, bool editing) {
         if (editing) {
-            node.particles = _api.scene->addParticles(node.texture, node.emitter.getMap(), node.emitter.getParams());
+            node.particles = _api.scene->addParticles(node.texture, node.emitter.getMap(), node.emitter.getDescription());
         }
         else {
-            core::ParticlesParams parameters (*node.originDesc);
-            node.particles = _api.scene->addParticles(node.texture, node.map, parameters);
+            //core::ParticlesParams parameters (*node.originDesc);
+            node.particles = _api.scene->addParticles(node.texture, node.map, *node.originDesc);
         }
     }
 
@@ -724,9 +719,9 @@ namespace game {
                 desc.setInteger("randomSeed", rndSeed);
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
-                desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
-                desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
-                desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
+                desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
+                desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
+                desc.setVector2f("maxSize", node->emitter.getMaxSize());
                 _recreateParticles(*node, true);
             }
             return true;
@@ -762,9 +757,9 @@ namespace game {
                 node->endShapeOffset = endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
-                desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
-                desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
-                desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
+                desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
+                desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
+                desc.setVector2f("maxSize", node->emitter.getMaxSize());
                 _recreateParticles(*node, true);
             }
             return true;
@@ -777,9 +772,9 @@ namespace game {
             desc.setString(name.c_str(), data);
             node->emitter.setParameters(*node->currentDesc);
             node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
-            desc.setVector3f("minXYZ", node->emitter.getParams().minXYZ);
-            desc.setVector3f("maxXYZ", node->emitter.getParams().maxXYZ);
-            desc.setVector2f("maxSize", node->emitter.getParams().maxSize);
+            desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
+            desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
+            desc.setVector2f("maxSize", node->emitter.getMaxSize());
             _recreateParticles(*node, true);
             return true;
         }

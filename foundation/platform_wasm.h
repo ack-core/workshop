@@ -8,7 +8,7 @@ namespace foundation {
         ~WASMPlatform() override;
         
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
-        void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) override;
+        void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) override;
         void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) override;
         
         float getScreenWidth() const override;

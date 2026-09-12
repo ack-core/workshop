@@ -71,6 +71,10 @@ namespace ui {
             if (auto target = _anchorTarget.lock()) {
                 lt = target->_globalPosition;
                 rb = target->_globalPosition + target->_size;
+
+                if (target->_positionChanged) {
+                    _positionChanged = true;
+                }
             }
             else if (auto parent = _parent.lock()) {
                 lt = parent->_globalPosition;
@@ -510,8 +514,7 @@ namespace ui {
                     if (_positionChanged) {
                         _positionChanged = false;
                         _instanceCount = 0;
-                    }
-                    if (_instanceCount == 0) {
+
                         fillInstances(_shadow, _shadowColor, _shadowOffset, _instanceCount);
                         fillInstances(_chars, _fontColor, {}, _instanceCount);
                     }
@@ -540,9 +543,7 @@ namespace ui {
         
     protected:
         void _makeText() {
-            _instances.clear();
-            _instanceCount = 0;
-            
+            _positionChanged = true;
             _textureWeak = _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, _chars);
             if (_shadowColor.a > 0.0f) {
                 _textureWeak = _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, _shadow);
@@ -657,9 +658,7 @@ namespace ui {
                     
                     if (_positionChanged) {
                         _positionChanged = false;
-                        _instanceCount = 0;
-                    }
-                    if (_instanceCount == 0) {
+
                         fillInstances(_shadow, _shadowColor, _shadowOffset, _instanceCount);
                         fillInstances(_chars, _fontColor, {}, _instanceCount);
                     }
@@ -722,7 +721,7 @@ namespace ui {
         
         foundation::EventHandlerToken _touchEventsToken;
         foundation::RenderShaderPtr _uiShader;
-        std::list<std::shared_ptr<ElementImpl>> _topLevelElements;
+        std::vector<std::shared_ptr<ElementImpl>> _topLevelElements;
         std::unordered_map<std::string, std::weak_ptr<ElementImpl>> _namedElements;
     };
     
@@ -936,6 +935,8 @@ namespace ui {
             rendering.applyShader(_uiShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
             for (const auto &topLevelElement : _topLevelElements) {
                 topLevelElement->updateCoordinates();
+            }
+            for (const auto &topLevelElement : _topLevelElements) {
                 topLevelElement->draw();
             }
         });

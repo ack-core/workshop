@@ -78,6 +78,55 @@ def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) 
 
     return count, output
 
+def make_vxm_data(src: str, opt: int):
+    with open(src, mode="rb") as src_file:
+        src_file.read(VOX_READ_MAIN)
+        current_offset = src_file.tell()
+        frame_count = 1
+
+        if src_file.read(VOX_READ_CHUNK_HEADER) == b'PACK':
+            data = src_file.read(12)
+            frame_count = struct.unpack("<i", data[8:12])[0]
+        else:
+            src_file.seek(current_offset)
+
+        mx, my, mz = (0, 0, 0)
+
+        frame_size = [0] * frame_count
+        frame_data = [b''] * frame_count
+        frame_bounds = [(0, 0, 0)] * frame_count
+
+        for i in range(0, frame_count):
+            if src_file.read(VOX_READ_CHUNK_HEADER) == b'SIZE':
+                data = src_file.read(20)
+                sz, sx, sy = struct.unpack("<iii", data[8:20])
+
+                mx = sx if sx > mx else mx
+                my = sy if sy > my else my
+                mz = sz if sz > mz else mz
+
+                if src_file.read(VOX_READ_CHUNK_HEADER) == b'XYZI':
+                    data = src_file.read(12)
+                    frame_size[i] = struct.unpack("<i", data[8:])[0]
+                    frame_data[i] = src_file.read(frame_size[i] * 4)
+                    frame_bounds[i] = (sx, sy, sz)
+                else:
+                    print("------ Error: '{}' has no 'XYZI' block".format(src))
+                    return []
+            else:
+                print("------ Error: '{}' has no 'SIZE' block".format(src))
+                return []
+
+        result = []
+        for i in range(0, frame_count):
+            voxels = [tuple(frame_data[i][c * 4:c * 4 + 4]) for c in range(0, frame_size[i])]
+            voxels = [(e[1], e[2], e[0], 7 - (256 - e[3]) % 8 + ((256 - e[3]) // 8) * 8) for e in voxels]
+            count, data = optimize(voxels, frame_bounds[i][0], frame_bounds[i][1], frame_bounds[i][2], opt)
+            result.append((count, data))
+
+        return result
+    return []
+
 def convert_vox(src: str, cfg: str, dst: str, opt: int):
     print("---- ", src)
     cfgstring = ""
@@ -89,44 +138,11 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
     
     os.makedirs(os.path.dirname(dst), exist_ok=True)
 
-    with open(src, mode="rb") as src_file:
+
+    vxm_data = make_vxm_data(src, opt)
+    if not vxm_data:
         with open(dst, mode="wb") as dst_file:
-            src_file.read(VOX_READ_MAIN)
-            current_offset = src_file.tell()
-            frame_count = 1
-
-            if src_file.read(VOX_READ_CHUNK_HEADER) == b'PACK':
-                data = src_file.read(12)
-                frame_count = struct.unpack("<i", data[8:12])[0]
-            else:
-                src_file.seek(current_offset)
-
-            mx, my, mz = (0, 0, 0)
-
-            frame_size = [0] * frame_count
-            frame_data = [b''] * frame_count
-            frame_bounds = [(0, 0, 0)] * frame_count
-
-            for i in range(0, frame_count):
-                if src_file.read(VOX_READ_CHUNK_HEADER) == b'SIZE':
-                    data = src_file.read(20)
-                    sz, sx, sy = struct.unpack("<iii", data[8:20])
-
-                    mx = sx if sx > mx else mx
-                    my = sy if sy > my else my
-                    mz = sz if sz > mz else mz
-
-                    if src_file.read(VOX_READ_CHUNK_HEADER) == b'XYZI':
-                        data = src_file.read(12)
-                        frame_size[i] = struct.unpack("<i", data[8:])[0]
-                        frame_data[i] = src_file.read(frame_size[i] * 4)
-                        frame_bounds[i] = (sx, sy, sz)
-                    else:
-                        print("------ Error: '{}' has no 'XYZI' block".format(src))
-                        return
-                else:
-                    print("------ Error: '{}' has no 'SIZE' block".format(src))
-                    return
+            frame_count = len(vxm_data)
 
             dst_file.write(b'VOX \x7f\0\0\0\0\0\0\0')
             dst_file.write(struct.pack("<iii", sx, sy, sz))
@@ -138,11 +154,8 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
             dst_file.write(struct.pack("<i", frame_count))
 
             for i in range(0, frame_count):
-                voxels = [tuple(frame_data[i][c * 4:c * 4 + 4]) for c in range(0, frame_size[i])]
-                voxels = [(e[1], e[2], e[0], 7 - (256 - e[3]) % 8 + ((256 - e[3]) // 8) * 8) for e in voxels]
-                count, data = optimize(voxels, frame_bounds[i][0], frame_bounds[i][1], frame_bounds[i][2], opt)
-                dst_file.write(struct.pack("<i", count))
-                dst_file.write(data)
+                dst_file.write(struct.pack("<i", vxm_data[i][0]))
+                dst_file.write(vxm_data[i][1])
 
 def main(src: str, dst: str, opt: int):
     src = os.path.abspath(src)

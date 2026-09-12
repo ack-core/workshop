@@ -1044,7 +1044,7 @@ namespace foundation {
                 if (ibuffer) {
                     [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:icnt indexType:MTLIndexTypeUInt32 indexBuffer:ibuffer indexBufferOffset:0 instanceCount:instanceCount];
                 }
-                else {
+                else if (vbuffer) {
                     [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vcnt instanceCount:instanceCount];
                 }
             }

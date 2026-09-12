@@ -62,6 +62,7 @@ namespace {
         return std::uint8_t(key >> 56);
     }
 
+    foundation::RenderTexturePtr g_empty;
 }
 
 namespace resource {
@@ -78,7 +79,7 @@ namespace resource {
             };
             
             // --- used from worker thread ---
-            std::unique_ptr<std::uint8_t[]> txdata;
+            ByteDataPtr txdata;
             int offsetX = ATLAS_SPACE;
             int offsetY = ATLAS_SPACE;
 
@@ -90,7 +91,7 @@ namespace resource {
         };
         
     public:
-        FontAtlasProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, std::unique_ptr<std::uint8_t[]> &&ttfData, std::size_t ttfLen);
+        FontAtlasProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, ByteDataPtr &&ttfData, std::size_t ttfLen);
         ~FontAtlasProviderImpl() override;
         
         auto getTextWidth(const char *text, std::uint8_t fontSize) const -> math::vector2f override;
@@ -104,7 +105,7 @@ namespace resource {
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         const std::shared_ptr<foundation::RenderingInterface> _rendering;
-        const std::unique_ptr<std::uint8_t[]> _ttfData;
+        const ByteDataPtr _ttfData;
         const std::size_t _ttfLen;
         
         stbtt_fontinfo _ttfInfo;
@@ -124,7 +125,7 @@ namespace resource {
     FontAtlasProviderImpl::FontAtlasProviderImpl(
         const std::shared_ptr<foundation::PlatformInterface> &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        std::unique_ptr<std::uint8_t[]> &&ttfData,
+        ByteDataPtr &&ttfData,
         std::size_t ttfLen
     )
     : _platform(platform)
@@ -300,6 +301,8 @@ namespace resource {
         else {
             _platform->logError("[FontAtlasProviderImpl::getTextFontAtlas] Missing pre-cached entries for the text '%s'", text);
         }
+        
+        return g_empty;
     }
     
     FontAtlasProviderImpl::FontAtlas *FontAtlasProviderImpl::_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::unordered_set<std::uint64_t> &toLoad) {
@@ -356,7 +359,7 @@ namespace resource {
     std::shared_ptr<FontAtlasProvider> FontAtlasProvider::instance(
         const std::shared_ptr<foundation::PlatformInterface> &platform,
         const foundation::RenderingInterfacePtr &rendering,
-        std::unique_ptr<std::uint8_t[]> &&ttfData,
+        ByteDataPtr &&ttfData,
         std::size_t ttfLen
     ) {
         return std::make_shared<FontAtlasProviderImpl>(platform, rendering, std::move(ttfData), ttfLen);

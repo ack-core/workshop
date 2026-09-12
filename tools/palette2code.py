@@ -50,7 +50,11 @@ def main(src: str, dst: str):
                 lr = int(linear_to_linear(c[0]) * 255.0)
                 lg = int(linear_to_linear(c[1]) * 255.0)
                 lb = int(linear_to_linear(c[2]) * 255.0)
-                f.write("0x{:02x}{:02x}{:02x}{:02x},\r\n".format(c[3], lb, lg, lr).encode("utf-8"))
+
+                if i == 0:
+                    f.write("0x00000000,\r\n".encode("utf-8"))
+                else:
+                    f.write("0x{:02x}{:02x}{:02x}{:02x},\r\n".format(c[3], lb, lg, lr).encode("utf-8"))
 
         except (Exception,) as e:
             print("---- Error: '{}'".format(e))

@@ -9,10 +9,22 @@ namespace layouts {
                 {"position_color_mask", foundation::InputAttributeFormat::SHORT4},
             }
         };
+        const foundation::InputLayout VTXVEG = foundation::InputLayout {
+            .attributes = {
+                {"position_dynamicity", foundation::InputAttributeFormat::FLOAT4},
+                {"uv", foundation::InputAttributeFormat::FLOAT2},
+            }
+        };
         const foundation::InputLayout VTXNRMUV = foundation::InputLayout {
             .attributes = {
                 {"position", foundation::InputAttributeFormat::FLOAT3},
                 {"normal", foundation::InputAttributeFormat::FLOAT3},
+                {"uv", foundation::InputAttributeFormat::FLOAT2},
+            }
+        };
+        const foundation::InputLayout VTXUIC = foundation::InputLayout {
+            .attributes = {
+                {"position", foundation::InputAttributeFormat::FLOAT2},
                 {"uv", foundation::InputAttributeFormat::FLOAT2},
             }
         };

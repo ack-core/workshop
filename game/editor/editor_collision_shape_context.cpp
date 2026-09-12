@@ -51,14 +51,14 @@ namespace game {
         }
 
         if (shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
-            core::SceneInterface::fillLineSetAsCircle(visual, 24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
+            visual->fillAsCircle(24, radius, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         else if (shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
             std::vector<math::vector3f> points;
             for (auto &index : obstaclePoints) {
                 points.emplace_back(index.second);
             }
-            core::SceneInterface::fillLineSetAsСlosedСircuit(visual, points, {0.0f, 1.0f, 1.0f, 0.7f});
+            visual->fillAsСlosedPolygon(points, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
     }

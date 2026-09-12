@@ -9,11 +9,13 @@
 #include <string>
 #include <vector>
 
+using ByteDataPtr = std::unique_ptr<std::uint8_t[]>;
+
 namespace foundation {
     using EventHandlerToken = unsigned char *;
     const EventHandlerToken INVALID_EVENT_TOKEN = nullptr;
     const std::size_t INVALID_POINTER_ID = std::size_t(-1);
-
+    
     enum class Key : std::uint32_t {
         A = 0, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
         NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
@@ -118,7 +120,7 @@ namespace foundation {
         // @return   - data != nullptr and size != 0 if file opened successfully.
         // @completion called from the main thread
         //
-        virtual void loadFile(const char *filePath, util::callback<void(std::unique_ptr<std::uint8_t[]> &&data, std::size_t size)> &&completion) = 0;
+        virtual void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) = 0;
         
         // Save file in resources or writable directory. Usable in editors. If data is nullptr and size is 0 then file is deleted
         // @return   - true if file saved successfully.

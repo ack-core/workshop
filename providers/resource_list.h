@@ -17,9 +17,13 @@ namespace resource {
 }
 namespace resource {
     const std::unordered_map<const char *, TextureInfo> TEXTURES_LIST = {
+        { "textures/misc/grass", { 16, 16, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/misc/green", { 16, 16, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/misc/tree", { 28, 7, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/castle-hp-bar", { 183, 37, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/joystick_bg", { 248, 248, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/button_down", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/castle-hp-back", { 326, 64, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/joystick_thumb", { 77, 77, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/img9slice", { 128, 128, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/button_up", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
@@ -34,5 +38,7 @@ namespace resource {
 }
 namespace resource {
     const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {
+        {"grounds/castle-00", { 1024, 1, 1024 }},
+        {"grounds/test", { 16, 1, 16 }},
     };
 }
