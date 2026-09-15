@@ -10,7 +10,7 @@ import png
 import struct
 import re
 from PIL import Image
-
+from gen_meshes import make_vxm_data as make_vxm_data
 import time
 import traceback
 
@@ -42,7 +42,7 @@ def get_paletted_texture(texture: str, palette: Palette):
 
     return color_idx_data, src_w, src_h
 
-def generate_place(src_txt: str, src_texture: str, src_vg: str, dst: str, palette: Palette):
+def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, dst: str, palette: Palette):
     print("---- ", dst)
 
     cfgstring = ""
@@ -60,7 +60,10 @@ def generate_place(src_txt: str, src_texture: str, src_vg: str, dst: str, palett
     pattern = r'(source\s*:\s*string\s*=\s*"([^"\n]*)")'
     matches = re.findall(pattern, cfgstring)
     vg_source_array = [match[1] for match in matches]
-    print("-->>> ", vg_source_array)
+
+    if len(vg_color_array) > 8:
+        print("---- Error: too many vegetations")
+        return
 
     try:
         with Image.open(src_vg) as img:
@@ -82,15 +85,12 @@ def generate_place(src_txt: str, src_texture: str, src_vg: str, dst: str, palett
                 bb = vg_data[vgi:vgi + 4]
                 rgb = int.from_bytes(bb[:3], byteorder='little')
                 maps_data[mapi + 0] = 0x0  # heightmap
-                maps_data[mapi + 1] = 0xFF # vegetation index
+                maps_data[mapi + 1] = 0x0 # vegetation bit
 
-                try:
-                    idx = vg_color_array.index(rgb)
-                    maps_data[mapi + 1] = idx
-                    maps_data[mapi + 2] = bb[3]
-
-                except ValueError:
-                    pass
+                for i in range(0, len(vg_color_array)):
+                    if rgb == vg_color_array[i]:
+                        maps_data[mapi + 1] = maps_data[mapi + 1] | (1 << i)
+                        maps_data[mapi + 2] = bb[3]
 
         with open(dst, mode="wb") as f:
             f.write(b'GROUND\0\0\0\0\0\0\0\0\0\0')
@@ -117,26 +117,52 @@ def generate_place(src_txt: str, src_texture: str, src_vg: str, dst: str, palett
                 f.write(struct.pack("<ffffffff", v[i][0], -0.5, v[i][1], 0.0, 1.0, 0.0, v[i][2], v[i][3]))
             f.write(struct.pack("<IIIIII", 0, 1, 2, 2, 1, 3))
 
+            f.write(struct.pack("<i", len(vg_source_array))) # vg entries count
             texture_headers = f.tell() 
             f.write(struct.pack("<ii", 0, 0)) # texture offset + size
             f.write(struct.pack("<ii", 0, 0)) # maps offset + size, 0 if absent
+            for i in range(0, len(vg_source_array)):
+                f.write(struct.pack("<ii", 0, 0)) # vg source data offset + size
 
             # grayscale texture with color indexes
-            tx_offset = f.tell();
-            writer = png.Writer(width=tx_w, height=tx_h, greyscale=True, alpha=False, compression=1)
-            writer.write_array(f, pixels=tx_data)
-            tx_size = f.tell() - tx_offset;
+            tx_offset = f.tell()
+            tx_writer = png.Writer(width=tx_w, height=tx_h, greyscale=True, alpha=False, compression=1)
+            tx_writer.write_array(f, pixels=tx_data)
+            tx_size = f.tell() - tx_offset
 
-            mp_offset = f.tell();
-            writer = png.Writer(width=mapw, height=maph, greyscale=False, alpha=True, compression=1)
-            writer.write_array(f, pixels=maps_data)
-            mp_size = f.tell() - mp_offset;
+            mp_offset = f.tell()
+            mp_writer = png.Writer(width=mapw, height=maph, greyscale=False, alpha=True, compression=1)
+            mp_writer.write_array(f, pixels=maps_data)
+            mp_size = f.tell() - mp_offset
+
+            vg_positions = []
+            for i in range(0, len(vg_source_array)):
+                vg_offset = f.tell()
+
+                if vg_source_array[i].startswith("auxiliary/textures"):
+                    spath = vg_source_array[i] + ".png"
+                    data, w, h = get_paletted_texture(os.path.join(resroot, spath), palette)
+                    writer = png.Writer(width=w, height=h, greyscale=True, alpha=False, compression=1)
+                    writer.write_array(f, pixels=data)
+                if vg_source_array[i].startswith("auxiliary/meshes"):
+                    spath = vg_source_array[i] + ".vox"
+                    frames = make_vxm_data(os.path.join(resroot, spath), 1)
+                    if frames:
+                        f.write(struct.pack("<i", frames[0][0]))
+                        f.write(frames[0][1])
+                    else:
+                        raise ValueError("No frames loaded for " + spath)
+
+                vg_size = f.tell() - vg_offset
+                vg_positions.append((vg_offset, vg_size));
 
             f.seek(texture_headers)
             f.write(struct.pack("<ii", tx_offset, tx_size))
             f.write(struct.pack("<ii", mp_offset, mp_size))
+            for i in range(0, len(vg_source_array)):
+                f.write(struct.pack("<ii", vg_positions[i][0], vg_positions[i][1]))
 
-    except (Exception,) as e:        
+    except (Exception,) as e:
         print("---- Error: '{}'".format(e))
         traceback.print_exc()
 
@@ -144,8 +170,7 @@ def main(src: str, dst: str, palette: str):
     src = os.path.abspath(src)
     dst = os.path.abspath(dst)
     palette = os.path.abspath(palette)
-
-    print("----! ", os.path.normpath(os.path.join(src, "..")))
+    resroot = os.path.normpath(os.path.join(src, ".."))
 
     try:
         palette_reader = png.Reader(filename=palette)
@@ -164,7 +189,7 @@ def main(src: str, dst: str, palette: str):
                         fullpath_txt_from = fullpath_texture_from.replace(".png", ".txt")
                         fullpath_vg_from = fullpath_texture_from.replace(".png", ".vg.tga")
                         st = time.perf_counter()
-                        generate_place(fullpath_txt_from, fullpath_texture_from, fullpath_vg_from, fullpath_to, palette_object)
+                        generate_place(resroot, fullpath_txt_from, fullpath_texture_from, fullpath_vg_from, fullpath_to, palette_object)
                         print("time: ", time.perf_counter() - st)
 
         else:

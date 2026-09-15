@@ -159,7 +159,7 @@ namespace core {
         
         void loadResources(const std::shared_ptr<WorldImpl> &world, const std::weak_ptr<ObjectImpl> &objweak) override {
             resource::ResourceProvider &res = world->getResources();
-            res.getOrLoadGround(resourcePath.c_str(), [world, this, objweak](const foundation::RenderDataPtr &msh, const foundation::RenderTexturePtr &t, const resource::GroundMapDescriptionPtr &desc) {
+            res.getOrLoadGround(resourcePath.c_str(), [world, this, objweak](const foundation::RenderDataPtr &msh, const foundation::RenderTexturePtr &t, const resource::GroundMapDescription &desc) {
                 if (auto object = objweak.lock()) {
                     if (msh) {
                         _objweak = objweak;

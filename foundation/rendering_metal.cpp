@@ -1016,7 +1016,7 @@ namespace foundation {
     }
     
     void MetalRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
-        if (_currentRenderCommandEncoder && _currentShader) {
+        if (_currentRenderCommandEncoder && _currentShader && inputData) {
             const InputLayout &layout = _currentShader->getInputLayout();
             const MetalData *implData = static_cast<const MetalData *>(inputData.get());
             const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];

@@ -87,46 +87,51 @@ namespace game {
 //            _mesh0->updateShaderConstants(&trfm);
 //        });
 
-        _joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
-            .anchorH = ui::HorizontalAnchor::RIGHT,
-            .anchorV = ui::VerticalAnchor::BOTTOM,
-            .anchorOffset = math::vector2f(50.0f, 50.0f),
-            .textureBackground = "textures/ui/joystick_bg_00",
-            .textureThumb = "textures/ui/joystick_thumb",
-            .maxThumbOffset = 100.0f,
-            .onChange = [this](const math::vector2f &direction) {
-                printf("%f %f\n", direction.x, direction.y);
-            }
-        });
+//        _joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
+//            .anchorH = ui::HorizontalAnchor::RIGHT,
+//            .anchorV = ui::VerticalAnchor::BOTTOM,
+//            .anchorOffset = math::vector2f(50.0f, 50.0f),
+//            .textureBackground = "textures/ui/joystick_bg_00",
+//            .textureThumb = "textures/ui/joystick_thumb",
+//            .maxThumbOffset = 100.0f,
+//            .onChange = [this](const math::vector2f &direction) {
+//                printf("%f %f\n", direction.x, direction.y);
+//            }
+//        });
         _api.resources->getOrLoadVoxelMesh("meshes/a-knight-blue", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
             _knight = _api.scene->addVoxelMesh(frames, desc);
-            _knight->setPosition({5, 0, 5});
+            _knight->setPosition({55, 0, 48});
         });
         
-        _api.resources->getOrLoadGround("grounds/test", [this](const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture, const resource::GroundMapDescriptionPtr &desc) {
+        _api.resources->getOrLoadGround("grounds/test", [this](const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture, const resource::GroundMapDescription &desc) {
             _ground = _api.scene->addGroundMesh(mesh, texture);
-            if (const util::Description *vg = desc->cfg.getDescription("vegetation")) {
-                const std::vector<const util::Description *> vgTypes = vg->getDescriptions("type");
-                const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
-                
-                //for (std::uint8_t i = 0; i < std::uint8_t(vgTypes.size()); i++) {
-                {
-                    const util::Description *type = vgTypes[0];
-                    if (const std::string *texture = type->getString("source")) {
-                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
-                            _grass = _api.scene->addVegetation(tx, desc->map, msize, 0, *type);
-                        });
-                    }
-                }
-                {
-                    const util::Description *type = vgTypes[1];
-                    if (const std::string *texture = type->getString("source")) {
-                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
-                            _api.scene->addVegetation(tx, desc->map, msize, 1, *type);
-                        });
-                    }
-                }
+            const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
+            for (std::size_t i = 0; i < desc.vegetation.size(); i++) {
+                const auto &vg = desc.vegetation[i];
+                _api.scene->addVegetation(vg.texture, vg.voxelSource, vg.voxelCount, desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description);
             }
+//            if (const util::Description *vg = desc->cfg.getDescription("vegetation")) {
+//                const std::vector<const util::Description *> vgTypes = vg->getDescriptions("type");
+//                const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
+//
+//                //for (std::uint8_t i = 0; i < std::uint8_t(vgTypes.size()); i++) {
+//                {
+//                    const util::Description *type = vgTypes[0];
+//                    if (const std::string *texture = type->getString("source")) {
+//                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
+//                            _grass = _api.scene->addVegetation(tx, desc->map, msize, 0, *type);
+//                        });
+//                    }
+//                }
+//                {
+//                    const util::Description *type = vgTypes[1];
+//                    if (const std::string *texture = type->getString("source")) {
+//                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
+//                            _api.scene->addVegetation(tx, desc->map, msize, 1, *type);
+//                        });
+//                    }
+//                }
+//            }
         });
         
         
@@ -137,6 +142,6 @@ namespace game {
     }
     
     void RenderDevContext::update(float dtSec) {
-        _api.scene->setCameraLookAt(_orbit, {0, 0, 0});
+        _api.scene->setCameraLookAt(math::vector3f{64, 0, 64} + _orbit, math::vector3f{64, 0, 64});
     }
 }

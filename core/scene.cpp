@@ -334,98 +334,151 @@ namespace core {
     //---
     
     class VegetationImpl : public SceneInterface::Vegetation {
+    private:
+        struct VTXVEG {
+            math::vector4f posdyn;
+            math::vector2f uv;
+        };
+        struct VTXMVOX {
+            std::int16_t positionX, positionY, positionZ;
+            std::uint8_t colorIndex, mask;
+        };
+        
     public:
         bool enabled = true;
+        bool isVoxelMesh = false;
         foundation::RenderDataPtr mesh;
         foundation::RenderTexturePtr texture;
         math::transform3f transform = math::transform3f::identity();
 
     public:
-        VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &desc)
+        VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcount, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc)
         : texture(tx)
         {
             const math::vector2f size = desc.getVector2f("size", {});
             const int geometryType = int(desc.getInteger("geometry", 0));
             const float voffset = float(desc.getNumber("voffset", 0.0f));
 
-            struct VTXVEG {
-                math::vector4f posdyn;
-                math::vector2f uv;
-            };
+            if (geometryType == 0) { // grass
+                fillGeometryGrass(rendering, map, margs, size);
+            }
+            if (geometryType == 1) { // tree leafs
+                const int vsegments = tx->getWidth() / tx->getHeight();
+                fillGeometryFoliage(rendering, map, margs, size, voffset, vsegments);
+            }
+            if (geometryType == 2) { // trunks, stones
+                fillGeometryMeshes(rendering, map, margs, vxm, vcount);
+            }
+        }
+        void fillGeometryGrass(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2f &size) {
             std::vector<VTXVEG> vertices;
             std::vector<std::uint32_t> indexes;
             
-            for (int y = 0; y < msize.y; y++) {
-                for (int x = 0; x < msize.x; x++) {
-                    if (map[4 * (y * msize.x + x) + 1] == mvalue) {
+            for (int y = 0; y < margs.y; y++) {
+                for (int x = 0; x < margs.x; x++) {
+                    if (map[4 * (y * margs.x + x) + 1] & margs.z) {
                         const std::uint32_t currv = std::uint32_t(vertices.size());
                         const std::uint32_t curri = std::uint32_t(indexes.size());
                         const float px = float(x);
                         const float pz = float(y);
-
-                        if (geometryType == 0) { // grass
-                            vertices.resize(vertices.size() + 5);
-                            indexes.resize(indexes.size() + 6);
-                            
-                            vertices[currv + 0].posdyn = math::vector4f(px - 0.5f * size.x, -0.5f, pz, 0.0f);
-                            vertices[currv + 0].uv = math::vector2f(0.0f, 1.0f);
-                            vertices[currv + 1].posdyn = math::vector4f(px, -0.5f, pz - 0.5f * size.x, 0.0f);
-                            vertices[currv + 1].uv = math::vector2f(0.0f, 1.0f);
-                            vertices[currv + 2].posdyn = math::vector4f(px + 0.5f * size.x, -0.5f, pz, 0.0f);
-                            vertices[currv + 2].uv = math::vector2f(1.0f, 1.0f);
-                            vertices[currv + 3].posdyn = math::vector4f(px, -0.5f, pz + 0.5f * size.x, 0.0f);
-                            vertices[currv + 3].uv = math::vector2f(1.0f, 1.0f);
-                            vertices[currv + 4].posdyn = math::vector4f(px, size.y - 0.5f, pz, 0.0f);
-                            vertices[currv + 4].uv = math::vector2f(0.5f, 0.0f);
-                            
-                            indexes[curri + 0] = currv + 0;
-                            indexes[curri + 1] = currv + 4;
-                            indexes[curri + 2] = currv + 2;
-                            indexes[curri + 3] = currv + 1;
-                            indexes[curri + 4] = currv + 4;
-                            indexes[curri + 5] = currv + 3;
-                        }
-                        if (geometryType == 1) { // top-down tree
-                            const int vsegments = tx->getWidth() / tx->getHeight();
-                            const float vinc = vsegments > 1 ? size.y / float(vsegments - 1) : 0.0f;
-                            const float tw = vsegments > 1 ? 1.0f / float(vsegments) : 1.0f;
-                            
-                            vertices.resize(vertices.size() + vsegments * 4);
-                            indexes.resize(indexes.size() + vsegments * 6);
-                            
-                            for (int i = 0; i < vsegments; i++) {
-                                const float ts = float(i) * tw;
-                                const float voff = -0.5f + voffset + float(i) * vinc;
-                                const int vblock = i * 4;
-                                const int iblock = i * 6;
-                                
-                                vertices[currv + vblock + 0].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
-                                vertices[currv + vblock + 0].uv = math::vector2f(ts, 0.0f);
-                                vertices[currv + vblock + 1].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
-                                vertices[currv + vblock + 1].uv = math::vector2f(ts + tw, 0.0f);
-                                vertices[currv + vblock + 2].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
-                                vertices[currv + vblock + 2].uv = math::vector2f(ts + tw, 1.0f);
-                                vertices[currv + vblock + 3].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
-                                vertices[currv + vblock + 3].uv = math::vector2f(ts, 1.0f);
-                                
-                                indexes[curri + iblock + 0] = currv + vblock + 0;
-                                indexes[curri + iblock + 1] = currv + vblock + 1;
-                                indexes[curri + iblock + 2] = currv + vblock + 3;
-                                indexes[curri + iblock + 3] = currv + vblock + 3;
-                                indexes[curri + iblock + 4] = currv + vblock + 1;
-                                indexes[curri + iblock + 5] = currv + vblock + 2;
-                            }
-                        }
+                        
+                        vertices.resize(vertices.size() + 5);
+                        indexes.resize(indexes.size() + 6);
+                        
+                        vertices[currv + 0].posdyn = math::vector4f(px - 0.5f * size.x, -0.5f, pz, 0.0f);
+                        vertices[currv + 0].uv = math::vector2f(0.0f, 1.0f);
+                        vertices[currv + 1].posdyn = math::vector4f(px, -0.5f, pz - 0.5f * size.x, 0.0f);
+                        vertices[currv + 1].uv = math::vector2f(0.0f, 1.0f);
+                        vertices[currv + 2].posdyn = math::vector4f(px + 0.5f * size.x, -0.5f, pz, 0.0f);
+                        vertices[currv + 2].uv = math::vector2f(1.0f, 1.0f);
+                        vertices[currv + 3].posdyn = math::vector4f(px, -0.5f, pz + 0.5f * size.x, 0.0f);
+                        vertices[currv + 3].uv = math::vector2f(1.0f, 1.0f);
+                        vertices[currv + 4].posdyn = math::vector4f(px, size.y - 0.5f, pz, 0.0f);
+                        vertices[currv + 4].uv = math::vector2f(0.5f, 0.0f);
+                        
+                        indexes[curri + 0] = currv + 0;
+                        indexes[curri + 1] = currv + 4;
+                        indexes[curri + 2] = currv + 2;
+                        indexes[curri + 3] = currv + 1;
+                        indexes[curri + 4] = currv + 4;
+                        indexes[curri + 5] = currv + 3;
                     }
                 }
             }
-            
             if (indexes.size()) {
                 mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
             }
         }
-        ~VegetationImpl() override {}
+        void fillGeometryFoliage(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2f &size, float voffset, int vseg) {
+            std::vector<VTXVEG> vertices;
+            std::vector<std::uint32_t> indexes;
+            
+            for (int y = 0; y < margs.y; y++) {
+                for (int x = 0; x < margs.x; x++) {
+                    if (map[4 * (y * margs.x + x) + 1] & margs.z) {
+                        const std::uint32_t currv = std::uint32_t(vertices.size());
+                        const std::uint32_t curri = std::uint32_t(indexes.size());
+                        const float px = float(x);
+                        const float pz = float(y);
+                        const float vinc = vseg > 1 ? size.y / float(vseg - 1) : 0.0f;
+                        const float tw = vseg > 1 ? 1.0f / float(vseg) : 1.0f;
+                        
+                        vertices.resize(vertices.size() + vseg * 4);
+                        indexes.resize(indexes.size() + vseg * 6);
+                        
+                        for (int i = 0; i < vseg; i++) {
+                            const float ts = float(i) * tw;
+                            const float voff = -0.5f + voffset + float(i) * vinc;
+                            const int vstart = currv + i * 4;
+                            const int istart = curri + i * 6;
+                            
+                            vertices[vstart + 0].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
+                            vertices[vstart + 0].uv = math::vector2f(ts, 0.0f);
+                            vertices[vstart + 1].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
+                            vertices[vstart + 1].uv = math::vector2f(ts + tw, 0.0f);
+                            vertices[vstart + 2].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
+                            vertices[vstart + 2].uv = math::vector2f(ts + tw, 1.0f);
+                            vertices[vstart + 3].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
+                            vertices[vstart + 3].uv = math::vector2f(ts, 1.0f);
+                            
+                            indexes[istart + 0] = vstart + 0;
+                            indexes[istart + 1] = vstart + 1;
+                            indexes[istart + 2] = vstart + 3;
+                            indexes[istart + 3] = vstart + 3;
+                            indexes[istart + 4] = vstart + 1;
+                            indexes[istart + 5] = vstart + 2;
+                        }
+                    }
+                }
+            }
+            if (indexes.size()) {
+                mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
+            }
+        }
+        void fillGeometryMeshes(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const ByteDataPtr &vxm, std::uint32_t vcount) {
+            std::vector<VTXMVOX> voxels;
+            
+            for (int y = 0; y < margs.y; y++) {
+                for (int x = 0; x < margs.x; x++) {
+                    if (map[4 * (y * margs.x + x) + 1] & margs.z) {
+                        const std::uint32_t currv = std::uint32_t(voxels.size());
+                        voxels.resize(voxels.size() + vcount);
 
+                        for (int i = 0; i < vcount; i++) {
+                            voxels[currv + i] = reinterpret_cast<const VTXMVOX *>(vxm.get())[i];
+                            voxels[currv + i].positionX += x;
+                            voxels[currv + i].positionZ += y;
+                        }
+                    }
+                }
+            }
+            if (voxels.size()) {
+                mesh = rendering->createData(layouts::VTXMVOX, voxels.data(), std::uint32_t(voxels.size()));
+            }
+            isVoxelMesh = true;
+        }
+        ~VegetationImpl() override {}
+        
     public:
         void setEnabled(bool value) override {
             enabled = value;
@@ -562,7 +615,7 @@ namespace core {
         auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
         auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr override;
-        auto addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &description) -> VegetationPtr override;
+        auto addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcnt, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc) -> VegetationPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
@@ -794,11 +847,11 @@ namespace {
             output_uv = vertex_uv;
         }
         fssrc {
-            float4 rgba = _tex2d(0, input_uv);
-            if (rgba.a < 0.99) {
+            float paletteIndex = _tex2d(0, input_uv).r;
+            if (paletteIndex < 0.0039) {
                 discard_fragment();
             }
-            output_color[0] = rgba;
+            output_color[0] = float4(0.5, 1.0, 0.5, paletteIndex);
         }
     )";
     const char *g_particlesShaderSrc = R"(
@@ -1008,8 +1061,8 @@ namespace core {
         return _groundMeshes.emplace_back(result);
     }
     
-    SceneInterface::VegetationPtr SceneInterfaceImpl::addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &map, const math::vector2i &msize, std::uint8_t mvalue, const util::Description &description) {
-        std::shared_ptr<VegetationImpl> result = std::make_shared<VegetationImpl>(_rendering, tx, map, msize, mvalue, description);
+    SceneInterface::VegetationPtr SceneInterfaceImpl::addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcnt, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc) {
+        std::shared_ptr<VegetationImpl> result = std::make_shared<VegetationImpl>(_rendering, tx, vxm, vcnt, map, margs, desc);
         return _vegetations.emplace_back(result);
     }
     
@@ -1082,6 +1135,16 @@ namespace core {
                     rendering.draw(groundMesh->mesh);
                 }
             }
+            rendering.applyShader(_vegetationShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+            for (const auto &vegetation : _vegetations) {
+                if (vegetation->enabled && vegetation->isVoxelMesh == false) {
+                    rendering.applyShaderConstants(&vegetation->transform);
+                    rendering.applyTextures({
+                        {vegetation->texture, foundation::SamplerType::NEAREST}
+                    });
+                    rendering.draw(vegetation->mesh);
+                }
+            }
             
             rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
             for (const auto &voxelMesh : _voxelMeshes) {
@@ -1091,6 +1154,13 @@ namespace core {
                     rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
                 }
             }
+            for (const auto &vegetation : _vegetations) {
+                if (vegetation->enabled && vegetation->isVoxelMesh == true) {
+                    rendering.applyShaderConstants(&vegetation->transform);
+                    rendering.draw(vegetation->mesh);
+                }
+            }
+
         });
         _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
             rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
@@ -1102,17 +1172,6 @@ namespace core {
             rendering.draw();
         });
         _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
-            rendering.applyShader(_vegetationShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &vegetation : _vegetations) {
-                if (vegetation->enabled) {
-                    rendering.applyShaderConstants(&vegetation->transform);
-                    rendering.applyTextures({
-                        {vegetation->texture, foundation::SamplerType::NEAREST}
-                    });
-                    rendering.draw(vegetation->mesh);
-                }
-            }
-
             rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
             for (const auto &emitter : _particleEmitters) {
                 if (emitter->enabled) {

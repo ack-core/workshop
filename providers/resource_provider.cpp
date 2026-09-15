@@ -32,14 +32,26 @@ namespace {
             float nx, ny, nz;
             float u, v;
         };
+        struct VGEntry {
+            enum class SourceType {
+                TEXTURE = 0,
+                VOXMESH,
+            };
+            util::Description description;
+            ByteDataPtr sourceData;
+            math::vector2i sourceSize;
+            SourceType sourceType;
+        };
 
+        math::vector2i textureSize;
         ByteDataPtr textureData;
         ByteDataPtr mapData;
-        std::uint32_t w, h;
         std::vector<Vertex> vertexes;
         std::vector<std::uint32_t> indexes;
-        util::Description description;
+        std::vector<VGEntry> vg;
     };
+
+    static_assert(sizeof(MeshAsyncContext::VTXMVOX) == 8, "");
     
     bool readEmitter(const std::uint8_t *data, util::Description &desc, size_t &read) {
         const std::uint8_t *origin = data;
@@ -69,11 +81,10 @@ namespace {
                 data += sizeof(std::uint32_t);
                 
                 for (std::uint32_t f = 0; f < frameCount; f++) {
-                    std::uint32_t voxelCount = *(std::uint32_t *)data;
+                    const std::uint32_t voxelCount = *(std::uint32_t *)data;
                     data += sizeof(std::uint32_t);
                     ctx.voxels[f].resize(voxelCount);
                     
-                    // TODO: move that loop to the mesh-preparing tool
                     for (std::uint32_t i = 0; i < voxelCount; i++) {
                         const MeshAsyncContext::Voxel &src = *(MeshAsyncContext::Voxel *)data;
                         MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][i];
@@ -100,8 +111,13 @@ namespace {
             const int sizeZ = *(int *)(data + 8);
             data += 12;
             
+            ctx.vg.reserve(4);
+            
             const int descLen = *(int *)(data + 0);
-            ctx.description = util::Description::parse((const std::uint8_t *)(data + 4), descLen);
+            util::Description vg = util::Description::parse((const std::uint8_t *)(data + 4), descLen);
+            for (auto &item : vg.getDescriptions("vegetation")) {
+                ctx.vg.emplace_back(GroundAsyncContext::VGEntry { std::move(*item), nullptr });
+            }
             data += 4 + descLen;
             
             const int vxcnt = *(int *)(data + 0);
@@ -119,38 +135,71 @@ namespace {
                 ctx.indexes.emplace_back(reinterpret_cast<const std::uint32_t *>(data)[i]);
             }
             data += sizeof(std::uint32_t) * ixcnt;
-            const std::uint32_t textureOffset = *(std::uint32_t *)(data + 0);
-            const std::uint32_t textureSize = *(std::uint32_t *)(data + 4);
-            const std::uint32_t mapOffset = *(std::uint32_t *)(data + 8);
-            const std::uint32_t mapSize = *(std::uint32_t *)(data + 12);
-            data += 4 * sizeof(std::uint32_t);
+            const std::uint32_t vgEntriesCount = *(std::uint32_t *)(data + 0);
+            const std::uint32_t textureOffset = *(std::uint32_t *)(data + 4);
+            const std::uint32_t textureLen = *(std::uint32_t *)(data + 8);
+            const std::uint32_t mapOffset = *(std::uint32_t *)(data + 12);
+            const std::uint32_t mapLen = *(std::uint32_t *)(data + 16);
+            data += 5 * sizeof(std::uint32_t);
             
-            upng_t *upng = upng_new_from_bytes(binstart + textureOffset, (unsigned long)textureSize);
+            upng_t *upng = upng_new_from_bytes(binstart + textureOffset, (unsigned long)textureLen);
             if (upng != nullptr) {
-                if (*reinterpret_cast<const unsigned *>(binstart + textureOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_LUMINANCE8) {
-                    ctx.w = upng_get_width(upng);
-                    ctx.h = upng_get_height(upng);
-                    ctx.textureData = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h);
-                    std::memcpy(ctx.textureData.get(), upng_get_buffer(upng), ctx.w * ctx.h);
+                if (*reinterpret_cast<const std::uint32_t *>(binstart + textureOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_LUMINANCE8) {
+                    ctx.textureSize = math::vector2i(upng_get_width(upng), upng_get_height(upng));
+                    ctx.textureData = std::make_unique<std::uint8_t[]>(ctx.textureSize.x * ctx.textureSize.y);
+                    std::memcpy(ctx.textureData.get(), upng_get_buffer(upng), ctx.textureSize.x * ctx.textureSize.y);
                 }
                 
                 upng_free(upng);
             }
-            
-            if (ctx.textureData) {
-                upng_t *upng = upng_new_from_bytes(binstart + mapOffset, (unsigned long)mapSize);
+            if (ctx.textureData && ctx.vg.size() == vgEntriesCount) {
+                upng_t *upng = upng_new_from_bytes(binstart + mapOffset, (unsigned long)mapLen);
                 if (upng != nullptr) {
-                    int mw = ctx.w + 1;
-                    int mh = ctx.h + 1;
-                    
-                    if (*reinterpret_cast<const unsigned *>(binstart + textureOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_RGBA8) {
-                        ctx.mapData = std::make_unique<std::uint8_t[]>(mw * mh * 4);
-                        std::memcpy(ctx.mapData.get(), upng_get_buffer(upng), mw * mh * 4);
+                    const math::vector2i mapSize = math::vector2i(ctx.textureSize.x + 1, ctx.textureSize.y + 1);
+                    if (*reinterpret_cast<const std::uint32_t *>(binstart + mapOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_RGBA8) {
+                        ctx.mapData = std::make_unique<std::uint8_t[]>(mapSize.x * mapSize.y * 4);
+                        std::memcpy(ctx.mapData.get(), upng_get_buffer(upng), mapSize.x * mapSize.y * 4);
                     }
                     
                     upng_free(upng);
                 }
-                
+                for (std::uint32_t i = 0; i < vgEntriesCount; i++) {
+                    ctx.vg[i].sourceType = GroundAsyncContext::VGEntry::SourceType(ctx.vg[i].description.getInteger("geometry", 0) == 2);
+                    const std::uint32_t vgSourceOffset = *(std::uint32_t *)(data + 0);
+                    const std::uint32_t vgSourceLen = *(std::uint32_t *)(data + 4);
+                    data += 8;
+                    
+                    if (vgSourceLen) {
+                        if (ctx.vg[i].sourceType == GroundAsyncContext::VGEntry::SourceType::TEXTURE) {
+                            upng_t *upng = upng_new_from_bytes(binstart + vgSourceOffset, (unsigned long)vgSourceLen);
+                            if (upng != nullptr) {
+                                if (*reinterpret_cast<const std::uint32_t *>(binstart + vgSourceOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_LUMINANCE8) {
+                                    int w = upng_get_width(upng);
+                                    int h = upng_get_height(upng);
+                                    ctx.vg[i].sourceSize = math::vector2i(w, h);
+                                    ctx.vg[i].sourceData = std::make_unique<std::uint8_t[]>(w * h);
+                                    std::memcpy(ctx.vg[i].sourceData.get(), upng_get_buffer(upng), w * h);
+                                }
+                                
+                                upng_free(upng);
+                            }
+                        }
+                        if (ctx.vg[i].sourceType == GroundAsyncContext::VGEntry::SourceType::VOXMESH) {
+                            const std::uint32_t voxelCount = *(std::uint32_t *)(binstart + vgSourceOffset);
+                            ctx.vg[i].sourceSize = math::vector2i(voxelCount, 0);
+                            ctx.vg[i].sourceData = std::make_unique<std::uint8_t[]>(sizeof(MeshAsyncContext::VTXMVOX) * voxelCount);
+                            for (std::uint32_t c = 0; c < voxelCount; c++) {
+                                const MeshAsyncContext::Voxel *src = (const MeshAsyncContext::Voxel *)(binstart + vgSourceOffset + 4);
+                                MeshAsyncContext::VTXMVOX *voxels = reinterpret_cast<MeshAsyncContext::VTXMVOX *>(ctx.vg[i].sourceData.get());
+                                voxels[c].positionX = src[c].positionX;
+                                voxels[c].positionY = src[c].positionY;
+                                voxels[c].positionZ = src[c].positionZ;
+                                voxels[c].colorIndex = src[c].colorIndex;
+                                voxels[c].mask = src[c].mask;
+                            }
+                        }
+                    }
+                }
                 return;
             }
 
@@ -199,7 +248,7 @@ namespace resource {
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) override;
-        void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescriptionPtr &)> &&completion) override;
+        void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescription &)> &&completion) override;
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) override;
         
@@ -230,7 +279,7 @@ namespace resource {
         struct GroundMesh {
             foundation::RenderDataPtr data;
             foundation::RenderTexturePtr texture;
-            GroundMapDescriptionPtr mapDesc;
+            GroundMapDescription mapDesc;
             bool outdated = false;
         };
         struct Emitter {
@@ -262,7 +311,7 @@ namespace resource {
         };
         struct QueueEntryGround {
             std::string groundPath;
-            util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescriptionPtr &)> callback;
+            util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescription &)> callback;
         };
         struct QueueEntryEmitter {
             std::string descPath;
@@ -458,7 +507,7 @@ namespace resource {
         }
     }
     
-    void ResourceProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescriptionPtr &)> &&completion) {
+    void ResourceProviderImpl::getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescription &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueGround.emplace_back(QueueEntryGround {
                 .groundPath = groundPath,
@@ -496,16 +545,29 @@ namespace resource {
                                     
                                     self->_grounds.erase(path);
                                     GroundMesh &groundMesh = self->_grounds.emplace(path, GroundMesh{}).first->second;
-                                    groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.w, ctx.h, {ctx.textureData.get()});
+                                    groundMesh.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, ctx.textureSize.x, ctx.textureSize.y, {ctx.textureData.get()});
                                     groundMesh.data = self->_rendering->createData(layouts::VTXNRMUV, ctx.vertexes.data(), vcnt, ctx.indexes.data(), icnt);
-                                    groundMesh.mapDesc = std::make_shared<GroundMapDescription>();
-                                    groundMesh.mapDesc->cfg = std::move(ctx.description);
-                                    groundMesh.mapDesc->map = std::move(ctx.mapData);
+                                    groundMesh.mapDesc.vegetation.reserve(ctx.vg.size());
+                                    groundMesh.mapDesc.map = std::move(ctx.mapData);
+                                    for (GroundAsyncContext::VGEntry &item : ctx.vg) {
+                                        if (item.sourceData) {
+                                            GroundMapDescription::Vegetation &newVG = groundMesh.mapDesc.vegetation.emplace_back(GroundMapDescription::Vegetation {});
+                                            newVG.description = std::move(item.description);
+                                            
+                                            if (item.sourceType == GroundAsyncContext::VGEntry::SourceType::TEXTURE) {
+                                                newVG.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, item.sourceSize.x, item.sourceSize.y, {item.sourceData.get()});
+                                            }
+                                            if (item.sourceType == GroundAsyncContext::VGEntry::SourceType::VOXMESH) {
+                                                newVG.voxelSource = std::move(item.sourceData);
+                                                newVG.voxelCount = item.sourceSize.x;
+                                            }
+                                        }
+                                    }
                                     completion(groundMesh.data, groundMesh.texture, groundMesh.mapDesc);
                                 }
                                 else {
                                     self->_platform->logError("[ResourceProviderImpl::getOrLoadGround] failed to load ground file '%s'", path.data());
-                                    completion(nullptr, nullptr, nullptr);
+                                    completion(nullptr, nullptr, {});
                                 }
                             }
                         }));
@@ -514,7 +576,7 @@ namespace resource {
                     else {
                         self->_asyncInProgress = false;
                         self->_platform->logError("[ResourceProviderImpl::getOrLoadGround] Unable to find file '%s'", path.data());
-                        completion(nullptr, nullptr, nullptr);
+                        completion(nullptr, nullptr, {});
                     }
                 }
             });

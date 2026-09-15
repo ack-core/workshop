@@ -26,10 +26,15 @@ namespace resource {
     };
 
     struct GroundMapDescription {
+        struct Vegetation {
+            util::Description description;
+            foundation::RenderTexturePtr texture;
+            ByteDataPtr voxelSource;
+            std::uint32_t voxelCount = 0;
+        };
         ByteDataPtr map;
-        util::Description cfg;
+        std::vector<Vegetation> vegetation;
     };
-    using GroundMapDescriptionPtr = std::shared_ptr<GroundMapDescription>;
     
     class ResourceProvider {
     public:
@@ -75,7 +80,7 @@ namespace resource {
         // @groundPath - path to file without extension
         // @return - primitives to construct ground object or nullptr's
         //
-        virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const resource::GroundMapDescriptionPtr &)> &&completion) = 0;
+        virtual void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const resource::GroundMapDescription &)> &&completion) = 0;
 
         // Asynchronously Load emitter from txt file and textures if it isn't loaded yet
         // @descPath - path to file without extension
