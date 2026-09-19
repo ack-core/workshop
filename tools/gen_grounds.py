@@ -9,6 +9,7 @@ import argparse
 import png
 import struct
 import re
+import random
 from PIL import Image
 from gen_meshes import make_vxm_data as make_vxm_data
 import time
@@ -74,6 +75,8 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
     try:
         tx_data, tx_w, tx_h = get_paletted_texture(src_texture, palette)
 
+        random.seed(100)
+
         mapw = tx_w + 1
         maph = tx_h + 1
         maps_data = bytearray(mapw * maph * 4)
@@ -86,11 +89,11 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
                 rgb = int.from_bytes(bb[:3], byteorder='little')
                 maps_data[mapi + 0] = 0x0  # heightmap
                 maps_data[mapi + 1] = 0x0 # vegetation bit
+                maps_data[mapi + 2] = random.getrandbits(8)
 
                 for i in range(0, len(vg_color_array)):
                     if rgb == vg_color_array[i]:
-                        maps_data[mapi + 1] = maps_data[mapi + 1] | (1 << i)
-                        maps_data[mapi + 2] = bb[3]
+                        maps_data[mapi + 1] = maps_data[mapi + 1] | (1 << i)                        
 
         with open(dst, mode="wb") as f:
             f.write(b'GROUND\0\0\0\0\0\0\0\0\0\0')
@@ -148,8 +151,10 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
                     spath = vg_source_array[i] + ".vox"
                     frames = make_vxm_data(os.path.join(resroot, spath), 1)
                     if frames:
-                        f.write(struct.pack("<i", frames[0][0]))
-                        f.write(frames[0][1])
+                        f.write(struct.pack("<i", len(frames)))
+                        for frame in range(0, len(frames)):
+                            f.write(struct.pack("<i", frames[frame][0]))
+                            f.write(frames[frame][1])
                     else:
                         raise ValueError("No frames loaded for " + spath)
 

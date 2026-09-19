@@ -108,7 +108,12 @@ namespace game {
             const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
             for (std::size_t i = 0; i < desc.vegetation.size(); i++) {
                 const auto &vg = desc.vegetation[i];
-                _api.scene->addVegetation(vg.texture, vg.voxelSource, vg.voxelCount, desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description);
+                if (vg.texture) {
+                    _api.scene->addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.texture);
+                }
+                else if (vg.voxmesh.size()) {
+                    _api.scene->addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.voxmesh);
+                }
             }
 //            if (const util::Description *vg = desc->cfg.getDescription("vegetation")) {
 //                const std::vector<const util::Description *> vgTypes = vg->getDescriptions("type");

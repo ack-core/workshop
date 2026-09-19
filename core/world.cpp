@@ -164,6 +164,20 @@ namespace core {
                     if (msh) {
                         _objweak = objweak;
                         _mesh = world->getScene().addGroundMesh(msh, t);
+                        
+                        if (desc.vegetation.size()) {
+                            const math::vector2i msize = math::vector2i(t->getWidth() + 1, t->getHeight() + 1);
+                            for (std::size_t i = 0; i < desc.vegetation.size(); i++) {
+                                const auto &vg = desc.vegetation[i];
+                                if (vg.texture) {
+                                    _vegetation.emplace_back(world->getScene().addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.texture));
+                                }
+                                else if (vg.voxmesh.size()) {
+                                    _vegetation.emplace_back(world->getScene().addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.voxmesh));
+                                }
+                            }
+
+                        }
                     }
                     object->nodeLoadingComplete();
                 }
@@ -171,6 +185,7 @@ namespace core {
         }
         void unloadResources() override {
             _mesh = nullptr;
+            _vegetation.clear();
         }
         void setEnabled(bool enabled) override {
             _enabled = enabled;
@@ -181,12 +196,16 @@ namespace core {
         void update(ObjectImpl &obj, float dtSec) override {
             if (_enabled && _mesh) {
                 _mesh->setTransform(worldTransform);
+                for (std::size_t i = 0; i < _vegetation.size(); i++) {
+                    _vegetation[i]->setTransform(worldTransform);
+                }
             }
         }
         
     private:
         std::weak_ptr<ObjectImpl> _objweak;
         core::SceneInterface::GroundMeshPtr _mesh;
+        std::vector<core::SceneInterface::VegetationPtr> _vegetation;
     };
 }
 

@@ -1,16 +1,16 @@
 vegetation {
-	color : integer = 0x0000fa
+	color : integer = 0x00ffff
     geometry : integer = 0
     source : string = "auxiliary/textures/test_grass"
-    size : vector2f = 3.0 2.0
+    size : vector2i = 3 2
     roffset : number = 1.0
 }
 vegetation {
 	color : integer = 0x0000FF
     geometry : integer = 1
-    source : string = "auxiliary/textures/test_foliage"
-    size : vector2f = 9.0 12.0
-    voffset : number = 4.9
+    source : string = "auxiliary/textures/test_fl"
+    size : vector2i = 9 10
+    voffset : number[2] = 5.0 4.0
 }
 vegetation {
     color : integer = 0x0000FF

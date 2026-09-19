@@ -109,7 +109,8 @@ namespace core {
         virtual auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr = 0;
         virtual auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) -> VoxelMeshPtr = 0;
         virtual auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr = 0;
-        virtual auto addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcnt, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc) -> VegetationPtr = 0;
+        virtual auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const foundation::RenderTexturePtr &tx) -> VegetationPtr = 0;
+        virtual auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) -> VegetationPtr = 0;
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &desc) -> ParticlesPtr = 0;
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         

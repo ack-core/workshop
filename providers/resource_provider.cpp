@@ -38,8 +38,9 @@ namespace {
                 VOXMESH,
             };
             util::Description description;
-            ByteDataPtr sourceData;
-            math::vector2i sourceSize;
+            std::vector<std::pair<math::vector2i, ByteDataPtr>> sourceData;
+//            ByteDataPtr sourceData;
+//            math::vector2i sourceSize;
             SourceType sourceType;
         };
 
@@ -116,7 +117,7 @@ namespace {
             const int descLen = *(int *)(data + 0);
             util::Description vg = util::Description::parse((const std::uint8_t *)(data + 4), descLen);
             for (auto &item : vg.getDescriptions("vegetation")) {
-                ctx.vg.emplace_back(GroundAsyncContext::VGEntry { std::move(*item), nullptr });
+                ctx.vg.emplace_back(GroundAsyncContext::VGEntry { std::move(*item), {} });
             }
             data += 4 + descLen;
             
@@ -176,26 +177,33 @@ namespace {
                                 if (*reinterpret_cast<const std::uint32_t *>(binstart + vgSourceOffset) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_LUMINANCE8) {
                                     int w = upng_get_width(upng);
                                     int h = upng_get_height(upng);
-                                    ctx.vg[i].sourceSize = math::vector2i(w, h);
-                                    ctx.vg[i].sourceData = std::make_unique<std::uint8_t[]>(w * h);
-                                    std::memcpy(ctx.vg[i].sourceData.get(), upng_get_buffer(upng), w * h);
+                                    const std::unique_ptr<std::uint8_t[]> &ptr = ctx.vg[i].sourceData.emplace_back(std::make_pair(math::vector2i(w, h), std::make_unique<std::uint8_t[]>(w * h))).second;
+                                    std::memcpy(ptr.get(), upng_get_buffer(upng), w * h);
                                 }
                                 
                                 upng_free(upng);
                             }
                         }
                         if (ctx.vg[i].sourceType == GroundAsyncContext::VGEntry::SourceType::VOXMESH) {
-                            const std::uint32_t voxelCount = *(std::uint32_t *)(binstart + vgSourceOffset);
-                            ctx.vg[i].sourceSize = math::vector2i(voxelCount, 0);
-                            ctx.vg[i].sourceData = std::make_unique<std::uint8_t[]>(sizeof(MeshAsyncContext::VTXMVOX) * voxelCount);
-                            for (std::uint32_t c = 0; c < voxelCount; c++) {
-                                const MeshAsyncContext::Voxel *src = (const MeshAsyncContext::Voxel *)(binstart + vgSourceOffset + 4);
-                                MeshAsyncContext::VTXMVOX *voxels = reinterpret_cast<MeshAsyncContext::VTXMVOX *>(ctx.vg[i].sourceData.get());
-                                voxels[c].positionX = src[c].positionX;
-                                voxels[c].positionY = src[c].positionY;
-                                voxels[c].positionZ = src[c].positionZ;
-                                voxels[c].colorIndex = src[c].colorIndex;
-                                voxels[c].mask = src[c].mask;
+                            const std::uint8_t *voxptr = binstart + vgSourceOffset;
+                            const std::uint32_t frameCount = *(std::uint32_t *)voxptr;
+                            voxptr += 4;
+                            
+                            for (std::uint32_t frame = 0; frame < frameCount; frame++) {
+                                const std::uint32_t voxelCount = *(std::uint32_t *)voxptr;
+                                const std::unique_ptr<std::uint8_t[]> &ptr = ctx.vg[i].sourceData.emplace_back(std::make_pair(math::vector2i(voxelCount, 0), std::make_unique<std::uint8_t[]>(sizeof(MeshAsyncContext::VTXMVOX) * voxelCount))).second;
+
+                                for (std::uint32_t c = 0; c < voxelCount; c++) {
+                                    const MeshAsyncContext::Voxel *src = (const MeshAsyncContext::Voxel *)(voxptr + 4);
+                                    MeshAsyncContext::VTXMVOX *voxels = reinterpret_cast<MeshAsyncContext::VTXMVOX *>(ptr.get());
+                                    voxels[c].positionX = src[c].positionX;
+                                    voxels[c].positionY = src[c].positionY;
+                                    voxels[c].positionZ = src[c].positionZ;
+                                    voxels[c].colorIndex = src[c].colorIndex;
+                                    voxels[c].mask = src[c].mask;
+                                }
+                                
+                                voxptr += sizeof(MeshAsyncContext::Voxel) * voxelCount + 4;
                             }
                         }
                     }
@@ -550,16 +558,18 @@ namespace resource {
                                     groundMesh.mapDesc.vegetation.reserve(ctx.vg.size());
                                     groundMesh.mapDesc.map = std::move(ctx.mapData);
                                     for (GroundAsyncContext::VGEntry &item : ctx.vg) {
-                                        if (item.sourceData) {
+                                        if (item.sourceData.size()) {
                                             GroundMapDescription::Vegetation &newVG = groundMesh.mapDesc.vegetation.emplace_back(GroundMapDescription::Vegetation {});
                                             newVG.description = std::move(item.description);
                                             
                                             if (item.sourceType == GroundAsyncContext::VGEntry::SourceType::TEXTURE) {
-                                                newVG.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, item.sourceSize.x, item.sourceSize.y, {item.sourceData.get()});
+                                                const math::vector2i txsize = item.sourceData[0].first;
+                                                newVG.texture = self->_rendering->createTexture(foundation::RenderTextureFormat::R8UN, txsize.x, txsize.y, {item.sourceData[0].second.get()});
                                             }
                                             if (item.sourceType == GroundAsyncContext::VGEntry::SourceType::VOXMESH) {
-                                                newVG.voxelSource = std::move(item.sourceData);
-                                                newVG.voxelCount = item.sourceSize.x;
+                                                for (auto &frame : item.sourceData) {
+                                                    newVG.voxmesh.emplace_back(std::make_pair(frame.first.x, std::move(frame.second)));
+                                                }
                                             }
                                         }
                                     }

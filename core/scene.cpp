@@ -352,25 +352,28 @@ namespace core {
         math::transform3f transform = math::transform3f::identity();
 
     public:
-        VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcount, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc)
+        VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const foundation::RenderTexturePtr &tx)
         : texture(tx)
         {
-            const math::vector2f size = desc.getVector2f("size", {});
+            const math::vector2i size = desc.getVector2i("size", {});
             const int geometryType = int(desc.getInteger("geometry", 0));
-            const float voffset = float(desc.getNumber("voffset", 0.0f));
+            const std::vector<double> voffs = desc.getNumbers("voffset");
 
             if (geometryType == 0) { // grass
                 fillGeometryGrass(rendering, map, margs, size);
             }
             if (geometryType == 1) { // tree leafs
-                const int vsegments = tx->getWidth() / tx->getHeight();
-                fillGeometryFoliage(rendering, map, margs, size, voffset, vsegments);
-            }
-            if (geometryType == 2) { // trunks, stones
-                fillGeometryMeshes(rendering, map, margs, vxm, vcount);
+                fillGeometryFoliage(rendering, map, margs, size, voffs);
             }
         }
-        void fillGeometryGrass(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2f &size) {
+        VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) {
+            const int geometryType = int(desc.getInteger("geometry", 0));
+            if (geometryType == 2) { // trunks, stones
+                fillGeometryMeshes(rendering, map, margs, vxm);
+            }
+        }
+
+        void fillGeometryGrass(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2i &size) {
             std::vector<VTXVEG> vertices;
             std::vector<std::uint32_t> indexes;
             
@@ -409,37 +412,45 @@ namespace core {
                 mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
             }
         }
-        void fillGeometryFoliage(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2f &size, float voffset, int vseg) {
+        void fillGeometryFoliage(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2i &size, const std::vector<double> &voffs) {
             std::vector<VTXVEG> vertices;
             std::vector<std::uint32_t> indexes;
+            
+            const int vsegcnt = std::max(1, int(texture->getWidth()) / size.x);
+            const int rcount = std::max(1, int(texture->getHeight()) / size.x);
+            const float vinc = vsegcnt > 1 ? size.y / float(vsegcnt - 1) : 0.0f;
+            const float tw = 1.0f / float(vsegcnt);
+            const float th = 1.0f / float(rcount);
             
             for (int y = 0; y < margs.y; y++) {
                 for (int x = 0; x < margs.x; x++) {
                     if (map[4 * (y * margs.x + x) + 1] & margs.z) {
                         const std::uint32_t currv = std::uint32_t(vertices.size());
                         const std::uint32_t curri = std::uint32_t(indexes.size());
+                        const int mapi = 4 * (y * margs.x + x) + 2;
+                        const int rindex = map[mapi] % rcount;
+                        const int voffsIndex = map[mapi] % voffs.size();
                         const float px = float(x);
                         const float pz = float(y);
-                        const float vinc = vseg > 1 ? size.y / float(vseg - 1) : 0.0f;
-                        const float tw = vseg > 1 ? 1.0f / float(vseg) : 1.0f;
+                        const float tv = rindex * th;
+
+                        vertices.resize(vertices.size() + vsegcnt * 4);
+                        indexes.resize(indexes.size() + vsegcnt * 6);
                         
-                        vertices.resize(vertices.size() + vseg * 4);
-                        indexes.resize(indexes.size() + vseg * 6);
-                        
-                        for (int i = 0; i < vseg; i++) {
-                            const float ts = float(i) * tw;
-                            const float voff = -0.5f + voffset + float(i) * vinc;
+                        for (int i = 0; i < vsegcnt; i++) {
+                            const float tu = float(i) * tw;
+                            const float voff = -0.5f + float(voffs[voffsIndex]) + float(i) * vinc;
                             const int vstart = currv + i * 4;
                             const int istart = curri + i * 6;
                             
                             vertices[vstart + 0].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
-                            vertices[vstart + 0].uv = math::vector2f(ts, 0.0f);
+                            vertices[vstart + 0].uv = math::vector2f(tu, tv);
                             vertices[vstart + 1].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
-                            vertices[vstart + 1].uv = math::vector2f(ts + tw, 0.0f);
+                            vertices[vstart + 1].uv = math::vector2f(tu + tw, tv);
                             vertices[vstart + 2].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
-                            vertices[vstart + 2].uv = math::vector2f(ts + tw, 1.0f);
+                            vertices[vstart + 2].uv = math::vector2f(tu + tw, tv + th);
                             vertices[vstart + 3].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
-                            vertices[vstart + 3].uv = math::vector2f(ts, 1.0f);
+                            vertices[vstart + 3].uv = math::vector2f(tu, tv + th);
                             
                             indexes[istart + 0] = vstart + 0;
                             indexes[istart + 1] = vstart + 1;
@@ -455,17 +466,19 @@ namespace core {
                 mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
             }
         }
-        void fillGeometryMeshes(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const ByteDataPtr &vxm, std::uint32_t vcount) {
+        void fillGeometryMeshes(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) {
             std::vector<VTXMVOX> voxels;
             
             for (int y = 0; y < margs.y; y++) {
                 for (int x = 0; x < margs.x; x++) {
                     if (map[4 * (y * margs.x + x) + 1] & margs.z) {
                         const std::uint32_t currv = std::uint32_t(voxels.size());
-                        voxels.resize(voxels.size() + vcount);
+                        const int rindex = map[4 * (y * margs.x + x) + 2] % vxm.size();
+                        const std::pair<std::uint32_t, ByteDataPtr> &srcMesh = vxm[rindex];
+                        voxels.resize(voxels.size() + srcMesh.first);
 
-                        for (int i = 0; i < vcount; i++) {
-                            voxels[currv + i] = reinterpret_cast<const VTXMVOX *>(vxm.get())[i];
+                        for (int i = 0; i < srcMesh.first; i++) {
+                            voxels[currv + i] = reinterpret_cast<const VTXMVOX *>(srcMesh.second.get())[i];
                             voxels[currv + i].positionX += x;
                             voxels[currv + i].positionZ += y;
                         }
@@ -615,7 +628,8 @@ namespace core {
         auto addBoundingBox(const math::vector3f &position, const math::bound3f &bbox, const math::color &rgba) -> BoundingBoxPtr override;
         auto addVoxelMesh(const std::vector<foundation::RenderDataPtr> &frames, const util::Description &description) -> VoxelMeshPtr override;
         auto addGroundMesh(const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture) -> GroundMeshPtr override;
-        auto addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcnt, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc) -> VegetationPtr override;
+        auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const foundation::RenderTexturePtr &tx) -> VegetationPtr override;
+        auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) -> VegetationPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
@@ -1061,8 +1075,12 @@ namespace core {
         return _groundMeshes.emplace_back(result);
     }
     
-    SceneInterface::VegetationPtr SceneInterfaceImpl::addVegetation(const foundation::RenderTexturePtr &tx, const ByteDataPtr &vxm, std::uint32_t vcnt, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc) {
-        std::shared_ptr<VegetationImpl> result = std::make_shared<VegetationImpl>(_rendering, tx, vxm, vcnt, map, margs, desc);
+    SceneInterface::VegetationPtr SceneInterfaceImpl::addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const foundation::RenderTexturePtr &tx) {
+        std::shared_ptr<VegetationImpl> result = std::make_shared<VegetationImpl>(_rendering, map, margs, desc, tx);
+        return _vegetations.emplace_back(result);
+    }
+    SceneInterface::VegetationPtr SceneInterfaceImpl::addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) {
+        std::shared_ptr<VegetationImpl> result = std::make_shared<VegetationImpl>(_rendering, map, margs, desc, vxm);
         return _vegetations.emplace_back(result);
     }
     

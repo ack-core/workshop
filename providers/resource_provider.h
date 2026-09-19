@@ -29,8 +29,7 @@ namespace resource {
         struct Vegetation {
             util::Description description;
             foundation::RenderTexturePtr texture;
-            ByteDataPtr voxelSource;
-            std::uint32_t voxelCount = 0;
+            std::vector<std::pair<std::uint32_t, ByteDataPtr>> voxmesh;
         };
         ByteDataPtr map;
         std::vector<Vegetation> vegetation;
