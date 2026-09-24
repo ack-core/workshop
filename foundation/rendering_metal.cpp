@@ -23,8 +23,8 @@ namespace {
     static const std::uint32_t MAX_TEXTURES = 4;
     static const std::uint32_t FRAME_CONST_BINDING_INDEX = 0;
     static const std::uint32_t DRAW_CONST_BINDING_INDEX = 1;
-    static const std::uint32_t VERTEX_IN_BINDING_START = 2;
-    static const std::uint32_t VERTEX_IN_VERTEX_COUNT = 3;
+    static const std::uint32_t VS_INPUT_BINDING_START = 2;
+    static const std::uint32_t VS_INPUT_VERTEX_COUNT = 3;
     
     std::uint32_t roundTo256(std::uint32_t value) {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
@@ -68,33 +68,32 @@ namespace {
         const char *nativeUnpackedName;
         const char *nativePackedTypeName;
         std::uint32_t size;
-        MTLVertexFormat nativeFormat;
     }
     g_formatConversionTable[] = { // index is RenderShaderInputFormat value
-        {"float2",  "packed_half2",         4,  MTLVertexFormatHalf2},
-        {"float4",  "packed_half4",         8,  MTLVertexFormatHalf4},
-        {"float",   "packed_float",         4,  MTLVertexFormatFloat},
-        {"float2",  "packed_float2",        8,  MTLVertexFormatFloat2},
-        {"float3",  "packed_float3",        12, MTLVertexFormatFloat3},
-        {"float4",  "packed_float4",        16, MTLVertexFormatFloat4},
-        {"short2",  "packed_short2",        4,  MTLVertexFormatShort2},
-        {"short4",  "packed_short4",        8,  MTLVertexFormatShort4},
-        {"ushort2", "packed_ushort2",       4,  MTLVertexFormatUShort2},
-        {"ushort4", "packed_ushort4",       8,  MTLVertexFormatUShort4},
-        {"float2",  "rg16snorm<float2>",    4,  MTLVertexFormatShort2Normalized},
-        {"float4",  "rgba16snorm<float4>",  8,  MTLVertexFormatShort4Normalized},
-        {"float2",  "rg16unorm<float2>",    4,  MTLVertexFormatUShort2Normalized},
-        {"float4",  "rgba16unorm<float4>",  8,  MTLVertexFormatUShort4Normalized},
-        {"uchar4",  "packed_uchar4",        4,  MTLVertexFormatUChar4},
-        {"float4",  "rgba8unorm<float4>",   4,  MTLVertexFormatUChar4Normalized},
-        {"int",     "packed_int",           4,  MTLVertexFormatInt},
-        {"int2",    "packed_int2",          8,  MTLVertexFormatInt2},
-        {"int3",    "packed_int3",          12, MTLVertexFormatInt3},
-        {"int4",    "packed_int4",          16, MTLVertexFormatInt4},
-        {"uint",    "packed_uint",          4,  MTLVertexFormatUInt},
-        {"uint2",   "packed_uint2",         8,  MTLVertexFormatUInt2},
-        {"uint3",   "packed_uint3",         12, MTLVertexFormatUInt3},
-        {"uint4",   "packed_uint4",         16, MTLVertexFormatUInt4}
+        {"float2",  "packed_half2",         4},
+        {"float4",  "packed_half4",         8},
+        {"float",   "packed_float",         4},
+        {"float2",  "packed_float2",        8},
+        {"float3",  "packed_float3",        12},
+        {"float4",  "packed_float4",        16},
+        {"short2",  "packed_short2",        4},
+        {"short4",  "packed_short4",        8},
+        {"ushort2", "packed_ushort2",       4},
+        {"ushort4", "packed_ushort4",       8},
+        {"float2",  "rg16snorm<float2>",    4},
+        {"float4",  "rgba16snorm<float4>",  8},
+        {"float2",  "rg16unorm<float2>",    4},
+        {"float4",  "rgba16unorm<float4>",  8},
+        {"uchar4",  "packed_uchar4",        4},
+        {"float4",  "rgba8unorm<float4>",   4},
+        {"int",     "packed_int",           4},
+        {"int2",    "packed_int2",          8},
+        {"int3",    "packed_int3",          12},
+        {"int4",    "packed_int4",          16},
+        {"uint",    "packed_uint",          4},
+        {"uint2",   "packed_uint2",         8},
+        {"uint3",   "packed_uint3",         12},
+        {"uint4",   "packed_uint4",         16}
     };
 
     std::weak_ptr<foundation::RenderingInterface> g_instance;
@@ -442,7 +441,6 @@ namespace foundation {
         bool inoutBlockDone = false;
         bool vssrcBlockDone = false;
         bool fssrcBlockDone = false;
-        int  fndefBlockCount = 0;
         
         while (input >> blockName) {
             if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
@@ -493,7 +491,6 @@ namespace foundation {
                         functions += "    }\n\n";
                         
                         functionDefines += "#define " + funcName + " _fn." + funcName + "\n";
-                        fndefBlockCount++;
                     }
                     else {
                         _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
@@ -518,11 +515,10 @@ namespace foundation {
                     nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n\n";
                 }
 
-                std::size_t index = 0;
-                std::uint32_t offset = 0;
-                std::string variables;
-                
-                auto formInput = [&](const std::vector<InputLayout::Attribute> &desc, std::uint32_t bufferIndex, const char *prefix, const char *assign, std::string &output) {
+                auto formInput = [&](const std::vector<InputLayout::Attribute> &desc, const char *prefix, const char *assign, std::string &output) {
+                    std::string variables;
+                    std::size_t index = 0;
+                    std::uint32_t offset = 0;
                     offset = 0;
                     
                     for (const auto &item : desc) {
@@ -532,6 +528,8 @@ namespace foundation {
                         offset += fmt.size;
                         index++;
                     }
+                    
+                    return variables;
                 };
                 
                 shaderUtils::replace(functions, "const_", "constants.", SEPARATORS);
@@ -551,7 +549,7 @@ namespace foundation {
                 nativeShader += "};\n";
                 nativeShader += functionDefines;
                 nativeShader += "\nstruct _VSVertexIn {\n";
-                formInput(layout.attributes, 0, "vertex_", "vertices[vertex_ID].", nativeShader);
+                std::string variables = formInput(layout.attributes, "vertex_", "vertices[vertex_ID].", nativeShader);
                 nativeShader += "};\n\nvertex _InOut main_vertex(\n";
                 
                 if (layout.repeat > 1) {
@@ -567,7 +565,7 @@ namespace foundation {
                     "    device const _VSVertexIn *vertices [[buffer(2)]],\n"
                     "    constant uint &_vertexCount [[buffer(";
                     
-                nativeShader += std::to_string(VERTEX_IN_VERTEX_COUNT);
+                nativeShader += std::to_string(VS_INPUT_VERTEX_COUNT);
                 nativeShader += ")]],\n"
                     "    sampler _sampler [[sampler(0)]],\n"
                     "    texture2d<float> _texture0 [[texture(0)]],\n"
@@ -1003,10 +1001,10 @@ namespace foundation {
             const InputLayout &layout = _currentShader->getInputLayout();
             const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
             
-            [_currentRenderCommandEncoder setVertexBuffer:nil offset:0 atIndex:VERTEX_IN_BINDING_START];
+            [_currentRenderCommandEncoder setVertexBuffer:nil offset:0 atIndex:VS_INPUT_BINDING_START];
             
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vertexCount length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
+                [_currentRenderCommandEncoder setVertexBytes:&vertexCount length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vertexCount];
             }
             else {
@@ -1034,10 +1032,10 @@ namespace foundation {
             }
 
             //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
-            [_currentRenderCommandEncoder setVertexBuffer:vbuffer offset:0 atIndex:VERTEX_IN_BINDING_START];
+            [_currentRenderCommandEncoder setVertexBuffer:vbuffer offset:0 atIndex:VS_INPUT_BINDING_START];
 
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
+                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt * instanceCount];
             }
             else {
@@ -1065,7 +1063,7 @@ namespace foundation {
                     std::memcpy(dynamicMemory + _dynamicBufferOffset + vlen, indexes, icnt * sizeof(std::uint32_t));
                 }
                 
-                [_currentRenderCommandEncoder setVertexBuffer:_dynamicBuffers[_dynamicBuffersIndex] offset:_dynamicBufferOffset atIndex:VERTEX_IN_BINDING_START];
+                [_currentRenderCommandEncoder setVertexBuffer:_dynamicBuffers[_dynamicBuffersIndex] offset:_dynamicBufferOffset atIndex:VS_INPUT_BINDING_START];
             }
             else {
                 _platform->logError("[MetalRendering::_appendConstantBuffer] Out of dynamic buffer length\n");
@@ -1073,7 +1071,7 @@ namespace foundation {
             }
             
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VERTEX_IN_VERTEX_COUNT];
+                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt];
             }
             else {

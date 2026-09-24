@@ -1,6 +1,5 @@
 
 #include "util.h"
-#include "math.h"
 
 namespace util {
     std::int64_t strstream::atoi(const char *s, std::size_t &len) {

@@ -6,6 +6,8 @@ set(
 	"${m_source_root}/math.h"
 	"${m_source_root}/util.h"
 	"${m_source_root}/util.cpp"
+	"${m_source_root}/shader.h"
+	"${m_source_root}/shader.cpp"
 	"${m_source_root}/platform.h"
 	"${m_source_root}/platform_windows.h"
 	"${m_source_root}/platform_windows.cpp"
