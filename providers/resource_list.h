@@ -3,21 +3,21 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
-        {"meshes/a-knight-blue", { 15, 187, 1835626081 }},
-        {"meshes/a-knight-red", { 15, 187, 1835626081 }},
-        {"meshes/castle-00", { 50, 60, 1835626081 }},
-        {"meshes/castle-01", { 62, 60, 1835626081 }},
-        {"meshes/b-tavern-0", { 13, 58, 1835626081 }},
-        {"meshes/ruins", { 64, 1, 256 }},
-        {"meshes/b-bows-0", { 15, 58, 1835626081 }},
-        {"meshes/b-blacksmith-0", { 12, 58, 1835626081 }},
-        {"meshes/voxtest", { 3, 1, 256 }},
+        {"meshes/a-knight-blue", { 1, 187, 1835626081 }},
+        {"meshes/a-knight-red", { 1, 187, 1835626081 }},
+        {"meshes/castle-00", { 1, 60, 1835626081 }},
+        {"meshes/castle-01", { 1, 60, 1835626081 }},
+        {"meshes/b-tavern-0", { 1, 58, 1835626081 }},
+        {"meshes/ruins", { 1, 1, 256 }},
+        {"meshes/b-bows-0", { 1, 58, 1835626081 }},
+        {"meshes/e-tree-0", { 1, 1, 256 }},
+        {"meshes/b-blacksmith-0", { 1, 58, 1835626081 }},
+        {"meshes/voxtest", { 1, 1, 256 }},
         {"meshes/1x1x1", { 1, 1, 256 }},
     };
 }
 namespace resource {
     const std::unordered_map<const char *, TextureInfo> TEXTURES_LIST = {
-        { "textures/misc/green", { 16, 16, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/castle-hp-bar", { 183, 37, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/joystick_bg", { 248, 248, foundation::RenderTextureFormat::RGBA8UN }},
         { "textures/ui/button_down", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},

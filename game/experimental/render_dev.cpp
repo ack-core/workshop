@@ -100,44 +100,52 @@ namespace game {
 //        });
         _api.resources->getOrLoadVoxelMesh("meshes/a-knight-blue", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
             _knight = _api.scene->addVoxelMesh(frames, desc);
-            _knight->setPosition({55, 0, 48});
+            _knight->setPosition({10, 0, 5});
         });
         
-        _api.resources->getOrLoadGround("grounds/test", [this](const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture, const resource::GroundMapDescription &desc) {
-            _ground = _api.scene->addGroundMesh(mesh, texture);
-            const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
-            for (std::size_t i = 0; i < desc.vegetation.size(); i++) {
-                const auto &vg = desc.vegetation[i];
-                if (vg.texture) {
-                    _api.scene->addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.texture);
-                }
-                else if (vg.voxmesh.size()) {
-                    _api.scene->addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.voxmesh);
-                }
-            }
-//            if (const util::Description *vg = desc->cfg.getDescription("vegetation")) {
-//                const std::vector<const util::Description *> vgTypes = vg->getDescriptions("type");
-//                const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
-//
-//                //for (std::uint8_t i = 0; i < std::uint8_t(vgTypes.size()); i++) {
-//                {
-//                    const util::Description *type = vgTypes[0];
-//                    if (const std::string *texture = type->getString("source")) {
-//                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
-//                            _grass = _api.scene->addVegetation(tx, desc->map, msize, 0, *type);
-//                        });
-//                    }
+        _img0 = _api.ui->addImage(std::nullopt, nullptr, ui::StageInterface::ImageParams {
+            .anchorH = ui::HorizontalAnchor::LEFT,
+            .anchorV = ui::VerticalAnchor::TOP,
+            .anchorOffset = math::vector2f(0.0f, 0.0f),
+            .texture = "textures/ui/castle-hp-bar",
+        });
+
+        
+//        _api.resources->getOrLoadGround("grounds/test", [this](const foundation::RenderDataPtr &mesh, const foundation::RenderTexturePtr &texture, const resource::GroundMapDescription &desc) {
+//            _ground = _api.scene->addGroundMesh(mesh, texture);
+//            const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
+//            for (std::size_t i = 0; i < desc.vegetation.size(); i++) {
+//                const auto &vg = desc.vegetation[i];
+//                if (vg.texture) {
+//                    _api.scene->addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.texture);
 //                }
-//                {
-//                    const util::Description *type = vgTypes[1];
-//                    if (const std::string *texture = type->getString("source")) {
-//                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
-//                            _api.scene->addVegetation(tx, desc->map, msize, 1, *type);
-//                        });
-//                    }
+//                else if (vg.voxmesh.size()) {
+//                    _api.scene->addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.voxmesh);
 //                }
 //            }
-        });
+////            if (const util::Description *vg = desc->cfg.getDescription("vegetation")) {
+////                const std::vector<const util::Description *> vgTypes = vg->getDescriptions("type");
+////                const math::vector2i msize = math::vector2i(texture->getWidth() + 1, texture->getHeight() + 1);
+////
+////                //for (std::uint8_t i = 0; i < std::uint8_t(vgTypes.size()); i++) {
+////                {
+////                    const util::Description *type = vgTypes[0];
+////                    if (const std::string *texture = type->getString("source")) {
+////                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
+////                            _grass = _api.scene->addVegetation(tx, desc->map, msize, 0, *type);
+////                        });
+////                    }
+////                }
+////                {
+////                    const util::Description *type = vgTypes[1];
+////                    if (const std::string *texture = type->getString("source")) {
+////                        _api.resources->getOrLoadTexture(texture->c_str(), [this, desc, type, msize](const foundation::RenderTexturePtr &tx) {
+////                            _api.scene->addVegetation(tx, desc->map, msize, 1, *type);
+////                        });
+////                    }
+////                }
+////            }
+//        });
         
         
     }
@@ -147,6 +155,6 @@ namespace game {
     }
     
     void RenderDevContext::update(float dtSec) {
-        _api.scene->setCameraLookAt(math::vector3f{64, 0, 64} + _orbit, math::vector3f{64, 0, 64});
+        _api.scene->setCameraLookAt(_orbit, math::vector3f{0, 0, 0});
     }
 }

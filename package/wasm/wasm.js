@@ -30,7 +30,10 @@ if (!crossOriginIsolated) {
 }
 
 const WASM_BINARY = document.currentScript.getAttribute('binary');
-const BUFFERS_REUSE_MAX = 2048;
+const SHADER_CONST_BUFFERS_REUSE_MAX = 2048;
+const DYNAMIC_VBUFFER_MAX = 1024 * 1024 * 3;
+const DYNAMIC_IBUFFER_MAX = 1024 * 1024 * 3;
+
 const FRAME_CONST_BINDING_INDEX = 0;
 const DRAW_CONST_BINDING_INDEX = 1;
 const POINTER_DOWN = 1;
@@ -62,6 +65,7 @@ var glShaderIDCounter = 0x10000000;
 var glBufferIDCounter = 0x20000000;
 var glTextureIDCounter = 0x30000000;
 var glFrameBufferIDCounter = 0x40000000;
+var gldynamic = {};
 var glshaders = {};
 var glbuffers = {};
 var gltextures = {};
@@ -226,9 +230,9 @@ const imports = {
                 instance.exports.fileSaved(block, pathLen, false);
             }
         },
-        js_editorMsg: function(msg, msglen, data, datalen) {
+        js_editorMsg: function(msg, msglen, data, dataLen) {
             const u8msg = new Uint8Array(memory.buffer, msg, msglen);
-            const u8data = new Uint8Array(memory.buffer, data, datalen);
+            const u8data = new Uint8Array(memory.buffer, data, dataLen);
             const handler = uiEditor[String.fromCharCode(...u8msg)];
 
             if (handler) {
@@ -337,6 +341,7 @@ const imports = {
                 const mw = w >> i;
                 const mh = h >> i;
                 const mipData = new Uint8Array(memory.buffer, mipPtrs[i], mw * mh * size);
+                glcontext.pixelStorei(glcontext.UNPACK_ALIGNMENT, 1);
                 glcontext.texSubImage2D(glcontext.TEXTURE_2D, i, 0, 0, mw, mh, format, type, mipData);
             }
 
@@ -449,7 +454,7 @@ const imports = {
             glcontext.bindBuffer(glcontext.UNIFORM_BUFFER, shaderConstantBuffers[shaderConstantIndex]);
             glcontext.bufferData(glcontext.UNIFORM_BUFFER, u8mem, glcontext.DYNAMIC_DRAW);
             glcontext.bindBufferBase(glcontext.UNIFORM_BUFFER, index, shaderConstantBuffers[shaderConstantIndex]);
-            shaderConstantIndex = (shaderConstantIndex + 1) % BUFFERS_REUSE_MAX;
+            shaderConstantIndex = (shaderConstantIndex + 1) % SHADER_CONST_BUFFERS_REUSE_MAX;
         },
         webgl_applyTexture: function(index, textureID, samplingType) {
             const texture = gltextures[textureID];
@@ -477,7 +482,52 @@ const imports = {
                 glcontext.vertexAttribDivisor(i, instanceCount);
             }
             glcontext.drawArraysInstanced(topology, 0, vertexCount, totalInstCount);
-        }
+        },
+        webgl_drawDynamic: function(layout, layoutLen, ptr, dataLen, stride, idx, icount, repeat, topology) {
+            const u8mem = new Uint8Array(memory.buffer, ptr, dataLen);
+            const lmem = new Uint8Array(memory.buffer, layout, layoutLen);
+
+            if (gldynamic.voffset + dataLen > DYNAMIC_VBUFFER_MAX || gldynamic.ioffset + 4 * icount > DYNAMIC_IBUFFER_MAX) {
+                gldynamic.voffset = 0;
+                gldynamic.ioffset = 0;
+            }
+
+            glcontext.bindVertexArray(gldynamic.layout);
+            glcontext.bindBuffer(glcontext.ARRAY_BUFFER, gldynamic.vbuffer);
+            glcontext.bufferSubData(glcontext.ARRAY_BUFFER, gldynamic.voffset, u8mem);
+            
+            for (let i = 0, offset = 0; i < layoutLen; i++) {
+                glcontext.enableVertexAttribArray(i);
+                glcontext.vertexAttribDivisor(i, 1);
+                offset += vertexAttribFunctions[lmem[i]](i, stride, offset + gldynamic.voffset);
+            }
+            if (gldynamic.lastActiveAttribs > layoutLen) {
+                for (let i = layoutLen; i < gldynamic.lastActiveAttribs; i++) {
+                    glcontext.disableVertexAttribArray(i);
+                }
+            }
+            gldynamic.lastActiveAttribs = layoutLen;
+
+            if (repeat > 1) {
+                if (uniformInstanceCountLocation) {
+                    glcontext.uniform1i(uniformInstanceCountLocation, 1);
+                }
+                glcontext.drawArraysInstanced(topology, 0, repeat, dataLen / stride);
+            }
+            else {
+                if (idx) {
+                    glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, gldynamic.ibuffer);
+                    glcontext.bufferSubData(glcontext.ELEMENT_ARRAY_BUFFER, gldynamic.ioffset, idx);
+                    glcontext.drawElements(topology, icount, glcontext.UNSIGNED_INT, gldynamic.ioffset);
+                }
+                else {
+                    glcontext.drawArrays(topology, 0, dataLen / stride);
+                }
+            }
+
+            gldynamic.voffset = (gldynamic.voffset + dataLen + 15) & ~15;
+            gldynamic.ioffset = (gldynamic.ioffset + 4 * icount + 15) & ~15;
+        }   
     }
 };
 
@@ -544,7 +594,7 @@ worker.onmessage = (msg) => {
         glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_S, glcontext.REPEAT);
         glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_T, glcontext.REPEAT);
 
-        for (let i = 0; i < BUFFERS_REUSE_MAX; i++) {
+        for (let i = 0; i < SHADER_CONST_BUFFERS_REUSE_MAX; i++) {
             shaderConstantBuffers[i] = glcontext.createBuffer();
         }
         
@@ -560,7 +610,24 @@ worker.onmessage = (msg) => {
         glcontext.bindBuffer(glcontext.ARRAY_BUFFER, null);
         glcontext.depthFunc(glcontext.GREATER);
         glcontext.drawingBufferColorSpace = "display-p3";
-        
+
+        gldynamic = {
+            layout: glcontext.createVertexArray(),
+            vbuffer: glcontext.createBuffer(),
+            ibuffer: glcontext.createBuffer(),
+            voffset: 0,
+            ioffset: 0,
+            lastActiveAttribs: 0
+        };
+        glcontext.bindVertexArray(gldynamic.layout);
+        glcontext.bindBuffer(glcontext.ARRAY_BUFFER, gldynamic.vbuffer);
+        glcontext.bufferData(glcontext.ARRAY_BUFFER, DYNAMIC_VBUFFER_MAX, glcontext.DYNAMIC_DRAW);
+        glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, gldynamic.ibuffer);
+        glcontext.bufferData(glcontext.ELEMENT_ARRAY_BUFFER, DYNAMIC_IBUFFER_MAX, glcontext.DYNAMIC_DRAW);
+        glcontext.bindVertexArray(null);
+        glcontext.bindBuffer(glcontext.ARRAY_BUFFER, null);
+        glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, null);
+
         recreateDefaultFBO();
         instance.exports.initialize();
         instance.exports.resized(targetWidth, targetHeight);

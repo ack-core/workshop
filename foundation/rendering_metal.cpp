@@ -9,6 +9,7 @@
 #endif
 
 #include "util.h"
+#include "shader.h"
 #include "rendering_metal.h"
 
 namespace {
@@ -63,50 +64,8 @@ namespace {
             target.destinationRGBBlendFactor = MTLBlendFactorOne;
         }
     };
-    
-    struct NativeFormat {
-        const char *nativeUnpackedName;
-        const char *nativePackedTypeName;
-        std::uint32_t size;
-    }
-    g_formatConversionTable[] = { // index is RenderShaderInputFormat value
-        {"float2",  "packed_half2",         4},
-        {"float4",  "packed_half4",         8},
-        {"float",   "packed_float",         4},
-        {"float2",  "packed_float2",        8},
-        {"float3",  "packed_float3",        12},
-        {"float4",  "packed_float4",        16},
-        {"short2",  "packed_short2",        4},
-        {"short4",  "packed_short4",        8},
-        {"ushort2", "packed_ushort2",       4},
-        {"ushort4", "packed_ushort4",       8},
-        {"float2",  "rg16snorm<float2>",    4},
-        {"float4",  "rgba16snorm<float4>",  8},
-        {"float2",  "rg16unorm<float2>",    4},
-        {"float4",  "rgba16unorm<float4>",  8},
-        {"uchar4",  "packed_uchar4",        4},
-        {"float4",  "rgba8unorm<float4>",   4},
-        {"int",     "packed_int",           4},
-        {"int2",    "packed_int2",          8},
-        {"int3",    "packed_int3",          12},
-        {"int4",    "packed_int4",          16},
-        {"uint",    "packed_uint",          4},
-        {"uint2",   "packed_uint2",         8},
-        {"uint3",   "packed_uint3",         12},
-        {"uint4",   "packed_uint4",         16}
-    };
 
     std::weak_ptr<foundation::RenderingInterface> g_instance;
-}
-
-namespace foundation {
-    std::uint32_t InputLayout::getStride() const {
-        std::uint32_t stride = 0;
-        for (const InputLayout::Attribute &item : attributes) {
-            stride += g_formatConversionTable[int(item.format)].size;
-        }
-        return stride;
-    }
 }
 
 namespace foundation {
@@ -306,12 +265,9 @@ namespace foundation {
         _frameConstants.cameraDirection.xyz = camDir;
     }
     
-    // TODO: dedicate shader generator (DRY)
-    //
     RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const InputLayout &layout) {
         std::shared_ptr<RenderShader> result;
         util::strstream input(shadersrc, strlen(shadersrc));
-        const std::string indent = "    ";
         
         if (_shaderNames.find(name) == _shaderNames.end()) {
             _shaderNames.emplace(name);
@@ -320,346 +276,11 @@ namespace foundation {
             _platform->logError("[MetalRendering::createShader] shader name '%s' already used\n", name);
         }
         
-        static const std::string SEPARATORS = " ;,=-+*/{(\n\t\r";
-        static const std::size_t TYPES_COUNT = 14;
-        static const std::size_t TYPES_PASS_COUNT = 4;
-        static const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
-            // Passing from App side
-            {"float4",  "float4",   16},
-            {"int4",    "int4",     16},
-            {"uint4",   "uint4",    16},
-            {"matrix4", "float4x4", 64},
-            // Internal shader types
-            {"float1",  "float",    4},
-            {"float2",  "float2",   8},
-            {"float3",  "float3",   12},
-            {"int1",    "int",      4},
-            {"int2",    "int2",     8},
-            {"int3",    "int3",     12},
-            {"uint1",   "uint",     4},
-            {"uint2",   "uint2",    8},
-            {"uint3",   "uint3",    12},
-            {"matrix3", "float3x3", 36},
-        };
+        std::string error;
+        const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(shadersrc, layout, error);
+        const std::string nativeShader = shaderUtils::makeLines(vs + fs);
         
-        auto formFixedBlock = [&indent](util::strstream &stream, std::string &output) {
-            std::string varname, arg;
-            
-            while (stream >> varname && varname[0] != '}') {
-                if (stream >> util::sequence(":") >> arg >> util::sequence("=")) {
-                    std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
-                    std::string nativeTypeName;
-                    
-                    if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, TYPES_COUNT, nativeTypeName, elementSize)) {
-                        output += "constant " + nativeTypeName + " fixed_" + varname + " = {\n";
-                        for (std::size_t i = 0; i < elementCount; i++) {
-                            output += indent + nativeTypeName + "(";
-
-                            if (stream >> util::braced(output, '[', ']')) {
-                                output += "),\n";
-                            }
-                            else return false;
-                        }
-                        
-                        output += "};\n\n";
-                        continue;
-                    }
-                }
-                
-                return false;
-            }
-            
-            return true;
-        };
-
-        auto formVarsBlock = [&indent](util::strstream &stream, std::string &output, std::size_t allowedTypeCount) {
-            std::string varname, arg;
-            std::uint32_t totalLength = 0;
-            
-            while (stream >> varname && varname[0] != '}') {
-                if (stream >> util::sequence(":") >> arg) {
-                    std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
-                    std::string nativeTypeName;
-                    
-                    if (shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
-                        output += indent + nativeTypeName + " " + varname + ";\n";
-                        totalLength += elementSize * elementCount;
-                        continue;
-                    }
-                }
-                
-                return std::uint32_t(0);
-            }
-            
-            return totalLength;
-        };
-        
-        std::string nativeShader =
-            "#include <metal_stdlib>\n"
-            "using namespace metal;\n"
-            "\n"
-            "#define _sign(a) (2.0 * step(0.0, a) - 1.0)\n"
-            "#define _sin(a) sin(a)\n"
-            "#define _cos(a) cos(a)\n"
-            "#define _abs(a) abs(a)\n"
-            "#define _sat(a) saturate(a)\n"
-            "#define _frac(a) fract(a)\n"
-            "#define _transform(a, b) ((b) * (a))\n"
-            "#define _dot(a, b) dot((a), (b))\n"
-            "#define _cross(a, b) cross((a), (b))\n"
-            "#define _len(a) length(a)\n"
-            "#define _pow(a, b) pow((a), (b))\n"
-            "#define _floor(a) floor(a)\n"
-            "#define _clamp(a) clamp(a, 0.0, 1.0)\n"
-            "#define _norm(a) normalize(a)\n"
-            "#define _lerp(a, b, k) mix((a), (b), k)\n"
-            "#define _select(a, b, k) select((a), (b), k)\n"
-            "#define _step(k, a) step((k), (a))\n"
-            "#define _smooth(a, b, k) smoothstep((a), (b), (k))\n"
-            "#define _min(a, b) min((a), (b))\n"
-            "#define _max(a, b) max((a), (b))\n"
-            "#define _tex2d(i, a) _texture##i.sample(_sampler, a)\n"
-            "#define _discard() discard_fragment()\n"
-            "\n"
-            "struct _FrameData {\n"
-            "    float4x4 plmVPMatrix;\n"
-            "    float4x4 stdVPMatrix;\n"
-            "    float4x4 invVPMatrix;\n"
-            "    float4 cameraPosition;\n"
-            "    float4 cameraDirection;\n"
-            "    float4 rtBounds;\n"
-            "};\n\n";
-        
-        std::string functions;
-        std::string functionDefines;
-        std::string blockName;
-        std::uint32_t constBlockLength = 0;
-        
-        bool completed = true;
-        bool fixedBlockDone = false;
-        bool constBlockDone = false;
-        bool inoutBlockDone = false;
-        bool vssrcBlockDone = false;
-        bool fssrcBlockDone = false;
-        
-        while (input >> blockName) {
-            if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
-                if (formFixedBlock(input, nativeShader) == false) {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'fixed' block\n", name);
-                    completed = false;
-                    break;
-                }
-
-                fixedBlockDone = true;
-                continue;
-            }
-            if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
-                nativeShader += "struct _Constants {\n";
-                
-                if ((constBlockLength = formVarsBlock(input, nativeShader, TYPES_PASS_COUNT)) == 0) {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'const' block\n", name);
-                    completed = false;
-                    break;
-                }
-                nativeShader += "};\n\n";
-                constBlockDone = true;
-                continue;
-            }
-            if (inoutBlockDone == false && blockName == "inout" && (input >> util::sequence("{"))) {
-                nativeShader += "struct _InOut {\n    float4 position [[position]];\n";
-                
-                if (formVarsBlock(input, nativeShader, TYPES_COUNT) == 0) {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' has ill-formed 'inout' block\n", name);
-                    completed = false;
-                    break;
-                }
-                nativeShader += "};\n\n";
-                inoutBlockDone = true;
-                continue;
-            }
-            if (blockName == "fndef") {
-                std::string funcName;
-                std::string funcSignature;
-                std::string funcReturnType;
-                
-                if (input >> util::word(funcName) >> util::braced(funcSignature, '(', ')') >> util::sequence("->") >> funcReturnType >> util::sequence("{")) {
-                    std::string codeBlock;
-                    
-                    if (shaderUtils::formCodeBlock("        ", input, codeBlock)) {
-                        functions += "    " + funcReturnType + " " + funcName + "(" + funcSignature + ") {\n";
-                        functions += codeBlock;
-                        functions += "    }\n\n";
-                        
-                        functionDefines += "#define " + funcName + " _fn." + funcName + "\n";
-                    }
-                    else {
-                        _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fndef' block\n", name);
-                        completed = false;
-                        break;
-                    }
-                }
-                else {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' has invalid 'fndef' block\n", name);
-                    completed = false;
-                    break;
-                }
-                continue;
-            }
-            if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
-                if (constBlockDone == false) {
-                    constBlockDone = true;
-                    nativeShader += "struct _Constants {\n};\n\n";
-                }
-                if (inoutBlockDone == false) {
-                    inoutBlockDone = true;
-                    nativeShader += "struct _InOut {\n    float4 position [[position]];\n};\n\n";
-                }
-
-                auto formInput = [&](const std::vector<InputLayout::Attribute> &desc, const char *prefix, const char *assign, std::string &output) {
-                    std::string variables;
-                    std::size_t index = 0;
-                    std::uint32_t offset = 0;
-                    offset = 0;
-                    
-                    for (const auto &item : desc) {
-                        NativeFormat &fmt = g_formatConversionTable[int(item.format)];
-                        variables += indent + "const " + fmt.nativeUnpackedName + " " + prefix + item.name + " = " + std::string(assign) + item.name + ";\n";
-                        output += indent + fmt.nativePackedTypeName + " " + item.name + ";\n";
-                        offset += fmt.size;
-                        index++;
-                    }
-                    
-                    return variables;
-                };
-                
-                shaderUtils::replace(functions, "const_", "constants.", SEPARATORS);
-                shaderUtils::replace(functions, "frame_", "framedata.", SEPARATORS);
-                
-                nativeShader +=
-                    "struct _FN {\n    "
-                    "constant const _FrameData &framedata;\n    "
-                    "constant const _Constants &constants;\n    "
-                    "thread const texture2d<float> &_texture0;\n    "
-                    "thread const texture2d<float> &_texture1;\n    "
-                    "thread const texture2d<float> &_texture2;\n    "
-                    "thread const texture2d<float> &_texture3;\n    "
-                    "thread const sampler &_sampler;\n\n";
-                    
-                nativeShader += functions;
-                nativeShader += "};\n";
-                nativeShader += functionDefines;
-                nativeShader += "\nstruct _VSVertexIn {\n";
-                std::string variables = formInput(layout.attributes, "vertex_", "vertices[vertex_ID].", nativeShader);
-                nativeShader += "};\n\nvertex _InOut main_vertex(\n";
-                
-                if (layout.repeat > 1) {
-                    nativeShader += "    unsigned int _r_ID [[vertex_id]],\n    unsigned int _i_ID [[instance_id]],\n";
-                }
-                else {
-                    nativeShader += "    unsigned int _v_ID [[vertex_id]],\n    unsigned int _i_ID [[instance_id]],\n";
-                }
-                
-                nativeShader +=
-                    "    constant _FrameData &framedata [[buffer(0)]],\n"
-                    "    constant _Constants &constants [[buffer(1)]],\n"
-                    "    device const _VSVertexIn *vertices [[buffer(2)]],\n"
-                    "    constant uint &_vertexCount [[buffer(";
-                    
-                nativeShader += std::to_string(VS_INPUT_VERTEX_COUNT);
-                nativeShader += ")]],\n"
-                    "    sampler _sampler [[sampler(0)]],\n"
-                    "    texture2d<float> _texture0 [[texture(0)]],\n"
-                    "    texture2d<float> _texture1 [[texture(1)]],\n"
-                    "    texture2d<float> _texture2 [[texture(2)]],\n"
-                    "    texture2d<float> _texture3 [[texture(3)]])\n{\n";
-                
-                if (layout.repeat > 1) {
-                    nativeShader += "    const int repeat_ID = _r_ID;\n";
-                    nativeShader += "    const int vertex_ID = _i_ID % _vertexCount;\n";
-                    nativeShader += "    const int instance_ID = _i_ID / _vertexCount;\n";
-                }
-                else {
-                    nativeShader += "    const int repeat_ID = 0;\n";
-                    nativeShader += "    const int vertex_ID = _v_ID;\n";
-                    nativeShader += "    const int instance_ID = _i_ID;\n";
-                }
-                
-                nativeShader += variables;
-                nativeShader += "    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n    _InOut output;\n\n";
-
-                std::string codeBlock;
-                
-                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'vssrc' block\n", name);
-                    completed = false;
-                    break;
-                }
-                
-                shaderUtils::replace(codeBlock, "output_", "output.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
-                
-                nativeShader += codeBlock;
-                nativeShader += "\n    (void)repeat_ID; (void)vertex_ID; (void)instance_ID;(void)_fn;\n";
-                nativeShader += "    return output;\n}\n\n";
-                vssrcBlockDone = true;
-                continue;
-            }
-            if (fssrcBlockDone == false && blockName == "fssrc" && (input >> util::sequence("{"))) {
-                if (vssrcBlockDone == false) {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' : 'vssrc' block must be defined before 'fssrc'\n", name);
-                    completed = false;
-                    break;
-                }
-                
-                nativeShader +=
-                    "struct _Output {\n"
-                    "    float4 c0[[color(0)]];\n"
-                    "    float4 c1[[color(1)]];\n"
-                    "    float4 c2[[color(2)]];\n"
-                    "    float4 c3[[color(3)]];\n"
-                    "};\n\n"
-                    "fragment _Output main_fragment(\n    "
-                    "_InOut input [[stage_in]],\n    "
-                    "sampler _sampler [[sampler(0)]],\n    "
-                    "texture2d<float> _texture0 [[texture(0)]],\n    "
-                    "texture2d<float> _texture1 [[texture(1)]],\n    "
-                    "texture2d<float> _texture2 [[texture(2)]],\n    "
-                    "texture2d<float> _texture3 [[texture(3)]],\n"
-                    "";
-
-                nativeShader += "    constant _FrameData &framedata [[buffer(0)]],\n";
-                nativeShader += "    constant _Constants &constants [[buffer(1)]])\n{\n";
-                nativeShader += "    float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n";
-                nativeShader += "    float4 output_color[4] = {};\n    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n\n";
-                
-                std::string codeBlock;
-                
-                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
-                    _platform->logError("[MetalRendering::createShader] shader '%s' has uncompleted 'fssrc' block\n", name);
-                    completed = false;
-                    break;
-                }
-                
-                shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
-                shaderUtils::replace(codeBlock, "input_", "input.", SEPARATORS);
-                
-                nativeShader += codeBlock;
-                nativeShader += "\n    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";
-                nativeShader += "    (void)fragment_coord;(void)_fn;\n";
-                nativeShader += "}\n";
-                fssrcBlockDone = true;
-                continue;
-            }
-            
-            _platform->logError("[MetalRendering::createShader] shader '%s' has unexpected '%s' block\n", name, blockName.data());
-        }
-        
-        nativeShader = shaderUtils::makeLines(nativeShader);
-        //printf("---------- begin ----------\n%s\n----------- end -----------\n", nativeShader.data());
-        
-        if (completed && vssrcBlockDone && fssrcBlockDone) {
+        if (error.empty()) {
             @autoreleasepool {
                 NSError *nsError = nil;
                 MTLCompileOptions* compileOptions = [MTLCompileOptions new];
@@ -669,7 +290,7 @@ namespace foundation {
                 id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
                 
                 if (library) {
-                    result = std::make_shared<MetalShader>(name, layout, library, constBlockLength);
+                    result = std::make_shared<MetalShader>(name, layout, library, constLength);
                 }
                 else {
                     const char *errorDesc = [[nsError localizedDescription] UTF8String];
@@ -677,11 +298,8 @@ namespace foundation {
                 }
             }
         }
-        else if(vssrcBlockDone == false) {
-            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'vssrc' block\n", name);
-        }
-        else if(fssrcBlockDone == false) {
-            _platform->logError("[MetalRendering::createShader] shader '%s' missing 'fssrc' block\n", name);
+        else {
+            _platform->logError("[MetalRendering::createShader] shader '%s' error : %s\n", name, error.data());
         }
 
         return result;

@@ -863,7 +863,7 @@ namespace {
         fssrc {
             float paletteIndex = _tex2d(0, input_uv).r;
             if (paletteIndex < 0.0039) {
-                discard_fragment();
+                _discard();
             }
             output_color[0] = float4(0.5, 1.0, 0.5, paletteIndex);
         }

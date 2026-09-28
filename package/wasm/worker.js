@@ -50,7 +50,8 @@ onmessage = (msg) => {
                 webgl_applyTexture: (index, textureID, samplingType) => { throw "can't access webgl from background" },
                 webgl_drawDefault: (buffer, vertexCount, instanceCount, topology) => { throw "can't access webgl from background" },
                 webgl_drawIndexed: (buffer, indexes, indexCount, topology) => { throw "can't access webgl from background" },
-                webgl_drawWithRepeat: (buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) => { throw "can't access webgl from background" }
+                webgl_drawWithRepeat: (buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) => { throw "can't access webgl from background" },
+                webgl_drawDynamic: (layout, layoutLen, ptr, dataLen, stride, idx, icount, repeat, topology) => { throw "can't access webgl from background" }
             }
         };
 

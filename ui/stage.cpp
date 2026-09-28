@@ -543,6 +543,7 @@ namespace ui {
         
     protected:
         void _makeText() {
+            _instances.clear();
             _positionChanged = true;
             _textureWeak = _facility.getFontAtlasProvider()->getTextFontAtlas(_text.data(), _fontSize, 0, _chars);
             if (_shadowColor.a > 0.0f) {

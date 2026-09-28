@@ -8,10 +8,10 @@
 #include "core/raycast.h"
 #include "core/simulation.h"
 #include "ui/stage.h"
+#include "datahub/datahub.h"
 
 #include "game/game.h"
 #include "game/state_manager.h"
-#include "datahub/datahub.h"
 
 foundation::PlatformInterfacePtr platform;
 foundation::RenderingInterfacePtr rendering;
@@ -38,7 +38,7 @@ extern "C" void initialize() {
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
             stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
             datahub = dh::DataHub::instance(platform, game::datahub);
-            stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage, datahub);
+            stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
             stateManager->switchToState("default");
             
             platform->setLoop([](float dtSec) {

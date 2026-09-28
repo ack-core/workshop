@@ -20,6 +20,7 @@ extern "C" {
     void webgl_drawDefault(WebGLId data, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
     void webgl_drawIndexed(WebGLId data, std::uint32_t indexCount, std::uint32_t instanceCount, GLenum topology);
     void webgl_drawWithRepeat(WebGLId data, std::uint32_t attrCount, std::uint32_t instanceCount, std::uint32_t vertexCount, std::uint32_t totalInstCount, GLenum topology);
+    void webgl_drawDynamic(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride, const std::uint32_t *idx, std::uint32_t icount, std::uint32_t repeat, GLenum topology);
     void webgl_deleteProgram(WebGLId id);
     void webgl_deleteData(WebGLId id);
     void webgl_deleteTexture(WebGLId id);
@@ -761,7 +762,20 @@ namespace foundation {
     }
     
     void WASMRendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
-        
+        if (_currentShader) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+
+            if (vcnt && layout.attributes.empty() == false) {
+                const std::uint32_t stride = layout.getStride();
+                std::uint8_t *memory = _getUploadBuffer(layout.attributes.size() + stride * vcnt);
+                for (std::size_t i = 0; i < layout.attributes.size(); i++) {
+                    memory[i] = std::uint8_t(layout.attributes[i].format);
+                }
+                
+                memcpy(memory + layout.attributes.size(), data, stride * vcnt);
+                webgl_drawDynamic(memory, layout.attributes.size(), memory + layout.attributes.size(), vcnt * stride, stride, indexes, icnt, layout.repeat, g_topologies[int(_topology)]);
+            }
+        }
     }
     
     void WASMRendering::presentFrame() {

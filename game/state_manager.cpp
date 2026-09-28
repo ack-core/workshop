@@ -16,8 +16,7 @@ namespace game {
             const core::WorldInterfacePtr &world,
             const core::RaycastInterfacePtr &raycast,
             const core::SimulationInterfacePtr &simulation,
-            const ui::StageInterfacePtr &ui,
-            const dh::DataHubPtr &dh
+            const ui::StageInterfacePtr &ui
         )
         : _platform(platform)
         , _resourceProvider(resourceProvider)
@@ -27,7 +26,6 @@ namespace game {
         , _raycast(raycast)
         , _simulation(simulation)
         , _ui(ui)
-        , _dh(dh)
         {
         }
         ~StateManagerImpl() override {}
@@ -50,21 +48,6 @@ namespace game {
         std::string _currentStateName;
         std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> _currentContextList;
     };
-    
-    std::shared_ptr<StateManager> StateManager::instance(
-        const foundation::PlatformInterfacePtr &platform,
-        const resource::ResourceProviderPtr &resourceProvider,
-        const resource::FontAtlasProviderPtr &fontAtlasProvider,
-        const core::SceneInterfacePtr &scene,
-        const core::WorldInterfacePtr &world,
-        const core::RaycastInterfacePtr &raycast,
-        const core::SimulationInterfacePtr &simulation,
-        const ui::StageInterfacePtr &ui,
-        const dh::DataHubPtr &dh
-    )
-    {
-        return std::make_shared<StateManagerImpl>(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, ui, dh);
-    }
     
     void StateManagerImpl::switchToState(const char *name) {
         for (auto index = std::begin(STATES); index != std::end(STATES); ++index) {
@@ -116,3 +99,16 @@ namespace game {
     }
 }
 
+std::shared_ptr<game::StateManager> game::StateManager::instance(
+    const foundation::PlatformInterfacePtr &platform,
+    const resource::ResourceProviderPtr &resourceProvider,
+    const resource::FontAtlasProviderPtr &fontAtlasProvider,
+    const core::SceneInterfacePtr &scene,
+    const core::WorldInterfacePtr &world,
+    const core::RaycastInterfacePtr &raycast,
+    const core::SimulationInterfacePtr &simulation,
+    const ui::StageInterfacePtr &ui
+)
+{
+    return std::make_shared<game::StateManagerImpl>(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, ui);
+}

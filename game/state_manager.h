@@ -20,8 +20,7 @@ namespace game {
             const core::WorldInterfacePtr &world,
             const core::RaycastInterfacePtr &raycast,
             const core::SimulationInterfacePtr &simulation,
-            const ui::StageInterfacePtr &ui,
-            const dh::DataHubPtr &dh
+            const ui::StageInterfacePtr &ui
         );
         
     public:

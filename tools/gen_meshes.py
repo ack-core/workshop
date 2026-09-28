@@ -140,12 +140,12 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
 
 
     vxm_data = make_vxm_data(src, opt)
-    if not vxm_data:
+    if vxm_data:
         with open(dst, mode="wb") as dst_file:
             frame_count = len(vxm_data)
 
             dst_file.write(b'VOX \x7f\0\0\0\0\0\0\0')
-            dst_file.write(struct.pack("<iii", sx, sy, sz))
+            dst_file.write(struct.pack("<iii", 1, 1, 1))
 
             # description
             dst_file.write(struct.pack("<i", len(cfgstring) + 1))
@@ -156,6 +156,8 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
             for i in range(0, frame_count):
                 dst_file.write(struct.pack("<i", vxm_data[i][0]))
                 dst_file.write(vxm_data[i][1])
+    else:
+        print("------ Error: empty vox data for ", src)
 
 def main(src: str, dst: str, opt: int):
     src = os.path.abspath(src)

@@ -5,19 +5,15 @@ message(STATUS "toolchain: ${CMAKE_TOOLCHAIN_FILE}")
 
 # platform-specific settings
 
-set(PLATFORM_POSTFIX "unknown")
 if (${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
 	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 	set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /EHsc /std:c++17")
 	set(PLATFORM_POSTFIX "win")
-
 elseif (${PLATFORM} STREQUAL "PLATFORM_IOS")
 	set(PLATFORM_POSTFIX "ios")
-
 elseif (${PLATFORM} STREQUAL "PLATFORM_WASM")
 	set(PLATFORM_POSTFIX "wasm")
 	set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O0")
-
 else()
 	message(FATAL_ERROR "Unsupported platform")
 endif()
@@ -43,17 +39,13 @@ add_subdirectory("${m_source_root}/thirdparty/upng")
 add_subdirectory("${m_source_root}/thirdparty/stb_mini_ttf")
 
 add_subdirectory("${m_source_root}/foundation")
+add_subdirectory("${m_source_root}/providers")
+add_subdirectory("${m_source_root}/core")
+add_subdirectory("${m_source_root}/ui")
+add_subdirectory("${m_source_root}/datahub")
+add_subdirectory("${m_source_root}/game")
 
-if (NOT APPTYPE STREQUAL "IS_TESTS")
-	add_subdirectory("${m_source_root}/providers")
-	add_subdirectory("${m_source_root}/core")
-	add_subdirectory("${m_source_root}/ui")
-	add_subdirectory("${m_source_root}/datahub")
-	add_subdirectory("${m_source_root}/game")
-	set(m_sources_list "${m_source_root}/entry.cpp")
-else()
-	set(m_sources_list "${m_source_root}/tests.cpp")
-endif()
+set(m_sources_list "${m_source_root}/entry.cpp")
 
 source_group("" FILES ${m_sources_list})
 add_executable(workshop ${m_sources_list})
@@ -63,24 +55,26 @@ target_link_libraries(workshop PUBLIC upng)
 target_link_libraries(workshop PUBLIC stb_mini_ttf)
 
 target_link_libraries(workshop PUBLIC foundation)
-
-if (NOT APPTYPE STREQUAL "IS_TESTS")
-	target_link_libraries(workshop PUBLIC providers)
-	target_link_libraries(workshop PUBLIC core)
-	target_link_libraries(workshop PUBLIC ui)
-	target_link_libraries(workshop PUBLIC datahub)
-	target_link_libraries(workshop PUBLIC game)
-endif()
+target_link_libraries(workshop PUBLIC providers)
+target_link_libraries(workshop PUBLIC core)
+target_link_libraries(workshop PUBLIC ui)
+target_link_libraries(workshop PUBLIC datahub)
+target_link_libraries(workshop PUBLIC game)
 
 if (APPTYPE STREQUAL "IS_GAME")
 	set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}")
 	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary_${PLATFORM_POSTFIX}" ABSOLUTE)
+	set(APPTYPE_POSTFIX "game")
 elseif (APPTYPE STREQUAL "IS_TESTS")
 	set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}_tests")
 	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary_${PLATFORM_POSTFIX}_tests" ABSOLUTE)
+	set(APPTYPE_POSTFIX "tests")
 elseif (APPTYPE STREQUAL "IS_EDITOR")
 	set_property(TARGET workshop PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_editor")
 	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary_editor" ABSOLUTE)
+	set(APPTYPE_POSTFIX "editor")
+else()
+	message(FATAL_ERROR "Unknown app type")
 endif()
 
 # resources
@@ -89,13 +83,18 @@ get_filename_component(m_tools_root "${PROJECT_SOURCE_DIR}/tools" ABSOLUTE)
 get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLUTE)
 get_filename_component(m_game_resources_root "${PROJECT_SOURCE_DIR}/game/resources" ABSOLUTE)
 get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}" ABSOLUTE)
+get_filename_component(m_package_app_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}_${APPTYPE_POSTFIX}" ABSOLUTE)
 
 #file(REMOVE_RECURSE "${m_binary_root}")
 #file(MAKE_DIRECTORY "${m_binary_root}")
 
 file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
+if (EXISTS ${m_package_app_root})
+	file(COPY "${m_package_app_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
+endif()
 
-if (NOT APPTYPE STREQUAL "IS_TESTS")
+if (APPTYPE STREQUAL "111")
+if (APPTYPE STREQUAL "IS_GAME" OR APPTYPE STREQUAL "IS_EDITOR")
 	message(STATUS "Copying files from resources...")
 	file(COPY "${m_resources_root}/meshes" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/emitters" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
@@ -108,10 +107,6 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 	file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
 	file(COPY "${m_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
 
-	file(COPY "${m_game_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
-	file(COPY "${m_game_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
-	file(COPY "${m_game_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
-	file(COPY "${m_game_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
 	
 	if (EXISTS ${m_game_resources_root}/base)
 		file(COPY "${m_game_resources_root}/base" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.*" PATTERN "*")
@@ -122,51 +117,64 @@ if (NOT APPTYPE STREQUAL "IS_TESTS")
 		COMMAND python ${m_tools_root}/palette2code.py -s ${m_resources_root}/palette.png -d ${PROJECT_SOURCE_DIR}/core/palette.h
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
-
-	message(STATUS "Generating prefabs...")
-	execute_process(
-		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -g ${m_game_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
-		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-	)
-
 	message(STATUS "Generating grounds...")
 	execute_process(
 		COMMAND python ${m_tools_root}/gen_grounds.py -s ${m_resources_root}/grounds -d ${m_binary_root}/data/grounds -p ${m_resources_root}/palette.png
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
+	message(STATUS "Generating optimized meshes...")
+	execute_process(
+		COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+	)
+	message(STATUS "Generating emitters...")
+	execute_process(
+		COMMAND python ${m_tools_root}/gen_emitters.py -s ${m_resources_root}/emitters -d ${m_binary_root}/data/emitters WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+	)
+endif()
+if (APPTYPE STREQUAL "IS_GAME")
+	file(COPY "${m_game_resources_root}/raycast" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
+	file(COPY "${m_game_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
+	file(COPY "${m_game_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
+	file(COPY "${m_game_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
+	message(STATUS "Generating game's grounds...")
 	if (EXISTS ${m_game_resources_root}/grounds)
 		execute_process(
 			COMMAND python ${m_tools_root}/gen_grounds.py -s ${m_game_resources_root}/grounds -d ${m_binary_root}/data/grounds -p ${m_resources_root}/palette.png
 			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 		)
-	endif()	
-
-	message(STATUS "Generating optimized meshes...")
-	execute_process(
-		COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-	)
-	if (EXISTS ${m_game_resources_root}/grounds)
+	endif()
+	message(STATUS "Generating game's optimized meshes...")
+	if (EXISTS ${m_game_resources_root}/meshes)
 		execute_process(
 			COMMAND python ${m_tools_root}/gen_meshes.py -s ${m_game_resources_root}/meshes -d ${m_binary_root}/data/meshes -o 1 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 		)
-	endif()	
-
-	message(STATUS "Generating emitters...")
-	execute_process(
-		COMMAND python ${m_tools_root}/gen_emitters.py -s ${m_resources_root}/emitters -d ${m_binary_root}/data/emitters WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-	)
-	if (EXISTS ${m_game_resources_root}/grounds)
+	endif()
+	message(STATUS "Generating game's emitters...")
+	if (EXISTS ${m_game_resources_root}/emitters)
 		execute_process(
 			COMMAND python ${m_tools_root}/gen_emitters.py -s ${m_game_resources_root}/emitters -d ${m_binary_root}/data/emitters WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 		)
-	endif()	
-
-	message(STATUS "Generating resource lists...")
+	endif()
+	message(STATUS "Generating game's prefabs...")
 	execute_process(
-		COMMAND python ${m_tools_root}/resource_list.py -r ${m_binary_root}/data -d ${PROJECT_SOURCE_DIR}/providers
+		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -g ${m_game_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
+	)
 endif()
+if (APPTYPE STREQUAL "IS_EDITOR")
+	message(STATUS "Generating prefabs...")
+	execute_process(
+		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
+		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+	)
+endif()
+endif()
+
+message(STATUS "Generating resource lists...")
+execute_process(
+	COMMAND python ${m_tools_root}/resource_list.py -r ${m_binary_root}/data -d ${PROJECT_SOURCE_DIR}/providers
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
 
 # specific
 

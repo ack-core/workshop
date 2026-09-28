@@ -79,16 +79,16 @@ namespace game {
         _knight = _api.world->createObject("prefabs/knight_red", core::RaycastInterface::MASK_ALL);
         _knight->setPosition({0, 0, 0});
         _knight->loadResources([this](core::WorldInterface::Object &obj) {
-            printf("!!! completed !!!\n");
+            //printf("!!! completed !!!\n");
             _knight->play("root.mdl:attack", false, [this](core::WorldInterface::Object &obj) {
-                printf("!!! attack !!!\n");
+                //printf("!!! attack !!!\n");
                 _knight->play("root.mdl:idle", true);
             });
         });
         _other = _api.world->createObject("prefabs/knight_blue", core::RaycastInterface::MASK_ALL);
         _other->setPosition({20.01f, 0, 0});
         _other->loadResources([](core::WorldInterface::Object &obj) {
-            printf("!!! completed !!!\n");
+            //printf("!!! completed !!!\n");
         });
         
 
@@ -98,7 +98,7 @@ namespace game {
         _pilon = _api.world->createObject("prefabs/coltest", core::RaycastInterface::MASK_ALL);
         _pilon->setTransform(t1);
         _pilon->loadResources([](core::WorldInterface::Object &) {
-            printf("!!! completed !!!\n");
+            //printf("!!! completed !!!\n");
         });
 
         
@@ -147,7 +147,7 @@ namespace game {
 //        }
 //
         auto v = _knight->getVelocity();
-        printf("--->>> %f %f\n", v.x, v.z);
+        //printf("--->>> %f %f\n", v.x, v.z);
         _knight->setPosition(_knight->getWorldPosition());
         _knight->setVelocity(_knightVelocity);
         _other->setVelocity({0, 0, 0});

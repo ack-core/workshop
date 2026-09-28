@@ -52,7 +52,7 @@ namespace {
 #endif
 }
 
-namespace foundation {
+namespace {
     struct NativeVertexFormat {
         const char *shaderTypeName;
         const char *nativeTypeName;
@@ -119,6 +119,16 @@ namespace foundation {
 }
 
 namespace foundation {
+    std::uint32_t InputLayout::getStride() const {
+        std::uint32_t stride = 0;
+        for (const InputLayout::Attribute &item : attributes) {
+            stride += VTX_CONVERSION_TABLE[int(item.format)].size;
+        }
+        return stride;
+    }
+}
+
+namespace {
 #ifdef PLATFORM_IOS
     static const std::uint32_t VS_INPUT_VERTEX_COUNT = 3;
 
@@ -157,8 +167,9 @@ namespace foundation {
     void formEmptyConstBlock(std::string &output) {
         output = "struct _Constants {\n};\n\n";
     }
-    void formEmptyInoutBlock(std::string &output) {
-        output = "struct _InOut {\n    float4 position [[position]];\n};\n\n";
+    void formEmptyInoutBlock(std::string &outputVS, std::string &outputFS) {
+        outputVS = "struct _InOut {\n    float4 position [[position]];\n};\n\n";
+        outputFS.clear();
     }
     bool formFixedBlock(util::strstream &stream, std::string &output) {
         std::string varname, arg;
@@ -189,16 +200,16 @@ namespace foundation {
         
         return true;
     }
-    bool formConstBlock(util::strstream &stream, std::string &output) {
+    std::uint32_t formConstBlock(util::strstream &stream, std::string &output) {
         std::uint32_t constBlockLength = 0;
         output = "struct _Constants {\n";
         
         if ((constBlockLength = formVarsBlock(stream, output, TYPES_PASS_COUNT)) == 0) {
-            return false;
+            return 0;
         }
         
         output += "};\n\n";
-        return true;
+        return constBlockLength;
     }
     bool formInoutBlock(util::strstream &stream, std::string &outputVS, std::string &outputFS) {
         outputVS += "struct _InOut {\n    float4 position [[position]];\n";
@@ -216,7 +227,7 @@ namespace foundation {
         functions += "    }\n\n";
         funcdefs += "#define " + name + " _fn." + name + "\n";
     }
-    std::string formInput(const std::vector<InputLayout::Attribute> &desc, const char *prefix, const char *assign, std::string &output) {
+    std::string formInput(const std::vector<foundation::InputLayout::Attribute> &desc, const char *prefix, const char *assign, std::string &output) {
         std::string variables;
         std::size_t index = 0;
         std::uint32_t offset = 0;
@@ -232,7 +243,7 @@ namespace foundation {
         
         return variables;
     }
-    void formVSBlock(const InputLayout &layout, const std::string &fixed, const std::string &consts, const std::string &inoutVS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &vsout) {
+    void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed, const std::string &consts, const std::string &inoutVS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &vsout) {
         vsout =
             "#include <metal_stdlib>\n"
             "using namespace metal;\n"
@@ -350,20 +361,64 @@ namespace foundation {
         fsout += "    constant _Constants &constants [[buffer(1)]])\n{\n";
         fsout += "    float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n";
         fsout += "    float4 output_color[4] = {};\n    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n\n";
-        fsout += transformCode(cb);
+        
+        std::string codeBlock = cb;
+        shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
+        shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
+        shaderUtils::replace(codeBlock, "input_", "input.", SEPARATORS);
+        fsout += codeBlock;
+        
         fsout += "\n    return _Output {output_color[0], output_color[1], output_color[2], output_color[3]};\n";
         fsout += "    (void)fragment_coord;(void)_fn;\n";
         fsout += "}\n";
     }
 #endif
 #ifdef PLATFORM_WASM
+std::string transformCode(const std::string &src) {
+    return src;
+}
+std::uint32_t formVarsBlock(util::strstream &stream, std::string &output, std::size_t allowedTypeCount) {
+    return 0;
+}
+void formEmptyFixedBlock(std::string &output) {
+    output = "\n";
+}
+void formEmptyConstBlock(std::string &output) {
+    output = "\n";
+}
+void formEmptyInoutBlock(std::string &outputVS, std::string &outputFS) {
+    outputVS = "\n";
+    outputFS = "\n";
+}
+bool formFixedBlock(util::strstream &stream, std::string &output) {
+    return false;
+}
+std::uint32_t formConstBlock(util::strstream &stream, std::string &output) {
+    return 0;
+}
+bool formInoutBlock(util::strstream &stream, std::string &outputVS, std::string &outputFS) {
+    outputVS.clear();
+    outputFS.clear();
+    return true;
+}
+void addFNDefBlock(const std::string &r, const std::string &name, const std::string &sgn, const std::string &cb, std::string &functions, std::string &funcdefs) {
+
+}
+std::string formInput(const std::vector<foundation::InputLayout::Attribute> &desc, const char *prefix, const char *assign, std::string &output) {
+    return {};
+}
+void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed, const std::string &consts, const std::string &inoutVS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &vsout) {
+
+}
+void formFSBlock(const std::string &cb, std::string &fsout) {
+}
 
 #endif
 
 }
 
 namespace foundation {
-    std::pair<std::string, std::string> makePlatformShaderSource(const char *src, const InputLayout &layout, std::string &error) {
+    std::tuple<std::string, std::string, std::uint32_t> makePlatformShaderSource(const char *src, const InputLayout &layout, std::string &error) {
         util::strstream input = util::strstream(src, strlen(src));
         
         bool completed = true;
@@ -378,7 +433,8 @@ namespace foundation {
         
         std::string shaderBlockFixed;
         std::string shaderBlockConsts;
-        std::string shaderBlockInout;
+        std::string shaderBlockInoutVS;
+        std::string shaderBlockInoutFS;
         std::string shaderBlockFunctions;
         std::string shaderBlockFuncdefs;
         
@@ -397,7 +453,7 @@ namespace foundation {
                 continue;
             }
             if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
-                if (formConstBlock(input, shaderBlockConsts) == false) {
+                if ((constBlockLength = formConstBlock(input, shaderBlockConsts)) == 0) {
                     error = "shader has ill-formed 'const' block";
                     completed = false;
                     break;
@@ -406,7 +462,7 @@ namespace foundation {
                 continue;
             }
             if (inoutBlockDone == false && blockName == "inout" && (input >> util::sequence("{"))) {
-                if (formInoutBlock(input, shaderBlockInout) == false) {
+                if (formInoutBlock(input, shaderBlockInoutVS, shaderBlockInoutFS) == false) {
                     error = "shader has ill-formed 'inout' block";
                     completed = false;
                     break;
@@ -439,8 +495,8 @@ namespace foundation {
                 continue;
             }
             if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
-                if (constBlockDone == false) {
-                    constBlockDone = true;
+                if (fixedBlockDone == false) {
+                    fixedBlockDone = true;
                     formEmptyFixedBlock(shaderBlockFixed);
                 }
                 if (constBlockDone == false) {
@@ -449,7 +505,7 @@ namespace foundation {
                 }
                 if (inoutBlockDone == false) {
                     inoutBlockDone = true;
-                    formEmptyInoutBlock(shaderBlockInout);
+                    formEmptyInoutBlock(shaderBlockInoutVS, shaderBlockInoutFS);
                 }
                 
                 std::string codeBlock;
@@ -459,7 +515,7 @@ namespace foundation {
                     break;
                 }
                 
-                formVSBlock(layout, shaderBlockFixed, shaderBlockConsts, shaderBlockInout, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultvs);
+                formVSBlock(layout, shaderBlockFixed, shaderBlockConsts, shaderBlockInoutVS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultvs);
                 vssrcBlockDone = true;
                 continue;
             }
@@ -477,7 +533,7 @@ namespace foundation {
                     break;
                 }
 
-
+                formFSBlock(codeBlock, resultfs);
                 fssrcBlockDone = true;
                 continue;
             }
@@ -486,7 +542,7 @@ namespace foundation {
         }
         
         if (error.empty()) {
-            return std::make_pair(std::move(resultvs), std::move(resultfs));
+            return std::make_tuple(std::move(resultvs), std::move(resultfs), constBlockLength);
         }
         return {};
     }
