@@ -60,27 +60,27 @@ namespace game {
 //        {"default", {
 //            &makeContext<DebugContext>
 //        }}
-//        {"default", {
-//            &makeContext<RenderDevContext>
-//        }}
-        
         {"default", {
-            &makeContext<GameDataContext>,
-            &makeContext<LoadingContext, GameDataInterface>
-        }},
-        {"castle", {
-            &makeContext<GameDataContext>,
-            &makeContext<CommonUIContext, GameDataInterface>,
-            &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<ConstructionUIContext, CastleInterface>,
-        }},
-        {"battle", {
-            &makeContext<GameDataContext>,
-            &makeContext<CommonUIContext, GameDataInterface>,
-            &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<BattleContext, GameDataInterface, CastleInterface>,
-            &makeContext<BattleUIContext, GameDataInterface, BattleInterface, CastleInterface>,
+            &makeContext<RenderDevContext>
         }}
+        
+//        {"default", {
+//            &makeContext<GameDataContext>,
+//            &makeContext<LoadingContext, GameDataInterface>
+//        }},
+//        {"castle", {
+//            &makeContext<GameDataContext>,
+//            &makeContext<CommonUIContext, GameDataInterface>,
+//            &makeContext<CastleContext, GameDataInterface>,
+//            &makeContext<ConstructionUIContext, CastleInterface>,
+//        }},
+//        {"battle", {
+//            &makeContext<GameDataContext>,
+//            &makeContext<CommonUIContext, GameDataInterface>,
+//            &makeContext<CastleContext, GameDataInterface>,
+//            &makeContext<BattleContext, GameDataInterface, CastleInterface>,
+//            &makeContext<BattleUIContext, GameDataInterface, BattleInterface, CastleInterface>,
+//        }}
 
 #endif
     };

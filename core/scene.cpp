@@ -993,21 +993,21 @@ namespace core {
     , _rendering(rendering)
     {
         _palette = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, {resource::PALETTE});
-        _arrowShader = rendering->createShader("scene_arrows", g_arrowShaderSrc, foundation::InputLayout {});
-        _lineShader = rendering->createShader("scene_lineset", g_lineShaderSrc, foundation::InputLayout {});
-        _boundingSphereShader = rendering->createShader("scene_bounding_sphere", g_boundingSphereShaderSrc, foundation::InputLayout {
+        _arrowShader = rendering->createShader(g_arrowShaderSrc, foundation::InputLayout {});
+        _lineShader = rendering->createShader(g_lineShaderSrc, foundation::InputLayout {});
+        _boundingSphereShader = rendering->createShader(g_boundingSphereShaderSrc, foundation::InputLayout {
             .repeat = 62
         });
-        _boundingBoxShader = rendering->createShader("scene_bounding_box", g_boundingBoxShaderSrc, foundation::InputLayout {
+        _boundingBoxShader = rendering->createShader(g_boundingBoxShaderSrc, foundation::InputLayout {
             .repeat = 24
         });
-        _voxelMeshShader = rendering->createShader("scene_voxel_mesh", g_voxelMeshShaderSrc, layouts::VTXMVOX);
-        _groundMeshShader = rendering->createShader("scene_ground_mesh", g_groundMeshShaderSrc, layouts::VTXNRMUV);
-        _vegetationShader = rendering->createShader("scene_vegetation", g_vegetationShaderSrc, layouts::VTXVEG);
-        _particlesShader = rendering->createShader("scene_particles", g_particlesShaderSrc, foundation::InputLayout {
+        _voxelMeshShader = rendering->createShader(g_voxelMeshShaderSrc, layouts::VTXMVOX);
+        _groundMeshShader = rendering->createShader(g_groundMeshShaderSrc, layouts::VTXNRMUV);
+        _vegetationShader = rendering->createShader(g_vegetationShaderSrc, layouts::VTXVEG);
+        _particlesShader = rendering->createShader(g_particlesShaderSrc, foundation::InputLayout {
             .repeat = 4
         });
-        _gbufferToScreenShader = rendering->createShader("scene_gbuffer_to_screen", g_gbufferToScreenShaderSrc, foundation::InputLayout {
+        _gbufferToScreenShader = rendering->createShader(g_gbufferToScreenShaderSrc, foundation::InputLayout {
             .repeat = 4
         });
         

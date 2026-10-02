@@ -72,6 +72,14 @@ namespace ui {
             virtual void setTexture(const foundation::RenderTexturePtr &texture) = 0;
             virtual void setSize(const math::vector2f &size) = 0;
         };
+        struct ImgCustom : public virtual Element {
+            virtual ~ImgCustom() = default;
+            virtual void setTexture(const char *texturePath) = 0;
+            virtual void setTexture(const foundation::RenderTexturePtr &texture) = 0;
+            virtual void setGeometry(foundation::RenderTopology topology, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
+            virtual void setSize(const math::vector2f &size) = 0;
+            virtual void setDrawHandler(util::callback<void(StageInterface::ImgCustom &)> &&handler) = 0;
+        };
         struct Img9Slice : public virtual Interactor {
             virtual ~Img9Slice() = default;
             virtual void setTexture(const char *texturePath, const math::vector3f &sliceArgs) = 0;
@@ -111,6 +119,16 @@ namespace ui {
             const float activeAreaOffset = 0.0f;
             const float activeAreaRadius = 0.0f;
         };
+        struct ImgCustomParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const math::vector2f size = math::vector2f(100.0f, 100.0f);
+            const foundation::InputLayout &layout;
+            const char *shaderSource = "";
+            const char *texture = "";
+        };
         struct Img9SliceParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
@@ -127,7 +145,7 @@ namespace ui {
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
-            const std::uint8_t fontSize = 20;
+            const std::uint8_t fontSize = 10;
             const math::color fontColor = math::color(1.0f, 1.0f, 1.0f, 1.0f);
             const math::color shadowColor = math::color(0.0f, 0.0f, 0.0f, 0.0f);
             const math::vector2f shadowOffset = {0, 0};
@@ -140,7 +158,7 @@ namespace ui {
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             const math::vector2f size = math::vector2f(100.0f, 100.0f);
             const TextAlign textAlign = TextAlign::LEFT;
-            const std::uint8_t fontSize;
+            const std::uint8_t fontSize = 10;
             const math::color fontColor = math::color(1.0f, 1.0f, 1.0f, 1.0f);
             const math::color shadowColor = math::color(0.0f, 0.0f, 0.0f, 0.0f);
             const math::vector2f shadowOffset = {0, 0};
@@ -152,11 +170,12 @@ namespace ui {
         virtual auto getNamedElement(const std::string &name) -> std::shared_ptr<Element> = 0;
         virtual auto addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
         virtual auto addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
+        virtual auto addImgCustom(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImgCustomParams &&params) -> std::shared_ptr<ImgCustom> = 0;
         virtual auto addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
         virtual auto addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
         virtual auto addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> = 0;
         
-        template<typename T> auto addExtensionElement(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, T &&params) -> std::shared_ptr<Interactor> {
+        template<typename T> auto addExtensionElement(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, T &&params) {
             return T::make(*this, name, parent, std::move(params));
         }
         

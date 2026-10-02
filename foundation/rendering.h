@@ -140,7 +140,6 @@ namespace foundation {
         virtual void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
         
         // Create shader from source text
-        // @name      - name that is used in error messages
         // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix
         // @src       - generic shader source text. Example:
         //
@@ -186,7 +185,7 @@ namespace foundation {
         // Global functions:
         //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2d(index, v)
         //
-        virtual auto createShader(const char *name, const char *src, const InputLayout &layout) -> RenderShaderPtr = 0;
+        virtual auto createShader(const char *src, const InputLayout &layout) -> RenderShaderPtr = 0;
         
         // Create texture from binary data or empty
         // @w and @h    - width and height of the 0th mip layer

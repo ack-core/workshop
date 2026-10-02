@@ -30,6 +30,6 @@ namespace game {
 //        core::SceneInterface::BoundingBoxPtr _bbox;
         core::SceneInterface::LineSetPtr _rayOut;
         
-        std::shared_ptr<ui::StageInterface::Element> _joystick;
+        ui::InteractorPtr _joystick;
     };
 }

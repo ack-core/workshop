@@ -498,7 +498,7 @@ const imports = {
             
             for (let i = 0, offset = 0; i < layoutLen; i++) {
                 glcontext.enableVertexAttribArray(i);
-                glcontext.vertexAttribDivisor(i, 1);
+                glcontext.vertexAttribDivisor(i, repeat > 1);
                 offset += vertexAttribFunctions[lmem[i]](i, stride, offset + gldynamic.voffset);
             }
             if (gldynamic.lastActiveAttribs > layoutLen) {
@@ -508,16 +508,17 @@ const imports = {
             }
             gldynamic.lastActiveAttribs = layoutLen;
 
+            if (uniformInstanceCountLocation) {
+                glcontext.uniform1i(uniformInstanceCountLocation, 1);
+            }
             if (repeat > 1) {
-                if (uniformInstanceCountLocation) {
-                    glcontext.uniform1i(uniformInstanceCountLocation, 1);
-                }
                 glcontext.drawArraysInstanced(topology, 0, repeat, dataLen / stride);
             }
             else {
                 if (idx) {
+                    const imem = new Uint32Array(memory.buffer, idx, icount);
                     glcontext.bindBuffer(glcontext.ELEMENT_ARRAY_BUFFER, gldynamic.ibuffer);
-                    glcontext.bufferSubData(glcontext.ELEMENT_ARRAY_BUFFER, gldynamic.ioffset, idx);
+                    glcontext.bufferSubData(glcontext.ELEMENT_ARRAY_BUFFER, gldynamic.ioffset, imem);
                     glcontext.drawElements(topology, icount, glcontext.UNSIGNED_INT, gldynamic.ioffset);
                 }
                 else {

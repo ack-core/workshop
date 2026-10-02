@@ -48,9 +48,11 @@ extern "C" void initialize() {
                 raycast->update(dtSec);
                 simulation->update(dtSec);
                 world->update(dtSec);
+                
                 scene->updateAndDraw(dtSec);
                 stage->updateAndDraw(dtSec);
                 rendering->presentFrame();
+                
                 resourceProvider->update(dtSec);
                 fontAtlasProvider->update(dtSec);
             });

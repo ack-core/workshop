@@ -19,6 +19,7 @@ namespace ui {
         virtual const foundation::RenderingInterfacePtr &getRendering() const = 0;
         virtual const resource::ResourceProviderPtr &getResourceProvider() const = 0;
         virtual const resource::FontAtlasProviderPtr &getFontAtlasProvider() const = 0;
+        virtual const foundation::RenderShaderPtr &getDefaultShader() const = 0;
         virtual ~StageFacility() = default;
     };
 }
@@ -375,6 +376,76 @@ namespace ui {
 //---
 
 namespace ui {
+    class ImgCustomImpl : public ElementImpl, public std::enable_shared_from_this<ImgCustomImpl>, public StageInterface::ImgCustom {
+    public:
+        ImgCustomImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size, const foundation::RenderShaderPtr &shader) : ElementImpl(facility, parent), _shader(shader) {
+            _size = size;
+        }
+        ~ImgCustomImpl() override {}
+        
+    public:
+        void setTexture(const char *texturePath) override {
+            std::string path = texturePath;
+            _facility.getResourceProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const foundation::RenderTexturePtr &texture) {
+                if (std::shared_ptr<ImgCustomImpl> self = weak.lock()) {
+                    self->_size.x = texture->getWidth();
+                    self->_size.y = texture->getHeight();
+                    self->_texture = texture;
+                }
+            });
+        }
+        void setTexture(const foundation::RenderTexturePtr &texture) override {
+            _size.x = texture->getWidth();
+            _size.y = texture->getHeight();
+            _texture = texture;
+        }
+        void setGeometry(foundation::RenderTopology topology, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override {
+            if (_shader) {
+                const std::size_t vlen = vcnt * _shader->getInputLayout().getStride();
+                _topology = topology;
+                _vertexCount = vcnt;
+                _vertexData = std::make_unique<std::uint8_t[]>(vlen);
+                _indexData.resize(icnt);
+                std::memcpy(_vertexData.get(), data, vlen);
+                std::memcpy(_indexData.data(), indexes, icnt * sizeof(std::uint32_t));
+            }
+        }
+        void setSize(const math::vector2f &size) override {
+            _size = size;
+        }
+        void setDrawHandler(util::callback<void(StageInterface::ImgCustom &)> &&handler) override {
+            _drawHandler = std::move(handler);
+        }
+        void draw() override {
+            const foundation::RenderingInterfacePtr &rendering = _facility.getRendering();
+            
+            _drawHandler(*this);
+            if (_shader && _texture && _vertexData) {
+                rendering->applyShader(_shader, _topology, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                rendering->applyTextures({{_texture, foundation::SamplerType::NEAREST}});
+                rendering->draw(_vertexData.get(), _vertexCount, _indexData.data(), std::uint32_t(_indexData.size()));
+                
+                rendering->applyShader(_facility.getDefaultShader(), foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                for (auto &item : _attachedElements) {
+                    item->draw();
+                }
+            }
+        }
+        
+    private:
+        util::callback<void(StageInterface::ImgCustom &)> _drawHandler;
+        foundation::RenderTexturePtr _texture;
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderTopology _topology = foundation::RenderTopology::TRIANGLES;
+        std::unique_ptr<std::uint8_t[]> _vertexData;
+        std::uint32_t _vertexCount = 0;
+        std::vector<std::uint32_t> _indexData;
+    };
+}
+
+//---
+
+namespace ui {
     class Img9SliceImpl : public InteractorImpl, public std::enable_shared_from_this<Img9SliceImpl>, public StageInterface::Img9Slice {
     public:
         Img9SliceImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size) : InteractorImpl(facility, parent) {
@@ -702,11 +773,13 @@ namespace ui {
         const foundation::RenderingInterfacePtr &getRendering() const override { return _rendering; }
         const resource::ResourceProviderPtr &getResourceProvider() const override { return _resourceProvider; }
         const resource::FontAtlasProviderPtr &getFontAtlasProvider() const override { return _fontAtlasProvider; }
+        const foundation::RenderShaderPtr &getDefaultShader() const override { return _uiShader; }
         
     public:
         auto getNamedElement(const std::string &name) -> std::shared_ptr<Element> override;
         auto addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> override;
         auto addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
+        auto addImgCustom(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImgCustomParams &&params) -> std::shared_ptr<ImgCustom> override;
         auto addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> override;
         auto addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> override;
         auto addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> override;
@@ -724,6 +797,7 @@ namespace ui {
         foundation::RenderShaderPtr _uiShader;
         std::vector<std::shared_ptr<ElementImpl>> _topLevelElements;
         std::unordered_map<std::string, std::weak_ptr<ElementImpl>> _namedElements;
+        std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
     };
     
     std::shared_ptr<StageInterface> StageInterface::instance(
@@ -773,7 +847,7 @@ namespace ui {
     , _fontAtlasProvider(fontAtlasProvider)
     , _touchEventsToken(nullptr)
     {
-        _uiShader = _rendering->createShader("stage_element", g_uiShaderSrc, layouts::VTXUIUV);
+        _uiShader = _rendering->createShader(g_uiShaderSrc, layouts::VTXUIUV);
         _touchEventsToken = _platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) {
             ui::Action action = ui::Action::RELEASE;
             
@@ -834,7 +908,7 @@ namespace ui {
             result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
             result->setActiveArea(params.activeAreaOffset, params.activeAreaRadius);
             result->setTexture(params.texture);
-                        
+            
             if (parent == nullptr) {
                 _topLevelElements.emplace_back(result);
             }
@@ -851,8 +925,36 @@ namespace ui {
         
         return result;
     }
+    
+    std::shared_ptr<StageInterface::ImgCustom> StageInterfaceImpl::addImgCustom(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImgCustomParams &&params) {
+        std::shared_ptr<ImgCustomImpl> result;
+        
+        if (const foundation::RenderShaderPtr &shader = _rendering->createShader(params.shaderSource, params.layout)) {
+            if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
+                result = std::make_shared<ImgCustomImpl>(*this, parent, math::vector2f(info->width, info->height), shader);
+                result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
+                result->setTexture(params.texture);
+                
+                if (parent == nullptr) {
+                    _topLevelElements.emplace_back(result);
+                }
+                else {
+                    std::dynamic_pointer_cast<ElementImpl>(parent)->attachElement(result);
+                }
+                if (name.has_value()) {
+                    _namedElements.emplace(*name, result);
+                }
+            }
+            else {
+                _platform->logError("[StageInterfaceImpl::addImgCustom] '%s' is not existing texture\n", params.texture);
+            }
+        }
+        
+        return result;
 
-    std::shared_ptr<StageInterfaceImpl::Img9Slice> StageInterfaceImpl::addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) {
+    }
+    
+    std::shared_ptr<StageInterface::Img9Slice> StageInterfaceImpl::addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) {
         std::shared_ptr<Img9SliceImpl> result;
         
         if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
@@ -860,7 +962,7 @@ namespace ui {
             result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
             result->setActiveArea(params.activeAreaOffset, params.activeAreaRadius);
             result->setTexture(params.texture, params.sliceArgs);
-                        
+            
             if (parent == nullptr) {
                 _topLevelElements.emplace_back(result);
             }
@@ -872,14 +974,13 @@ namespace ui {
             }
         }
         else {
-            _platform->logError("[StageInterfaceImpl::addImage] '%s' is not existing texture\n", params.texture);
+            _platform->logError("[StageInterfaceImpl::addImg9Slice] '%s' is not existing texture\n", params.texture);
         }
         
         return result;
-
     }
 
-    std::shared_ptr<StageInterfaceImpl::TextLine> StageInterfaceImpl::addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) {
+    std::shared_ptr<StageInterface::TextLine> StageInterfaceImpl::addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) {
         std::shared_ptr<TextLineImpl> result = std::make_shared<TextLineImpl>(*this, parent);
         result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
         result->setFontParameters(params.fontColor, params.fontSize, params.shadowOffset, params.shadowColor, params.shadowBlur);
@@ -897,7 +998,7 @@ namespace ui {
         return result;
     }
     
-    std::shared_ptr<StageInterfaceImpl::TextBlock> StageInterfaceImpl::addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) {
+    std::shared_ptr<StageInterface::TextBlock> StageInterfaceImpl::addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) {
         std::shared_ptr<TextBlockImpl> result = std::make_shared<TextBlockImpl>(*this, parent);
         result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
         result->setFontParameters(params.fontColor, params.fontSize, params.shadowOffset, params.shadowColor, params.shadowBlur);

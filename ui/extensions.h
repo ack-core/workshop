@@ -151,6 +151,132 @@ namespace ui {
                 return base;
             }
         };
+    
+        //---
+    
+        struct ImgSector {
+            friend struct ImgSectorParams;
+            
+        public:
+            std::shared_ptr<StageInterface::ImgCustom> img;
+            ImgSector(const std::shared_ptr<StageInterface::ImgCustom> &m) : img(m) {}
+            
+            void setSector(float sectorStartDeg, float sectorEndDeg) {
+                _sectorStartDeg = sectorStartDeg;
+                _sectorEndDeg = sectorEndDeg;
+                _dirty = true;
+            }
+            
+        private:
+            float _sectorStartDeg = 0;
+            float _sectorEndDeg = 360;
+            bool _dirty = true;
+        };
+        using ImgSectorPtr = std::shared_ptr<ImgSector>;
+        struct ImgSectorParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const char *texture = "";
+
+            static auto make(StageInterface &stage, const std::optional<std::string> &name, const std::shared_ptr<StageInterface::Element> &parent, ImgSectorParams &&params) -> ImgSectorPtr {
+                const resource::ResourceProviderPtr res = stage.getResourceProvider();
+                const char *shaderSrc = R"(
+                    inout {
+                        texcoord : float2
+                    }
+                    vssrc {
+                        float2 screenTransform = float2(2.0, -2.0) / frame_rtBounds.xy;
+                        output_texcoord = vertex_position_tx.zw;
+                        output_position = float4(vertex_position_tx.xy * screenTransform + float2(-1.0, 1.0), 0.1, 1); //
+                    }
+                    fssrc {
+                        float4 texcolor = _tex2d(0, input_texcoord);
+                        output_color[0] = texcolor;
+                    }
+                )";
+                const foundation::InputLayout layout = foundation::InputLayout {
+                    .attributes = {
+                        {"position_tx", foundation::InputAttributeFormat::FLOAT4},
+                    }
+                };
+                if (const resource::TextureInfo *info = res->getTextureInfo(params.texture)) {
+                    std::shared_ptr<StageInterface::ImgCustom> img = stage.addImgCustom(std::nullopt, nullptr, ui::StageInterface::ImgCustomParams {
+                        .anchorH = params.anchorH,
+                        .anchorV = params.anchorV,
+                        .anchorOffset = params.anchorOffset,
+                        .layout = layout,
+                        .shaderSource = shaderSrc,
+                        .texture = params.texture
+                    });
+                    ImgSectorPtr result = std::make_shared<ImgSector>(img);
+                    img->setSize(math::vector2f(info->width, info->height));
+                    img->setDrawHandler([weak = std::weak_ptr<ImgSector>(result)](StageInterface::ImgCustom &img) {
+                        if (auto owner = weak.lock()) {
+                            if (owner->_dirty) {
+                                struct Vtx {
+                                    float x, y, tx, ty;
+                                };
+                                const float posx = img.getPosition().x;
+                                const float posy = img.getPosition().y;
+                                const float width = img.getSize().x;
+                                const float height = img.getSize().y;
+                                const Vtx corners[] = {
+                                    Vtx{ posx + width, posy + 0.0f, 1, 0 },
+                                    Vtx{ posx + width, posy + height, 1, 1 },
+                                    Vtx{ posx + 0.0f, posy + height, 0, 1 },
+                                    Vtx{ posx + 0.0f, posy + 0.0f, 0, 0 },
+                                };
+                                auto boundaryVertex = [&](float angleDeg) {
+                                    const float rad = angleDeg * (3.14159265358979323846f / 180.0f);
+                                    const float dx = std::sin(rad);
+                                    const float dy = -std::cos(rad);
+                                    const float scale = 1.0f / std::max(std::abs(dx), std::abs(dy));
+                                    const float halfW = width * 0.5f;
+                                    const float halfH = height * 0.5f;
+                                    const float rx = halfW + dx * scale * halfW;
+                                    const float ry = halfH + dy * scale * halfH;
+                                    return Vtx{ posx + rx, posy + ry, rx / width, ry / height };
+                                };
+                                
+                                float sectorStartDeg = owner->_sectorStartDeg;
+                                float sectorEndDeg = owner->_sectorEndDeg;
+                                const float sweep = std::min(sectorEndDeg - sectorStartDeg, 360.0f);
+                                if (!(sweep > 0.0f)) {
+                                    return;
+                                }
+                                sectorEndDeg = sectorStartDeg + sweep;
+                                Vtx vertices[7] = {};
+                                std::uint32_t indeces[3 * 7] = {};
+                                std::uint32_t vcnt = 0, icnt = 0;
+                                
+                                vertices[0] = Vtx{ posx + width * 0.5f, posy + height * 0.5f, 0.5f, 0.5f };
+                                vertices[1] = boundaryVertex(sectorStartDeg);
+                                vcnt = 2;
+                                for (int k = static_cast<int>(std::floor((sectorStartDeg - 45.0f) / 90.0f)) + 1; 45.0f + 90.0f * static_cast<float>(k) < sectorEndDeg; k++) {
+                                    vertices[vcnt++] = corners[((k % 4) + 4) % 4];
+                                }
+                                vertices[vcnt++] = boundaryVertex(sectorEndDeg);
+
+                                const std::uint32_t last = vcnt - 1;
+                                for (std::uint32_t i = 1; i < last; i++) {
+                                    indeces[icnt++] = 0;
+                                    indeces[icnt++] = i;
+                                    indeces[icnt++] = i + 1;
+                                }
+                                img.setGeometry(foundation::RenderTopology::TRIANGLES, vertices, vcnt, indeces, icnt);
+                            }
+                        }
+                    });
+                    return result;
+                }
+
+                return nullptr;
+            }
+        };
+
+        
     }
 }
 

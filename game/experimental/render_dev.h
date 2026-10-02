@@ -1,6 +1,7 @@
 
 #pragma once
 #include <game/context.h>
+#include <ui/extensions.h>
 
 namespace game {
     class RenderDevContext : public Context {
@@ -25,7 +26,7 @@ namespace game {
         core::SceneInterface::VegetationPtr _grass;
         core::SceneInterface::VegetationPtr _trees;
         
-        std::shared_ptr<ui::StageInterface::Element> _joystick;
+        ui::InteractorPtr _joystick;
         std::shared_ptr<ui::StageInterface::Image> _img0;
         std::shared_ptr<ui::StageInterface::Img9Slice> _img1;
         std::shared_ptr<ui::StageInterface::Element> _btn0;
@@ -33,6 +34,8 @@ namespace game {
         std::shared_ptr<ui::StageInterface::TextLine> _txt1;
         std::shared_ptr<ui::StageInterface::TextLine> _txt2;
         std::shared_ptr<ui::StageInterface::TextBlock> _tb0;
-
+        std::shared_ptr<ui::StageInterface::ImgCustom> _img2;
+        
+        ui::extensions::ImgSectorPtr _ims;
     };
 }

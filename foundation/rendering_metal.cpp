@@ -265,41 +265,42 @@ namespace foundation {
         _frameConstants.cameraDirection.xyz = camDir;
     }
     
-    RenderShaderPtr MetalRendering::createShader(const char *name, const char *shadersrc, const InputLayout &layout) {
+    RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout) {
         std::shared_ptr<RenderShader> result;
-        util::strstream input(shadersrc, strlen(shadersrc));
+        std::string shaderName = std::to_string(std::hash<std::string>{}(shadersrc));
         
-        if (_shaderNames.find(name) == _shaderNames.end()) {
-            _shaderNames.emplace(name);
+        auto shaderIndex = _shaders.find(shaderName);
+        if (shaderIndex != _shaders.end()) {
+            return shaderIndex->second;
         }
         else {
-            _platform->logError("[MetalRendering::createShader] shader name '%s' already used\n", name);
-        }
-        
-        std::string error;
-        const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(shadersrc, layout, error);
-        const std::string nativeShader = shaderUtils::makeLines(vs + fs);
-        
-        if (error.empty()) {
-            @autoreleasepool {
-                NSError *nsError = nil;
-                MTLCompileOptions* compileOptions = [MTLCompileOptions new];
-                compileOptions.languageVersion = MTLLanguageVersion2_0;
-                compileOptions.fastMathEnabled = true;
-                
-                id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
-                
-                if (library) {
-                    result = std::make_shared<MetalShader>(name, layout, library, constLength);
-                }
-                else {
-                    const char *errorDesc = [[nsError localizedDescription] UTF8String];
-                    _platform->logError("[MetalRendering::createShader] '%s' generated code:\n--------------------\n%s\n--------------------\n%s\n", name, nativeShader.data(), errorDesc);
+            util::strstream input(shadersrc, strlen(shadersrc));
+            std::string error;
+            
+            const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(shadersrc, layout, error);
+            const std::string nativeShader = shaderUtils::makeLines(vs + fs);
+            
+            if (error.empty()) {
+                @autoreleasepool {
+                    NSError *nsError = nil;
+                    MTLCompileOptions* compileOptions = [MTLCompileOptions new];
+                    compileOptions.languageVersion = MTLLanguageVersion2_0;
+                    compileOptions.fastMathEnabled = true;
+                    
+                    id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
+                    
+                    if (library) {
+                        result = std::make_shared<MetalShader>(shaderName, layout, library, constLength);
+                    }
+                    else {
+                        const char *errorDesc = [[nsError localizedDescription] UTF8String];
+                        _platform->logError("[MetalRendering::createShader] generated code:\n--------------------\n%s\n--------------------\n%s\n", nativeShader.data(), errorDesc);
+                    }
                 }
             }
-        }
-        else {
-            _platform->logError("[MetalRendering::createShader] shader '%s' error : %s\n", name, error.data());
+            else {
+                _platform->logError("[MetalRendering::createShader] shader error : %s\n", error.data());
+            }
         }
 
         return result;
