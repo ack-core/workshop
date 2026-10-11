@@ -59,6 +59,7 @@ namespace ui {
         };
         struct Interactor : public virtual Element {
             virtual void setActionHandler(util::callback<void(ui::Action action, float x, float y)> &&handler) = 0;
+            virtual void setStateHandler(util::callback<void(bool locked)> &&handler) = 0;
             virtual void setLocked(bool locked) = 0;
             virtual ~Interactor() = default;
         };
@@ -139,6 +140,7 @@ namespace ui {
             const math::vector3f sliceArgs = math::vector3f(0, 0, 0);
             const float activeAreaOffset = 0.0f;
             const float activeAreaRadius = 0.0f;
+            const bool fill = true;
         };
         struct TextLineParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;

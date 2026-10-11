@@ -79,7 +79,87 @@ namespace ui {
                 return bg;
             }
         };
+        
+        //---
+        
+        struct ImgButtonParams {
+            const std::shared_ptr<StageInterface::Element> anchorTarget;
+            const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
+            const VerticalAnchor anchorV = VerticalAnchor::TOP;
+            const math::vector2f anchorOffset = math::vector2f(0, 0);
+            const math::vector2f size = math::vector2f(100.0f, 100.0f);
+            const char *textureBase = "";
+            const char *textureOver = "";
+            const char *texturePress = "";
+            const char *textureDisabled = "";
+            const float activeAreaOffset = 0.0f;
+            const float activeAreaRadius = 0.0f;
+            util::callback<void()> onPress;
+            
+            static auto make(StageInterface &stage, const std::optional<std::string> &name, const std::shared_ptr<StageInterface::Element> &parent, ImgButtonParams &&params) -> InteractorPtr {
+                const resource::ResourceProviderPtr res = stage.getResourceProvider();
+                std::shared_ptr<StageInterface::Image> base = stage.addImage(name, parent, ui::StageInterface::ImageParams {
+                    .anchorH = params.anchorH,
+                    .anchorV = params.anchorV,
+                    .anchorOffset = params.anchorOffset,
+                    .texture = params.textureBase,
+                });
+                
+                bool texturesFound = false;
+                if (const resource::TextureInfo *baseInfo = res->getTextureInfo(params.textureBase)) {
+                    if (const resource::TextureInfo *overInfo = res->getTextureInfo(params.textureOver)) {
+                        if (const resource::TextureInfo *pressInfo = res->getTextureInfo(params.texturePress)) {
+                            if (const resource::TextureInfo *disabledInfo = res->getTextureInfo(params.textureDisabled)) {
+                                texturesFound = true;
+                            }
+                        }
+                    }
+                }
 
+                if (texturesFound) {
+                    std::weak_ptr<StageInterface::Image> weakBase = base;
+                    std::string overPath = std::string(params.textureOver);
+                    std::string pressPath = std::string(params.texturePress);
+                    std::string disPath = std::string(params.textureDisabled);
+
+                    auto baseLoaded = [weakBase, res, overPath, pressPath, disPath, onPress = std::move(params.onPress)](const foundation::RenderTexturePtr &txBase) mutable {
+                        auto overLoaded = [weakBase, res, overPath, pressPath, disPath, txBase, onPress = std::move(onPress)](const foundation::RenderTexturePtr &txOver) mutable {
+                            auto pressLoaded = [weakBase, res, overPath, pressPath, disPath, txBase, txOver, onPress = std::move(onPress)](const foundation::RenderTexturePtr &txPress) mutable {
+                                auto disabledLoaded = [weakBase, txBase, txOver, txPress, onPress = std::move(onPress)](const foundation::RenderTexturePtr &txDisabled) mutable {
+                                    if (auto base = weakBase.lock()) {
+                                        base->setStateHandler([weakBase, txBase, txDisabled](bool locked) {
+                                            if (auto base = weakBase.lock()) {
+                                                base->setTexture(locked ? txDisabled : txBase);
+                                            }
+                                        });
+                                        base->setActionHandler([onPress = std::move(onPress), weakBase, txBase, txOver, txPress, txDisabled](Action action, float x, float y) {
+                                            if (auto base = weakBase.lock()) {
+                                                if (action == Action::PRESS) {
+                                                    base->setTexture(txPress);
+                                                }
+                                                if (action == Action::RELEASE) {
+                                                    base->setTexture(txBase);
+                                                    if (onPress) {
+                                                        onPress();
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    }
+                                };
+                                res->getOrLoadTexture(disPath.data(), std::move(disabledLoaded));
+                            };
+                            res->getOrLoadTexture(pressPath.data(), std::move(pressLoaded));
+                        };
+                        res->getOrLoadTexture(overPath.data(), std::move(overLoaded));
+                    };
+                    res->getOrLoadTexture(params.textureBase, std::move(baseLoaded));
+                }
+                
+                return base;
+            }
+        };
+        
         //---
 
         struct Button9SliceParams {
@@ -202,7 +282,7 @@ namespace ui {
                     }
                 };
                 if (const resource::TextureInfo *info = res->getTextureInfo(params.texture)) {
-                    std::shared_ptr<StageInterface::ImgCustom> img = stage.addImgCustom(std::nullopt, nullptr, ui::StageInterface::ImgCustomParams {
+                    std::shared_ptr<StageInterface::ImgCustom> img = stage.addImgCustom(std::nullopt, parent, ui::StageInterface::ImgCustomParams {
                         .anchorH = params.anchorH,
                         .anchorV = params.anchorV,
                         .anchorOffset = params.anchorOffset,

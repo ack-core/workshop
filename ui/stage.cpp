@@ -168,10 +168,16 @@ namespace ui {
             _activeAreaRadius = radius;
         }
         void setActionHandler(util::callback<void(ui::Action action, float x, float y)> &&handler) override {
-            _handler = std::move(handler);
+            _actionHandler = std::move(handler);
+        }
+        void setStateHandler(util::callback<void(bool locked)> &&handler) override {
+            _stateHandler = std::move(handler);
         }
         void setLocked(bool locked) override {
-            _locked = locked;
+            if (_locked != locked) {
+                _locked = locked;
+                _stateHandler(locked);
+            }
         }
         bool onInteraction(ui::Action action, std::size_t id, float x, float y) override {
             if (ElementImpl::onInteraction(action, id, x, y)) {
@@ -220,16 +226,16 @@ namespace ui {
                 _pointerId = id;
                 _currentAction = action;
 
-                if (_handler && _locked == false) {
-                    _handler(action, x, y);
+                if (_actionHandler && _locked == false) {
+                    _actionHandler(action, x, y);
                     return true;
                 }
             }
             if (action == ui::Action::MOVE && _pointerId != foundation::INVALID_POINTER_ID) {
                 _currentAction = action;
                 
-                if (_handler && _locked == false) {
-                    _handler(action, x, y);
+                if (_actionHandler && _locked == false) {
+                    _actionHandler(action, x, y);
                     return true;
                 }
             }
@@ -237,8 +243,8 @@ namespace ui {
                 _pointerId = foundation::INVALID_POINTER_ID;
                 _currentAction = action;
 
-                if (_handler && _locked == false) {
-                    _handler(action, x, y);
+                if (_actionHandler && _locked == false) {
+                    _actionHandler(action, x, y);
                     return true;
                 }
             }
@@ -255,7 +261,8 @@ namespace ui {
         float _activeAreaOffset = 0.0f;
         float _activeAreaRadius = 0.0f;
         
-        util::callback<void(ui::Action action, float x, float y)> _handler;
+        util::callback<void(bool locked)> _stateHandler;
+        util::callback<void(ui::Action action, float x, float y)> _actionHandler;
     };
 }
 
@@ -448,7 +455,7 @@ namespace ui {
 namespace ui {
     class Img9SliceImpl : public InteractorImpl, public std::enable_shared_from_this<Img9SliceImpl>, public StageInterface::Img9Slice {
     public:
-        Img9SliceImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size) : InteractorImpl(facility, parent) {
+        Img9SliceImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size, bool fill) : InteractorImpl(facility, parent), _fill(fill) {
             _size = size;
         }
         ~Img9SliceImpl() override {}
@@ -492,9 +499,13 @@ namespace ui {
                 instances[2].uvCoords = math::vector4f(0, txSliceSize.y, txSliceSize.x, txSliceSize.y + txSliceSize.y);
                 instances[3].positionAndSize = math::vector4f(_globalPosition + math::vector2f(rbSliceStart.x, rbSliceStart.y), math::vector2f(_sliceArgs.z, _sliceArgs.z));
                 instances[3].uvCoords = math::vector4f(txSliceSize.x, txSliceSize.y, txSliceSize.x + txSliceSize.x, txSliceSize.y + txSliceSize.y);
-                instances[4].positionAndSize = math::vector4f(_globalPosition + math::vector2f(_sliceArgs.z, _sliceArgs.z), edgeLeft);
-                instances[4].uvCoords = math::vector4f(2.0f * txSliceSize.x, 2.0f * txSliceSize.y, 3.0f * txSliceSize.x, 3.0f * txSliceSize.y);
-                int index = 5;
+                int index = 4;
+                
+                if (_fill) {
+                    instances[4].positionAndSize = math::vector4f(_globalPosition + math::vector2f(_sliceArgs.z, _sliceArgs.z), edgeLeft);
+                    instances[4].uvCoords = math::vector4f(2.0f * txSliceSize.x, 2.0f * txSliceSize.y, 3.0f * txSliceSize.x, 3.0f * txSliceSize.y);
+                    index++;
+                }
                 
                 for (int i = 0; i < EGDE_REPEAT_MAX && edgeLeft.x > 0.0f; i++) {
                     const float repWidth = std::min(edgeLeft.x, _sliceArgs.x);
@@ -531,6 +542,7 @@ namespace ui {
     private:
         foundation::RenderTexturePtr _texture;
         math::vector3f _sliceArgs;
+        bool _fill;
     };
 }
 
@@ -958,7 +970,7 @@ namespace ui {
         std::shared_ptr<Img9SliceImpl> result;
         
         if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
-            result = std::make_shared<Img9SliceImpl>(*this, parent, params.size);
+            result = std::make_shared<Img9SliceImpl>(*this, parent, params.size, params.fill);
             result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
             result->setActiveArea(params.activeAreaOffset, params.activeAreaRadius);
             result->setTexture(params.texture, params.sliceArgs);

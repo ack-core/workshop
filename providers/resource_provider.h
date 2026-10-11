@@ -83,7 +83,7 @@ namespace resource {
 
         // Asynchronously Load emitter from txt file and textures if it isn't loaded yet
         // @descPath - path to file without extension
-        // @return - description to construct emitter or nullptrs. It's ok to return map and texture == nullptr - usable for editors
+        // @return - description, map, texture to construct emitter or nullptrs. It's ok to return map and texture == nullptr - usable for editors
         //
         virtual void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) = 0;
 

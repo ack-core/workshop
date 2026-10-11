@@ -1139,6 +1139,7 @@ namespace core {
         util::cleanupUnused(_boundingBoxes);
         util::cleanupUnused(_voxelMeshes);
         util::cleanupUnused(_groundMeshes);
+        util::cleanupUnused(_vegetations);
         util::cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         

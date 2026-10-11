@@ -89,7 +89,7 @@ namespace core {
         // @typeMask   - game specific type. Used as mask in raycast.
         // @name       - object's name. Named objects stay in the world even if no pointers in the game code keep them.
         //
-        virtual auto createObject(const char *prefabPath, std::uint64_t typeMask, const char *name = nullptr) -> ObjectPtr = 0;
+        virtual auto createObject(const char *prefabPath, std::uint64_t typeMask = 0xffffffffffffffff, const char *name = nullptr) -> ObjectPtr = 0;
         virtual void removeObject(const char *name) = 0;
         virtual void update(float dtSec) = 0;
         

@@ -93,7 +93,6 @@ if (EXISTS ${m_package_app_root})
 	file(COPY "${m_package_app_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 endif()
 
-if (APPTYPE STREQUAL "111")
 if (APPTYPE STREQUAL "IS_GAME" OR APPTYPE STREQUAL "IS_EDITOR")
 	message(STATUS "Copying files from resources...")
 	file(COPY "${m_resources_root}/meshes" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
@@ -167,7 +166,6 @@ if (APPTYPE STREQUAL "IS_EDITOR")
 		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
-endif()
 endif()
 
 message(STATUS "Generating resource lists...")

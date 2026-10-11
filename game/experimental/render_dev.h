@@ -20,7 +20,8 @@ namespace game {
         math::vector2f _lockedCoordinates;
         math::vector3f _orbit = { 35, 125, 35 };
         core::SceneInterface::LineSetPtr _axis;
-
+        
+        core::WorldInterface::ObjectPtr _ptc;
         core::SceneInterface::VoxelMeshPtr _knight;
         core::SceneInterface::GroundMeshPtr _ground;
         core::SceneInterface::VegetationPtr _grass;

@@ -228,11 +228,6 @@ namespace game {
     }
     
     Emitter::Emitter() {
-//        _ptcParams.additiveBlend = false;
-//        _ptcParams.orientation = core::ParticlesParams::ParticlesOrientation::CAMERA;
-//        _ptcParams.minXYZ = {-10, 0, -10};
-//        _ptcParams.maxXYZ = {10, 10, 10};
-//        _ptcParams.maxSize = {1.0f, 1.0f};
         _randomSeed = 0;
     }
     Emitter::~Emitter() {
@@ -258,8 +253,7 @@ namespace game {
         _endShape.args = params.getVector3f("endShapeArgs", {});
         _endShapeOffset = params.getVector3f("endShapeOffset", {});
         _shapeDistribution = static_cast<ShapeDistribution>(params.getInteger("shapeDistributionType", 0));
-        //_ptcParams.orientation = static_cast<core::ParticlesParams::ParticlesOrientation>(params.getInteger("particleOrientation", 0));
-        //_ptcParams.additiveBlend = params.getBool("additiveBlend", false);
+        
         _emissionGraph.setPointsFromString(params.getString("emissionGraphData", ""));
         _widthGraph.setPointsFromString(params.getString("widthGraphData", ""));
         _heightGraph.setPointsFromString(params.getString("heightGraphData", ""));
@@ -432,12 +426,7 @@ namespace game {
 //        printf("\n!!!\n");
         
         _mapTexture = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, mapTextureWidth, mapTextureHeight, { _mapData.data() });
-        //_ptcParams.bakingTimeSec = float(_bakingFrameTimeMs) / 1000.0f;
     }
-
-//    const core::ParticlesParams &Emitter::getParams() const {
-//        return _ptcParams;
-//    }
 
     std::pair<math::vector3f, math::vector3f> Emitter::_getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) {
         switch (_shapeDistribution) {
@@ -492,7 +481,6 @@ namespace game {
                     map = m;
                     
                     if (map) {
-                        //core::ParticlesParams parameters (*originDesc);
                         particles = api.scene->addParticles(texture, map, *originDesc);
                         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
                     }
@@ -577,7 +565,6 @@ namespace game {
             node.particles = _api.scene->addParticles(node.texture, node.emitter.getMap(), node.emitter.getDescription());
         }
         else {
-            //core::ParticlesParams parameters (*node.originDesc);
             node.particles = _api.scene->addParticles(node.texture, node.map, *node.originDesc);
         }
     }
@@ -731,6 +718,7 @@ namespace game {
     bool EditorParticlesContext::_visualSet(const std::string &data) {
         if (std::shared_ptr<EditorNodeParticles> node = std::dynamic_pointer_cast<EditorNodeParticles>(_nodeAccess.getSelectedNode().lock())) {
             util::strstream input(data.c_str(), data.length());
+            std::string ptcTexture;
             math::vector3f startShapeArgs, endShapeArgs, endShapeOffset;
             int startShapeType, endShapeType, shapeDistributionType, particleOrientation;
             bool startShapeFill, endShapeFill;
@@ -741,7 +729,7 @@ namespace game {
             success |= input >> endShapeType >> endShapeFill;
             success |= input >> endShapeArgs.x >> endShapeArgs.y >> endShapeArgs.z;
             success |= input >> endShapeOffset.x >> endShapeOffset.y >> endShapeOffset.z;
-            success |= input >> shapeDistributionType >> particleOrientation;
+            success |= input >> shapeDistributionType >> particleOrientation >> ptcTexture;
             
             if (success) {
                 util::Description &desc = node->currentDesc.value();
@@ -754,13 +742,17 @@ namespace game {
                 desc.setVector3f("endShapeOffset", endShapeOffset);
                 desc.setInteger("shapeDistributionType", shapeDistributionType);
                 desc.setInteger("particleOrientation", particleOrientation);
+                desc.setString("texture", ptcTexture);
                 node->endShapeOffset = endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
                 node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
                 desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
                 desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
                 desc.setVector2f("maxSize", node->emitter.getMaxSize());
-                _recreateParticles(*node, true);
+                _api.resources->getOrLoadTexture(ptcTexture.c_str(), [this, node](const foundation::RenderTexturePtr &t) {
+                    node->texture = t;
+                    _recreateParticles(*node, true);
+                });
             }
             return true;
         }

@@ -8,35 +8,35 @@ namespace resource {
         {"meshes/castle-00", { 1, 60, 1835626081 }},
         {"meshes/castle-01", { 1, 60, 1835626081 }},
         {"meshes/b-tavern-0", { 1, 58, 1835626081 }},
-        {"meshes/ruins", { 1, 1, 256 }},
+        {"meshes/b-tavern-1", { 1, 1, 256 }},
         {"meshes/b-bows-0", { 1, 58, 1835626081 }},
-        {"meshes/e-tree-0", { 1, 1, 256 }},
+        {"meshes/b-tower-1", { 1, 58, 1835626081 }},
+        {"meshes/b-tower-0", { 1, 92, 1835626081 }},
         {"meshes/b-blacksmith-0", { 1, 58, 1835626081 }},
-        {"meshes/voxtest", { 1, 1, 256 }},
-        {"meshes/1x1x1", { 1, 1, 256 }},
     };
 }
 namespace resource {
     const std::unordered_map<const char *, TextureInfo> TEXTURES_LIST = {
-        { "textures/ui/castle-hp-bar", { 183, 37, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_bg", { 248, 248, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/button_down", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/castle-hp-back", { 326, 64, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_thumb", { 77, 77, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/img9slice", { 128, 128, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/button_up", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_slice_press", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_bg_00", { 256, 256, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_st_00", { 96, 96, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_circle_down", { 64, 64, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_circle_up", { 64, 64, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_slice_base", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/particles/test", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-x-bar", { 145, 145, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/castle-hp-bar", { 366, 74, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/res-coins", { 74, 49, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-0-d", { 112, 111, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/common-menu", { 168, 150, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/castle-hp-back", { 651, 128, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-0-p", { 112, 111, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-x-back", { 145, 138, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/common-border", { 352, 352, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-0-a", { 112, 111, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/res-bag", { 61, 56, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-0-n", { 112, 111, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/ally-x-txt", { 80, 44, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/ui/res-back", { 457, 88, foundation::RenderTextureFormat::RGBA8UN }},
+        { "textures/particles/arrow", { 300, 300, foundation::RenderTextureFormat::RGBA8UN }},
     };
 }
 namespace resource {
     const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {
+        {"grounds/castle-01", { 1024, 1, 1024 }},
         {"grounds/castle-00", { 1024, 1, 1024 }},
-        {"grounds/test", { 128, 1, 128 }},
     };
 }

@@ -360,14 +360,21 @@ namespace game {
 //        });
 //        _img2->setGeometry(foundation::RenderTopology::TRIANGLES, vertices.data(), std::uint32_t(vertices.size()), indices.data(), std::uint32_t(indices.size()));
         
-        _ims = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::ImgSectorParams {
-            .anchorH = ui::HorizontalAnchor::CENTER,
-            .anchorV = ui::VerticalAnchor::TOP,
-            .anchorOffset = math::vector2f(0.0f, 5.0f),
-            .texture = "textures/ui/button_down"
+//        _ims = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::ImgSectorParams {
+//            .anchorH = ui::HorizontalAnchor::CENTER,
+//            .anchorV = ui::VerticalAnchor::TOP,
+//            .anchorOffset = math::vector2f(0.0f, 5.0f),
+//            .texture = "textures/ui/button_down"
+//        });
+//
+//        _api.resources->getOrLoadEmitter("emitters/defend", [this](const util::Description &d, const foundation::RenderTexturePtr &m, const foundation::RenderTexturePtr &t) {
+//            _ptc = _api.scene->addParticles(t, m, d);
+//        });
+        
+        _ptc = _api.world->createObject("prefabs/ptc-defend");
+        _ptc->loadResources([this](core::WorldInterface::Object &) {
+            _ptc->setTransform(math::transform3f::directionXZ({-1, 0, -1}));
         });
-        
-        
     }
     
     RenderDevContext::~RenderDevContext() {
@@ -376,6 +383,6 @@ namespace game {
     
     void RenderDevContext::update(float dtSec) {
         _api.scene->setCameraLookAt(_orbit, math::vector3f{0, 0, 0});
-        _ims->setSector(90, 360);
+        //_ims->setSector(-135, -105);
     }
 }

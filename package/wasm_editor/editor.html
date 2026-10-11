@@ -276,6 +276,13 @@
                 }
                 $$("swd").show();
             },
+            loadResources: async function(e) {
+                $$("processing_popup").show();
+                await utility.updateResourcesList();
+                await utility.hostUpdateResources(() => {
+                    $$("processing_popup").hide();
+                });
+            },
             centerOnObject: function(e) {
                 uiEditor.sendMsg("editor.centerOnObject", "");
             },
@@ -411,8 +418,7 @@
                         id: "top_buttons",
                         hidden: true,
                         cols: [
-                            elements.button("\uD83D\uDCE4", "Load scene"),
-                            elements.button("\uD83D\uDCBE", "Save scene"),
+                            elements.button("\uD83D\uDCE4", "Load resources", uiBindings.loadResources),
                             elements.button("\u2316", "Center on selected object", uiBindings.centerOnObject),
                             elements.toggle('<img src="editor/axis.svg"></img>', '<img src="editor/axis_off.svg"></img>', true, "Hide/show axis", uiBindings.axisSwitch),
                             elements.toggle('\u25FC\uFE0F', '\u25B6', false, "Update every frame", uiBindings.updateSwitch)
@@ -765,7 +771,7 @@
                 args += $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " ";
                 args += $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue() + " ";
                 args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
-                args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue();
+                args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue() + " " + $$("inspect_ptc_texture").getValue();
                 uiEditor.sendMsg("editor.particles.visual", args);
             };
             uiBindings.particleEmissionGraph = function(e, points) {
@@ -867,9 +873,7 @@
                         ]},
                         {cols: [
                             elements.label("Texture:"), {},
-                            elements.combo("inspect_ptc_texture", "", listParticleTextures, 175, (e, nv, old) => {
-
-                            }),
+                            elements.combo("inspect_ptc_texture", "", listParticleTextures, 175, uiBindings.particlesVisual),
                         ]},
                         { height: 16 }
                     ]

@@ -350,6 +350,7 @@ namespace math {
         static transform3f lookAtRH(const vector3f &eye, const vector3f &at, const vector3f &up);
         static transform3f perspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar);
         static transform3f platformPerspectiveFovRH(scalar fovY, scalar aspect, scalar zNear, scalar zFar);
+        static transform3f directionXZ(const vector3f &v);
         
         transform3f() = default;
         transform3f(const vector4f &r0, const vector4f &r1, const vector4f &r2, const vector4f &r3);
@@ -790,6 +791,10 @@ namespace math {
             vector4f(0, 0, (dF * zNear - dN * zFar) / (zFar - zNear), -scalar(1.0)),
             vector4f(0, 0, (dF - dN) * (zFar * zNear) / (zFar - zNear), 0),
         };
+    }
+    inline transform3f transform3f::directionXZ(const vector3f &v) {
+        const float angle = v.angleTo({1, 0, 0}) * (v.z >= 0.0f ? 1.0f : -1.0f);
+        return transform3f({0, 1, 0}, angle);
     }
     
     inline transform3f::transform3f(const vector4f &r0, const vector4f &r1, const vector4f &r2, const vector4f &r3) {

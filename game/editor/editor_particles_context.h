@@ -75,7 +75,6 @@ namespace game {
         auto getMinXYZ() const -> const math::vector3f & { return _minXYZ; }
         auto getMaxXYZ() const -> const math::vector3f & { return _maxXYZ; }
         auto getMaxSize() const -> const math::vector2f & { return _maxSize; }
-        //auto getParams() const -> const core::ParticlesParams &;
         
     public:
         struct ActiveParticle {
@@ -100,8 +99,6 @@ namespace game {
         Shape _endShape = {Shape::Type::DISK, false, {5.0f, 0.0f, 0.0f}};
         math::vector3f _endShapeOffset = {0, 10.0f, 0};
 
-        foundation::RenderTexturePtr _texture;
-        
         std::size_t _bakingFrameTimeMs = 10;
         std::size_t _particlesToEmit = 100;
         
@@ -117,7 +114,6 @@ namespace game {
         std::vector<std::uint8_t> _mapData;
         foundation::RenderTexturePtr _mapTexture;
         util::Description _description;
-        //core::ParticlesParams _ptcParams;
         
         math::vector3f _minXYZ = {0, 0, 0};
         math::vector3f _maxXYZ = {0, 0, 0};
