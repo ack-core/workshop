@@ -58,7 +58,7 @@ namespace game {
             for (auto &index : obstaclePoints) {
                 points.emplace_back(index.second);
             }
-            visual->fillAsСlosedPolygon(points, {0.0f, 1.0f, 1.0f, 0.7f});
+            visual->fillAsClosedPolygon(points, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         api.platform->sendEditorMsg("engine.refresh", EDITOR_REFRESH_PARAM);
     }

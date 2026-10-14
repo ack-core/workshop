@@ -30,6 +30,10 @@ namespace resource {
             util::Description description;
             foundation::RenderTexturePtr texture;
             std::vector<std::pair<std::uint32_t, ByteDataPtr>> voxmesh;
+
+            Vegetation() = default;
+            Vegetation(Vegetation &&) = default;
+            Vegetation &operator=(Vegetation &&) = default;
         };
         ByteDataPtr map;
         std::vector<Vegetation> vegetation;

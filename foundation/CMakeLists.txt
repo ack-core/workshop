@@ -42,9 +42,9 @@ add_library(foundation
 )	
 
 set_property(TARGET foundation PROPERTY FOLDER "engine")
-target_compile_options(foundation PUBLIC "-fobjc-arc")
 
 if(${PLATFORM} STREQUAL "PLATFORM_IOS")
+	target_compile_options(foundation PUBLIC "-fobjc-arc")
 	set_source_files_properties(${m_source_root}/platform_ios.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
 	set_source_files_properties(${m_source_root}/rendering_metal.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
 endif()

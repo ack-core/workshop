@@ -1,17 +1,22 @@
 
 // TODO:
-// + keyboard
 // + gamepad
-// + file operations
+// + text input
+// + window resize
 
 #ifdef PLATFORM_WINDOWS
 
+#include <atomic>
 #include <chrono>
 #include <list>
 #include <mutex>
+#include <thread>
+#include <condition_variable>
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
+#include <cstdarg>
+#include <cstdio>
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -21,132 +26,287 @@
 #include "platform_windows.h"
 
 namespace {
-    struct KeyboardCallbacksEntry {
-        const void *handle;
-        std::function<void(foundation::PlatformKeyboardEventArgs &)> keyboardDown;
-        std::function<void(foundation::PlatformKeyboardEventArgs &)> keyboardUp;
-    };
-
-    struct MouseCallbacksEntry {
-        const void *handle;
-        std::function<void(foundation::PlatformMouseEventArgs &)> mousePress;
-        std::function<void(foundation::PlatformMouseEventArgs &)> mouseMove;
-        std::function<void(foundation::PlatformMouseEventArgs &)> mouseRelease;
-    };
-
-    static wchar_t *APP_CLASS_NAME = L"Application";
+    const wchar_t *APP_CLASS_NAME = L"Application";
 
     const unsigned APP_WIDTH = 1280;
     const unsigned APP_HEIGHT = 720;
     const unsigned BUFFER_SIZE = 65536;
 
-    bool g_killed = false;
+    char g_buffer[BUFFER_SIZE];
+    std::atomic<bool> g_killed {false};
 
     std::weak_ptr<foundation::PlatformInterface> g_instance;
-    std::mutex g_logMutex;
+    util::callback<void(float)> g_updateAndDraw;
+    util::callback<void()> g_resizeHandler;
 
-    std::size_t g_callbacksIdSource = 0;
-    std::list<KeyboardCallbacksEntry> g_keyboardCallbacks;
-    std::list<MouseCallbacksEntry> g_mouseCallbacks;
+    foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
 
-    char g_buffer[BUFFER_SIZE];
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformKeyboardEventArgs &)>>> g_keyboardHandlers;
+
+    std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
+    std::mutex g_foregroundMutex;
+
+    struct BackgroundThread {
+        std::thread thread;
+        std::mutex mutex;
+        std::condition_variable notifier;
+        std::list<std::unique_ptr<foundation::AsyncTask>> queue;
+    };
+
+    BackgroundThread g_io;
+    BackgroundThread g_worker;
+
+    void backgroundThreadLoop(BackgroundThread &threadData) {
+        printf("[PLATFORM] Background Thread started\n");
+
+        while (true) {
+            std::unique_ptr<foundation::AsyncTask> task = nullptr;
+
+            {
+                std::unique_lock<std::mutex> guard(threadData.mutex);
+
+                while (threadData.queue.empty() && g_killed == false) {
+                    threadData.notifier.wait(guard);
+                }
+                if (g_killed) {
+                    return;
+                }
+
+                task = std::move(threadData.queue.front());
+                threadData.queue.pop_front();
+            }
+
+            if (task) {
+                task->executeInBackground();
+                std::unique_lock<std::mutex> guard(g_foregroundMutex);
+                g_foregroundQueue.emplace_back(std::move(task));
+            }
+        }
+    }
+    void backgroundThreadPush(BackgroundThread &threadData, std::unique_ptr<foundation::AsyncTask> &&task) {
+        {
+            std::lock_guard<std::mutex> guard(threadData.mutex);
+            threadData.queue.emplace_back(std::move(task));
+        }
+        threadData.notifier.notify_one();
+    }
+    void backgroundThreadStop(BackgroundThread &threadData) {
+        {
+            std::lock_guard<std::mutex> guard(threadData.mutex);
+        }
+        threadData.notifier.notify_one();
+        threadData.thread.join();
+    }
+
+    template <typename L, typename H> foundation::EventHandlerToken addHandler(L &list, H &&handler, bool setTop) {
+        foundation::EventHandlerToken token = g_tokenCounter++;
+        if (setTop) {
+            list.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            list.emplace_back(std::make_pair(token, std::move(handler)));
+        }
+        return token;
+    }
+    template <typename L> bool removeHandler(L &list, foundation::EventHandlerToken token) {
+        for (auto index = list.begin(); index != list.end(); ++index) {
+            if (index->first == token) {
+                list.erase(index);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool translateKey(WPARAM vk, foundation::Key &key) {
+        if (vk >= 'A' && vk <= 'Z') {
+            key = foundation::Key(std::uint32_t(foundation::Key::A) + std::uint32_t(vk - 'A'));
+            return true;
+        }
+        if (vk >= '0' && vk <= '9') {
+            key = foundation::Key(std::uint32_t(foundation::Key::NUM0) + std::uint32_t(vk - '0'));
+            return true;
+        }
+        if (vk >= VK_F1 && vk <= VK_F10) {
+            key = foundation::Key(std::uint32_t(foundation::Key::F1) + std::uint32_t(vk - VK_F1));
+            return true;
+        }
+        switch (vk) {
+            case VK_LEFT: key = foundation::Key::LEFT; return true;
+            case VK_RIGHT: key = foundation::Key::RIGHT; return true;
+            case VK_UP: key = foundation::Key::UP; return true;
+            case VK_DOWN: key = foundation::Key::DOWN; return true;
+            case VK_SPACE: key = foundation::Key::SPACE; return true;
+            case VK_RETURN: key = foundation::Key::ENTER; return true;
+            case VK_TAB: key = foundation::Key::TAB; return true;
+        }
+        return false;
+    }
+
+    void keyboardEvent(foundation::PlatformKeyboardEventArgs::EventType type, WPARAM vk) {
+        foundation::PlatformKeyboardEventArgs args;
+        args.type = type;
+
+        if (translateKey(vk, args.key)) {
+            for (auto &index : g_keyboardHandlers) {
+                if (index.second(args)) {
+                    break;
+                }
+            }
+        }
+    }
+
+    void pointerEvent(HWND hwnd, foundation::PlatformPointerEventArgs::EventType type, float x, float y, bool left, bool right, int wheel) {
+        foundation::PlatformPointerEventArgs args = {};
+        args.type = type;
+        args.pointerID = 0;
+        args.coordinateX = x;
+        args.coordinateY = y;
+        args.flags.wheel = wheel;
+        args.flags.isLeftButton = left;
+        args.flags.isRightButton = right;
+
+        for (auto &index : g_pointerHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
+
+        if (args.coordinateX != x || args.coordinateY != y) { // handler replaced pointer coordinates
+            POINT cursorPosition { LONG(args.coordinateX), LONG(args.coordinateY) };
+            ::ClientToScreen(hwnd, &cursorPosition);
+            ::SetCursorPos(cursorPosition.x, cursorPosition.y);
+        }
+    }
+
+    LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+        using PointerEventType = foundation::PlatformPointerEventArgs::EventType;
+        using KeyboardEventType = foundation::PlatformKeyboardEventArgs::EventType;
+
+        const float x = float(short(LOWORD(lParam)));
+        const float y = float(short(HIWORD(lParam)));
+
+        switch (uMsg) {
+            case WM_CLOSE:
+            {
+                g_killed = true;
+                return 0;
+            }
+            case WM_KEYDOWN:
+            {
+                if ((lParam & 0x40000000) == 0) {
+                    keyboardEvent(KeyboardEventType::PRESS, wParam);
+                }
+                break;
+            }
+            case WM_KEYUP:
+            {
+                keyboardEvent(KeyboardEventType::RELEASE, wParam);
+                break;
+            }
+            case WM_LBUTTONDOWN:
+            case WM_RBUTTONDOWN:
+            {
+                ::SetCapture(hwnd);
+                pointerEvent(hwnd, PointerEventType::START, x, y, uMsg == WM_LBUTTONDOWN, uMsg == WM_RBUTTONDOWN, 0);
+                break;
+            }
+            case WM_LBUTTONUP:
+            case WM_RBUTTONUP:
+            {
+                pointerEvent(hwnd, PointerEventType::FINISH, x, y, uMsg == WM_LBUTTONUP, uMsg == WM_RBUTTONUP, 0);
+
+                if ((wParam & (MK_LBUTTON | MK_RBUTTON)) == 0) {
+                    ::ReleaseCapture();
+                }
+                break;
+            }
+            case WM_MOUSEMOVE:
+            {
+                const bool left = (wParam & MK_LBUTTON) != 0;
+                const bool right = (wParam & MK_RBUTTON) != 0;
+                pointerEvent(hwnd, left || right ? PointerEventType::MOVE : PointerEventType::HOVER, x, y, left, right, 0);
+                break;
+            }
+            case WM_MOUSEWHEEL:
+            {
+                POINT cursorPosition { LONG(x), LONG(y) }; // wheel coordinates are in screen space
+                ::ScreenToClient(hwnd, &cursorPosition);
+
+                const int wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1;
+                pointerEvent(hwnd, PointerEventType::WHEEL, float(cursorPosition.x), float(cursorPosition.y), false, false, wheel);
+                break;
+            }
+        }
+
+        return ::DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
 }
 
-namespace {
-    LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-        static bool mouseCaptured = false;
+namespace foundation {
+    namespace {
+        class FileLoadTask : public AsyncTask {
+        public:
+            FileLoadTask(std::string &&filePath, util::callback<void(ByteDataPtr &&, std::size_t)> &&completion) : _path(std::move(filePath)), _size(0), _completion(std::move(completion)) {}
+            ~FileLoadTask() override {}
 
-        if (uMsg == WM_CLOSE) {
-            g_killed = true;
-        }
-        if (uMsg == WM_KEYDOWN) {
-            if ((lParam & 0x40000000) == 0) {
-                if (wParam >= 'A' && wParam <= 'Z') {
-                    foundation::PlatformKeyboardEventArgs keyboardEvent;
-                    keyboardEvent.key = foundation::PlatformKeyboardEventArgs::Key(wParam - 'A');
-                    
-                    for (const auto &entry : g_keyboardCallbacks) {
-                        if (entry.keyboardDown) {
-                            entry.keyboardDown(keyboardEvent);
-                        }
+        public:
+            void executeInBackground() override {
+                std::fstream fileStream(_path, std::ios::binary | std::ios::in | std::ios::ate);
+
+                if (fileStream.is_open() && fileStream.good()) {
+                    std::size_t fileSize = std::size_t(fileStream.tellg());
+                    _data = std::make_unique<std::uint8_t[]>(fileSize);
+                    fileStream.seekg(0);
+                    fileStream.read((char *)_data.get(), fileSize);
+                    _size = fileSize;
+                }
+            }
+            void executeInMainThread() override {
+                _completion(std::move(_data), _size);
+            }
+
+        private:
+            std::string _path;
+            ByteDataPtr _data;
+            std::size_t _size;
+            util::callback<void(ByteDataPtr &&, std::size_t)> _completion;
+        };
+
+        class FileSaveTask : public AsyncTask {
+        public:
+            FileSaveTask(std::string &&filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) : _path(std::move(filePath)), _data(data, data + size), _result(false), _completion(std::move(completion)) {}
+            ~FileSaveTask() override {}
+
+        public:
+            void executeInBackground() override {
+                std::error_code error;
+
+                if (_data.empty()) {
+                    _result = std::filesystem::remove(_path, error);
+                }
+                else {
+                    std::filesystem::create_directories(std::filesystem::path(_path).parent_path(), error);
+                    std::fstream fileStream(_path, std::ios::binary | std::ios::out | std::ios::trunc);
+
+                    if (fileStream.is_open() && fileStream.good()) {
+                        fileStream.write((const char *)_data.data(), _data.size());
+                        _result = fileStream.good();
                     }
                 }
             }
-        }
-        if (uMsg == WM_KEYUP) {
-            if (wParam >= 'A' && wParam <= 'Z') {
-                foundation::PlatformKeyboardEventArgs keyboardEvent;
-                keyboardEvent.key = foundation::PlatformKeyboardEventArgs::Key(wParam - 'A');
-
-                for (const auto &entry : g_keyboardCallbacks) {
-                    if (entry.keyboardUp) {
-                        entry.keyboardUp(keyboardEvent);
-                    }
-                }
-            }
-        }
-        if (uMsg == WM_LBUTTONDOWN) {
-            mouseCaptured = true;
-            ::SetCapture(hwnd);
-
-            foundation::PlatformMouseEventArgs mouseEvent;
-
-            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
-
-            for (const auto &entry : g_mouseCallbacks) {
-                if (entry.mousePress) {
-                    entry.mousePress(mouseEvent);
-                }
-            }
-        }
-        if (uMsg == WM_LBUTTONUP) {
-            mouseCaptured = false;
-
-            foundation::PlatformMouseEventArgs mouseEvent;
-
-            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
-
-            for (const auto &entry : g_mouseCallbacks) {
-                if (entry.mouseRelease) {
-                    entry.mouseRelease(mouseEvent);
-                }
+            void executeInMainThread() override {
+                _completion(_result);
             }
 
-            ::ReleaseCapture();
-        }
-        if (uMsg == WM_MOUSEMOVE) {
-            foundation::PlatformMouseEventArgs mouseEvent;
-
-            mouseEvent.captured = mouseCaptured;
-            mouseEvent.coordinateX = float(short(LOWORD(lParam)));
-            mouseEvent.coordinateY = float(short(HIWORD(lParam)));
-
-            for (const auto &entry : g_mouseCallbacks) {
-                if (entry.mouseMove) {
-                    entry.mouseMove(mouseEvent);
-                }
-            }
-        }
-        if (uMsg == 0x020A) {
-            foundation::PlatformMouseEventArgs mouseEvent;
-
-            POINT cursorPosition;
-            GetCursorPos(&cursorPosition);
-            ScreenToClient(hwnd, &cursorPosition);
-
-            mouseEvent.coordinateX = float(cursorPosition.x);
-            mouseEvent.coordinateY = float(cursorPosition.y);
-            mouseEvent.wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1;
-
-            for (const auto &entry : g_mouseCallbacks) {
-                if (entry.mouseMove) {
-                    entry.mouseMove(mouseEvent);
-                }
-            }
-        }
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        private:
+            std::string _path;
+            std::vector<std::uint8_t> _data;
+            bool _result;
+            util::callback<void(bool)> _completion;
+        };
     }
 }
 
@@ -155,10 +315,8 @@ namespace foundation {
         ::SetProcessDPIAware();
         ::WNDCLASSW wc;
 
-        _message = {};
-
         _hinst = ::GetModuleHandle(0);
-        wc.style = NULL;
+        wc.style = 0;
         wc.lpfnWndProc = (::WNDPROC)WndProc;
         wc.cbClsExtra = 0;
         wc.cbWndExtra = 0;
@@ -184,45 +342,29 @@ namespace foundation {
         *(strrchr(g_buffer, '\\') + 1) = 0;
         std::replace(std::begin(g_buffer), std::end(g_buffer), '\\', '/');
 
-        _executableDirectoryPath = g_buffer;
+        _dataPath = std::string(g_buffer) + "data/";
     }
 
     WindowsPlatform::~WindowsPlatform() {
-        ::UnregisterClassW(APP_CLASS_NAME, _hinst);
         ::DestroyWindow(_window);
+        ::UnregisterClassW(APP_CLASS_NAME, _hinst);
     }
 
-    std::vector<FileEntry> WindowsPlatform::formFileList(const char *dirPath) {
-        std::string fullPath = _executableDirectoryPath + dirPath;
-        std::vector<FileEntry> result;
-
-        for (auto &entry : std::filesystem::directory_iterator(fullPath)) {
-            result.emplace_back(FileEntry{ entry.path().generic_u8string(), entry.is_directory()});
-        }
-
-        return result;
-    }
-    bool WindowsPlatform::loadFile(const char *filePath, std::unique_ptr<unsigned char[]> &data, std::size_t &size) {
-        std::string fullPath = _executableDirectoryPath + filePath;
-        std::fstream fileStream(fullPath, std::ios::binary | std::ios::in | std::ios::ate);
-
-        if (fileStream.is_open() && fileStream.good()) {
-            std::size_t fileSize = std::size_t(fileStream.tellg());
-            data = std::make_unique<unsigned char[]>(fileSize);
-            fileStream.seekg(0);
-            fileStream.read((char *)data.get(), fileSize);
-            size = fileSize;
-
-            return true;
-        }
-
-        return false;
+    void WindowsPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
+        backgroundThreadPush(g_worker, std::move(task));
     }
 
-    float WindowsPlatform::getNativeScreenWidth() const {
+    void WindowsPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+        backgroundThreadPush(g_io, std::make_unique<FileLoadTask>(_dataPath + filePath, std::move(completion)));
+    }
+    void WindowsPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+        backgroundThreadPush(g_io, std::make_unique<FileSaveTask>(_dataPath + filePath, data, data ? size : 0, std::move(completion)));
+    }
+
+    float WindowsPlatform::getScreenWidth() const {
         return float(APP_WIDTH);
     }
-    float WindowsPlatform::getNativeScreenHeight() const {
+    float WindowsPlatform::getScreenHeight() const {
         return float(APP_HEIGHT);
     }
 
@@ -278,77 +420,43 @@ namespace foundation {
     void WindowsPlatform::showKeyboard() {}
     void WindowsPlatform::hideKeyboard() {}
 
-    EventHandlersToken WindowsPlatform::addKeyboardEventHandlers(
-        std::function<void(const PlatformKeyboardEventArgs &)> &&down,
-        std::function<void(const PlatformKeyboardEventArgs &)> &&up
-    ) {
-        EventHandlersToken result{ reinterpret_cast<EventHandlersToken>(g_callbacksIdSource++) };
-        g_keyboardCallbacks.emplace_front(KeyboardCallbacksEntry{ result, std::move(down), std::move(up) });
-        return result;
+    void WindowsPlatform::sendEditorMsg(const std::string &msg, const std::string &data) {
+
     }
-
-    EventHandlersToken WindowsPlatform::addInputEventHandlers(
-        std::function<void(const char(&utf8char)[4])> &&input,
-        std::function<void()> &&backspace
-    ) {
-        return nullptr;
-    }
-
-    EventHandlersToken WindowsPlatform::addMouseEventHandlers(
-        std::function<void(const PlatformMouseEventArgs &)> &&press,
-        std::function<void(const PlatformMouseEventArgs &)> &&move,
-        std::function<void(const PlatformMouseEventArgs &)> &&release
-    ) {
-        EventHandlersToken result{ reinterpret_cast<EventHandlersToken>(g_callbacksIdSource++) };
-        g_mouseCallbacks.emplace_front(MouseCallbacksEntry{ result, std::move(press), std::move(move), std::move(release) });
-        return result;
-    }
-
-    EventHandlersToken WindowsPlatform::addTouchEventHandlers(
-        std::function<void(const PlatformTouchEventArgs &)> &&start,
-        std::function<void(const PlatformTouchEventArgs &)> &&move,
-        std::function<void(const PlatformTouchEventArgs &)> &&finish
-    ) {
-        return nullptr;
-    }
-
-    EventHandlersToken WindowsPlatform::addGamepadEventHandlers(
-        std::function<void(const PlatformGamepadEventArgs &)> &&buttonPress,
-        std::function<void(const PlatformGamepadEventArgs &)> &&buttonRelease
-    ) {
-        return nullptr;
-    }
-
-    void WindowsPlatform::removeEventHandlers(EventHandlersToken token) {
-        for (auto index = std::begin(g_keyboardCallbacks); index != std::end(g_keyboardCallbacks); ++index) {
-            if (index->handle == token) {
-                g_keyboardCallbacks.erase(index);
-                return;
-            }
-        }
-
-        for (auto index = std::begin(g_mouseCallbacks); index != std::end(g_mouseCallbacks); ++index) {
-            if (index->handle == token) {
-                g_mouseCallbacks.erase(index);
-                return;
+    void WindowsPlatform::editorLoopbackMsg(const std::string &msg, const std::string &data) {
+        for (auto &index : g_editorHandlers) {
+            if (index.second(msg, data)) {
+                break;
             }
         }
     }
 
-    void WindowsPlatform::run(std::function<void(float)> &&updateAndDraw) {
-        static std::chrono::time_point<std::chrono::high_resolution_clock> prevFrameTime = std::chrono::high_resolution_clock::now();
+    EventHandlerToken WindowsPlatform::addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop) {
+        return addHandler(g_editorHandlers, std::move(handler), setTop);
+    }
+    EventHandlerToken WindowsPlatform::addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) {
+        return addHandler(g_keyboardHandlers, std::move(handler), setTop);
+    }
+    EventHandlerToken WindowsPlatform::addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) {
+        return nullptr;
+    }
+    EventHandlerToken WindowsPlatform::addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) {
+        return addHandler(g_pointerHandlers, std::move(handler), setTop);
+    }
+    EventHandlerToken WindowsPlatform::addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) {
+        return nullptr;
+    }
 
-        while (!g_killed) {
-            while (::PeekMessage(&_message, _window, 0, 0, PM_REMOVE)) {
-                ::TranslateMessage(&_message);
-                ::DispatchMessage(&_message);
-            }
+    void WindowsPlatform::removeEventHandler(EventHandlerToken token) {
+        removeHandler(g_editorHandlers, token) || removeHandler(g_pointerHandlers, token) || removeHandler(g_keyboardHandlers, token);
+    }
 
-            auto curFrameTime = std::chrono::high_resolution_clock::now();
-            float dt = float(std::chrono::duration_cast<std::chrono::milliseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
-            updateAndDraw(dt);
-            prevFrameTime = curFrameTime;
-        }
+    void WindowsPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
+        g_updateAndDraw = std::move(updateAndDraw);
+    }
+
+    void WindowsPlatform::setResizeHandler(util::callback<void()> &&handler) {
+        g_resizeHandler = std::move(handler); // window has fixed size, so never called
     }
 
     void WindowsPlatform::exit() {
@@ -356,11 +464,11 @@ namespace foundation {
     }
 
     void WindowsPlatform::logMsg(const char *fmt, ...) {
-        std::lock_guard<std::mutex> guard(g_logMutex);
+        std::lock_guard<std::mutex> guard(_logMutex);
 
         va_list args;
         va_start(args, fmt);
-        vsprintf_s(g_buffer, fmt, args);
+        vsnprintf(g_buffer, BUFFER_SIZE, fmt, args);
         va_end(args);
 
         OutputDebugStringA(g_buffer);
@@ -370,11 +478,11 @@ namespace foundation {
     }
 
     void WindowsPlatform::logError(const char *fmt, ...) {
-        std::lock_guard<std::mutex> guard(g_logMutex);
+        std::lock_guard<std::mutex> guard(_logMutex);
 
         va_list args;
         va_start(args, fmt);
-        vsprintf_s(g_buffer, fmt, args);
+        vsnprintf(g_buffer, BUFFER_SIZE, fmt, args);
         va_end(args);
 
         OutputDebugStringA(g_buffer);
@@ -399,6 +507,55 @@ namespace foundation {
 
         return result;
     }
+}
+
+extern "C" void initialize();
+extern "C" void deinitialize();
+
+int main(int argc, const char *argv[]) {
+    initialize();
+
+    g_io.thread = std::thread(&backgroundThreadLoop, std::ref(g_io));
+    g_worker.thread = std::thread(&backgroundThreadLoop, std::ref(g_worker));
+
+    std::vector<std::unique_ptr<foundation::AsyncTask>> foregroundQueue;
+    std::chrono::time_point<std::chrono::high_resolution_clock> prevFrameTime = std::chrono::high_resolution_clock::now();
+    MSG message = {};
+
+    while (!g_killed) {
+        while (::PeekMessage(&message, nullptr, 0, 0, PM_REMOVE)) {
+            ::TranslateMessage(&message);
+            ::DispatchMessage(&message);
+        }
+
+        {
+            std::unique_lock<std::mutex> guard(g_foregroundMutex);
+            for (auto &task : g_foregroundQueue) {
+                foregroundQueue.emplace_back(std::move(task));
+            }
+            g_foregroundQueue.clear();
+        }
+
+        for (auto &task : foregroundQueue) {
+            task->executeInMainThread();
+        }
+        foregroundQueue.clear();
+
+        auto curFrameTime = std::chrono::high_resolution_clock::now();
+        float dt = float(std::chrono::duration_cast<std::chrono::milliseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
+
+        if (g_updateAndDraw) {
+            g_updateAndDraw(dt);
+        }
+
+        prevFrameTime = curFrameTime;
+    }
+
+    backgroundThreadStop(g_io);
+    backgroundThreadStop(g_worker);
+
+    deinitialize();
+    return 0;
 }
 
 #endif // PLATFORM_WINDOWS

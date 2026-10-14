@@ -110,14 +110,14 @@ namespace core {
         void fillAsCircle(std::uint32_t segCount, float radius, const math::color &rgba) override {
             buckets.clear();
             for (std::uint32_t i = 0; i < segCount; i++) {
-                const float koeff0 = 2.0f * M_PI * float(i) / float(segCount);
-                const float koeff1 = 2.0f * M_PI * float(i + 1) / float(segCount);
+                const float koeff0 = 2.0f * MATH_PI * float(i) / float(segCount);
+                const float koeff1 = 2.0f * MATH_PI * float(i + 1) / float(segCount);
                 const math::vector3f p0 = math::vector3f(radius * std::cosf(koeff0), 0.0f, radius * std::sinf(koeff0));
                 const math::vector3f p1 = math::vector3f(radius * std::cosf(koeff1), 0.0f, radius * std::sinf(koeff1));
                 setLine(i, p0, p1, rgba);
             }
         }
-        void fillAsСlosedPolygon(const std::vector<math::vector3f> &points, const math::color &rgba) override {
+        void fillAsClosedPolygon(const std::vector<math::vector3f> &points, const math::color &rgba) override {
             buckets.clear();
             std::uint32_t lineIndex = 0;
             for (auto index = points.begin(); index != points.end(); ++index) {
@@ -477,7 +477,7 @@ namespace core {
                         const std::pair<std::uint32_t, ByteDataPtr> &srcMesh = vxm[rindex];
                         voxels.resize(voxels.size() + srcMesh.first);
 
-                        for (int i = 0; i < srcMesh.first; i++) {
+                        for (std::uint32_t i = 0; i < srcMesh.first; i++) {
                             voxels[currv + i] = reinterpret_cast<const VTXMVOX *>(srcMesh.second.get())[i];
                             voxels[currv + i].positionX += x;
                             voxels[currv + i].positionZ += y;
@@ -1011,9 +1011,9 @@ namespace core {
             .repeat = 4
         });
         
-        _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
+        _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
         _platform->setResizeHandler([&]() {
-            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, _rendering->getBackBufferWidth(), _rendering->getBackBufferHeight(), true);
+            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
         });
 
         setCameraLookAt({45, 45, 45}, {0, 0, 0});
@@ -1040,8 +1040,8 @@ namespace core {
         math::transform3f viewMatrix = math::transform3f::lookAtRH(_camera.position, _camera.target, _camera.up) * mm;
 
         _camera.position = position - _camera.right * shift.x - _camera.up * shift.y + _camera.forward * shift.z;
-        _camera.plmVPMatrix = viewMatrix * math::transform3f::platformPerspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
-        _camera.stdVPMatrix = viewMatrix * math::transform3f::perspectiveFovRH(50.0 / 180.0f * float(3.14159f), aspect, 0.1f, 10000.0f);
+        _camera.plmVPMatrix = viewMatrix * math::transform3f::platformPerspectiveFovRH(50.0f / 180.0f * MATH_PI, aspect, 0.1f, 10000.0f);
+        _camera.stdVPMatrix = viewMatrix * math::transform3f::perspectiveFovRH(50.0f / 180.0f * MATH_PI, aspect, 0.1f, 10000.0f);
         _camera.invVPMatrix = _camera.stdVPMatrix.inverted();
     }
     

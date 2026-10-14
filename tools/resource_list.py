@@ -136,7 +136,7 @@ def main(root: str, dst: str) -> None:
                     if file.endswith(ext):
                         relpath = os.path.relpath(path, root)
                         if not relpath.startswith("."):
-                            type_item[0](root, os.path.join(relpath, file), f)
+                            type_item[0](root, os.path.join(relpath, file).replace("\\", "/"), f)
 
             f.write("    };\r\n".encode("utf-8"))
             f.write("}\r\n".encode("utf-8"))

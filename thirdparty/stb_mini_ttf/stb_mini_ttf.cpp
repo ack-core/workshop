@@ -330,7 +330,8 @@ extern "C" {
 
    // #define your own functions "STBTT_malloc" / "STBTT_free" to avoid malloc.h
    #ifndef STBTT_malloc
-   //#include <stdlib.h>
+   void* malloc(size_t);
+   void free(void *ptr);
    #define STBTT_malloc(x,u)  ((void)(u),malloc(x))
    #define STBTT_free(x,u)    ((void)(u),free(x))
    #endif
