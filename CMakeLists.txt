@@ -42,7 +42,12 @@ add_subdirectory("${m_source_root}/foundation")
 add_subdirectory("${m_source_root}/providers")
 add_subdirectory("${m_source_root}/core")
 add_subdirectory("${m_source_root}/ui")
-add_subdirectory("${m_source_root}/game")
+
+if (APPTYPE STREQUAL "IS_GAME" OR APPTYPE STREQUAL "IS_EDITOR")
+	add_subdirectory("${m_source_root}/game")
+elseif (APPTYPE STREQUAL "IS_TESTS")
+	add_subdirectory("${m_source_root}/testing")
+endif()
 
 set(m_sources_list "${m_source_root}/entry.cpp")
 
@@ -57,7 +62,12 @@ target_link_libraries(app PUBLIC foundation)
 target_link_libraries(app PUBLIC providers)
 target_link_libraries(app PUBLIC core)
 target_link_libraries(app PUBLIC ui)
-target_link_libraries(app PUBLIC game)
+
+if (APPTYPE STREQUAL "IS_GAME" OR APPTYPE STREQUAL "IS_EDITOR")
+	target_link_libraries(app PUBLIC game)
+elseif (APPTYPE STREQUAL "IS_TESTS")
+	target_link_libraries(app PUBLIC testing)
+endif()
 
 if (APPTYPE STREQUAL "IS_GAME")
 	set_property(TARGET app PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}")
