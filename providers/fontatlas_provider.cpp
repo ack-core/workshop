@@ -134,8 +134,13 @@ namespace resource {
     , _ttfLen(ttfLen)
     , _asyncInProgress(false)
     {
-        if (stbtt_InitFont(&_ttfInfo, _ttfData.get(), 0) == 0) {
-            _platform->logError("[FontAtlasProviderImpl::FontAtlasProviderImpl] ttf is not valid true type file\n");
+        if (_ttfData) {
+            if (stbtt_InitFont(&_ttfInfo, _ttfData.get(), 0) == 0) {
+                _platform->logError("[FontAtlasProviderImpl::FontAtlasProviderImpl] ttf is not valid true type file\n");
+            }
+        }
+        else {
+            _platform->logMsg("[FontAtlasProviderImpl::FontAtlasProviderImpl] ttf file data is empty\n");
         }
     }
     

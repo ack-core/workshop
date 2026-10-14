@@ -6,6 +6,8 @@
 #include "core/raycast.h"
 #include "ui/stage.h"
 
+#include <unordered_map>
+
 namespace test {
     struct API {
         const foundation::PlatformInterfacePtr &platform;
@@ -33,9 +35,9 @@ namespace test {
         virtual ~StepTestInterface() = default;
     };
 
-    class RegistryInterface {
+    class TestRunner {
     public:
-        static std::shared_ptr<RegistryInterface> instance(
+        TestRunner(
             const foundation::PlatformInterfacePtr& platform,
             const foundation::RenderingInterfacePtr& rendering,
             const resource::ResourceProviderPtr& resourceProvider,
@@ -46,16 +48,19 @@ namespace test {
             const core::SimulationInterfacePtr& simulation,
             const ui::StageInterfacePtr& ui
         );
+        ~TestRunner();
 
     public:
 
-        virtual void registerUnitTest(const char *name, bool (*testFunc)(API&& api)) = 0;
-        virtual void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*testInstance)(API&& api)) = 0;
-        virtual void registerScreenshotTest(const char* name, void (*testFunc)(API&& api)) = 0;
+        void registerUnitTest(const char *name, bool (*testFunc)(API&& api));
+        void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)(API&& api));
+        void registerScreenshotTest(const char* name, void (*testFunc)(API&& api));
 
-        virtual void nextFrame() = 0;
+        void nextFrame();
 
-    public:
-        virtual ~RegistryInterface() = default;
+    private:
+        std::unordered_map<std::string, bool (*)(API&& api)> _unitTests;
+        std::unordered_map<std::string, std::unique_ptr<StepTestInterface>(*)(API&& api)> _stepTests;
+        std::unordered_map<std::string, void (*)(API&& api)> _screenshotTests;
     };
 }
