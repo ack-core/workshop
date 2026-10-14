@@ -34,7 +34,7 @@ namespace core {
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setLine(std::uint32_t index, const math::vector3f &start, const math::vector3f &end, const math::color &rgba) = 0;
             virtual void fillAsCircle(std::uint32_t segCount, float radius, const math::color &rgba) = 0;
-            virtual void fillAsСlosedPolygon(const std::vector<math::vector3f> &points, const math::color &rgba) = 0;
+            virtual void fillAsClosedPolygon(const std::vector<math::vector3f> &points, const math::color &rgba) = 0;
             virtual void clear() = 0;
             virtual ~LineSet() = default;
         };

@@ -1,17 +1,20 @@
 
 #include "platform.h"
 
+#include <mutex>
+
 namespace foundation {
     class WindowsPlatform : public PlatformInterface {
     public:
         WindowsPlatform();
         ~WindowsPlatform() override;
 
-        std::vector<FileEntry> formFileList(const char *dirPath) override;
-        bool loadFile(const char *filePath, std::unique_ptr<unsigned char[]> &data, std::size_t &size) override;
+        void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
+        void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) override;
+        void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) override;
 
-        float getNativeScreenWidth() const override;
-        float getNativeScreenHeight() const override;
+        float getScreenWidth() const override;
+        float getScreenHeight() const override;
 
         void *attachNativeRenderingContext(void *context) override;
 
@@ -21,46 +24,29 @@ namespace foundation {
         void showKeyboard() override;
         void hideKeyboard() override;
 
-        EventHandlersToken addKeyboardEventHandlers(
-            std::function<void(const PlatformKeyboardEventArgs &)> &&down,
-            std::function<void(const PlatformKeyboardEventArgs &)> &&up
-        ) override;
+        void sendEditorMsg(const std::string &msg, const std::string &data) override;
+        void editorLoopbackMsg(const std::string &msg, const std::string &data) override;
 
-        EventHandlersToken addInputEventHandlers(
-            std::function<void(const char(&utf8char)[4])> &&input,
-            std::function<void()> &&backspace
-        ) override;
+        EventHandlerToken addEditorEventHandler(util::callback<bool(const std::string &, const std::string &)> &&handler, bool setTop) override;
+        EventHandlerToken addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) override;
+        EventHandlerToken addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) override;
+        EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) override;
+        EventHandlerToken addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) override;
 
-        EventHandlersToken addMouseEventHandlers(
-            std::function<void(const PlatformMouseEventArgs &)> &&press,
-            std::function<void(const PlatformMouseEventArgs &)> &&move,
-            std::function<void(const PlatformMouseEventArgs &)> &&release
-        ) override;
+        void removeEventHandler(EventHandlerToken token) override;
 
-        EventHandlersToken addTouchEventHandlers(
-            std::function<void(const PlatformTouchEventArgs &)> &&start,
-            std::function<void(const PlatformTouchEventArgs &)> &&move,
-            std::function<void(const PlatformTouchEventArgs &)> &&finish
-        ) override;
-
-        EventHandlersToken addGamepadEventHandlers(
-            std::function<void(const PlatformGamepadEventArgs &)> &&buttonPress,
-            std::function<void(const PlatformGamepadEventArgs &)> &&buttonRelease
-        ) override;
-
-        void removeEventHandlers(EventHandlersToken token) override;
-
-        void run(std::function<void(float)> &&updateAndDraw) override;
+        void setLoop(util::callback<void(float)> &&updateAndDraw) override;
+        void setResizeHandler(util::callback<void()> &&handler) override;
         void exit() override;
 
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;
 
     private:
-        std::string _executableDirectoryPath;
+        std::mutex _logMutex;
+        std::string _dataPath;
 
         HINSTANCE _hinst;
         HWND _window;
-        MSG _message;
     };
 }

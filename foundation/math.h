@@ -12,6 +12,8 @@
 #include <cmath>
 #include <algorithm>
 
+static const float MATH_PI = 3.14159265f;
+
 namespace math {
     using scalar = float;
     using integer = int;
@@ -567,7 +569,7 @@ namespace math {
     inline vector2f swizzle2f<Ix, Iy>::normalized(scalar length) const {
         const scalar (&flat)[4] = asFlat();
         const scalar lm = this->length();
-        const scalar k = lm > std::numeric_limits<scalar>::epsilon() ? length / lm : 1.0;
+        const scalar k = lm > std::numeric_limits<scalar>::epsilon() ? length / lm : scalar(1.0);
         return vector2f(flat[Ix] * k, flat[Iy] * k);
     }
     template<int Ix, int Iy>
@@ -649,7 +651,7 @@ namespace math {
     inline vector3f swizzle3f<Ix, Iy, Iz>::normalized(scalar length) const {
         const scalar (&flat)[4] = asFlat();
         const scalar lm = this->length();
-        const scalar k = lm > std::numeric_limits<scalar>::epsilon() ? length / lm : 1.0;
+        const scalar k = lm > std::numeric_limits<scalar>::epsilon() ? length / lm : scalar(1.0);
         return vector3f(flat[Ix] * k, flat[Iy] * k, flat[Iz] * k);
     }
     template<int Ix, int Iy, int Iz>
@@ -680,8 +682,8 @@ namespace math {
     }
     template<int Ix, int Iy, int Iz>
     inline vector3f swizzle3f<Ix, Iy, Iz>::rotated(const vector3f &axis, scalar radians) const {
-        const scalar rsin = std::sinf(-radians * 0.5);
-        const scalar rcos = std::cosf(-radians * 0.5);
+        const scalar rsin = std::sinf(-radians * scalar(0.5));
+        const scalar rcos = std::cosf(-radians * scalar(0.5));
         const vector4f q = vector4f(axis.x * rsin, axis.y * rsin, axis.z * rsin, rcos);
         const vector4f invq = vector4f(-q.x, -q.y, -q.z, q.w);
         const vector4f p = this->atv4start(0.0f);
@@ -781,6 +783,9 @@ namespace math {
 #elif PLATFORM_WASM
         scalar dN = scalar(-1.0f);
         scalar dF = scalar(1.0f);
+#elif PLATFORM_WINDOWS
+        scalar dN = scalar(0.0f);
+        scalar dF = scalar(1.0f);
 #else
         static_assert("");
 #endif
@@ -804,16 +809,16 @@ namespace math {
         rv3 = r3.block;
     }
     inline transform3f::transform3f(const vector3f &axis, scalar radians) {
-        const scalar sina = std::sinf(-radians * 0.5);
-        const scalar cosa = std::cosf(-radians * 0.5);
+        const scalar sina = std::sinf(-radians * scalar(0.5));
+        const scalar cosa = std::cosf(-radians * scalar(0.5));
         
         const vector4f q = vector4f(axis.x * sina, axis.y * sina, axis.z * sina, cosa);
-        const vector4f xq = vector4f(2.0 * q.x) * q;
-        const vector4f wq = vector4f(2.0 * q.w) * q;
-        
-        scalar yy = 2.0 * q.y * q.y;
-        scalar yz = 2.0 * q.y * q.z;
-        scalar zz = 2.0 * q.z * q.z;
+        const vector4f xq = vector4f(scalar(2.0) * q.x) * q;
+        const vector4f wq = vector4f(scalar(2.0) * q.w) * q;
+
+        scalar yy = scalar(2.0) * q.y * q.y;
+        scalar yz = scalar(2.0) * q.y * q.z;
+        scalar zz = scalar(2.0) * q.z * q.z;
 
         rv0 = {scalar(1.0) - (yy + zz), xq.y + wq.z, xq.z - wq.y, 0.0};
         rv1 = {xq.y - wq.z, scalar(1.0) - (xq.x + zz), yz + wq.x, 0.0};
@@ -852,7 +857,7 @@ namespace math {
         scalar a0113 = row1[0] * row3[1] - row1[1] * row3[0];
         scalar a0112 = row1[0] * row2[1] - row1[1] * row2[0];
 
-        scalar det = 1.0 / (
+        scalar det = scalar(1.0) / (
             row0[0] * (row1[1] * a2323 - row1[2] * a1323 + row1[3] * a1223) -
             row0[1] * (row1[0] * a2323 - row1[2] * a0323 + row1[3] * a0223) +
             row0[2] * (row1[0] * a1323 - row1[1] * a0323 + row1[3] * a0123) -

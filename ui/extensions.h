@@ -291,7 +291,7 @@ namespace ui {
                         .texture = params.texture
                     });
                     ImgSectorPtr result = std::make_shared<ImgSector>(img);
-                    img->setSize(math::vector2f(info->width, info->height));
+                    img->setSize(math::vector2f(math::scalar(info->width), math::scalar(info->height)));
                     img->setDrawHandler([weak = std::weak_ptr<ImgSector>(result)](StageInterface::ImgCustom &img) {
                         if (auto owner = weak.lock()) {
                             if (owner->_dirty) {

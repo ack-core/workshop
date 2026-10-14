@@ -41,7 +41,11 @@ namespace {
             std::vector<std::pair<math::vector2i, ByteDataPtr>> sourceData;
 //            ByteDataPtr sourceData;
 //            math::vector2i sourceSize;
-            SourceType sourceType;
+            SourceType sourceType = SourceType::TEXTURE;
+
+            VGEntry(const util::Description &desc) : description(desc) {}
+            VGEntry(VGEntry &&) = default;
+            VGEntry &operator=(VGEntry &&) = default;
         };
 
         math::vector2i textureSize;
@@ -89,9 +93,9 @@ namespace {
                     for (std::uint32_t i = 0; i < voxelCount; i++) {
                         const MeshAsyncContext::Voxel &src = *(MeshAsyncContext::Voxel *)data;
                         MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][i];
-                        voxel.positionX = src.positionX - originOffset.x;
-                        voxel.positionY = src.positionY - originOffset.y;
-                        voxel.positionZ = src.positionZ - originOffset.z;
+                        voxel.positionX = src.positionX - std::int16_t(originOffset.x);
+                        voxel.positionY = src.positionY - std::int16_t(originOffset.y);
+                        voxel.positionZ = src.positionZ - std::int16_t(originOffset.z);
                         voxel.colorIndex = src.colorIndex;
                         voxel.mask = src.mask;
 
@@ -117,7 +121,7 @@ namespace {
             const int descLen = *(int *)(data + 0);
             util::Description vg = util::Description::parse((const std::uint8_t *)(data + 4), descLen);
             for (auto &item : vg.getDescriptions("vegetation")) {
-                ctx.vg.emplace_back(GroundAsyncContext::VGEntry { std::move(*item), {} });
+                ctx.vg.emplace_back(*item);
             }
             data += 4 + descLen;
             

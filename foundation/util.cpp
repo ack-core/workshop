@@ -95,7 +95,7 @@ namespace util {
         output--;
         
         while(p < output) {
-            char tmp = *output;
+            uint16_t tmp = *output;
             *output-- = *p;
             *p++ = tmp;
         }
@@ -462,7 +462,7 @@ namespace util {
         _state = oldstate * 6364136223846793005ULL + (_inc | 1);
         uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
         uint32_t rot = oldstate >> 59u;
-        return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+        return (xorshifted >> rot) | (xorshifted << ((32u - rot) & 31u));
     }
     float RandomSource::getNextRandomF() {
         return std::int32_t(getNextRandom()) * 4.6566129e-10f;
@@ -473,7 +473,7 @@ namespace util {
         const float u1 = _rnd.getNextRandomF();
         const float u2 = _rnd.getNextRandomF();
         float r = std::sqrtf(-2.0f * std::logf(u1));
-        float theta = 2.0f * M_PI * u2;
+        float theta = 2.0f * MATH_PI * u2;
         return r * std::cosf(theta);
     }
 

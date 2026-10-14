@@ -50,6 +50,11 @@ namespace {
         {"matrix3", "mat3",   36},
     };
 #endif
+#ifdef PLATFORM_WINDOWS
+    const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
+        {}
+    };
+#endif
 }
 
 namespace {
@@ -114,6 +119,11 @@ namespace {
         {"uint2",   "uvec2", 8,  2},
         {"uint3",   "uvec3", 12, 3},
         {"uint4",   "uvec4", 16, 4},
+    };
+#endif
+#ifdef PLATFORM_WINDOWS
+    const NativeVertexFormat VTX_CONVERSION_TABLE[] = { // index is InputAttributeFormat value
+        {}
     };
 #endif
 }
@@ -565,7 +575,45 @@ void formFSBlock(const std::string &fixed, const std::string &consts, const std:
 }
 
 #endif
+#ifdef PLATFORM_WINDOWS
+std::string transformCode(const std::string& src) {
+    std::string result = src;
+    return result;
+}
+std::uint32_t formVarsBlock(util::strstream& stream, std::string& output, std::size_t allowedTypeCount) {
+    return 0;
+}
+void formEmptyFixedBlock(std::string& output) {
+    output = "\n";
+}
+void formEmptyConstBlock(std::string& output) {
+    output = "\n";
+}
+void formEmptyInoutBlock(std::string& outputVS, std::string& outputFS) {
+    outputVS = "\n";
+    outputFS = "\n";
+}
+bool formFixedBlock(util::strstream& stream, std::string& output) {
+    return false;
+}
+std::uint32_t formConstBlock(util::strstream& stream, std::string& output) {
+    std::uint32_t constBlockLength = 0;
+    return constBlockLength;
+}
+bool formInoutBlock(util::strstream& stream, std::string& outputVS, std::string& outputFS) {
+    return false;
+}
+void addFNDefBlock(const std::string& r, const std::string& name, const std::string& sgn, const std::string& cb, std::string& functions, std::string& funcdefs) {
 
+}
+void formVSBlock(const foundation::InputLayout& layout, const std::string& fixed, const std::string& consts, const std::string& inoutVS, const std::string& funcs, const std::string& cb, const std::string& fdefs, std::string& vsout) {
+
+}
+void formFSBlock(const std::string& fixed, const std::string& consts, const std::string& inoutFS, const std::string& funcs, const std::string& cb, const std::string& fdefs, std::string& fsout) {
+
+}
+
+#endif
 }
 
 namespace foundation {

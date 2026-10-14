@@ -15,18 +15,18 @@
 #include "experimental/debug_context.h"
 #include "experimental/render_dev.h"
 
-#include "contexts/game_data_interface.h"
-#include "contexts/castle_interface.h"
-#include "contexts/battle_interface.h"
-
-#include "contexts/loading_context.h"
-#include "contexts/menu_ui_context.h"
-#include "contexts/common_ui_context.h"
-#include "contexts/construction_ui_context.h"
-#include "contexts/castle_context.h"
-#include "contexts/battle_ui_context.h"
-#include "contexts/battle_context.h"
-#include "contexts/game_data_context.h"
+//#include "contexts/game_data_interface.h"
+//#include "contexts/castle_interface.h"
+//#include "contexts/battle_interface.h"
+//
+//#include "contexts/loading_context.h"
+//#include "contexts/menu_ui_context.h"
+//#include "contexts/common_ui_context.h"
+//#include "contexts/construction_ui_context.h"
+//#include "contexts/castle_context.h"
+//#include "contexts/battle_ui_context.h"
+//#include "contexts/battle_context.h"
+//#include "contexts/game_data_context.h"
 
 // Rule of states:
 // Context is created if the next state contains it and current state does not
@@ -60,27 +60,27 @@ namespace game {
 //        {"default", {
 //            &makeContext<DebugContext>
 //        }}
-//        {"default", {
-//            &makeContext<RenderDevContext>
-//        }}
-        
         {"default", {
-            &makeContext<GameDataContext>,
-            &makeContext<LoadingContext, GameDataInterface>
-        }},
-        {"castle", {
-            &makeContext<GameDataContext>,
-            &makeContext<CommonUIContext, GameDataInterface>,
-            &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<ConstructionUIContext, CastleInterface>,
-        }},
-        {"battle", {
-            &makeContext<GameDataContext>,
-            &makeContext<CommonUIContext, GameDataInterface>,
-            &makeContext<CastleContext, GameDataInterface>,
-            &makeContext<BattleContext, GameDataInterface, CastleInterface>,
-            &makeContext<BattleUIContext, GameDataInterface, BattleInterface, CastleInterface>,
+            &makeContext<RenderDevContext>
         }}
+        
+        //{"default", {
+        //    &makeContext<GameDataContext>,
+        //    &makeContext<LoadingContext, GameDataInterface>
+        //}},
+        //{"castle", {
+        //    &makeContext<GameDataContext>,
+        //    &makeContext<CommonUIContext, GameDataInterface>,
+        //    &makeContext<CastleContext, GameDataInterface>,
+        //    &makeContext<ConstructionUIContext, CastleInterface>,
+        //}},
+        //{"battle", {
+        //    &makeContext<GameDataContext>,
+        //    &makeContext<CommonUIContext, GameDataInterface>,
+        //    &makeContext<CastleContext, GameDataInterface>,
+        //    &makeContext<BattleContext, GameDataInterface, CastleInterface>,
+        //    &makeContext<BattleUIContext, GameDataInterface, BattleInterface, CastleInterface>,
+        //}}
 
 #endif
     };

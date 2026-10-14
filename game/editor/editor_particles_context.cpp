@@ -109,7 +109,7 @@ namespace game {
 
             // points
             for (std::size_t i = 0; i < amount; i++) {
-                const float koeff = 2.0f * M_PI * float(i) / float(amount);
+                const float koeff = 2.0f * MATH_PI * float(i) / float(amount);
                 float r = 0.5f * args.x;
                 
                 if (fill) { // spread in [0..radius]
@@ -210,7 +210,7 @@ namespace game {
             // lineset
             const math::vector3f bbmin = -0.5f * args;
             const math::vector3f bbmax = 0.5f * args;
-            const float alpha = 0.3f + 0.1 * float(std::max(dimCount, 1));
+            const float alpha = 0.3f + 0.1f * float(std::max(dimCount, 1));
             lineSet->clear();
             lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
             lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
@@ -239,12 +239,12 @@ namespace game {
             0, 10, 20, 50, 100
         };
         
-        _emissionTimeMs = params.getInteger("emissionTimeMs", 0);
-        _particleLifeTimeMs = params.getInteger("particleLifeTimeMs", 0);
-        _bakingFrameTimeMs = bakingTimeTable[params.getInteger("bakingFrameType", 0)];
-        _particlesToEmit = params.getInteger("particlesToEmit", 0);
+        _emissionTimeMs = static_cast<float>(params.getInteger("emissionTimeMs", 0));
+        _particleLifeTimeMs = static_cast<float>(params.getInteger("particleLifeTimeMs", 0));
+        _bakingFrameTimeMs = bakingTimeTable[static_cast<std::size_t>(params.getInteger("bakingFrameType", 0))];
+        _particlesToEmit = static_cast<std::size_t>(params.getInteger("particlesToEmit", 0));
         _isLooped = params.getBool("looped", false);
-        _randomSeed = params.getInteger("randomSeed", 0);
+        _randomSeed = static_cast<std::size_t>(params.getInteger("randomSeed", 0));
         _startShape.type = static_cast<Shape::Type>(params.getInteger("startShapeType", 0));
         _startShape.fill = params.getBool("startShapeFill", false);
         _startShape.args = params.getVector3f("startShapeArgs", {});
@@ -367,7 +367,7 @@ namespace game {
                     element.height = _heightGraph.getValue(lifeKoeff, ptc->spreadKoeffSize);
                     element.angle = 0.0f;
                     element.alpha = _alphaGraph.getValue(lifeKoeff, ptc->spreadKoeffAlpha);
-                    element.mask = loop + 1; // Mask: 1 - newborn, 2 - old
+                    element.mask = std::uint8_t(loop + 1); // Mask: 1 - newborn, 2 - old
                     element.history = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 255 = 255 * BakingTimeSec)
                     
                     if (lifeKoeff < std::numeric_limits<float>::epsilon()) { // mark where the particle starts
@@ -409,7 +409,7 @@ namespace game {
                 m2[2] = std::uint8_t(heightKoeff);                      // Height hi
                 m2[3] = std::uint8_t(255.0f * fract(heightKoeff));      // Height low
 
-                m3[0] = 255.0f * element.alpha;                         // Alpha
+                m3[0] = std::uint8_t(255.0f * element.alpha);           // Alpha
                 m3[1] = 255;                                            // reserved
                 m3[2] = element.history;
                 m3[3] = element.mask;
@@ -450,6 +450,7 @@ namespace game {
                 return std::make_pair(_startShape.points[startIndex], shapeOffset + _endShape.points[endIndex]);
             }
         }
+        return {};
     }
     
 }

@@ -75,7 +75,7 @@ namespace core {
                 points.emplace_back(point);
             }
             _visual = scene->addLineSet();
-            _visual->fillAsСlosedPolygon(_src, {0.0f, 1.0f, 1.0f, 0.7f});
+            _visual->fillAsClosedPolygon(_src, {0.0f, 1.0f, 1.0f, 0.7f});
         }
         ~ObstaclePolygonXZImpl() override {}
         
