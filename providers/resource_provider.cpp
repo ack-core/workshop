@@ -39,8 +39,6 @@ namespace {
             };
             util::Description description;
             std::vector<std::pair<math::vector2i, ByteDataPtr>> sourceData;
-//            ByteDataPtr sourceData;
-//            math::vector2i sourceSize;
             SourceType sourceType = SourceType::TEXTURE;
 
             VGEntry(const util::Description &desc) : description(desc) {}
@@ -353,8 +351,13 @@ namespace resource {
     , _rendering(rendering)
     , _asyncInProgress(false)
     {
-        if (readPrefabs(_prefabs, prefabSrcData.get()) == false) {
-            _platform->logError("[ResourceProviderImpl::ResourceProviderImpl] Invalid prefabs.bin");
+        if (prefabSrcData) {
+            if (readPrefabs(_prefabs, prefabSrcData.get()) == false) {
+                _platform->logError("[ResourceProviderImpl::ResourceProviderImpl] Invalid prefabs.bin");
+            }
+        }
+        else {
+            _platform->logMsg("[ResourceProviderImpl::ResourceProviderImpl] Empty prefabs.bin");
         }
     }
     

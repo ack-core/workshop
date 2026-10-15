@@ -3,29 +3,13 @@
 
 namespace resource {
     const std::unordered_map<const char *, MeshInfo> MESHES_LIST = {
-        {"meshes/1x1x1", { 1, 1, 256 }},
-        {"meshes/ruins", { 1, 1, 256 }},
-        {"meshes/voxtest", { 1, 1, 256 }},
     };
 }
 namespace resource {
     const std::unordered_map<const char *, TextureInfo> TEXTURES_LIST = {
-        { "textures/particles/test", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_circle_down", { 64, 64, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_circle_up", { 64, 64, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_slice_base", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/btn_slice_press", { 32, 32, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/button_down", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/button_up", { 100, 40, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/img9slice", { 128, 128, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_bg", { 248, 248, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_bg_00", { 256, 256, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_st_00", { 96, 96, foundation::RenderTextureFormat::RGBA8UN }},
-        { "textures/ui/joystick_thumb", { 77, 77, foundation::RenderTextureFormat::RGBA8UN }},
     };
 }
 namespace resource {
     const std::unordered_map<const char *, GroundInfo> GROUNDS_LIST = {
-        {"grounds/test", { 128, 1, 128 }},
     };
 }

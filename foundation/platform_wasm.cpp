@@ -18,6 +18,7 @@ namespace {
     
     std::uint32_t g_width;
     std::uint32_t g_height;
+    std::size_t g_asyncWorkCount = 0;
 }
 
 void fatal() {
@@ -158,7 +159,12 @@ namespace foundation {
     }
     
     void WASMPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
+        g_asyncWorkCount++;
         js_task(task.release());
+    }
+    
+    bool WASMPlatform::isAsyncWorkInProgress() const {
+        return g_asyncWorkCount != 0;
     }
     
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
@@ -425,6 +431,7 @@ extern "C" {
         ptr->executeInBackground();
         ptr->executeInMainThread();
         delete ptr;
+        g_asyncWorkCount--;
     }
     void editorEvent(const char *msg, std::size_t msglen, const char *data, std::size_t datalen) {
         if (auto p = g_instance.lock()) {

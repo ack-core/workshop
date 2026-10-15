@@ -1143,102 +1143,104 @@ namespace core {
         util::cleanupUnused(_particleEmitters);
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
-        _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
-            rendering.applyShader(_groundMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &groundMesh : _groundMeshes) {
-                if (groundMesh->enabled) {
-                    rendering.applyShaderConstants(&groundMesh->transform);
-                    rendering.applyTextures({
-                        {groundMesh->texture, foundation::SamplerType::NEAREST}
-                    });
-                    rendering.draw(groundMesh->mesh);
+        if (_gbuffer) {
+            _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_groundMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+                for (const auto &groundMesh : _groundMeshes) {
+                    if (groundMesh->enabled) {
+                        rendering.applyShaderConstants(&groundMesh->transform);
+                        rendering.applyTextures({
+                            {groundMesh->texture, foundation::SamplerType::NEAREST}
+                        });
+                        rendering.draw(groundMesh->mesh);
+                    }
                 }
-            }
-            rendering.applyShader(_vegetationShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &vegetation : _vegetations) {
-                if (vegetation->enabled && vegetation->isVoxelMesh == false) {
-                    rendering.applyShaderConstants(&vegetation->transform);
-                    rendering.applyTextures({
-                        {vegetation->texture, foundation::SamplerType::NEAREST}
-                    });
-                    rendering.draw(vegetation->mesh);
+                rendering.applyShader(_vegetationShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+                for (const auto &vegetation : _vegetations) {
+                    if (vegetation->enabled && vegetation->isVoxelMesh == false) {
+                        rendering.applyShaderConstants(&vegetation->transform);
+                        rendering.applyTextures({
+                            {vegetation->texture, foundation::SamplerType::NEAREST}
+                        });
+                        rendering.draw(vegetation->mesh);
+                    }
                 }
-            }
             
-            rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
-            for (const auto &voxelMesh : _voxelMeshes) {
-                if (voxelMesh->enabled) {
-                    const math::transform3f transform = voxelMesh->getFinalTransform();
-                    rendering.applyShaderConstants(&transform);
-                    rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
+                rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+                for (const auto &voxelMesh : _voxelMeshes) {
+                    if (voxelMesh->enabled) {
+                        const math::transform3f transform = voxelMesh->getFinalTransform();
+                        rendering.applyShaderConstants(&transform);
+                        rendering.draw(voxelMesh->frames[voxelMesh->frameIndex]);
+                    }
                 }
-            }
-            for (const auto &vegetation : _vegetations) {
-                if (vegetation->enabled && vegetation->isVoxelMesh == true) {
-                    rendering.applyShaderConstants(&vegetation->transform);
-                    rendering.draw(vegetation->mesh);
+                for (const auto &vegetation : _vegetations) {
+                    if (vegetation->enabled && vegetation->isVoxelMesh == true) {
+                        rendering.applyShaderConstants(&vegetation->transform);
+                        rendering.draw(vegetation->mesh);
+                    }
                 }
-            }
 
-        });
-        _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
-            rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
-            rendering.applyTextures({
-                {_palette, foundation::SamplerType::NEAREST},
-                {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
-                {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
             });
-            rendering.draw();
-        });
-        _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
-            rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
-            for (const auto &emitter : _particleEmitters) {
-                if (emitter->enabled) {
-                    rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));
-                    rendering.applyTextures({
-                        {emitter->map, foundation::SamplerType::NEAREST},
-                        {emitter->texture, foundation::SamplerType::NEAREST}
-                    });
-                    rendering.draw(emitter->particleCount);
+            _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyTextures({
+                    {_palette, foundation::SamplerType::NEAREST},
+                    {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
+                    {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
+                });
+                rendering.draw();
+            });
+            _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
+                for (const auto &emitter : _particleEmitters) {
+                    if (emitter->enabled) {
+                        rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));
+                        rendering.applyTextures({
+                            {emitter->map, foundation::SamplerType::NEAREST},
+                            {emitter->texture, foundation::SamplerType::NEAREST}
+                        });
+                        rendering.draw(emitter->particleCount);
+                    }
                 }
-            }
-            if (_lineDrawingEnabled) {
-                rendering.applyShader(_arrowShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-                for (const auto &set : _arrows) {
-                    if (set->enabled) {
-                        for (const auto &arrow : set->arrows) {
-                            set->fillShaderConstants(arrow);
-                            rendering.applyShaderConstants(&set->shaderConstants);
-                            rendering.draw(34);
+                if (_lineDrawingEnabled) {
+                    rendering.applyShader(_arrowShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                    for (const auto &set : _arrows) {
+                        if (set->enabled) {
+                            for (const auto &arrow : set->arrows) {
+                                set->fillShaderConstants(arrow);
+                                rendering.applyShaderConstants(&set->shaderConstants);
+                                rendering.draw(34);
+                            }
+                        }
+                    }
+                    rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                    for (const auto &set : _lineSets) {
+                        if (set->enabled) {
+                            for (auto &bucket : set->buckets) {
+                                bucket.transform = set->transform;
+                                rendering.applyShaderConstants(&bucket);
+                                rendering.draw(48);
+                            }
+                        }
+                    }
+                    rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                    for (const auto &bbox : _boundingBoxes) {
+                        if (bbox->enabled) {
+                            rendering.applyShaderConstants(&bbox->bboxData);
+                            rendering.draw();
+                        }
+                    }
+                    rendering.applyShader(_boundingSphereShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
+                    for (const auto &bsphere : _boundingSpheres) {
+                        if (bsphere->enabled) {
+                            rendering.applyShaderConstants(&bsphere->bsphereData);
+                            rendering.draw(3);
                         }
                     }
                 }
-                rendering.applyShader(_lineShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-                for (const auto &set : _lineSets) {
-                    if (set->enabled) {
-                        for (auto &bucket : set->buckets) {
-                            bucket.transform = set->transform;
-                            rendering.applyShaderConstants(&bucket);
-                            rendering.draw(48);
-                        }
-                    }
-                }
-                rendering.applyShader(_boundingBoxShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-                for (const auto &bbox : _boundingBoxes) {
-                    if (bbox->enabled) {
-                        rendering.applyShaderConstants(&bbox->bboxData);
-                        rendering.draw();
-                    }
-                }
-                rendering.applyShader(_boundingSphereShader, foundation::RenderTopology::LINES, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-                for (const auto &bsphere : _boundingSpheres) {
-                    if (bsphere->enabled) {
-                        rendering.applyShaderConstants(&bsphere->bsphereData);
-                        rendering.draw(3);
-                    }
-                }
-            }
-        });
+            });
+        }
     }
 
     void SceneInterfaceImpl::setLinesDrawingEnabled(bool enabled) {

@@ -34,6 +34,7 @@ namespace {
 
     char g_buffer[BUFFER_SIZE];
     std::atomic<bool> g_killed {false};
+    int g_returnCode = 0;
 
     std::weak_ptr<foundation::PlatformInterface> g_instance;
     util::callback<void(float)> g_updateAndDraw;
@@ -47,6 +48,7 @@ namespace {
 
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
+    std::size_t g_asyncWorkCount = 0;
 
     struct BackgroundThread {
         std::thread thread;
@@ -110,14 +112,13 @@ namespace {
         }
         return token;
     }
-    template <typename L> bool removeHandler(L &list, foundation::EventHandlerToken token) {
+    template <typename L> void removeHandler(L &list, foundation::EventHandlerToken token) {
         for (auto index = list.begin(); index != list.end(); ++index) {
             if (index->first == token) {
                 list.erase(index);
-                return true;
+                return;
             }
         }
-        return false;
     }
 
     bool translateKey(WPARAM vk, foundation::Key &key) {
@@ -351,13 +352,20 @@ namespace foundation {
     }
 
     void WindowsPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
+        g_asyncWorkCount++;
         backgroundThreadPush(g_worker, std::move(task));
     }
 
+    bool WindowsPlatform::isAsyncWorkInProgress() const {
+        return g_asyncWorkCount != 0;
+    }
+
     void WindowsPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+        g_asyncWorkCount++;
         backgroundThreadPush(g_io, std::make_unique<FileLoadTask>(_dataPath + filePath, std::move(completion)));
     }
     void WindowsPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+        g_asyncWorkCount++;
         backgroundThreadPush(g_io, std::make_unique<FileSaveTask>(_dataPath + filePath, data, data ? size : 0, std::move(completion)));
     }
 
@@ -448,7 +456,9 @@ namespace foundation {
     }
 
     void WindowsPlatform::removeEventHandler(EventHandlerToken token) {
-        removeHandler(g_editorHandlers, token) || removeHandler(g_pointerHandlers, token) || removeHandler(g_keyboardHandlers, token);
+        removeHandler(g_editorHandlers, token);
+        removeHandler(g_pointerHandlers, token);
+        removeHandler(g_keyboardHandlers, token);
     }
 
     void WindowsPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
@@ -459,8 +469,9 @@ namespace foundation {
         g_resizeHandler = std::move(handler); // window has fixed size, so never called
     }
 
-    void WindowsPlatform::exit() {
+    void WindowsPlatform::exit(int returnCode) {
         g_killed = true;
+        g_returnCode = returnCode;
     }
 
     void WindowsPlatform::logMsg(const char *fmt, ...) {
@@ -512,7 +523,7 @@ namespace foundation {
 extern "C" void initialize();
 extern "C" void deinitialize();
 
-int main(int argc, const char *argv[]) {
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
     initialize();
 
     g_io.thread = std::thread(&backgroundThreadLoop, std::ref(g_io));
@@ -538,6 +549,7 @@ int main(int argc, const char *argv[]) {
 
         for (auto &task : foregroundQueue) {
             task->executeInMainThread();
+            g_asyncWorkCount--;
         }
         foregroundQueue.clear();
 
@@ -555,7 +567,7 @@ int main(int argc, const char *argv[]) {
     backgroundThreadStop(g_worker);
 
     deinitialize();
-    return 0;
+    return g_returnCode;
 }
 
 #endif // PLATFORM_WINDOWS

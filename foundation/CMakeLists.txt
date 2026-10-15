@@ -26,6 +26,8 @@ set(
 	"${m_source_root}/rendering_metal.cpp"
 	"${m_source_root}/rendering_wasm.h"
 	"${m_source_root}/rendering_wasm.cpp"
+	"${m_source_root}/rendering_dx11.h"
+	"${m_source_root}/rendering_dx11.cpp"
 )
 source_group("" FILES ${m_sources_rendering_list})
 
