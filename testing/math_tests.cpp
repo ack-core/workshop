@@ -2,7 +2,8 @@
 #include "math_tests.h"
 
 namespace test {
-    bool math_vector2f_test(API&& api) {
+    bool math_vector2f_test(const API &api) {
+        EXPECT_EQ(10, 10);
         return true;
     }
 }
@@ -10,6 +11,6 @@ namespace test {
 
 namespace test {
     void registerMathTests(TestRunner& runner) {
-        runner.registerUnitTest("math_vector2f_test", math_vector2f_test);
+        REGISTER_UNIT_TEST(math_vector2f_test);
     }
 }

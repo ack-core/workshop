@@ -111,9 +111,12 @@ namespace foundation {
         static std::shared_ptr<PlatformInterface> instance();
         
     public:
-        // Execute task in IO Thread
+        // Execute task in Working Thread
         // @task     - task to be executed
         virtual void executeAsync(std::unique_ptr<AsyncTask> &&task) = 0;
+
+        // Check if some async work is still in progress
+        virtual bool isAsyncWorkInProgress() const = 0;
         
         // Loads file to memory. First looks into read-only (distribution) directory, then into writable
         // @filePath - file path. Example: "data/map1/test.png"
@@ -191,9 +194,9 @@ namespace foundation {
         //
         virtual void setResizeHandler(util::callback<void()> &&handler) = 0;
         
-        // Breaks platform update cycle
+        // Breaks platform update cycle and exits the app
         //
-        virtual void exit() = 0;
+        virtual void exit(int returnCode) = 0;
         
     public:
         virtual ~PlatformInterface() = default;

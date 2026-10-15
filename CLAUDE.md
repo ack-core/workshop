@@ -7,13 +7,14 @@ Code-first C++ 3D engine for small lowpoly/voxel games
 cmake - toolchains for CMake
 foundation - low level engine interfaces and implementations
 providers - texture, model, font provides
-core - mid level engine interfaces and implementations
+core - mid level 3d engine interfaces and implementations
 ui - 2d components
 game - contexts with game/editor logic
 package - platform specific prepared files
+testing - test suite
 
 binary_* - built platform executables
-workshop_* - generated IDE project
+workshop_* - generated IDE projects
 
 ## Human interaction & communication
 
@@ -21,3 +22,5 @@ workshop_* - generated IDE project
 **Code first:** Start responces directly with required code or structural solutions
 **Do only what was asked:** No extra experiments or verifications beyond the request
 
+**Do not write python scripts for code editing automation**
+**Be aware of uncommitted user's edits**

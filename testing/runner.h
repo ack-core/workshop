@@ -6,9 +6,55 @@
 #include "core/raycast.h"
 #include "ui/stage.h"
 
-#include <unordered_map>
+#include <string>
+#include <vector>
+
+#define EXPECT_EQ(a, b) \
+    if ((a) != (b)) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define EXPECT_NOT_EQ(a, b) \
+    if ((a) == (b)) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define EXPECT_TRUE(a) \
+    if (!(a)) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define EXPECT_FALSE(a) \
+    if (a) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define EXPECT_LT(a, b) \
+    if (!((a) < (b))) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define REGISTER_UNIT_TEST(f) runner.registerUnitTest(#f, f)
+#define REGISTER_STEP_TEST(c) runner.registerStepTest(#c, c::make)
 
 namespace test {
+    static const std::size_t MAX_UNIT_TESTS_PER_FRAME = 1;
+
     struct API {
         const foundation::PlatformInterfacePtr &platform;
         const foundation::RenderingInterfacePtr& rendering;
@@ -28,8 +74,9 @@ namespace test {
             ASYNC_WORK_COMPLETE
         };
 
-        virtual void start() = 0;
-        virtual void testResult() = 0;
+        virtual auto getType() const -> StepType = 0;
+        virtual void init(const API &api) = 0;
+        virtual bool testResult(const API &api) = 0;
 
     public:
         virtual ~StepTestInterface() = default;
@@ -52,15 +99,23 @@ namespace test {
 
     public:
 
-        void registerUnitTest(const char *name, bool (*testFunc)(API&& api));
-        void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)(API&& api));
-        void registerScreenshotTest(const char* name, void (*testFunc)(API&& api));
+        void registerUnitTest(const char *name, bool (*testFunc)(const API &api));
+        void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)());
+        void registerScreenshotTest(const char* name, void (*testFunc)(const API &api));
 
         void nextFrame();
 
     private:
-        std::unordered_map<std::string, bool (*)(API&& api)> _unitTests;
-        std::unordered_map<std::string, std::unique_ptr<StepTestInterface>(*)(API&& api)> _stepTests;
-        std::unordered_map<std::string, void (*)(API&& api)> _screenshotTests;
+        API _api;
+
+        std::vector<std::pair<std::string, bool (*)(const API &api)>> _unitTests;
+        std::vector<std::pair<std::string, std::unique_ptr<StepTestInterface>(*)()>> _stepTests;
+        std::vector<std::pair<std::string, void (*)(const API &api)>> _screenshotTests;
+
+        bool _finished = false;
+        int _testsFailed = 0;
+        std::size_t _unitTestIndex = 0;
+        std::size_t _stepTestIndex = 0;
+        std::unique_ptr<StepTestInterface> _currentStepTest;
     };
 }

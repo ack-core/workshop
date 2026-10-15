@@ -31,6 +31,7 @@ namespace {
 
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
+    std::size_t g_asyncWorkCount = 0;
     
     struct BackgroundThread {
         std::thread thread;
@@ -136,6 +137,7 @@ namespace {
     
     for (auto &task : foregroundQueue) {
         task->executeInMainThread();
+        g_asyncWorkCount--;
     }
     foregroundQueue.clear();
     
@@ -328,6 +330,7 @@ namespace foundation {
     }
     
     void IOSPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
+        g_asyncWorkCount++;
         {
             std::lock_guard<std::mutex> guard(g_worker.mutex);
             g_worker.queue.emplace_back(std::move(task));
@@ -335,7 +338,12 @@ namespace foundation {
         g_worker.notifier.notify_one();
     }
     
+    bool IOSPlatform::isAsyncWorkInProgress() const {
+        return g_asyncWorkCount != 0;
+    }
+    
     void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+        g_asyncWorkCount++;
         {
             std::lock_guard<std::mutex> guard(g_io.mutex);
             g_io.queue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));

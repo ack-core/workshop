@@ -10,6 +10,7 @@ namespace foundation {
         ~WindowsPlatform() override;
 
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
+        bool isAsyncWorkInProgress() const override;
         void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) override;
         void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) override;
 
@@ -37,7 +38,7 @@ namespace foundation {
 
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void setResizeHandler(util::callback<void()> &&handler) override;
-        void exit() override;
+        void exit(int returnCode) override;
 
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;

@@ -90,6 +90,7 @@ endif()
 get_filename_component(m_tools_root "${PROJECT_SOURCE_DIR}/tools" ABSOLUTE)
 get_filename_component(m_resources_root "${PROJECT_SOURCE_DIR}/resources" ABSOLUTE)
 get_filename_component(m_game_resources_root "${PROJECT_SOURCE_DIR}/game/resources" ABSOLUTE)
+get_filename_component(m_tests_resources_root "${PROJECT_SOURCE_DIR}/testing/resources" ABSOLUTE)
 get_filename_component(m_package_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}" ABSOLUTE)
 get_filename_component(m_package_app_root "${PROJECT_SOURCE_DIR}/package/${PLATFORM_POSTFIX}_${APPTYPE_POSTFIX}" ABSOLUTE)
 
@@ -101,8 +102,9 @@ if (EXISTS ${m_package_app_root})
 	file(COPY "${m_package_app_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 endif()
 
+message(STATUS "Copying files from resources...")
+
 if (APPTYPE STREQUAL "IS_GAME" OR APPTYPE STREQUAL "IS_EDITOR")
-	message(STATUS "Copying files from resources...")
 	file(COPY "${m_resources_root}/meshes" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/emitters" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
 	file(COPY "${m_resources_root}/grounds" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.copy_only_dir_structure")
@@ -113,7 +115,6 @@ if (APPTYPE STREQUAL "IS_GAME" OR APPTYPE STREQUAL "IS_EDITOR")
 	file(COPY "${m_resources_root}/collision" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.txt" PATTERN "*")
 	file(COPY "${m_resources_root}/textures" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.png" PATTERN "*")
 	file(COPY "${m_resources_root}/primary.ttf" DESTINATION "${m_binary_root}/data")
-
 	
 	if (EXISTS ${m_game_resources_root}/base)
 		file(COPY "${m_game_resources_root}/base" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*.*" PATTERN "*")
@@ -170,6 +171,11 @@ if (APPTYPE STREQUAL "IS_GAME")
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
 endif()
+if (APPTYPE STREQUAL "IS_TESTS")
+	if (EXISTS ${m_tests_resources_root})
+		file(COPY "${m_tests_resources_root}/" DESTINATION "${m_binary_root}/data" FILES_MATCHING PATTERN "*" PATTERN "*")
+	endif()
+endif()
 if (APPTYPE STREQUAL "IS_EDITOR")
 	message(STATUS "Generating prefabs...")
 	execute_process(
@@ -195,7 +201,7 @@ if (PLATFORM STREQUAL "PLATFORM_WINDOWS")
 	endif()
 	
 	set_target_properties(app PROPERTIES WIN32_EXECUTABLE TRUE)
-	target_link_options(app PRIVATE "/ENTRY:mainCRTStartup")
+	#target_link_options(app PRIVATE "/ENTRY:mainCRTStartup")
 	set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "${m_binary_root}")
 	set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "${m_binary_root}")
 

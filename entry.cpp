@@ -13,7 +13,9 @@
 #include "game/game.h"
 #include "game/state_manager.h"
 #elif defined(IS_TESTS)
-#include "testing/registry.h"
+#include "testing/runner.h"
+#include "testing/math_tests.h"
+#include "testing/platform_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;
@@ -29,7 +31,7 @@ ui::StageInterfacePtr stage;
 #if defined(IS_GAME)
 game::StateManagerPtr stateManager;
 #elif defined(IS_TESTS)
-test::RegistryInterfacePtr testing;
+std::unique_ptr<test::TestRunner> testRunner;
 #endif
 
 extern "C" void initialize() {
@@ -44,13 +46,14 @@ extern "C" void initialize() {
             simulation = core::SimulationInterface::instance(platform, scene);
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
             stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
-            //stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
-            //stateManager->switchToState("default");
-            
-            platform->logMsg("--->>> !");
+
+#if defined(IS_GAME)
+            stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
+            stateManager->switchToState("default");
+
             platform->setLoop([](float dtSec) {
                 dtSec = std::min(dtSec, 0.035f);
-                //stateManager->update(dtSec);
+                stateManager->update(dtSec);
                 raycast->update(dtSec);
                 simulation->update(dtSec);
                 world->update(dtSec);
@@ -62,10 +65,34 @@ extern "C" void initialize() {
                 resourceProvider->update(dtSec);
                 fontAtlasProvider->update(dtSec);
             });
+#elif defined(IS_TESTS)
+            testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
+            test::registerMathTests(*testRunner);
+            test::registerPlatformTests(*testRunner);
+
+            platform->setLoop([](float dtSec) {
+                testRunner->nextFrame();
+            });
+#endif
+
         });
     });
 }
 
 extern "C" void deinitialize() {
+#if defined(IS_GAME)
+    stateManager = nullptr;
+#elif defined(IS_TESTS)
+    testRunner = nullptr;
+#endif
 
+    stage = nullptr;
+    world = nullptr;
+    simulation = nullptr;
+    raycast = nullptr;
+    scene = nullptr;
+    fontAtlasProvider = nullptr;
+    resourceProvider = nullptr;
+    rendering = nullptr;
+    platform = nullptr;
 }
