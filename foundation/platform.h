@@ -12,6 +12,11 @@
 using ByteDataPtr = std::unique_ptr<std::uint8_t[]>;
 
 namespace foundation {
+#if defined(IS_TESTS)
+    static const std::uint32_t TESTING_RENDER_WIDTH = 512;
+    static const std::uint32_t TESTING_RENDER_HEIGHT = 512;
+#endif
+
     using EventHandlerToken = unsigned char *;
     const EventHandlerToken INVALID_EVENT_TOKEN = nullptr;
     const std::size_t INVALID_POINTER_ID = std::size_t(-1);
@@ -190,6 +195,7 @@ namespace foundation {
         //
         virtual void setLoop(util::callback<void(float)> &&updateAndDraw) = 0;
         
+        // TODO: addResizeHandler as others
         // Set handler for window resize
         //
         virtual void setResizeHandler(util::callback<void()> &&handler) = 0;

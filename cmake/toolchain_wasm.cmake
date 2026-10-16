@@ -7,15 +7,25 @@ set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS FALSE)
 if ("$ENV{EMSDK}" STREQUAL "")
 	message(FATAL_ERROR "env-variable EMSDK must be a path to Emscripten SDK root")
 else()
-	set(EMSDK_ROOT "$ENV{EMSDK}")
+	file(TO_CMAKE_PATH "$ENV{EMSDK}" EMSDK_ROOT)
+	get_filename_component(EMSDK_ROOT "${EMSDK_ROOT}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+	set(ENV{EMSDK} "${EMSDK_ROOT}") # keep absolute for nested try_compile projects
 endif()
 
-set(CMAKE_C_COMPILER "${EMSDK_ROOT}/upstream/bin/clang")
-set(CMAKE_CXX_COMPILER "${EMSDK_ROOT}/upstream/bin/clang")
-set(CMAKE_LINKER "${EMSDK_ROOT}/upstream/bin/wasm-ld")
+if (CMAKE_HOST_WIN32)
+	set(EMSDK_EXE_SUFFIX ".exe")
+else()
+	set(EMSDK_EXE_SUFFIX "")
+endif()
+
+set(CMAKE_C_COMPILER "${EMSDK_ROOT}/upstream/bin/clang${EMSDK_EXE_SUFFIX}")
+set(CMAKE_CXX_COMPILER "${EMSDK_ROOT}/upstream/bin/clang${EMSDK_EXE_SUFFIX}")
+set(CMAKE_LINKER "${EMSDK_ROOT}/upstream/bin/wasm-ld${EMSDK_EXE_SUFFIX}")
+set(CMAKE_C_COMPILER_TARGET wasm32-unknown-emscripten)
+set(CMAKE_CXX_COMPILER_TARGET wasm32-unknown-emscripten)
 set(CMAKE_SYSROOT "${EMSDK_ROOT}/upstream/emscripten/cache/sysroot") # -fignore-exceptions
 
-set(CMAKE_CXX_FLAGS_INIT "-target wasm32-unknown-emscripten -DEMSCRIPTEN -fno-exceptions -fvisibility=default -std=c++20 -fshort-wchar -mbulk-memory -matomics -c")
+set(CMAKE_CXX_FLAGS_INIT "-isystem ${CMAKE_SYSROOT}/include/compat -DEMSCRIPTEN -fno-exceptions -fvisibility=default -std=c++20 -fshort-wchar -mbulk-memory -matomics -c")
 set(CMAKE_CXX_LINK_FLAGS "-L${EMSDK_ROOT}/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten  --import-memory --shared-memory --max-memory=4294967296")
 set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -lc++-mt-noexcept -lc++abi-mt-noexcept --import-undefined --strip-debug --no-entry") #  -ldlmalloc-noerrno
 set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} --no-export-dynamic  --export=__wasm_call_ctors  --export=__init")
@@ -24,8 +34,8 @@ set(CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_LINKER> <LINK_FLAGS> <CMAKE_CXX_LINK_FLAGS
 set(CMAKE_C_COMPILER_WORKS TRUE)
 set(CMAKE_CXX_COMPILER_WORKS TRUE)
 
-set(CMAKE_AR "${EMSDK_ROOT}/upstream/bin/llvm-ar")
-set(CMAKE_RANLIB "${EMSDK_ROOT}/upstream/bin/llvm-ranlib")
+set(CMAKE_AR "${EMSDK_ROOT}/upstream/bin/llvm-ar${EMSDK_EXE_SUFFIX}")
+set(CMAKE_RANLIB "${EMSDK_ROOT}/upstream/bin/llvm-ranlib${EMSDK_EXE_SUFFIX}")
 
 set(CMAKE_C_OUTPUT_EXTENSION .o)
 set(CMAKE_CXX_OUTPUT_EXTENSION .o)

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ack-core demo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, viewport-fit=cover, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-title" content="ack-core-demo" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" href="data:;base64,=">
+    <style>
+        html, body {
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+            background: white;
+        }
+        .rt {
+            left: 0;
+            top: 0;
+            width: 512px; /* TESTING_RENDER_WIDTH */
+            height: 512px; /* TESTING_RENDER_HEIGHT */
+            position: fixed;
+            display: block;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas class="rt" id="render_target"></canvas>
+    <script type="text/javascript">
+        // Back buffer must be strictly the canvas css size, and never resized
+        Object.defineProperty(window, "devicePixelRatio", { get: () => 1 });
+        window.addEventListener("resize", (event) => event.stopImmediatePropagation());
+
+        // Minimal FileSystemDirectoryHandle used by js_save. Files are written by testing.js server into the 'data' directory files are read from
+        function remoteDirectory(path) {
+            return {
+                getDirectoryHandle: async (name) => remoteDirectory(path + name + "/"),
+                getFileHandle: async (name) => ({
+                    createWritable: async () => {
+                        let content = null;
+                        return {
+                            write: async (data) => { content = data; },
+                            truncate: async (size) => {},
+                            close: async () => {
+                                const response = await fetch(path + name, { method: "PUT", body: content });
+                                if (!response.ok) throw response.status + " " + response.statusText;
+                            }
+                        };
+                    },
+                    remove: async () => {
+                        const response = await fetch(path + name, { method: "DELETE" });
+                        if (!response.ok) throw response.status + " " + response.statusText;
+                    }
+                })
+            };
+        }
+        var editorRootDirectory = { getDirectoryHandle: async (name) => remoteDirectory("data/") }; // js_save requests "resources"
+    </script>
+    <script type="text/javascript" src="wasm.js" binary="tests.wasm"></script>
+</body>
+</html>

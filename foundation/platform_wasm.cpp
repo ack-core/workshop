@@ -9,7 +9,7 @@
 #include "thirdparty/tlsf/tlsf.h"
 
 namespace {
-    const std::size_t PAGESIZE = 65536;
+    const std::size_t WASM_MEM_PAGE_SIZE = 65536;
 
     std::atomic<std::uint32_t> g_memoryLock {0};
     std::size_t g_currentMemoryPages;
@@ -29,6 +29,7 @@ void fatal() {
 extern "C" {
     void js_dbg(const void *ptr0, const void *ptr1, const void *ptr2);
     void js_log(const std::uint16_t *ptr, int length);
+    void js_exit(int code);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
     void js_save(const void *path, int pathLen, const void *data, int dataLen);
@@ -78,12 +79,19 @@ extern "C" {
         return isalpha(c) || isdigit(c);
     }
 }
+
+// Overrides libc++ default which requires libc's stderr
+_LIBCPP_BEGIN_NAMESPACE_STD
+    void __libcpp_verbose_abort(const char *format, ...) _NOEXCEPT {
+        __builtin_trap();
+    }
+_LIBCPP_END_NAMESPACE_STD
     
 // Memory management
 extern "C" {
     void *sbrk(intptr_t increment) {
         if (increment == 0) {
-            return (void *)(__builtin_wasm_memory_size(0) * PAGESIZE);
+            return (void *)(__builtin_wasm_memory_size(0) * WASM_MEM_PAGE_SIZE);
         }
         if (increment < 0) {
             increment = 0;
@@ -92,7 +100,7 @@ extern "C" {
         std::size_t oldOffset = g_currentMemoryOffset;
         g_currentMemoryOffset += increment;
         
-        std::size_t incMemoryPages = ((g_currentMemoryOffset + PAGESIZE - 1) / PAGESIZE) - g_currentMemoryPages;
+        std::size_t incMemoryPages = ((g_currentMemoryOffset + WASM_MEM_PAGE_SIZE - 1) / WASM_MEM_PAGE_SIZE) - g_currentMemoryPages;
         
         if (incMemoryPages) {
             std::size_t oldMemoryPages = __builtin_wasm_memory_grow(0, incMemoryPages);
@@ -108,16 +116,16 @@ extern "C" {
     }
     void __init() { // This function is called before global ctors
         g_currentMemoryPages = __builtin_wasm_memory_size(0);
-        g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
-        g_dynamicMemoryStart = sbrk(PAGESIZE);
-        tlsf::init_memory_pool(PAGESIZE, g_dynamicMemoryStart);
+        g_currentMemoryOffset = g_currentMemoryPages * WASM_MEM_PAGE_SIZE;
+        g_dynamicMemoryStart = sbrk(WASM_MEM_PAGE_SIZE);
+        tlsf::init_memory_pool(WASM_MEM_PAGE_SIZE, g_dynamicMemoryStart);
     }
     void *malloc(size_t size) {
         std::uint32_t expected = 0;
         
         void *result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         if (result == nullptr) {
-            size_t areaSize = PAGESIZE * (2 * size / PAGESIZE + 1);
+            size_t areaSize = WASM_MEM_PAGE_SIZE * (2 * size / WASM_MEM_PAGE_SIZE + 1);
             tlsf::add_new_area(sbrk(areaSize), areaSize, g_dynamicMemoryStart);
             result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         }
@@ -170,8 +178,9 @@ namespace foundation {
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(ByteDataPtr &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
-        const std::size_t len = fullPath.length() + 1;
-        
+        const std::size_t len = fullPath.length();
+        g_asyncWorkCount++;
+
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * len));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
         
@@ -186,7 +195,8 @@ namespace foundation {
     }
     void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
         using cbtype = util::callback<void(bool)>;
-        const std::size_t pathLen = std::strlen(filePath) + 1;
+        const std::size_t pathLen = std::strlen(filePath);
+        g_asyncWorkCount++;
         
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * pathLen));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
@@ -302,8 +312,8 @@ namespace foundation {
         g_resizeHandler = std::move(handler);
     }
     
-    void WASMPlatform::exit() {
-
+    void WASMPlatform::exit(int returnCode) {
+        js_exit(returnCode);
     }
     
     void WASMPlatform::logMsg(const char *fmt, ...) {
@@ -390,7 +400,7 @@ namespace foundation {
         const std::size_t capacity = msgLength(fmt, arglist);
         const std::unique_ptr<std::uint16_t[]> logBuffer = std::make_unique<std::uint16_t[]>(capacity);
         const std::size_t length = msgFormat(logBuffer.get(), fmt, arglist);
-        js_log(logBuffer.get(), length);
+        js_log(logBuffer.get(), length - 1); // without null-terminator
     }
 }
 
@@ -415,6 +425,7 @@ extern "C" {
         cb->operator()(ByteDataPtr(data), length);
         cb->~cbtype();
         ::free(cb);
+        g_asyncWorkCount--;
     }
     void fileSaved(std::uint16_t *block, std::size_t pathLen, int result) {
         using cbtype = util::callback<void(bool)>;
@@ -422,6 +433,7 @@ extern "C" {
         cb->operator()(bool(result));
         cb->~cbtype();
         ::free(cb);
+        g_asyncWorkCount--;
     }
     void taskExecute(foundation::AsyncTask *ptr) {
         // TODO:

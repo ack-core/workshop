@@ -28,6 +28,7 @@ onmessage = (msg) => {
                     const u16str = new Uint16Array(memory.buffer, str, len);
                     console.log(String.fromCharCode(...u16str));
                 },
+                js_exit: (code) => { throw "can't exit from background" },
                 js_task: (task) => { throw "can't start task in background" },
                 js_fetch: (block, pathLen) => { throw "can't read files in background" },
                 js_save: (block, pathLen, data, dataLen) => { throw "can't write files in background" },
@@ -42,6 +43,7 @@ onmessage = (msg) => {
                 webgl_deleteData: (id) => { throw "can't access webgl from background" },
                 webgl_deleteTexture: (id) => { throw "can't access webgl from background" },
                 webgl_deleteTarget: (id) => { throw "can't access webgl from background" },
+                webgl_readPixels: (ptr, w, h) => { throw "can't access webgl from background" },
                 webgl_viewPort: (w, h) => { throw "can't access webgl from background" },
                 webgl_beginTarget: (frameBufferID, depth, mask, r, g, b, a, d) => { throw "can't access webgl from background" },
                 webgl_endTarget: (frameBufferID, depth) => { throw "can't access webgl from background" },

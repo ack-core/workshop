@@ -708,7 +708,7 @@ namespace foundation {
 
     }
         
-    void MetalRendering::presentFrame() {
+    std::unique_ptr<std::uint8_t[]> MetalRendering::presentFrame() {
         _finishRenderCommandEncoder();
         
         if (_view && _currentCommandBuffer) {
@@ -729,6 +729,8 @@ namespace foundation {
 
             dispatch_semaphore_wait(_frameBufferingSemaphore, DISPATCH_TIME_FOREVER);
         }
+
+        return nullptr;
     }
     
     void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {

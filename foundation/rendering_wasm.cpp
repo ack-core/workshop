@@ -26,6 +26,7 @@ extern "C" {
     void webgl_deleteData(WebGLId id);
     void webgl_deleteTexture(WebGLId id);
     void webgl_deleteTarget(WebGLId id);
+    void webgl_readPixels(std::uint8_t *dst, std::uint32_t w, std::uint32_t h);
 }
 
 namespace {
@@ -503,10 +504,18 @@ namespace foundation {
         }
     }
     
-    void WASMRendering::presentFrame() {
+    std::unique_ptr<std::uint8_t[]> WASMRendering::presentFrame() {
         for (std::size_t i = 0; i < MAX_TEXTURES; i++) {
             webgl_applyTexture(i, 0, 0);
         }
+
+#if defined(IS_TESTS)
+        auto pixels = std::make_unique<std::uint8_t[]>(TESTING_RENDER_WIDTH * TESTING_RENDER_HEIGHT * 4);
+        webgl_readPixels(pixels.get(), TESTING_RENDER_WIDTH, TESTING_RENDER_HEIGHT);
+        return pixels;
+#else
+        return nullptr;
+#endif
     }
     
     std::uint8_t *WASMRendering::_getUploadBuffer(std::size_t requiredLength) {

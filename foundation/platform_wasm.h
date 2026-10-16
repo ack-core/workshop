@@ -35,7 +35,7 @@ namespace foundation {
 
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void setResizeHandler(util::callback<void()> &&handler) override;
-        void exit() override;
+        void exit(int returnCode) override;
         
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;

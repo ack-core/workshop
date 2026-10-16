@@ -163,13 +163,16 @@ const imports = {
             const u16str = new Uint16Array(memory.buffer, str, len);
             print(String.fromCharCode(...u16str));
         },
+        js_exit: function(code) {
+            window.location.href = "/" + (code == 0 ? "success" : "fail");
+        },
         js_task: function(task) {
             worker.postMessage({type: EventType.BTASK, task: task});
         },
         js_fetch: function(block, pathLen) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
-            
+
             fetch(path, {cache: "no-store"}).then(response => {
                 if (response.ok) {
                     return response.arrayBuffer();
@@ -180,13 +183,13 @@ const imports = {
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
                 print("[WASM] " + path + " loaded successfully " + buffer.byteLength);
-                instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
-            })
-            .catch(error => {
+                return [data, buffer.byteLength];
+            }, error => {
                 print("[WASM] " + path + " loading failed with " + error);
-                if (typeof error === "string") {
-                    instance.exports.fileLoaded(block, pathLen, 0, 0);
-                }
+                return [0, 0];
+            })
+            .then(([data, length]) => {
+                instance.exports.fileLoaded(block, pathLen, data, length);
             });
         },
         js_save: function(block, pathLen, data, dataLen) {
@@ -408,6 +411,13 @@ const imports = {
             const target = glframebuffers[id]
             glcontext.deleteFramebuffer(target.fb);
             glframebuffers[id] = null;
+        },
+        webgl_readPixels(ptr, w, h) {
+            const u8mem = new Uint8Array(memory.buffer, ptr, w * h * 4);
+            glcontext.bindFramebuffer(glcontext.READ_FRAMEBUFFER, glframebuffers[0].fb);
+            glcontext.readBuffer(glcontext.COLOR_ATTACHMENT0);
+            glcontext.readPixels(0, 0, w, h, glcontext.RGBA, glcontext.UNSIGNED_BYTE, u8mem);
+            glcontext.bindFramebuffer(glcontext.READ_FRAMEBUFFER, null);
         },
         webgl_viewPort(w, h) {
             glcontext.viewport(0, 0, w, h);

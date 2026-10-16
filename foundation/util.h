@@ -641,6 +641,14 @@ namespace util {
     };
 }
 
+namespace util {
+    // Makes uncompressed 32-bit TGA file data (origin top-left)
+    // @rgbaData - pixels, 4 bytes per pixel
+    // @return   - file data and its size
+    //
+    std::pair<std::unique_ptr<std::uint8_t[]>, std::size_t> writeTGA(const std::uint8_t *rgbaData, std::size_t width, std::size_t height);
+}
+
 // TODO: move to dedicated shader generator
 namespace shaderUtils {
     struct ShaderTypeInfo{

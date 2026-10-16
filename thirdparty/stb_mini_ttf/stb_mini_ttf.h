@@ -12,6 +12,8 @@
 ////
 ////
 
+#include <stddef.h>
+
 #ifndef __STB_INCLUDE_STB_TRUETYPE_H__
 #define __STB_INCLUDE_STB_TRUETYPE_H__
 

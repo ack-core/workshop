@@ -58,7 +58,9 @@ namespace foundation {
     void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {}
     void Direct3D11Rendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {}
 
-    void Direct3D11Rendering::presentFrame() {}
+    std::unique_ptr<std::uint8_t[]> Direct3D11Rendering::presentFrame() {
+        return nullptr;
+    }
 }
 
 namespace foundation {

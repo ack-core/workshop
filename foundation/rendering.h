@@ -262,8 +262,9 @@ namespace foundation {
         virtual void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
 
         // Frame finalization
+        // @return - IS_TESTS: RGBA8 pixels of the frame, TESTING_RENDER_WIDTH x TESTING_RENDER_HEIGHT. nullptr otherwise
         //
-        virtual void presentFrame() = 0;
+        virtual std::unique_ptr<std::uint8_t[]> presentFrame() = 0;
         
     public:
         virtual ~RenderingInterface() = default;

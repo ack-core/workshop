@@ -28,7 +28,7 @@ namespace foundation {
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
 
-        void presentFrame() override;
+        auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
 
     private:
         std::shared_ptr<PlatformInterface> _platform;
