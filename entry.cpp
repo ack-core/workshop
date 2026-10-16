@@ -30,14 +30,11 @@ ui::StageInterfacePtr stage;
 
 #if defined(IS_GAME)
 game::StateManagerPtr stateManager;
-#elif defined(IS_TESTS)
-std::unique_ptr<test::TestRunner> testRunner;
-#endif
 
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
-    platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
-        platform->loadFile("primary.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t []> &&fontData, std::size_t fontSize) {
+    platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t[]>&& prefabsData, std::size_t prefabsSize) {
+        platform->loadFile("primary.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t[]>&& fontData, std::size_t fontSize) {
             rendering = foundation::RenderingInterface::instance(platform);
             resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
             fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
@@ -47,7 +44,6 @@ extern "C" void initialize() {
             world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
             stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
 
-#if defined(IS_GAME)
             stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
             stateManager->switchToState("default");
 
@@ -57,35 +53,20 @@ extern "C" void initialize() {
                 raycast->update(dtSec);
                 simulation->update(dtSec);
                 world->update(dtSec);
-                
+
                 scene->updateAndDraw(dtSec);
                 stage->updateAndDraw(dtSec);
                 rendering->presentFrame();
-                
+
                 resourceProvider->update(dtSec);
                 fontAtlasProvider->update(dtSec);
             });
-#elif defined(IS_TESTS)
-            testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
-            test::registerMathTests(*testRunner);
-            test::registerPlatformTests(*testRunner);
-
-            platform->setLoop([](float dtSec) {
-                testRunner->nextFrame();
-            });
-#endif
-
         });
     });
 }
 
 extern "C" void deinitialize() {
-#if defined(IS_GAME)
     stateManager = nullptr;
-#elif defined(IS_TESTS)
-    testRunner = nullptr;
-#endif
-
     stage = nullptr;
     world = nullptr;
     simulation = nullptr;
@@ -96,3 +77,39 @@ extern "C" void deinitialize() {
     rendering = nullptr;
     platform = nullptr;
 }
+
+#elif defined(IS_TESTS)
+std::unique_ptr<test::TestRunner> testRunner;
+
+extern "C" void initialize() {
+    platform = foundation::PlatformInterface::instance();
+    rendering = foundation::RenderingInterface::instance(platform);
+    scene = core::SceneInterface::instance(platform, rendering);
+    raycast = core::RaycastInterface::instance(platform, scene);
+    simulation = core::SimulationInterface::instance(platform, scene);
+    
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
+    test::registerMathTests(*testRunner);
+    test::registerPlatformTests(*testRunner);
+
+    platform->setLoop([](float dtSec) {
+        testRunner->nextFrame();
+    });
+}
+
+extern "C" void deinitialize() {
+    testRunner = nullptr;
+    stage = nullptr;
+    world = nullptr;
+    simulation = nullptr;
+    raycast = nullptr;
+    scene = nullptr;
+    fontAtlasProvider = nullptr;
+    resourceProvider = nullptr;
+    rendering = nullptr;
+    platform = nullptr;
+}
+#endif
+
+
+

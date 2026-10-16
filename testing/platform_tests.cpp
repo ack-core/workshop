@@ -14,11 +14,9 @@ namespace test {
         static auto make() -> std::unique_ptr<StepTestInterface> {
             return std::make_unique<platform_file_loading_test>();
         }
-
         auto getType() const -> StepType override {
             return StepType::ASYNC_WORK_COMPLETE;
         }
-
         void init(const API &api) override {
             api.platform->loadFile("platform_tests/file_5.txt", [this](ByteDataPtr &&data, std::size_t size) {
                 if (data) {
@@ -26,7 +24,6 @@ namespace test {
                 }
             });
         }
-
         bool testResult(const API &api) override {
             EXPECT_EQ(_content.size(), 5);
             EXPECT_EQ(_content, "test5");

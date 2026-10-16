@@ -9,7 +9,7 @@
 #include "thirdparty/tlsf/tlsf.h"
 
 namespace {
-    const std::size_t PAGESIZE = 65536;
+    const std::size_t WASM_MEM_PAGE_SIZE = 65536;
 
     std::atomic<std::uint32_t> g_memoryLock {0};
     std::size_t g_currentMemoryPages;
@@ -78,12 +78,19 @@ extern "C" {
         return isalpha(c) || isdigit(c);
     }
 }
+
+// Overrides libc++ default which requires libc's stderr
+_LIBCPP_BEGIN_NAMESPACE_STD
+    void __libcpp_verbose_abort(const char *format, ...) _NOEXCEPT {
+        __builtin_trap();
+    }
+_LIBCPP_END_NAMESPACE_STD
     
 // Memory management
 extern "C" {
     void *sbrk(intptr_t increment) {
         if (increment == 0) {
-            return (void *)(__builtin_wasm_memory_size(0) * PAGESIZE);
+            return (void *)(__builtin_wasm_memory_size(0) * WASM_MEM_PAGE_SIZE);
         }
         if (increment < 0) {
             increment = 0;
@@ -92,7 +99,7 @@ extern "C" {
         std::size_t oldOffset = g_currentMemoryOffset;
         g_currentMemoryOffset += increment;
         
-        std::size_t incMemoryPages = ((g_currentMemoryOffset + PAGESIZE - 1) / PAGESIZE) - g_currentMemoryPages;
+        std::size_t incMemoryPages = ((g_currentMemoryOffset + WASM_MEM_PAGE_SIZE - 1) / WASM_MEM_PAGE_SIZE) - g_currentMemoryPages;
         
         if (incMemoryPages) {
             std::size_t oldMemoryPages = __builtin_wasm_memory_grow(0, incMemoryPages);
@@ -108,16 +115,16 @@ extern "C" {
     }
     void __init() { // This function is called before global ctors
         g_currentMemoryPages = __builtin_wasm_memory_size(0);
-        g_currentMemoryOffset = g_currentMemoryPages * PAGESIZE;
-        g_dynamicMemoryStart = sbrk(PAGESIZE);
-        tlsf::init_memory_pool(PAGESIZE, g_dynamicMemoryStart);
+        g_currentMemoryOffset = g_currentMemoryPages * WASM_MEM_PAGE_SIZE;
+        g_dynamicMemoryStart = sbrk(WASM_MEM_PAGE_SIZE);
+        tlsf::init_memory_pool(WASM_MEM_PAGE_SIZE, g_dynamicMemoryStart);
     }
     void *malloc(size_t size) {
         std::uint32_t expected = 0;
         
         void *result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         if (result == nullptr) {
-            size_t areaSize = PAGESIZE * (2 * size / PAGESIZE + 1);
+            size_t areaSize = WASM_MEM_PAGE_SIZE * (2 * size / WASM_MEM_PAGE_SIZE + 1);
             tlsf::add_new_area(sbrk(areaSize), areaSize, g_dynamicMemoryStart);
             result = tlsf::malloc_ex(size, g_dynamicMemoryStart);
         }
@@ -302,7 +309,7 @@ namespace foundation {
         g_resizeHandler = std::move(handler);
     }
     
-    void WASMPlatform::exit() {
+    void WASMPlatform::exit(int returnCode) {
 
     }
     

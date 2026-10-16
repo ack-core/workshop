@@ -3,6 +3,8 @@ cmake_policy(SET CMP0091 NEW)
 
 message(STATUS "toolchain: ${CMAKE_TOOLCHAIN_FILE}")
 
+project(workshop CXX)
+
 # platform-specific settings
 
 if (${PLATFORM} STREQUAL "PLATFORM_WINDOWS")
@@ -28,8 +30,6 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # application
-
-project(workshop CXX)
 
 get_filename_component(m_source_root "${PROJECT_SOURCE_DIR}" ABSOLUTE)
 include_directories("${m_source_root}")
@@ -71,7 +71,7 @@ endif()
 
 if (APPTYPE STREQUAL "IS_GAME")
 	set_property(TARGET app PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}")
-	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary_${PLATFORM_POSTFIX}" ABSOLUTE)
+	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary_${PLATFORM_POSTFIX}_game" ABSOLUTE)
 	set(APPTYPE_POSTFIX "game")
 elseif (APPTYPE STREQUAL "IS_TESTS")
 	set_property(TARGET app PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}_tests")
