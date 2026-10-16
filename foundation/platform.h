@@ -190,6 +190,7 @@ namespace foundation {
         //
         virtual void setLoop(util::callback<void(float)> &&updateAndDraw) = 0;
         
+        // TODO: addResizeHandler as others
         // Set handler for window resize
         //
         virtual void setResizeHandler(util::callback<void()> &&handler) = 0;

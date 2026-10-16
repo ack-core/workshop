@@ -33,10 +33,6 @@ namespace test {
     }
 
     void TestRunner::nextFrame() {
-        if (_finished) {
-            return;
-        }
-
         // Unit tests
         if (_unitTestIndex < _unitTests.size()) {
             for (std::size_t i = 0; i < MAX_UNIT_TESTS_PER_FRAME && _unitTestIndex < _unitTests.size(); i++, _unitTestIndex++) {

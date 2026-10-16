@@ -29,6 +29,7 @@ void fatal() {
 extern "C" {
     void js_dbg(const void *ptr0, const void *ptr1, const void *ptr2);
     void js_log(const std::uint16_t *ptr, int length);
+    void js_exit(int code);
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen);
     void js_save(const void *path, int pathLen, const void *data, int dataLen);
@@ -310,7 +311,7 @@ namespace foundation {
     }
     
     void WASMPlatform::exit(int returnCode) {
-
+        js_exit(returnCode);
     }
     
     void WASMPlatform::logMsg(const char *fmt, ...) {

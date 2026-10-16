@@ -112,7 +112,6 @@ namespace test {
         std::vector<std::pair<std::string, std::unique_ptr<StepTestInterface>(*)()>> _stepTests;
         std::vector<std::pair<std::string, void (*)(const API &api)>> _screenshotTests;
 
-        bool _finished = false;
         int _testsFailed = 0;
         std::size_t _unitTestIndex = 0;
         std::size_t _stepTestIndex = 0;

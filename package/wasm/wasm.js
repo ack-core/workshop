@@ -163,6 +163,9 @@ const imports = {
             const u16str = new Uint16Array(memory.buffer, str, len);
             print(String.fromCharCode(...u16str));
         },
+        js_exit: function(code) {
+            window.location.href = "/" + (code == 0 ? "success" : "fail");
+        },
         js_task: function(task) {
             worker.postMessage({type: EventType.BTASK, task: task});
         },
