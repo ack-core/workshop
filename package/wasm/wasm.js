@@ -412,6 +412,13 @@ const imports = {
             glcontext.deleteFramebuffer(target.fb);
             glframebuffers[id] = null;
         },
+        webgl_readPixels(ptr, w, h) {
+            const u8mem = new Uint8Array(memory.buffer, ptr, w * h * 4);
+            glcontext.bindFramebuffer(glcontext.READ_FRAMEBUFFER, glframebuffers[0].fb);
+            glcontext.readBuffer(glcontext.COLOR_ATTACHMENT0);
+            glcontext.readPixels(0, 0, w, h, glcontext.RGBA, glcontext.UNSIGNED_BYTE, u8mem);
+            glcontext.bindFramebuffer(glcontext.READ_FRAMEBUFFER, null);
+        },
         webgl_viewPort(w, h) {
             glcontext.viewport(0, 0, w, h);
         },

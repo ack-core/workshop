@@ -674,7 +674,7 @@ namespace game {
             _api.platform->saveFile((node->resourcePath + ".txt").c_str(), reinterpret_cast<const std::uint8_t *>(_savingCfg.data()), _savingCfg.length(), [this, node](bool result) {
                 const std::size_t width = node->emitter.getMap()->getWidth();
                 const std::size_t height = node->emitter.getMap()->getHeight();
-                auto tgaResult = editor::writeTGA(node->emitter.getMapRaw(), width, height);
+                auto tgaResult = util::writeTGA(node->emitter.getMapRaw(), width, height);
                 _savingMap = std::move(tgaResult.first);
             
                 _api.platform->saveFile((node->resourcePath + ".tga").c_str(), _savingMap.get(), tgaResult.second, [this, path = node->resourcePath](bool result) {

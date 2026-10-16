@@ -51,6 +51,7 @@
 
 #define REGISTER_UNIT_TEST(f) runner.registerUnitTest(#f, f)
 #define REGISTER_STEP_TEST(c) runner.registerStepTest(#c, c::make)
+#define REGISTER_SCREENSHOT_TEST(c) runner.registerScreenshotTest(#c, c::make)
 
 namespace test {
     static const std::size_t MAX_UNIT_TESTS_PER_FRAME = 1;
@@ -67,6 +68,8 @@ namespace test {
         const ui::StageInterfacePtr &ui;
     };
 
+    // testResult is called when async work is complete, but not earlier than next frame after init
+    //
     class StepTestInterface {
     public:
         virtual void init(const API &api) = 0;
@@ -76,9 +79,15 @@ namespace test {
         virtual ~StepTestInterface() = default;
     };
 
+    // testResult is called when async work is complete, but not earlier than next frame after init
+    // @ref   - RGBA pixels of 'rendering_tests/<test name>_ref.tga'
+    // @frame - RGBA pixels of the rendered frame
+    // Both are TESTING_RENDER_WIDTH x TESTING_RENDER_HEIGHT, rows top-down
+    //
     class ScreenshotTestInterface {
     public:
         virtual void init(const API& api) = 0;
+        virtual void updateAndDraw(const API& api) = 0;
         virtual bool testResult(const API& api, const std::uint8_t *ref, const std::uint8_t *frame) = 0;
 
     public:
@@ -104,7 +113,7 @@ namespace test {
 
         void registerUnitTest(const char *name, bool (*testFunc)(const API &api));
         void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)());
-        void registerScreenshotTest(const char* name, void (*testFunc)(const API &api));
+        void registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)());
 
         void nextFrame();
 
@@ -113,11 +122,15 @@ namespace test {
 
         std::vector<std::pair<std::string, bool (*)(const API &api)>> _unitTests;
         std::vector<std::pair<std::string, std::unique_ptr<StepTestInterface>(*)()>> _stepTests;
-        std::vector<std::pair<std::string, void (*)(const API &api)>> _screenshotTests;
+        std::vector<std::pair<std::string, std::unique_ptr<ScreenshotTestInterface>(*)()>> _screenshotTests;
 
         int _testsFailed = 0;
         std::size_t _unitTestIndex = 0;
         std::size_t _stepTestIndex = 0;
         std::unique_ptr<StepTestInterface> _currentStepTest;
+        std::size_t _screenshotTestIndex = 0;
+        std::unique_ptr<ScreenshotTestInterface> _currentScreenshotTest;
+        ByteDataPtr _screenshotRef;
+        ByteDataPtr _screenshotFrameTGA;
     };
 }

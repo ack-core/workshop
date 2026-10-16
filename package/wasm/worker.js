@@ -43,6 +43,7 @@ onmessage = (msg) => {
                 webgl_deleteData: (id) => { throw "can't access webgl from background" },
                 webgl_deleteTexture: (id) => { throw "can't access webgl from background" },
                 webgl_deleteTarget: (id) => { throw "can't access webgl from background" },
+                webgl_readPixels: (ptr, w, h) => { throw "can't access webgl from background" },
                 webgl_viewPort: (w, h) => { throw "can't access webgl from background" },
                 webgl_beginTarget: (frameBufferID, depth, mask, r, g, b, a, d) => { throw "can't access webgl from background" },
                 webgl_endTarget: (frameBufferID, depth) => { throw "can't access webgl from background" },

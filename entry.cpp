@@ -16,6 +16,7 @@
 #include "testing/runner.h"
 #include "testing/math_tests.h"
 #include "testing/platform_tests.h"
+#include "testing/rendering_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;
@@ -91,6 +92,7 @@ extern "C" void initialize() {
     testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
     test::registerMathTests(*testRunner);
     test::registerPlatformTests(*testRunner);
+    test::registerRenderingTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
         testRunner->nextFrame();

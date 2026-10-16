@@ -137,7 +137,7 @@ namespace foundation {
         void draw(std::uint32_t vertexCount) override;
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override;
-        void presentFrame() override;
+        auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
         
     private:
         void _initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear);
