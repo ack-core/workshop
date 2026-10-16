@@ -178,8 +178,9 @@ namespace foundation {
     void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(ByteDataPtr &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
-        const std::size_t len = fullPath.length() + 1;
-        
+        const std::size_t len = fullPath.length();
+        g_asyncWorkCount++;
+
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * len));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
         
@@ -194,7 +195,8 @@ namespace foundation {
     }
     void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
         using cbtype = util::callback<void(bool)>;
-        const std::size_t pathLen = std::strlen(filePath) + 1;
+        const std::size_t pathLen = std::strlen(filePath);
+        g_asyncWorkCount++;
         
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * pathLen));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
@@ -398,7 +400,7 @@ namespace foundation {
         const std::size_t capacity = msgLength(fmt, arglist);
         const std::unique_ptr<std::uint16_t[]> logBuffer = std::make_unique<std::uint16_t[]>(capacity);
         const std::size_t length = msgFormat(logBuffer.get(), fmt, arglist);
-        js_log(logBuffer.get(), length);
+        js_log(logBuffer.get(), length - 1); // without null-terminator
     }
 }
 
@@ -423,6 +425,7 @@ extern "C" {
         cb->operator()(ByteDataPtr(data), length);
         cb->~cbtype();
         ::free(cb);
+        g_asyncWorkCount--;
     }
     void fileSaved(std::uint16_t *block, std::size_t pathLen, int result) {
         using cbtype = util::callback<void(bool)>;
@@ -430,6 +433,7 @@ extern "C" {
         cb->operator()(bool(result));
         cb->~cbtype();
         ::free(cb);
+        g_asyncWorkCount--;
     }
     void taskExecute(foundation::AsyncTask *ptr) {
         // TODO:

@@ -51,7 +51,7 @@ namespace test {
 
         // Step tests
         if (_currentStepTest) {
-            if (_currentStepTest->getType() == StepTestInterface::StepType::ONE_FRAME || _api.platform->isAsyncWorkInProgress() == false) {
+            if (_api.platform->isAsyncWorkInProgress() == false) {
                 if (_currentStepTest->testResult(_api)) {
                     _api.platform->logMsg("[STEP TEST] '%s' passed", _stepTests[_stepTestIndex].first.data());
                 }

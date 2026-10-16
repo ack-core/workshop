@@ -69,17 +69,20 @@ namespace test {
 
     class StepTestInterface {
     public:
-        enum class StepType {
-            ONE_FRAME,
-            ASYNC_WORK_COMPLETE
-        };
-
-        virtual auto getType() const -> StepType = 0;
         virtual void init(const API &api) = 0;
         virtual bool testResult(const API &api) = 0;
 
     public:
         virtual ~StepTestInterface() = default;
+    };
+
+    class ScreenshotTestInterface {
+    public:
+        virtual void init(const API& api) = 0;
+        virtual bool testResult(const API& api, const std::uint8_t *ref, const std::uint8_t *frame) = 0;
+
+    public:
+        virtual ~ScreenshotTestInterface() = default;
     };
 
     class TestRunner {

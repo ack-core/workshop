@@ -17,8 +17,10 @@
             background: white;
         }
         .rt {
-            width: 100%;
-            height: 100%;
+            left: 0;
+            top: 0;
+            width: 512px; /* TESTING_RENDER_WIDTH */
+            height: 512px; /* TESTING_RENDER_HEIGHT */
             position: fixed;
             display: block;
             touch-action: none;
@@ -30,6 +32,36 @@
 </head>
 <body>
     <canvas class="rt" id="render_target"></canvas>
+    <script type="text/javascript">
+        // Back buffer must be strictly the canvas css size, and never resized
+        Object.defineProperty(window, "devicePixelRatio", { get: () => 1 });
+        window.addEventListener("resize", (event) => event.stopImmediatePropagation());
+
+        // Minimal FileSystemDirectoryHandle used by js_save. Files are written by testing.js server into the 'data' directory files are read from
+        function remoteDirectory(path) {
+            return {
+                getDirectoryHandle: async (name) => remoteDirectory(path + name + "/"),
+                getFileHandle: async (name) => ({
+                    createWritable: async () => {
+                        let content = null;
+                        return {
+                            write: async (data) => { content = data; },
+                            truncate: async (size) => {},
+                            close: async () => {
+                                const response = await fetch(path + name, { method: "PUT", body: content });
+                                if (!response.ok) throw response.status + " " + response.statusText;
+                            }
+                        };
+                    },
+                    remove: async () => {
+                        const response = await fetch(path + name, { method: "DELETE" });
+                        if (!response.ok) throw response.status + " " + response.statusText;
+                    }
+                })
+            };
+        }
+        var editorRootDirectory = { getDirectoryHandle: async (name) => remoteDirectory("data/") }; // js_save requests "resources"
+    </script>
     <script type="text/javascript" src="wasm.js" binary="tests.wasm"></script>
 </body>
 </html>

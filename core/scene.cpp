@@ -1141,6 +1141,12 @@ namespace core {
         util::cleanupUnused(_groundMeshes);
         util::cleanupUnused(_vegetations);
         util::cleanupUnused(_particleEmitters);
+
+        _rendering->forTarget(nullptr, nullptr, math::color{ 0.0, 1.0, 0.0, 1.0 }, [&](foundation::RenderingInterface& rendering) {
+
+        });
+        return;
+
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         if (_gbuffer) {

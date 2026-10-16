@@ -28,8 +28,13 @@
 namespace {
     const wchar_t *APP_CLASS_NAME = L"Application";
 
+#if defined(IS_TESTS)
+    const unsigned APP_WIDTH = foundation::TESTING_RENDER_WIDTH;
+    const unsigned APP_HEIGHT = foundation::TESTING_RENDER_HEIGHT;
+#else
     const unsigned APP_WIDTH = 1280;
     const unsigned APP_HEIGHT = 720;
+#endif
     const unsigned BUFFER_SIZE = 65536;
 
     char g_buffer[BUFFER_SIZE];

@@ -14,7 +14,32 @@ https.createServer({
     cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
     key: fs.readFileSync(path.join(__dirname, 'key.pem')),
 }, (req, res) => {
-    fs.readFile(path.join(__dirname, req.url), (err, data) => {
+    const filePath = path.join(__dirname, decodeURIComponent(req.url));
+
+    if (filePath.startsWith(path.join(__dirname, 'data')) == false && req.method != 'GET') {
+        res.writeHead(403);
+        return res.end();
+    }
+    if (req.method == 'PUT') {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => {
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            fs.writeFile(filePath, Buffer.concat(chunks), err => {
+                res.writeHead(err ? 500 : 200);
+                res.end();
+            });
+        });
+        return;
+    }
+    if (req.method == 'DELETE') {
+        return fs.rm(filePath, { force: true }, err => {
+            res.writeHead(err ? 500 : 200);
+            res.end();
+        });
+    }
+
+    fs.readFile(filePath, (err, data) => {
         res.writeHead(err ? 404 : 200, {
             'Content-Type': MIME[path.extname(req.url)] || 'application/octet-stream',
             'Cross-Origin-Embedder-Policy': 'credentialless',

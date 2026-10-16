@@ -172,7 +172,7 @@ const imports = {
         js_fetch: function(block, pathLen) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
-            
+
             fetch(path, {cache: "no-store"}).then(response => {
                 if (response.ok) {
                     return response.arrayBuffer();
@@ -183,13 +183,13 @@ const imports = {
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
                 print("[WASM] " + path + " loaded successfully " + buffer.byteLength);
-                instance.exports.fileLoaded(block, pathLen, data, buffer.byteLength);
-            })
-            .catch(error => {
+                return [data, buffer.byteLength];
+            }, error => {
                 print("[WASM] " + path + " loading failed with " + error);
-                if (typeof error === "string") {
-                    instance.exports.fileLoaded(block, pathLen, 0, 0);
-                }
+                return [0, 0];
+            })
+            .then(([data, length]) => {
+                instance.exports.fileLoaded(block, pathLen, data, length);
             });
         },
         js_save: function(block, pathLen, data, dataLen) {

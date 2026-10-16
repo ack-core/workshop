@@ -95,13 +95,16 @@ namespace {
 }
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     if (application.applicationState != UIApplicationStateBackground) {
-        _controller = [[RootViewController alloc] init];
-        _window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
-        _window.rootViewController = _controller;
-        
-        CGRect frame = UIScreen.mainScreen.bounds;
-
         g_nativeScreenScale = UIScreen.mainScreen.scale;
+#if defined(IS_TESTS)
+        CGRect frame = CGRectMake(0, 0, foundation::TESTING_RENDER_WIDTH / g_nativeScreenScale, foundation::TESTING_RENDER_HEIGHT / g_nativeScreenScale);
+#else
+        CGRect frame = UIScreen.mainScreen.bounds;
+#endif
+        _controller = [[RootViewController alloc] init];
+        _window = [[UIWindow alloc] initWithFrame:frame];
+        _window.rootViewController = _controller;
+
         g_nativeScreenWidth = frame.size.width * g_nativeScreenScale;
         g_nativeScreenHeight = frame.size.height * g_nativeScreenScale;
         
@@ -315,9 +318,14 @@ namespace foundation {
     	@autoreleasepool {
             CGRect frame = UIScreen.mainScreen.bounds;
             g_nativeScreenScale = UIScreen.mainScreen.nativeScale;
+#if defined(IS_TESTS)
+            g_nativeScreenWidth = TESTING_RENDER_WIDTH;
+            g_nativeScreenHeight = TESTING_RENDER_HEIGHT;
+#else
             g_nativeScreenWidth = frame.size.height * g_nativeScreenScale; // at this time screen orientation isn't applied
             g_nativeScreenHeight = frame.size.width * g_nativeScreenScale;
-            
+#endif
+
             _executableDirectoryPath = [[[NSBundle mainBundle] bundlePath] cStringUsingEncoding:NSUTF8StringEncoding];
         }
     }

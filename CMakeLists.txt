@@ -70,7 +70,7 @@ elseif (APPTYPE STREQUAL "IS_TESTS")
 endif()
 
 if (APPTYPE STREQUAL "IS_GAME")
-	set_property(TARGET app PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}")
+	set_property(TARGET app PROPERTY RUNTIME_OUTPUT_DIRECTORY "${m_source_root}/binary_${PLATFORM_POSTFIX}_game")
 	get_filename_component(m_binary_root "${PROJECT_SOURCE_DIR}/binary_${PLATFORM_POSTFIX}_game" ABSOLUTE)
 	set(APPTYPE_POSTFIX "game")
 elseif (APPTYPE STREQUAL "IS_TESTS")
