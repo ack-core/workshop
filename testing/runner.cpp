@@ -77,10 +77,10 @@ namespace test {
                 const auto &test = _unitTests[_unitTestIndex];
 
                 if (test.second(_api)) {
-                    _api.platform->logMsg("[UNIT TEST] '%s' passed", test.first.data());
+                    _api.platform->logMsg("[PASSED UNIT TEST] '%s'", test.first.data());
                 }
                 else {
-                    _api.platform->logMsg("[UNIT TEST] '%s' failed", test.first.data());
+                    _api.platform->logMsg("[FAILED UNIT TEST] '%s'", test.first.data());
                     _testsFailed++;
                 }
             }
@@ -91,10 +91,10 @@ namespace test {
         if (_currentStepTest) {
             if (_api.platform->isAsyncWorkInProgress() == false) {
                 if (_currentStepTest->testResult(_api)) {
-                    _api.platform->logMsg("[STEP TEST] '%s' passed", _stepTests[_stepTestIndex].first.data());
+                    _api.platform->logMsg("[PASSED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
                 }
                 else {
-                    _api.platform->logMsg("[STEP TEST] '%s' failed", _stepTests[_stepTestIndex].first.data());
+                    _api.platform->logMsg("[FAILED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
                     _testsFailed++;
                 }
                 _currentStepTest.reset();
@@ -118,15 +118,15 @@ namespace test {
                 const std::string &name = _screenshotTests[_screenshotTestIndex].first;
 
                 if (frame == nullptr) {
-                    _api.platform->logMsg("[SCREENSHOT TEST] '%s' failed : frame capture isn't supported", name.data());
+                    _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s' : frame capture isn't supported", name.data());
                     _testsFailed++;
                 }
                 else if (_screenshotRef && _currentScreenshotTest->testResult(_api, _screenshotRef.get(), frame.get())) {
-                    _api.platform->logMsg("[SCREENSHOT TEST] '%s' passed", name.data());
+                    _api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
                 }
                 else {
                     if (_screenshotRef) {
-                        _api.platform->logMsg("[SCREENSHOT TEST] '%s' failed", name.data());
+                        _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s'", name.data());
                         _testsFailed++;
                     }
                     else {

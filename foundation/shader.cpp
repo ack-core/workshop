@@ -640,104 +640,109 @@ namespace foundation {
         std::string resultvs, resultfs;
         error.clear();
         
-        while (input >> blockName) {
-            if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
-                if (formFixedBlock(input, shaderBlockFixed) == false) {
-                    error = "shader has ill-formed 'fixed' block";
-                    completed = false;
-                    break;
-                }
-
-                fixedBlockDone = true;
-                continue;
-            }
-            if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
-                if ((constBlockLength = formConstBlock(input, shaderBlockConsts)) == 0) {
-                    error = "shader has ill-formed 'const' block";
-                    completed = false;
-                    break;
-                }
-                constBlockDone = true;
-                continue;
-            }
-            if (inoutBlockDone == false && blockName == "inout" && (input >> util::sequence("{"))) {
-                if (formInoutBlock(input, shaderBlockInoutVS, shaderBlockInoutFS) == false) {
-                    error = "shader has ill-formed 'inout' block";
-                    completed = false;
-                    break;
-                }
-                inoutBlockDone = true;
-                continue;
-            }
-            if (blockName == "fndef") {
-                std::string funcName;
-                std::string funcSignature;
-                std::string funcReturnType;
-                
-                if (input >> util::word(funcName) >> util::braced(funcSignature, '(', ')') >> util::sequence("->") >> funcReturnType >> util::sequence("{")) {
-                    std::string codeBlock;
-                    
-                    if (shaderUtils::formCodeBlock("        ", input, codeBlock)) {
-                        addFNDefBlock(funcReturnType, funcName, funcSignature, codeBlock, shaderBlockFunctions, shaderBlockFuncdefs);
-                    }
-                    else {
-                        error = "shader has uncompleted 'fndef' block";
+        if (!layout.attributes.empty() || layout.repeat > 1) {
+            while (input >> blockName) {
+                if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
+                    if (formFixedBlock(input, shaderBlockFixed) == false) {
+                        error = "shader has ill-formed 'fixed' block";
                         completed = false;
                         break;
                     }
-                }
-                else {
-                    error = "shader has invalid 'fndef' block";
-                    completed = false;
-                    break;
-                }
-                continue;
-            }
-            if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
-                if (fixedBlockDone == false) {
+
                     fixedBlockDone = true;
-                    formEmptyFixedBlock(shaderBlockFixed);
+                    continue;
                 }
-                if (constBlockDone == false) {
+                if (constBlockDone == false && blockName == "const" && (input >> util::sequence("{"))) {
+                    if ((constBlockLength = formConstBlock(input, shaderBlockConsts)) == 0) {
+                        error = "shader has ill-formed 'const' block";
+                        completed = false;
+                        break;
+                    }
                     constBlockDone = true;
-                    formEmptyConstBlock(shaderBlockConsts);
+                    continue;
                 }
-                if (inoutBlockDone == false) {
+                if (inoutBlockDone == false && blockName == "inout" && (input >> util::sequence("{"))) {
+                    if (formInoutBlock(input, shaderBlockInoutVS, shaderBlockInoutFS) == false) {
+                        error = "shader has ill-formed 'inout' block";
+                        completed = false;
+                        break;
+                    }
                     inoutBlockDone = true;
-                    formEmptyInoutBlock(shaderBlockInoutVS, shaderBlockInoutFS);
+                    continue;
                 }
-                
-                std::string codeBlock;
-                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
-                    error = "shader has uncompleted 'vssrc' block";
-                    completed = false;
-                    break;
+                if (blockName == "fndef") {
+                    std::string funcName;
+                    std::string funcSignature;
+                    std::string funcReturnType;
+
+                    if (input >> util::word(funcName) >> util::braced(funcSignature, '(', ')') >> util::sequence("->") >> funcReturnType >> util::sequence("{")) {
+                        std::string codeBlock;
+
+                        if (shaderUtils::formCodeBlock("        ", input, codeBlock)) {
+                            addFNDefBlock(funcReturnType, funcName, funcSignature, codeBlock, shaderBlockFunctions, shaderBlockFuncdefs);
+                        }
+                        else {
+                            error = "shader has uncompleted 'fndef' block";
+                            completed = false;
+                            break;
+                        }
+                    }
+                    else {
+                        error = "shader has invalid 'fndef' block";
+                        completed = false;
+                        break;
+                    }
+                    continue;
                 }
-                
-                formVSBlock(layout, shaderBlockFixed, shaderBlockConsts, shaderBlockInoutVS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultvs);
-                vssrcBlockDone = true;
-                continue;
-            }
-            if (fssrcBlockDone == false && blockName == "fssrc" && (input >> util::sequence("{"))) {
-                if (vssrcBlockDone == false) {
-                    error = "'vssrc' block must be defined before 'fssrc'\n";
-                    completed = false;
-                    break;
+                if (vssrcBlockDone == false && blockName == "vssrc" && (input >> util::sequence("{"))) {
+                    if (fixedBlockDone == false) {
+                        fixedBlockDone = true;
+                        formEmptyFixedBlock(shaderBlockFixed);
+                    }
+                    if (constBlockDone == false) {
+                        constBlockDone = true;
+                        formEmptyConstBlock(shaderBlockConsts);
+                    }
+                    if (inoutBlockDone == false) {
+                        inoutBlockDone = true;
+                        formEmptyInoutBlock(shaderBlockInoutVS, shaderBlockInoutFS);
+                    }
+
+                    std::string codeBlock;
+                    if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
+                        error = "shader has uncompleted 'vssrc' block";
+                        completed = false;
+                        break;
+                    }
+
+                    formVSBlock(layout, shaderBlockFixed, shaderBlockConsts, shaderBlockInoutVS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultvs);
+                    vssrcBlockDone = true;
+                    continue;
+                }
+                if (fssrcBlockDone == false && blockName == "fssrc" && (input >> util::sequence("{"))) {
+                    if (vssrcBlockDone == false) {
+                        error = "'vssrc' block must be defined before 'fssrc'\n";
+                        completed = false;
+                        break;
+                    }
+
+                    std::string codeBlock;
+                    if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
+                        error = "shader has uncompleted 'fssrc' block";
+                        completed = false;
+                        break;
+                    }
+
+                    formFSBlock(shaderBlockFixed, shaderBlockConsts, shaderBlockInoutFS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultfs);
+                    fssrcBlockDone = true;
+                    continue;
                 }
 
-                std::string codeBlock;
-                if (shaderUtils::formCodeBlock(indent, input, codeBlock) == false) {
-                    error = "shader has uncompleted 'fssrc' block";
-                    completed = false;
-                    break;
-                }
-
-                formFSBlock(shaderBlockFixed, shaderBlockConsts, shaderBlockInoutFS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultfs);
-                fssrcBlockDone = true;
-                continue;
+                error = "shader has unexpected block\n";
             }
-            
-            error = "shader has unexpected block\n";
+        }
+        else {
+            error = "layout should either have vertex attributes or repeat > 1";
         }
         
         if (error.empty()) {

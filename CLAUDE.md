@@ -13,6 +13,7 @@ game - contexts with game/editor logic
 package - platform specific prepared files
 testing - test suite
 
+generated folders:
 binary_* - built platform executables
 workshop_* - generated IDE projects
 

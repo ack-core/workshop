@@ -681,6 +681,7 @@ namespace core {
         
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
         
+        bool _initialized = false;
         bool _lineDrawingEnabled = true;
     };
     
@@ -992,30 +993,6 @@ namespace core {
     : _platform(platform)
     , _rendering(rendering)
     {
-        _palette = rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, {resource::PALETTE});
-        _arrowShader = rendering->createShader(g_arrowShaderSrc, foundation::InputLayout {});
-        _lineShader = rendering->createShader(g_lineShaderSrc, foundation::InputLayout {});
-        _boundingSphereShader = rendering->createShader(g_boundingSphereShaderSrc, foundation::InputLayout {
-            .repeat = 62
-        });
-        _boundingBoxShader = rendering->createShader(g_boundingBoxShaderSrc, foundation::InputLayout {
-            .repeat = 24
-        });
-        _voxelMeshShader = rendering->createShader(g_voxelMeshShaderSrc, layouts::VTXMVOX);
-        _groundMeshShader = rendering->createShader(g_groundMeshShaderSrc, layouts::VTXNRMUV);
-        _vegetationShader = rendering->createShader(g_vegetationShaderSrc, layouts::VTXVEG);
-        _particlesShader = rendering->createShader(g_particlesShaderSrc, foundation::InputLayout {
-            .repeat = 4
-        });
-        _gbufferToScreenShader = rendering->createShader(g_gbufferToScreenShaderSrc, foundation::InputLayout {
-            .repeat = 4
-        });
-        
-        _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
-        _platform->setResizeHandler([&]() {
-            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
-        });
-
         setCameraLookAt({45, 45, 45}, {0, 0, 0});
     }
     
@@ -1141,6 +1118,34 @@ namespace core {
         util::cleanupUnused(_groundMeshes);
         util::cleanupUnused(_vegetations);
         util::cleanupUnused(_particleEmitters);
+
+        if (_initialized == false) {
+            _initialized = true;
+
+            _palette = _rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 256, 1, { resource::PALETTE });
+            _arrowShader = _rendering->createShader(g_arrowShaderSrc, foundation::InputLayout{});
+            _lineShader = _rendering->createShader(g_lineShaderSrc, foundation::InputLayout{});
+            _boundingSphereShader = _rendering->createShader(g_boundingSphereShaderSrc, foundation::InputLayout{
+                .repeat = 62
+            });
+            _boundingBoxShader = _rendering->createShader(g_boundingBoxShaderSrc, foundation::InputLayout{
+                .repeat = 24
+            });
+            _voxelMeshShader = _rendering->createShader(g_voxelMeshShaderSrc, layouts::VTXMVOX);
+            _groundMeshShader = _rendering->createShader(g_groundMeshShaderSrc, layouts::VTXNRMUV);
+            _vegetationShader = _rendering->createShader(g_vegetationShaderSrc, layouts::VTXVEG);
+            _particlesShader = _rendering->createShader(g_particlesShaderSrc, foundation::InputLayout{
+                .repeat = 4
+            });
+            _gbufferToScreenShader = _rendering->createShader(g_gbufferToScreenShaderSrc, foundation::InputLayout{
+                .repeat = 4
+            });
+
+            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
+            _platform->setResizeHandler([&]() {
+                _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
+            });
+        }
 
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         

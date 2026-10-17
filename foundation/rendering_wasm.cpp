@@ -280,12 +280,14 @@ namespace foundation {
                 const std::string linedFS = shaderUtils::makeLines(fs);
                 createNativeSrc(nativeShaderVS, linedVS);
                 createNativeSrc(nativeShaderFS, linedFS);
-                
+
                 //_platform->logMsg("--------------------\n%s\n--------------------\n", linedVS.data());
                 //_platform->logMsg("--------------------\n%s\n--------------------\n\n\n", linedFS.data());
 
                 WebGLId webglShader = webgl_createProgram(nativeShaderVS.src.get(), nativeShaderVS.length, nativeShaderFS.src.get(), nativeShaderFS.length);
-                result = std::make_shared<WASMShader>(webglShader, layout, constLength);
+                if (webglShader) {
+                    result = std::make_shared<WASMShader>(webglShader, layout, constLength);
+                }
             }
             else {
                 _platform->logError("[MetalRendering::createShader] shader error : %s\n", error.data());
