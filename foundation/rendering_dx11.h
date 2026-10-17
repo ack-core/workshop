@@ -1,7 +1,33 @@
 
 #include "rendering.h"
 
+#include <d3d11_1.h>
+#include <d3dcompiler.h>
+#include <wrl.h>
+
 namespace foundation {
+    using Microsoft::WRL::ComPtr;
+
+    class Direct3D11Shader : public RenderShader {
+    public:
+        Direct3D11Shader(const InputLayout &layout, const ComPtr<ID3D11InputLayout> &inputLayout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::uint32_t constBufferLength);
+        ~Direct3D11Shader() override;
+
+        auto getInputLayout() const -> const InputLayout & override;
+        auto getConstBufferLength() const -> std::uint32_t override;
+
+        void apply(const ComPtr<ID3D11DeviceContext1> &context, const void *constants) const;
+
+    private:
+        const InputLayout _layout;
+        const std::uint32_t _constBufferLength;
+
+        ComPtr<ID3D11InputLayout> _inputLayout;
+        ComPtr<ID3D11VertexShader> _vshader;
+        ComPtr<ID3D11PixelShader> _pshader;
+        ComPtr<ID3D11Buffer> _constBuffer;
+    };
+
     class Direct3D11Rendering final : public RenderingInterface {
     public:
         Direct3D11Rendering(const std::shared_ptr<PlatformInterface> &platform);
@@ -33,5 +59,8 @@ namespace foundation {
     private:
         std::shared_ptr<PlatformInterface> _platform;
         math::transform3f _stdVPMatrix;
+
+        ComPtr<ID3D11Device1> _device;
+        ComPtr<ID3D11DeviceContext1> _context;
     };
 }

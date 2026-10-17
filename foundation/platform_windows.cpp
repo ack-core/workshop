@@ -506,7 +506,9 @@ namespace foundation {
 
         printf("%s\n", g_buffer);
 
-        DebugBreak();
+        if (IsDebuggerPresent()) {
+            DebugBreak();
+        }
     }
 }
 
