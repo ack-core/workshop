@@ -142,8 +142,14 @@ namespace {
 #ifdef PLATFORM_IOS
     static const std::uint32_t VS_INPUT_VERTEX_COUNT = 3;
 
+    void transformTypes(std::string &code) {
+        shaderUtils::replace(code, "float1", "float", SEPARATORS, SEPARATORS);
+        shaderUtils::replace(code, "int1", "int", SEPARATORS, SEPARATORS);
+        shaderUtils::replace(code, "uint1", "uint", SEPARATORS, SEPARATORS);
+    }
     std::string transformCode(const std::string &src) {
         std::string result = src;
+        transformTypes(result);
         shaderUtils::replace(result, "output_", "output.", SEPARATORS);
         shaderUtils::replace(result, "const_", "constants.", SEPARATORS);
         shaderUtils::replace(result, "frame_", "framedata.", SEPARATORS);
@@ -190,6 +196,16 @@ namespace {
                 std::string nativeTypeName;
                 
                 if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, TYPES_COUNT, nativeTypeName, elementSize)) {
+                    if (varname.find('[') == std::string::npos) {
+                        output += "constant " + nativeTypeName + " fixed_" + varname + " = " + nativeTypeName + "(";
+
+                        if (stream >> util::braced(output, '[', ']')) {
+                            output += ");\n\n";
+                            continue;
+                        }
+                        else return false;
+                    }
+
                     output += "constant " + nativeTypeName + " fixed_" + varname + " = {\n";
                     for (std::size_t i = 0; i < elementCount; i++) {
                         output += indent + nativeTypeName + "(";
@@ -373,6 +389,7 @@ namespace {
         fsout += "    float4 output_color[4] = {};\n    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n\n";
         
         std::string codeBlock = cb;
+        transformTypes(codeBlock);
         shaderUtils::replace(codeBlock, "const_", "constants.", SEPARATORS);
         shaderUtils::replace(codeBlock, "frame_", "framedata.", SEPARATORS);
         shaderUtils::replace(codeBlock, "input_", "input.", SEPARATORS);
@@ -435,7 +452,7 @@ std::string transformCode(const std::string &src) {
     shaderUtils::replace(result, "frame_", "framedata.", SEPARATORS);
     return result;
 }
-std::uint32_t formVarsBlock(util::strstream &stream, std::string &output, std::size_t allowedTypeCount) {
+std::uint32_t formVarsBlock(util::strstream &stream, std::string &output, std::size_t allowedTypeCount, std::string *varyingsFS = nullptr) {
     std::string varname, arg;
     std::uint32_t totalLength = 0;
 
@@ -445,7 +462,16 @@ std::uint32_t formVarsBlock(util::strstream &stream, std::string &output, std::s
             std::string nativeTypeName;
 
             if (shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
-                output += indent + "mediump " + nativeTypeName + " " + varname + ";\n";
+                if (varyingsFS) {
+                    // integer varyings must be flat
+                    const std::string flat = nativeTypeName[0] == 'i' || nativeTypeName[0] == 'u' ? "flat " : "";
+                    const std::string decl = "mediump " + nativeTypeName + " passing_" + varname + ";\n";
+                    output += flat + "out " + decl;
+                    *varyingsFS += flat + "in " + decl;
+                }
+                else {
+                    output += indent + "mediump " + nativeTypeName + " " + varname + ";\n";
+                }
                 totalLength += elementSize * elementCount;
                 continue;
             }
@@ -475,6 +501,16 @@ bool formFixedBlock(util::strstream &stream, std::string &output) {
             std::string nativeTypeName;
             
             if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, TYPES_COUNT, nativeTypeName, elementSize)) {
+                if (varname.find('[') == std::string::npos) {
+                    output += "const mediump " + nativeTypeName + " fixed_" + varname + " = " + nativeTypeName + "(";
+
+                    if (stream >> util::braced(output, '[', ']')) {
+                        output += ");\n\n";
+                        continue;
+                    }
+                    else return false;
+                }
+
                 output += "const mediump " + nativeTypeName + " fixed_" + varname + " = " + nativeTypeName + "[](\n";
                 for (std::size_t i = 0; i < elementCount; i++) {
                     output += indent + nativeTypeName + "(";
@@ -484,7 +520,7 @@ bool formFixedBlock(util::strstream &stream, std::string &output) {
                     }
                     else return false;
                 }
-                
+
                 output += ");\n\n";
                 continue;
             }
@@ -507,18 +543,15 @@ std::uint32_t formConstBlock(util::strstream &stream, std::string &output) {
     return constBlockLength;
 }
 bool formInoutBlock(util::strstream &stream, std::string &outputVS, std::string &outputFS) {
-    outputVS = "out struct _InOut {\n";
-    outputFS = "in struct _InOut {\n";
-    
-    std::string varsBlock;
-    if (formVarsBlock(stream, varsBlock, TYPES_COUNT) == 0) {
+    outputVS.clear();
+    outputFS.clear();
+
+    if (formVarsBlock(stream, outputVS, TYPES_COUNT, &outputFS) == 0) {
         return false;
     }
-    
-    outputVS += varsBlock;
-    outputVS += "}\npassing;\n\n";
-    outputFS += varsBlock;
-    outputFS += "}\npassing;\n\n";
+
+    outputVS += "\n";
+    outputFS += "\n";
     return true;
 }
 void addFNDefBlock(const std::string &r, const std::string &name, const std::string &sgn, const std::string &cb, std::string &functions, std::string &funcdefs) {
@@ -555,7 +588,7 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
     }
     
     std::string codeBlock = transformCode(cb);
-    shaderUtils::replace(codeBlock, "output_", "passing.", SEPARATORS, {"output_position"});
+    shaderUtils::replace(codeBlock, "output_", "passing_", SEPARATORS, {"output_position"});
     vsout += codeBlock;
     
     vsout += "    gl_Position.y *= -1.0;\n";
@@ -566,7 +599,7 @@ void formFSBlock(const std::string &fixed, const std::string &consts, const std:
     fsout += transformCode(funcs);
     fsout += inoutFS;
     std::string codeBlock = transformCode(cb);
-    shaderUtils::replace(codeBlock, "input_", "passing.", SEPARATORS, {"input_position"});
+    shaderUtils::replace(codeBlock, "input_", "passing_", SEPARATORS, {"input_position"});
     
     fsout += "out vec4 output_color[4];\n\n";
     fsout += "void main() {\n";
