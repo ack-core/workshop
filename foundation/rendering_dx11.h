@@ -28,6 +28,84 @@ namespace foundation {
         ComPtr<ID3D11Buffer> _constBuffer;
     };
 
+    class Direct3D11Texture : public RenderTexture {
+    public:
+        Direct3D11Texture(const ComPtr<ID3D11Texture2D> &texture, const ComPtr<ID3D11ShaderResourceView> &view, RenderTextureFormat format, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        ~Direct3D11Texture() override;
+
+        auto getWidth() const -> std::uint32_t override;
+        auto getHeight() const -> std::uint32_t override;
+        auto getMipCount() const -> std::uint32_t override;
+        auto getFormat() const -> RenderTextureFormat override;
+
+        auto getShaderResourceView() const -> ID3D11ShaderResourceView *;
+
+    private:
+        ComPtr<ID3D11Texture2D> _texture;
+        ComPtr<ID3D11ShaderResourceView> _view;
+        RenderTextureFormat _format;
+        std::uint32_t _width;
+        std::uint32_t _height;
+        std::uint32_t _mipCount;
+    };
+
+    class Direct3D11Target : public RenderTarget {
+    public:
+        class DepthTexture : public Direct3D11Texture {
+        public:
+            DepthTexture(const ComPtr<ID3D11Texture2D> &texture, const ComPtr<ID3D11ShaderResourceView> &view, const ComPtr<ID3D11DepthStencilView> &depthView, std::uint32_t w, std::uint32_t h)
+                : Direct3D11Texture(texture, view, RenderTextureFormat::R32F, w, h, 1)
+                , _depthView(depthView)
+            {}
+
+            auto getDepthStencilView() const -> ID3D11DepthStencilView * { return _depthView.Get(); }
+
+        private:
+            ComPtr<ID3D11DepthStencilView> _depthView;
+        };
+
+        Direct3D11Target(const RenderTexturePtr *textures, const ComPtr<ID3D11RenderTargetView> *views, std::uint32_t count, const RenderTexturePtr &depth, RenderTextureFormat format, std::uint32_t w, std::uint32_t h);
+        ~Direct3D11Target() override;
+
+        auto getWidth() const -> std::uint32_t override;
+        auto getHeight() const -> std::uint32_t override;
+        auto getFormat() const -> RenderTextureFormat override;
+        auto getTextureCount() const -> std::uint32_t override;
+        auto getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & override;
+        auto getDepth() const -> const std::shared_ptr<RenderTexture> & override;
+
+        auto getRenderTargetViews() const -> ID3D11RenderTargetView *const *;
+
+    private:
+        RenderTexturePtr _textures[RenderTarget::MAX_TEXTURE_COUNT];
+        ComPtr<ID3D11RenderTargetView> _views[RenderTarget::MAX_TEXTURE_COUNT];
+        RenderTexturePtr _depth;
+        RenderTextureFormat _format;
+        std::uint32_t _count;
+        std::uint32_t _width;
+        std::uint32_t _height;
+    };
+
+    class Direct3D11Data : public RenderData {
+    public:
+        Direct3D11Data(const ComPtr<ID3D11Buffer> &vertexes, const ComPtr<ID3D11Buffer> &indexes, std::uint32_t vcnt, std::uint32_t icnt, std::uint32_t stride);
+        ~Direct3D11Data() override;
+
+        auto getVertexCount() const -> std::uint32_t override;
+        auto getIndexCount() const -> std::uint32_t override;
+        auto getStride() const -> std::uint32_t override;
+
+        auto getVertexes() const -> ID3D11Buffer *;
+        auto getIndexes() const -> ID3D11Buffer *;
+
+    private:
+        ComPtr<ID3D11Buffer> _vertexes;
+        ComPtr<ID3D11Buffer> _indexes;
+        std::uint32_t _vcount;
+        std::uint32_t _icount;
+        std::uint32_t _stride;
+    };
+
     class Direct3D11Rendering final : public RenderingInterface {
     public:
         Direct3D11Rendering(const std::shared_ptr<PlatformInterface> &platform);
@@ -59,6 +137,9 @@ namespace foundation {
     private:
         std::shared_ptr<PlatformInterface> _platform;
         math::transform3f _stdVPMatrix;
+
+        std::shared_ptr<Direct3D11Shader> _currentShader;
+        RenderTopology _currentTopology = RenderTopology::TRIANGLES;
 
         ComPtr<ID3D11Device1> _device;
         ComPtr<ID3D11DeviceContext1> _context;

@@ -101,16 +101,6 @@ namespace {
     std::weak_ptr<foundation::RenderingInterface> g_instance;
 }
 
-//namespace foundation {
-//    std::uint32_t InputLayout::getStride() const {
-//        std::uint32_t stride = 0;
-//        for (std::size_t i = 0; i < attributes.size(); i++) {
-//            stride += g_formatConversionTable[int(attributes[i].format)].size;
-//        }
-//        return stride;
-//    }
-//}
-
 namespace foundation {
     WASMShader::WASMShader(WebGLId shader, const InputLayout &layout, std::uint32_t constBufferLength)
         : _shader(shader)
@@ -196,7 +186,9 @@ namespace foundation {
         for (unsigned i = 0; i < count; i++) {
             _textures[i] = std::make_shared<RTTexture>(*this, fmt, textures[i]);
         }
-        _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
+        if (depth) {
+            _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
+        }
     }
     WASMTarget::RTTexture::~RTTexture() {
         webgl_deleteTexture(_texture);
@@ -280,9 +272,6 @@ namespace foundation {
                 const std::string linedFS = shaderUtils::makeLines(fs);
                 createNativeSrc(nativeShaderVS, linedVS);
                 createNativeSrc(nativeShaderFS, linedFS);
-
-                //_platform->logMsg("--------------------\n%s\n--------------------\n", linedVS.data());
-                //_platform->logMsg("--------------------\n%s\n--------------------\n\n\n", linedFS.data());
 
                 WebGLId webglShader = webgl_createProgram(nativeShaderVS.src.get(), nativeShaderVS.length, nativeShaderFS.src.get(), nativeShaderFS.length);
                 if (webglShader) {

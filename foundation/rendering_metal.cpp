@@ -145,7 +145,9 @@ namespace foundation {
         for (unsigned i = 0; i < count; i++) {
             _textures[i] = std::make_shared<RTTexture>(*this, fmt, targets[i]);
         }
-        _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
+        if (depth) {
+            _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
+        }
     }
     
     MetalTarget::~MetalTarget() {
@@ -359,8 +361,11 @@ namespace foundation {
             
             unsigned counter = 0;
             for (auto &item : mipsData) {
-                MTLRegion region = {{ 0, 0, 0 }, {w >> counter, h >> counter, 1}};
-                [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, w)];
+                const std::uint32_t mipWidth = std::max(std::uint32_t(1), w >> counter);
+                const std::uint32_t mipHeight = std::max(std::uint32_t(1), h >> counter);
+                MTLRegion region = {{ 0, 0, 0 }, {mipWidth, mipHeight, 1}};
+                [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, mipWidth)];
+                counter++;
             }
             
             return std::make_shared<MetalTexture>(texture, format, w, h, mipmapLevelCount);
@@ -462,8 +467,10 @@ namespace foundation {
                     renderPassDescriptor.colorAttachments[i].clearColor = colorClearValue;
                 }
                 
-                renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
-                renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+                if (target->getDepth()) {
+                    renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
+                    renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+                }
                 
                 viewPort.width = _frameConstants.rtBounds.x = float(target->getWidth());
                 viewPort.height = _frameConstants.rtBounds.y = float(target->getHeight());

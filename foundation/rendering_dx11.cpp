@@ -42,6 +42,30 @@ namespace {
         DXGI_FORMAT_R32G32B32_UINT,
         DXGI_FORMAT_R32G32B32A32_UINT,
     };
+
+    const struct {
+        DXGI_FORMAT format;
+        std::uint32_t pixelSize;
+    }
+    g_textureFormatTable[] = { // index is RenderTextureFormat value
+        {DXGI_FORMAT_R8_UNORM, 1},
+        {DXGI_FORMAT_R16_FLOAT, 2},
+        {DXGI_FORMAT_R32_FLOAT, 4},
+        {DXGI_FORMAT_R8G8_UNORM, 2},
+        {DXGI_FORMAT_R16G16_FLOAT, 4},
+        {DXGI_FORMAT_R32G32_FLOAT, 8},
+        {DXGI_FORMAT_R8G8B8A8_UNORM, 4},
+        {DXGI_FORMAT_R16G16B16A16_FLOAT, 8},
+        {DXGI_FORMAT_R32G32B32A32_FLOAT, 16},
+    };
+
+    const D3D11_PRIMITIVE_TOPOLOGY g_topologies[] = { // index is RenderTopology value
+        D3D11_PRIMITIVE_TOPOLOGY_POINTLIST,
+        D3D11_PRIMITIVE_TOPOLOGY_LINELIST,
+        D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP,
+        D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+        D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+    };
 }
 
 namespace foundation {
@@ -77,6 +101,116 @@ namespace foundation {
             context->VSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
             context->PSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
         }
+    }
+}
+
+namespace foundation {
+    Direct3D11Texture::Direct3D11Texture(const ComPtr<ID3D11Texture2D> &texture, const ComPtr<ID3D11ShaderResourceView> &view, RenderTextureFormat format, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
+        : _texture(texture)
+        , _view(view)
+        , _format(format)
+        , _width(w)
+        , _height(h)
+        , _mipCount(mipCount)
+    {}
+
+    Direct3D11Texture::~Direct3D11Texture() {}
+
+    auto Direct3D11Texture::getWidth() const -> std::uint32_t {
+        return _width;
+    }
+
+    auto Direct3D11Texture::getHeight() const -> std::uint32_t {
+        return _height;
+    }
+
+    auto Direct3D11Texture::getMipCount() const -> std::uint32_t {
+        return _mipCount;
+    }
+
+    auto Direct3D11Texture::getFormat() const -> RenderTextureFormat {
+        return _format;
+    }
+
+    auto Direct3D11Texture::getShaderResourceView() const -> ID3D11ShaderResourceView * {
+        return _view.Get();
+    }
+}
+
+namespace foundation {
+    Direct3D11Target::Direct3D11Target(const RenderTexturePtr *textures, const ComPtr<ID3D11RenderTargetView> *views, std::uint32_t count, const RenderTexturePtr &depth, RenderTextureFormat format, std::uint32_t w, std::uint32_t h)
+        : _depth(depth)
+        , _format(format)
+        , _count(count)
+        , _width(w)
+        , _height(h)
+    {
+        for (std::uint32_t i = 0; i < count; i++) {
+            _textures[i] = textures[i];
+            _views[i] = views[i];
+        }
+    }
+
+    Direct3D11Target::~Direct3D11Target() {}
+
+    auto Direct3D11Target::getWidth() const -> std::uint32_t {
+        return _width;
+    }
+
+    auto Direct3D11Target::getHeight() const -> std::uint32_t {
+        return _height;
+    }
+
+    auto Direct3D11Target::getFormat() const -> RenderTextureFormat {
+        return _format;
+    }
+
+    auto Direct3D11Target::getTextureCount() const -> std::uint32_t {
+        return _count;
+    }
+
+    auto Direct3D11Target::getTexture(unsigned index) const -> const std::shared_ptr<RenderTexture> & {
+        return _textures[index];
+    }
+
+    auto Direct3D11Target::getDepth() const -> const std::shared_ptr<RenderTexture> & {
+        return _depth;
+    }
+
+    auto Direct3D11Target::getRenderTargetViews() const -> ID3D11RenderTargetView *const * {
+        return _views[0].GetAddressOf();
+    }
+}
+
+namespace foundation {
+    Direct3D11Data::Direct3D11Data(const ComPtr<ID3D11Buffer> &vertexes, const ComPtr<ID3D11Buffer> &indexes, std::uint32_t vcnt, std::uint32_t icnt, std::uint32_t stride)
+        : _vertexes(vertexes)
+        , _indexes(indexes)
+        , _vcount(vcnt)
+        , _icount(icnt)
+        , _stride(stride)
+    {}
+
+    Direct3D11Data::~Direct3D11Data() {}
+
+    auto Direct3D11Data::getVertexCount() const -> std::uint32_t {
+        return _vcount;
+    }
+
+    auto Direct3D11Data::getIndexCount() const -> std::uint32_t {
+        return _icount;
+    }
+
+    auto Direct3D11Data::getStride() const -> std::uint32_t {
+        return _stride;
+    }
+
+    auto Direct3D11Data::getVertexes() const -> ID3D11Buffer * {
+        return _vertexes.Get();
+    }
+
+    auto Direct3D11Data::getIndexes() const -> ID3D11Buffer * {
+        return _indexes.Get();
     }
 }
 
@@ -184,15 +318,137 @@ namespace foundation {
     }
 
     auto Direct3D11Rendering::createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr {
-        return nullptr;
+        HRESULT hresult;
+        ComPtr<ID3D11Texture2D> texture;
+        ComPtr<ID3D11ShaderResourceView> view;
+
+        const auto &fmt = g_textureFormatTable[int(format)];
+        const std::uint32_t mipCount = std::max(std::uint32_t(1), std::uint32_t(mipsData.size()));
+
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Width = w;
+        desc.Height = h;
+        desc.MipLevels = mipCount;
+        desc.ArraySize = 1;
+        desc.Format = fmt.format;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = mipsData.size() ? D3D11_USAGE_IMMUTABLE : D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+        std::vector<D3D11_SUBRESOURCE_DATA> subresources;
+        for (const void *item : mipsData) {
+            const std::uint32_t mipWidth = std::max(std::uint32_t(1), w >> subresources.size());
+            subresources.emplace_back(D3D11_SUBRESOURCE_DATA{item, mipWidth * fmt.pixelSize, 0});
+        }
+
+        if ((hresult = _device->CreateTexture2D(&desc, subresources.empty() ? nullptr : subresources.data(), &texture)) != S_OK) {
+            _platform->logError("[Direct3D11Rendering::createTexture] texture creation failed with result = %p", hresult);
+            return nullptr;
+        }
+        _device->CreateShaderResourceView(texture.Get(), nullptr, &view);
+
+        return std::make_shared<Direct3D11Texture>(texture, view, format, w, h, mipCount);
     }
 
     auto Direct3D11Rendering::createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr {
-        return nullptr;
+        HRESULT hresult;
+        RenderTexturePtr textures[RenderTarget::MAX_TEXTURE_COUNT];
+        ComPtr<ID3D11RenderTargetView> views[RenderTarget::MAX_TEXTURE_COUNT];
+        RenderTexturePtr depth;
+
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Width = w;
+        desc.Height = h;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = g_textureFormatTable[int(format)].format;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+        for (std::uint32_t i = 0; i < textureCount; i++) {
+            ComPtr<ID3D11Texture2D> texture;
+            ComPtr<ID3D11ShaderResourceView> view;
+
+            if ((hresult = _device->CreateTexture2D(&desc, nullptr, &texture)) != S_OK) {
+                _platform->logError("[Direct3D11Rendering::createRenderTarget] texture creation failed with result = %p", hresult);
+                return nullptr;
+            }
+            _device->CreateRenderTargetView(texture.Get(), nullptr, &views[i]);
+            _device->CreateShaderResourceView(texture.Get(), nullptr, &view);
+
+            textures[i] = std::make_shared<Direct3D11Texture>(texture, view, format, w, h, 1);
+        }
+
+        if (withZBuffer) {
+            ComPtr<ID3D11Texture2D> texture;
+            ComPtr<ID3D11ShaderResourceView> view;
+            ComPtr<ID3D11DepthStencilView> depthView;
+
+            desc.Format = DXGI_FORMAT_R32_TYPELESS;
+            desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+
+            D3D11_DEPTH_STENCIL_VIEW_DESC dsvdesc = {};
+            dsvdesc.Format = DXGI_FORMAT_D32_FLOAT;
+            dsvdesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvdesc = {};
+            srvdesc.Format = DXGI_FORMAT_R32_FLOAT;
+            srvdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            srvdesc.Texture2D.MipLevels = 1;
+
+            if ((hresult = _device->CreateTexture2D(&desc, nullptr, &texture)) != S_OK) {
+                _platform->logError("[Direct3D11Rendering::createRenderTarget] depth texture creation failed with result = %p", hresult);
+                return nullptr;
+            }
+            _device->CreateDepthStencilView(texture.Get(), &dsvdesc, &depthView);
+            _device->CreateShaderResourceView(texture.Get(), &srvdesc, &view);
+
+            depth = std::make_shared<Direct3D11Target::DepthTexture>(texture, view, depthView, w, h);
+        }
+
+        return std::make_shared<Direct3D11Target>(textures, views, textureCount, depth, format, w, h);
     }
 
     auto Direct3D11Rendering::createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr {
-        return nullptr;
+        if (indexes && layout.repeat > 1) {
+            _platform->logError("[Direct3D11Rendering::createData] Vertex repeat is incompatible with indexed data");
+            return nullptr;
+        }
+
+        HRESULT hresult;
+        ComPtr<ID3D11Buffer> vbuffer, ibuffer;
+        const std::uint32_t stride = layout.getStride();
+
+        D3D11_BUFFER_DESC vdesc = {};
+        vdesc.ByteWidth = vcnt * stride;
+        vdesc.Usage = D3D11_USAGE_IMMUTABLE;
+        vdesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA vdata = {};
+        vdata.pSysMem = data;
+
+        if ((hresult = _device->CreateBuffer(&vdesc, &vdata, &vbuffer)) != S_OK) {
+            _platform->logError("[Direct3D11Rendering::createData] vertex buffer creation failed with result = %p", hresult);
+            return nullptr;
+        }
+
+        if (indexes) {
+            D3D11_BUFFER_DESC idesc = {};
+            idesc.ByteWidth = icnt * sizeof(std::uint32_t);
+            idesc.Usage = D3D11_USAGE_IMMUTABLE;
+            idesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+
+            D3D11_SUBRESOURCE_DATA idata = {};
+            idata.pSysMem = indexes;
+
+            if ((hresult = _device->CreateBuffer(&idesc, &idata, &ibuffer)) != S_OK) {
+                _platform->logError("[Direct3D11Rendering::createData] index buffer creation failed with result = %p", hresult);
+                return nullptr;
+            }
+        }
+
+        return std::make_shared<Direct3D11Data>(vbuffer, ibuffer, vcnt, icnt, stride);
     }
 
     auto Direct3D11Rendering::getBackBufferWidth() const -> float {
@@ -211,14 +467,29 @@ namespace foundation {
 
     }
 
-    void Direct3D11Rendering::applyShader(const RenderShaderPtr &shader, RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {}
-    void Direct3D11Rendering::applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) {}
-    void Direct3D11Rendering::applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) {}
-    void Direct3D11Rendering::applyShaderConstants(const void *constants) {}
+    void Direct3D11Rendering::applyShader(const RenderShaderPtr &shader, RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
 
-    void Direct3D11Rendering::draw(std::uint32_t vertexCount) {}
-    void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {}
-    void Direct3D11Rendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {}
+    }
+
+    void Direct3D11Rendering::applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) {
+    
+    }
+    void Direct3D11Rendering::applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) {
+    
+    }
+    void Direct3D11Rendering::applyShaderConstants(const void *constants) {
+    
+    }
+
+    void Direct3D11Rendering::draw(std::uint32_t vertexCount) {
+    
+    }
+    void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
+
+    }
+    void Direct3D11Rendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
+    
+    }
 
     std::unique_ptr<std::uint8_t[]> Direct3D11Rendering::presentFrame() {
         return nullptr;
