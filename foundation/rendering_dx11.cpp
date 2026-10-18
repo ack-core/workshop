@@ -19,6 +19,8 @@
 namespace {
     std::weak_ptr<foundation::RenderingInterface> g_instance;
 
+    const std::uint32_t MAX_TEXTURES = 4; // texture slots in shader
+
     const DXGI_FORMAT g_vertexFormatTable[] = { // index is InputAttributeFormat value
         DXGI_FORMAT_R16G16_FLOAT,
         DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -370,7 +372,6 @@ namespace foundation {
 
         _context->RSSetViewports(1, &viewport);
         _context->RSSetState(_rasterState.Get());
-        _context->OMSetRenderTargets(1, _defaultRTView.GetAddressOf(), _defaultDepthView.Get());
         _context->OMSetBlendState(_blendStates[int(BlendType::DISABLED)].Get(), nullptr, 0xffffffff);
         _context->OMSetDepthStencilState(_depthStates[int(DepthBehavior::DISABLED)].Get(), 0);
         _context->VSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
@@ -620,19 +621,95 @@ namespace foundation {
     }
 
     void Direct3D11Rendering::forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) {
+        ID3D11RenderTargetView *const *rtViews = _defaultRTView.GetAddressOf();
+        ID3D11DepthStencilView *depthView = _defaultDepthView.Get();
+        std::uint32_t rtCount = 1;
 
+        _frameConstants.rtBounds.x = _platform->getScreenWidth();
+        _frameConstants.rtBounds.y = _platform->getScreenHeight();
+
+        if (target) {
+            const Direct3D11Target *platformTarget = static_cast<const Direct3D11Target *>(target.get());
+            const RenderTexturePtr &targetDepth = platformTarget->getDepth();
+
+            rtViews = platformTarget->getRenderTargetViews();
+            rtCount = platformTarget->getTextureCount();
+            depthView = targetDepth ? static_cast<const Direct3D11Target::DepthTexture *>(targetDepth.get())->getDepthStencilView() : nullptr;
+
+            _frameConstants.rtBounds.x = float(platformTarget->getWidth());
+            _frameConstants.rtBounds.y = float(platformTarget->getHeight());
+        }
+
+        if (depth) {
+            depthView = static_cast<const Direct3D11Target::DepthTexture *>(depth.get())->getDepthStencilView();
+        }
+        else if (depthView) {
+            _context->ClearDepthStencilView(depthView, D3D11_CLEAR_DEPTH, 0.0f, 0);
+        }
+
+        if (rgba.has_value()) {
+            const float color[4] = {rgba->r, rgba->g, rgba->b, rgba->a};
+
+            for (std::uint32_t i = 0; i < rtCount; i++) {
+                _context->ClearRenderTargetView(rtViews[i], color);
+            }
+        }
+
+        // textures of this target can be still bound as shader resources by the previous pass
+        ID3D11ShaderResourceView *const nullResources[MAX_TEXTURES] = {nullptr};
+        _context->VSSetShaderResources(0, MAX_TEXTURES, nullResources);
+        _context->PSSetShaderResources(0, MAX_TEXTURES, nullResources);
+        _context->OMSetRenderTargets(rtCount, rtViews, depthView);
+
+        const D3D11_VIEWPORT viewport = {0.0f, 0.0f, _frameConstants.rtBounds.x, _frameConstants.rtBounds.y, 0.0f, 1.0f};
+        _context->RSSetViewports(1, &viewport);
+        _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
+
+        _isForTarget = true;
+        pass(*this);
+        _isForTarget = false;
+        _currentShader = nullptr;
+
+        // release target textures so the next passes can sample them
+        _context->OMSetRenderTargets(0, nullptr, nullptr);
     }
 
     void Direct3D11Rendering::applyShader(const RenderShaderPtr &shader, RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) {
+        if (_isForTarget && shader) {
+            _currentShader = std::static_pointer_cast<Direct3D11Shader>(shader);
+            _currentTopology = topology;
+            _currentShader->apply(_context, nullptr);
 
+            _context->IASetPrimitiveTopology(g_topologies[int(topology)]);
+            _context->OMSetBlendState(_blendStates[int(blendType)].Get(), nullptr, 0xffffffff);
+            _context->OMSetDepthStencilState(_depthStates[int(depthBehavior)].Get(), 0);
+        }
     }
 
+    void Direct3D11Rendering::_applyTextures(const std::pair<RenderTexturePtr, SamplerType> *textures, std::size_t size) {
+        if (_currentShader) {
+            const UINT count = UINT(std::min(size, std::size_t(MAX_TEXTURES)));
+            ID3D11ShaderResourceView *views[MAX_TEXTURES] = {nullptr};
+            ID3D11SamplerState *samplers[MAX_TEXTURES] = {nullptr};
+
+            for (UINT i = 0; i < count; i++) {
+                views[i] = textures[i].first ? static_cast<const Direct3D11Texture *>(textures[i].first.get())->getShaderResourceView() : nullptr;
+                samplers[i] = _samplerStates[int(textures[i].second)].Get();
+            }
+
+            _context->VSSetShaderResources(0, count, views);
+            _context->VSSetSamplers(0, count, samplers);
+            _context->PSSetShaderResources(0, count, views);
+            _context->PSSetSamplers(0, count, samplers);
+        }
+    }
     void Direct3D11Rendering::applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) {
-    
+        _applyTextures(textures.begin(), textures.size());
     }
     void Direct3D11Rendering::applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) {
-    
+        _applyTextures(textures.data(), textures.size());
     }
+
     void Direct3D11Rendering::applyShaderConstants(const void *constants) {
     
     }
@@ -670,9 +747,6 @@ namespace foundation {
 #endif
 
         _swapChain->Present(1, 0);
-
-        // flip model unbinds back buffer after Present
-        _context->OMSetRenderTargets(1, _defaultRTView.GetAddressOf(), _defaultDepthView.Get());
         return result;
     }
 }

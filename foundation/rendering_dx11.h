@@ -135,6 +135,8 @@ namespace foundation {
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
 
     private:
+        void _applyTextures(const std::pair<RenderTexturePtr, SamplerType> *textures, std::size_t size);
+
         struct FrameConstants {
             math::transform3f plmVPMatrix = math::transform3f::identity();
             math::transform3f stdVPMatrix = math::transform3f::identity();
@@ -149,6 +151,7 @@ namespace foundation {
 
         std::shared_ptr<Direct3D11Shader> _currentShader;
         RenderTopology _currentTopology = RenderTopology::TRIANGLES;
+        bool _isForTarget = false;
 
         ComPtr<ID3D11Device1> _device;
         ComPtr<ID3D11DeviceContext1> _context;
