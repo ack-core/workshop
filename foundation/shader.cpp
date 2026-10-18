@@ -681,7 +681,10 @@ static const std::string SHADER_DEFINES =
     "Texture2D _texture1 : register(t1);\n"
     "Texture2D _texture2 : register(t2);\n"
     "Texture2D _texture3 : register(t3);\n"
-    "SamplerState _sampler : register(s0);\n\n";
+    "SamplerState _sampler0 : register(s0);\n"
+    "SamplerState _sampler1 : register(s1);\n"
+    "SamplerState _sampler2 : register(s2);\n"
+    "SamplerState _sampler3 : register(s3);\n\n";
 
 std::string transformCode(const std::string &src) {
     std::string result = src;
@@ -801,7 +804,7 @@ void addFNDefBlock(const std::string &r, const std::string &name, const std::str
 }
 void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed, const std::string &consts, const std::string &inoutVS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &vsout) {
     vsout = SHADER_DEFINES;
-    vsout += "#define _tex2d(i, a) _texture##i.SampleLevel(_sampler, a, 0)\n\n";
+    vsout += "#define _tex2d(i, a) _texture##i.SampleLevel(_sampler##i, a, 0)\n\n";
     vsout += fixed;
     vsout += consts;
     vsout += inoutVS;
@@ -852,7 +855,7 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
 }
 void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &fsout) {
     fsout = SHADER_DEFINES;
-    fsout += "#define _tex2d(i, a) _texture##i.Sample(_sampler, a)\n\n";
+    fsout += "#define _tex2d(i, a) _texture##i.Sample(_sampler##i, a)\n\n";
     fsout += fixed;
     fsout += consts;
     fsout += inoutFS;

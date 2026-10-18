@@ -56,6 +56,7 @@ namespace {
             target.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         },
         [](MTLRenderPipelineColorAttachmentDescriptor *target){
+            target.blendingEnabled = true;
             target.alphaBlendOperation = MTLBlendOperationAdd;
             target.rgbBlendOperation = MTLBlendOperationAdd;
             target.sourceAlphaBlendFactor = MTLBlendFactorOne;

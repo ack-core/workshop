@@ -135,13 +135,36 @@ namespace foundation {
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
 
     private:
+        struct FrameConstants {
+            math::transform3f plmVPMatrix = math::transform3f::identity();
+            math::transform3f stdVPMatrix = math::transform3f::identity();
+            math::transform3f invVPMatrix = math::transform3f::identity();
+            math::vector4f cameraPosition = math::vector4f(0, 0, 0, 1);
+            math::vector4f cameraDirection = math::vector4f(1, 0, 0, 0);
+            math::vector4f rtBounds = {0, 0, 0, 0};
+        }
+        _frameConstants;
+
         std::shared_ptr<PlatformInterface> _platform;
-        math::transform3f _stdVPMatrix;
 
         std::shared_ptr<Direct3D11Shader> _currentShader;
         RenderTopology _currentTopology = RenderTopology::TRIANGLES;
 
         ComPtr<ID3D11Device1> _device;
         ComPtr<ID3D11DeviceContext1> _context;
+        ComPtr<IDXGISwapChain1> _swapChain;
+
+        ComPtr<ID3D11RenderTargetView> _defaultRTView;
+        ComPtr<ID3D11DepthStencilView> _defaultDepthView;
+        ComPtr<ID3D11Buffer> _frameConstantsBuffer;
+
+        ComPtr<ID3D11RasterizerState> _rasterState;
+        ComPtr<ID3D11BlendState> _blendStates[4];               // index is BlendType value
+        ComPtr<ID3D11DepthStencilState> _depthStates[4];        // index is DepthBehavior value
+        ComPtr<ID3D11SamplerState> _samplerStates[2];           // index is SamplerType value
+
+#if defined(IS_TESTS)
+        ComPtr<ID3D11Texture2D> _readbackTexture;
+#endif
     };
 }
