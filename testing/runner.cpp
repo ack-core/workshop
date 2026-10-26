@@ -77,7 +77,7 @@ namespace test {
                 const auto &test = _unitTests[_unitTestIndex];
 
                 if (test.second(_api)) {
-                    _api.platform->logMsg("[PASSED UNIT TEST] '%s'", test.first.data());
+                    //_api.platform->logMsg("[PASSED UNIT TEST] '%s'", test.first.data());
                 }
                 else {
                     _api.platform->logMsg("[FAILED UNIT TEST] '%s'", test.first.data());
@@ -91,7 +91,7 @@ namespace test {
         if (_currentStepTest) {
             if (_api.platform->isAsyncWorkInProgress() == false) {
                 if (_currentStepTest->testResult(_api)) {
-                    _api.platform->logMsg("[PASSED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
+                    //_api.platform->logMsg("[PASSED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
                 }
                 else {
                     _api.platform->logMsg("[FAILED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
@@ -122,7 +122,7 @@ namespace test {
                     _testsFailed++;
                 }
                 else if (_screenshotRef && _currentScreenshotTest->testResult(_api, _screenshotRef.get(), frame.get())) {
-                    _api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
+                    //_api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
                 }
                 else {
                     if (_screenshotRef) {

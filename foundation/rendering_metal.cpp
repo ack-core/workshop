@@ -268,7 +268,7 @@ namespace foundation {
         _frameConstants.cameraDirection.xyz = camDir;
     }
     
-    RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout) {
+    RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout, bool suppressErrors) {
         std::shared_ptr<RenderShader> result;
         std::string shaderName = std::to_string(std::hash<std::string>{}(shadersrc));
         
@@ -295,13 +295,13 @@ namespace foundation {
                     if (library) {
                         result = std::make_shared<MetalShader>(shaderName, layout, library, constLength);
                     }
-                    else {
+                    else if (suppressErrors == false) {
                         const char *errorDesc = [[nsError localizedDescription] UTF8String];
                         _platform->logError("[MetalRendering::createShader] generated code:\n--------------------\n%s\n--------------------\n%s\n", nativeShader.data(), errorDesc);
                     }
                 }
             }
-            else {
+            else if (suppressErrors == false) {
                 _platform->logError("[MetalRendering::createShader] shader error : %s\n", error.data());
             }
         }

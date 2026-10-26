@@ -35,7 +35,7 @@ onmessage = (msg) => {
                 js_editorMsg: (msg, msglen, data, datalen) => { throw "can't message to editor from background" },
                 js_canvas_width: () => { throw "can't access canvas from background" },
                 js_canvas_height: () => { throw "can't access canvas from background" },
-                webgl_createProgram: (vsrc, vlen, fsrc, flen) => { throw "can't access webgl from background" },
+                webgl_createProgram: (vsrc, vlen, fsrc, flen, suppressErrors) => { throw "can't access webgl from background" },
                 webgl_createData: (layout, layoutLen, ptr, dataLen, stride, idx, icount) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },
                 webgl_createTarget: (format, internal, type, w, h, count, enableDepth, textures) => { throw "can't access webgl from background" },

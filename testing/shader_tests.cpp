@@ -18,9 +18,9 @@ namespace test {
             .repeat = 3
         };
         const foundation::InputLayout layout1 = foundation::InputLayout{};
-        foundation::RenderShaderPtr shader0 = api.rendering->createShader(shaderSrc0, layout0);
+        foundation::RenderShaderPtr shader0 = api.rendering->createShader(shaderSrc0, layout0, true);
         EXPECT_EQ(shader0, nullptr);
-        foundation::RenderShaderPtr shader1 = api.rendering->createShader(shaderSrc1, layout1);
+        foundation::RenderShaderPtr shader1 = api.rendering->createShader(shaderSrc1, layout1, true);
         EXPECT_EQ(shader1, nullptr);
         return true;
     }
@@ -236,7 +236,7 @@ namespace test {
         foundation::RenderShaderPtr shader1 = api.rendering->createShader(shaderSrc1, layout);
         EXPECT_NOT_EQ(shader1, nullptr);
 
-        foundation::RenderShaderPtr badShader0 = api.rendering->createShader(badShaderSrc0, layout);
+        foundation::RenderShaderPtr badShader0 = api.rendering->createShader(badShaderSrc0, layout, true);
         EXPECT_EQ(badShader0, nullptr);
         return true;
     }
@@ -311,7 +311,7 @@ namespace test {
         foundation::RenderShaderPtr shader2 = api.rendering->createShader(shaderSrc2, layout);
         EXPECT_NOT_EQ(shader2, nullptr);
 
-        foundation::RenderShaderPtr badShader0 = api.rendering->createShader(badShaderSrc0, layout);
+        foundation::RenderShaderPtr badShader0 = api.rendering->createShader(badShaderSrc0, layout, true);
         EXPECT_EQ(badShader0, nullptr);
         return true;
     }

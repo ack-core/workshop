@@ -93,18 +93,24 @@ namespace foundation {
         return _constBufferLength;
     }
 
-    void Direct3D11Shader::apply(const ComPtr<ID3D11DeviceContext1> &context, const void *constants) const {
+    void Direct3D11Shader::apply(const ComPtr<ID3D11DeviceContext1> &context) const {
         context->IASetInputLayout(_inputLayout.Get());
         context->VSSetShader(_vshader.Get(), nullptr, 0);
         context->PSSetShader(_pshader.Get(), nullptr, 0);
 
         if (_constBuffer) {
-            if (constants) {
-                context->UpdateSubresource(_constBuffer.Get(), 0, nullptr, constants, 0, 0);
-            }
-
             context->VSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
             context->PSSetConstantBuffers(1, 1, _constBuffer.GetAddressOf());
+        }
+    }
+
+    void Direct3D11Shader::updateConstants(const ComPtr<ID3D11DeviceContext1> &context, const void *constants) const {
+        D3D11_MAPPED_SUBRESOURCE mapped;
+
+        // discard gives a fresh memory region, so there is no stall on buffer used by previous draws
+        if (context->Map(_constBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped) == S_OK) {
+            std::memcpy(mapped.pData, constants, _constBufferLength);
+            context->Unmap(_constBuffer.Get(), 0);
         }
     }
 }
@@ -291,6 +297,17 @@ namespace foundation {
             return;
         }
 
+        D3D11_BUFFER_DESC drawConstantsDesc = {};
+        drawConstantsDesc.ByteWidth = 16;
+        drawConstantsDesc.Usage = D3D11_USAGE_DYNAMIC;
+        drawConstantsDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        drawConstantsDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        if ((hresult = _device->CreateBuffer(&drawConstantsDesc, nullptr, &_drawConstantsBuffer)) != S_OK) {
+            _platform->logError("[RENDER] Draw constants buffer creation failed with result = %p", hresult);
+            return;
+        }
+
         // rasterizer state
 
         D3D11_RASTERIZER_DESC rasterDesc = {};
@@ -376,6 +393,8 @@ namespace foundation {
         _context->OMSetDepthStencilState(_depthStates[int(DepthBehavior::DISABLED)].Get(), 0);
         _context->VSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
         _context->PSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
+        _context->VSSetConstantBuffers(2, 1, _drawConstantsBuffer.GetAddressOf());
+
         ID3D11SamplerState *samplers[] = {
             _samplerStates[int(SamplerType::NEAREST)].Get(),
             _samplerStates[int(SamplerType::NEAREST)].Get(),
@@ -403,12 +422,14 @@ namespace foundation {
         _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
     }
 
-    auto Direct3D11Rendering::createShader(const char *src, const InputLayout &layout) -> RenderShaderPtr {
+    auto Direct3D11Rendering::createShader(const char *src, const InputLayout &layout, bool suppressErrors) -> RenderShaderPtr {
         std::string error;
         const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(src, layout, error);
 
         if (error.empty() == false) {
-            _platform->logError("[Direct3D11Rendering::createShader] shader error : %s\n", error.data());
+            if (suppressErrors == false) {
+                _platform->logError("[Direct3D11Rendering::createShader] shader error : %s\n", error.data());
+            }
             return nullptr;
         }
 
@@ -423,10 +444,11 @@ namespace foundation {
         if (constLength) {
             D3D11_BUFFER_DESC bdsc = {};
             bdsc.ByteWidth = constLength;
-            bdsc.Usage = D3D11_USAGE_DEFAULT;
+            bdsc.Usage = D3D11_USAGE_DYNAMIC;
             bdsc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+            bdsc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-            if ((hresult = _device->CreateBuffer(&bdsc, nullptr, &constBuffer)) != S_OK) {
+            if ((hresult = _device->CreateBuffer(&bdsc, nullptr, &constBuffer)) != S_OK && suppressErrors == false) {
                 _platform->logError("[Direct3D11Rendering::createShader] const buffer creation failed with result = %p", hresult);
             }
         }
@@ -447,7 +469,7 @@ namespace foundation {
             if (D3DCompile(fs.data(), fs.length(), "ps", nullptr, nullptr, "main", "ps_4_0", D3DCOMPILE_DEBUG, 0, &psBinary, &errorBlob) == S_OK) {
                 if ((hresult = _device->CreateVertexShader(vsBinary->GetBufferPointer(), vsBinary->GetBufferSize(), nullptr, &vertexShader)) == S_OK) {
                     if (elements.empty() == false) {
-                        if ((hresult = _device->CreateInputLayout(elements.data(), UINT(elements.size()), vsBinary->GetBufferPointer(), vsBinary->GetBufferSize(), &inputLayout)) != S_OK) {
+                        if ((hresult = _device->CreateInputLayout(elements.data(), UINT(elements.size()), vsBinary->GetBufferPointer(), vsBinary->GetBufferSize(), &inputLayout)) != S_OK && suppressErrors == false) {
                             _platform->logError("[Direct3D11Rendering::createShader] input layout creation failed with result = %p", hresult);
                         }
                     }
@@ -455,19 +477,19 @@ namespace foundation {
                     if ((hresult = _device->CreatePixelShader(psBinary->GetBufferPointer(), psBinary->GetBufferSize(), nullptr, &pixelShader)) == S_OK) {
                         result = std::make_shared<Direct3D11Shader>(layout, inputLayout, vertexShader, pixelShader, constBuffer, constLength);
                     }
-                    else {
+                    else if (suppressErrors == false) {
                         _platform->logError("[Direct3D11Rendering::createShader] pixel shader creation failed with result = %p", hresult);
                     }
                 }
-                else {
+                else if (suppressErrors == false) {
                     _platform->logError("[Direct3D11Rendering::createShader] vertex shader creation failed with result = %p", hresult);
                 }
             }
-            else {
+            else if (suppressErrors == false) {
                 _platform->logError("[Direct3D11Rendering::createShader] pixel shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), shaderUtils::makeLines(fs).data());
             }
         }
-        else {
+        else if (suppressErrors == false) {
             _platform->logError("[Direct3D11Rendering::createShader] vertex shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), shaderUtils::makeLines(vs).data());
         }
 
@@ -678,11 +700,20 @@ namespace foundation {
         if (_isForTarget && shader) {
             _currentShader = std::static_pointer_cast<Direct3D11Shader>(shader);
             _currentTopology = topology;
-            _currentShader->apply(_context, nullptr);
+            _currentShader->apply(_context);
 
             _context->IASetPrimitiveTopology(g_topologies[int(topology)]);
             _context->OMSetBlendState(_blendStates[int(blendType)].Get(), nullptr, 0xffffffff);
             _context->OMSetDepthStencilState(_depthStates[int(depthBehavior)].Get(), 0);
+        }
+    }
+
+    void Direct3D11Rendering::_applyDrawConstants(std::uint32_t vertexCount) {
+        D3D11_MAPPED_SUBRESOURCE mapped;
+
+        if (_context->Map(_drawConstantsBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped) == S_OK) {
+            *static_cast<std::uint32_t *>(mapped.pData) = vertexCount;
+            _context->Unmap(_drawConstantsBuffer.Get(), 0);
         }
     }
 
@@ -711,11 +742,27 @@ namespace foundation {
     }
 
     void Direct3D11Rendering::applyShaderConstants(const void *constants) {
-    
+        if (_currentShader && _currentShader->getConstBufferLength()) {
+            _currentShader->updateConstants(_context, constants);
+        }
     }
 
     void Direct3D11Rendering::draw(std::uint32_t vertexCount) {
-    
+        if (_currentShader) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            ID3D11Buffer *const nullBuffer = nullptr;
+            const UINT zero = 0;
+
+            _context->IASetVertexBuffers(0, 1, &nullBuffer, &zero, &zero);
+
+            if (layout.repeat > 1) {
+                _applyDrawConstants(vertexCount);
+                _context->DrawInstanced(layout.repeat, vertexCount, 0, 0);
+            }
+            else {
+                _context->Draw(vertexCount, 0);
+            }
+        }
     }
     void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
 

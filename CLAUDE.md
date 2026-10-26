@@ -9,9 +9,13 @@ foundation - low level engine interfaces and implementations
 providers - texture, model, font provides
 core - mid level 3d engine interfaces and implementations
 ui - 2d components
-game - contexts with game/editor logic
 package - platform specific prepared files
-testing - test suite
+testing - tests suite
+
+shell scripts:
+make_<platform>_<app> - generate IDE projects 
+build_<platform>_<app> - make & build executables
+build_and_run_<platform>_tests - build & run tests
 
 generated folders:
 binary_* - built platform executables

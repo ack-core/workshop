@@ -245,7 +245,7 @@ const imports = {
         abort: function() {
             throw "aborted";
         },
-        webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
+        webgl_createProgram: function(vsrc, vlen, fsrc, flen, suppressErrors) {
             const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
             const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
             const vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
@@ -279,17 +279,17 @@ const imports = {
                         glshaders[glShaderIDCounter] = program;
                         return glShaderIDCounter++;
                     }
-                    else {
+                    else if (!suppressErrors) {
                         print("[WebGL link] " + glcontext.getProgramInfoLog(program));
                         print(vsstr + "-----\n" + fsstr);
                     }
                 }
-                else {
+                else if (!suppressErrors) {
                     print("[WebGL fs] " + glcontext.getShaderInfoLog(fshader));
                     print(fsstr);
                 }
             }
-            else {
+            else if (!suppressErrors) {
                 print("[WebGL vs] " + glcontext.getShaderInfoLog(vshader));
                 print(vsstr);
             }

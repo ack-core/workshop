@@ -16,7 +16,8 @@ namespace foundation {
         auto getInputLayout() const -> const InputLayout & override;
         auto getConstBufferLength() const -> std::uint32_t override;
 
-        void apply(const ComPtr<ID3D11DeviceContext1> &context, const void *constants) const;
+        void apply(const ComPtr<ID3D11DeviceContext1> &context) const;
+        void updateConstants(const ComPtr<ID3D11DeviceContext1> &context, const void *constants) const;
 
     private:
         const InputLayout _layout;
@@ -113,7 +114,7 @@ namespace foundation {
 
         void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) override;
 
-        auto createShader(const char *src, const InputLayout &layout) -> RenderShaderPtr override;
+        auto createShader(const char *src, const InputLayout &layout, bool suppressErrors) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
         auto createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr override;
@@ -136,6 +137,7 @@ namespace foundation {
 
     private:
         void _applyTextures(const std::pair<RenderTexturePtr, SamplerType> *textures, std::size_t size);
+        void _applyDrawConstants(std::uint32_t vertexCount);
 
         struct FrameConstants {
             math::transform3f plmVPMatrix = math::transform3f::identity();
@@ -160,6 +162,7 @@ namespace foundation {
         ComPtr<ID3D11RenderTargetView> _defaultRTView;
         ComPtr<ID3D11DepthStencilView> _defaultDepthView;
         ComPtr<ID3D11Buffer> _frameConstantsBuffer;
+        ComPtr<ID3D11Buffer> _drawConstantsBuffer;              // vertex count for repeated layouts
 
         ComPtr<ID3D11RasterizerState> _rasterState;
         ComPtr<ID3D11BlendState> _blendStates[4];               // index is BlendType value

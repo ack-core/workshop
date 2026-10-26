@@ -8,7 +8,7 @@
 
 // From js
 extern "C" {
-    auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen) -> WebGLId;
+    auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen, bool suppressErrors) -> WebGLId;
     auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride, const std::uint32_t *idx, std::uint32_t icount) -> WebGLId;
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
     auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
@@ -238,7 +238,7 @@ namespace foundation {
         _frameConstants->cameraDirection.xyz = camDir;
     }
         
-    RenderShaderPtr WASMRendering::createShader(const char *src, const InputLayout &layout) {
+    RenderShaderPtr WASMRendering::createShader(const char *src, const InputLayout &layout, bool suppressErrors) {
         std::shared_ptr<RenderShader> result;
         std::string shaderName = std::to_string(std::hash<std::string>{}(src));
         
@@ -273,12 +273,12 @@ namespace foundation {
                 createNativeSrc(nativeShaderVS, linedVS);
                 createNativeSrc(nativeShaderFS, linedFS);
 
-                WebGLId webglShader = webgl_createProgram(nativeShaderVS.src.get(), nativeShaderVS.length, nativeShaderFS.src.get(), nativeShaderFS.length);
+                WebGLId webglShader = webgl_createProgram(nativeShaderVS.src.get(), nativeShaderVS.length, nativeShaderFS.src.get(), nativeShaderFS.length, suppressErrors);
                 if (webglShader) {
                     result = std::make_shared<WASMShader>(webglShader, layout, constLength);
                 }
             }
-            else {
+            else if (suppressErrors == false) {
                 _platform->logError("[MetalRendering::createShader] shader error : %s\n", error.data());
             }
         }
