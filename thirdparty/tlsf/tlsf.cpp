@@ -184,7 +184,7 @@ static const size_t table[] = {
 static size_t ls_bit(size_t i)
 {
     size_t a;
-    size_t x = i & -i;
+    size_t x = i & (0 - i);
 
     a = x <= 0xffff ? (x <= 0xff ? 0 : 8) : (x <= 0xffffff ? 16 : 24);
     return table[x >> a] + a;
@@ -198,12 +198,12 @@ static size_t ms_bit(size_t x)
 
 static void set_bit(size_t nr, size_t * addr)
 {
-    addr[nr >> 5] |= 1 << (nr & 0x1f);
+    addr[nr >> 5] |= size_t(1) << (nr & 0x1f);
 }
 
 static void clear_bit(size_t nr, size_t * addr)
 {
-    addr[nr >> 5] &= ~(1 << (nr & 0x1f));
+    addr[nr >> 5] &= ~(size_t(1) << (nr & 0x1f));
 }
 
 static void MAPPING_SEARCH(size_t * _r, size_t *_fl, size_t *_sl)

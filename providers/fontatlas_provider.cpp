@@ -216,7 +216,8 @@ namespace resource {
                     stbtt_GetFontVMetrics(ttf, &ascent, &descent, &lineGap);
                     int lineHeight = int(float(ascent - descent) * scale);
                     
-                    for (std::uint16_t u16ch : toLoad) {
+                    for (std::uint64_t key : toLoad) {
+                        const std::uint16_t u16ch = std::uint16_t(key);
                         int glyph = stbtt_FindGlyphIndex(ttf, u16ch);
                         if (glyph != 0) {
                             int ix0 = 0, ix1 = 0, iy0 = 0, iy1 = 0, iadvance, ilsb;
@@ -240,8 +241,8 @@ namespace resource {
                             FontAtlas::CharInfo &chInfo = ctx.resultChars.emplace(makeKey(u16ch, blur), FontAtlas::CharInfo{}).first->second;
                             chInfo.advance = ceilfloat(scale * float(iadvance));
                             chInfo.lsb = floorfloat(scale * float(ilsb));
-                            chInfo.pxSize = math::vector2f(ix1 - ix0, iy1 - iy0);
-                            chInfo.txLT = math::vector2f(suitable->offsetX - blur, suitable->offsetY + suitable->baseLine + iy0) / float(ATLAS_SIZE);
+                            chInfo.pxSize = math::vector2f(float(ix1 - ix0), float(iy1 - iy0));
+                            chInfo.txLT = math::vector2f(float(suitable->offsetX - blur), suitable->offsetY + suitable->baseLine + iy0) / float(ATLAS_SIZE);
                             chInfo.txRB = chInfo.txLT + chInfo.pxSize / float(ATLAS_SIZE);
                             chInfo.voffset = suitable->baseLine + float(iy0);
                             chInfo.u16ch = u16ch;

@@ -342,15 +342,15 @@ namespace ui {
             std::string path = texturePath;
             _facility.getResourceProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const foundation::RenderTexturePtr &texture) {
                 if (std::shared_ptr<ImageImpl> self = weak.lock()) {
-                    self->_size.x = texture->getWidth();
-                    self->_size.y = texture->getHeight();
+                    self->_size.x = float(texture->getWidth());
+                    self->_size.y = float(texture->getHeight());
                     self->_texture = texture;
                 }
             });
         }
         void setTexture(const foundation::RenderTexturePtr &texture) override {
-            _size.x = texture->getWidth();
-            _size.y = texture->getHeight();
+            _size.x = float(texture->getWidth());
+            _size.y = float(texture->getHeight());
             _texture = texture;
         }
         void setSize(const math::vector2f &size) override {
@@ -395,15 +395,15 @@ namespace ui {
             std::string path = texturePath;
             _facility.getResourceProvider()->getOrLoadTexture(texturePath, [weak = weak_from_this(), path](const foundation::RenderTexturePtr &texture) {
                 if (std::shared_ptr<ImgCustomImpl> self = weak.lock()) {
-                    self->_size.x = texture->getWidth();
-                    self->_size.y = texture->getHeight();
+                    self->_size.x = float(texture->getWidth());
+                    self->_size.y = float(texture->getHeight());
                     self->_texture = texture;
                 }
             });
         }
         void setTexture(const foundation::RenderTexturePtr &texture) override {
-            _size.x = texture->getWidth();
-            _size.y = texture->getHeight();
+            _size.x = float(texture->getWidth());
+            _size.y = float(texture->getHeight());
             _texture = texture;
         }
         void setGeometry(foundation::RenderTopology topology, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override {
@@ -486,7 +486,7 @@ namespace ui {
                 DrawingInstance instances[INSTANCES_MAX] = {0};
                 
                 const math::vector2f rbSliceStart = math::vector2f(_size.x - _sliceArgs.z, _size.y - _sliceArgs.z);
-                const math::vector2f txSliceSize = _sliceArgs.z / math::vector2f(_texture->getWidth(), _texture->getHeight());
+                const math::vector2f txSliceSize = _sliceArgs.z / math::vector2f(float(_texture->getWidth()), float(_texture->getHeight()));
 
                 math::vector2f edgeLeft = math::vector2f(_size.x - 2.0f * _sliceArgs.z, _size.y - 2.0f * _sliceArgs.z);
                 math::vector2f edgeOffset = math::vector2f(_sliceArgs.z, _sliceArgs.z);
@@ -915,7 +915,7 @@ namespace ui {
         std::shared_ptr<ImageImpl> result;
         
         if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
-            result = std::make_shared<ImageImpl>(*this, parent, math::vector2f(info->width, info->height));
+            result = std::make_shared<ImageImpl>(*this, parent, math::vector2f(float(info->width), float(info->height)));
             result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
             result->setActiveArea(params.activeAreaOffset, params.activeAreaRadius);
             result->setTexture(params.texture);
@@ -942,7 +942,7 @@ namespace ui {
         
         if (const foundation::RenderShaderPtr &shader = _rendering->createShader(params.shaderSource, params.layout)) {
             if (const resource::TextureInfo *info = _resourceProvider->getTextureInfo(params.texture)) {
-                result = std::make_shared<ImgCustomImpl>(*this, parent, math::vector2f(info->width, info->height), shader);
+                result = std::make_shared<ImgCustomImpl>(*this, parent, math::vector2f(float(info->width), float(info->height)), shader);
                 result->setAnchor(params.anchorTarget, params.anchorH, params.anchorV, params.anchorOffset.x, params.anchorOffset.y);
                 result->setTexture(params.texture);
                 
