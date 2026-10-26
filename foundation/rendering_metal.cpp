@@ -56,6 +56,7 @@ namespace {
             target.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         },
         [](MTLRenderPipelineColorAttachmentDescriptor *target){
+            target.blendingEnabled = true;
             target.alphaBlendOperation = MTLBlendOperationAdd;
             target.rgbBlendOperation = MTLBlendOperationAdd;
             target.sourceAlphaBlendFactor = MTLBlendFactorOne;
@@ -145,7 +146,9 @@ namespace foundation {
         for (unsigned i = 0; i < count; i++) {
             _textures[i] = std::make_shared<RTTexture>(*this, fmt, targets[i]);
         }
-        _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
+        if (depth) {
+            _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
+        }
     }
     
     MetalTarget::~MetalTarget() {
@@ -265,7 +268,7 @@ namespace foundation {
         _frameConstants.cameraDirection.xyz = camDir;
     }
     
-    RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout) {
+    RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout, bool suppressErrors) {
         std::shared_ptr<RenderShader> result;
         std::string shaderName = std::to_string(std::hash<std::string>{}(shadersrc));
         
@@ -292,13 +295,13 @@ namespace foundation {
                     if (library) {
                         result = std::make_shared<MetalShader>(shaderName, layout, library, constLength);
                     }
-                    else {
+                    else if (suppressErrors == false) {
                         const char *errorDesc = [[nsError localizedDescription] UTF8String];
                         _platform->logError("[MetalRendering::createShader] generated code:\n--------------------\n%s\n--------------------\n%s\n", nativeShader.data(), errorDesc);
                     }
                 }
             }
-            else {
+            else if (suppressErrors == false) {
                 _platform->logError("[MetalRendering::createShader] shader error : %s\n", error.data());
             }
         }
@@ -359,8 +362,11 @@ namespace foundation {
             
             unsigned counter = 0;
             for (auto &item : mipsData) {
-                MTLRegion region = {{ 0, 0, 0 }, {w >> counter, h >> counter, 1}};
-                [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, w)];
+                const std::uint32_t mipWidth = std::max(std::uint32_t(1), w >> counter);
+                const std::uint32_t mipHeight = std::max(std::uint32_t(1), h >> counter);
+                MTLRegion region = {{ 0, 0, 0 }, {mipWidth, mipHeight, 1}};
+                [texture replaceRegion:region mipmapLevel:counter withBytes:item bytesPerRow:getTexture2DPitch(format, mipWidth)];
+                counter++;
             }
             
             return std::make_shared<MetalTexture>(texture, format, w, h, mipmapLevelCount);
@@ -462,8 +468,10 @@ namespace foundation {
                     renderPassDescriptor.colorAttachments[i].clearColor = colorClearValue;
                 }
                 
-                renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
-                renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+                if (target->getDepth()) {
+                    renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
+                    renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
+                }
                 
                 viewPort.width = _frameConstants.rtBounds.x = float(target->getWidth());
                 viewPort.height = _frameConstants.rtBounds.y = float(target->getHeight());

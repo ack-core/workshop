@@ -365,11 +365,11 @@ namespace foundation {
         return g_asyncWorkCount != 0;
     }
 
-    void WindowsPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+    void WindowsPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
         g_asyncWorkCount++;
         backgroundThreadPush(g_io, std::make_unique<FileLoadTask>(_dataPath + filePath, std::move(completion)));
     }
-    void WindowsPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+    void WindowsPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
         g_asyncWorkCount++;
         backgroundThreadPush(g_io, std::make_unique<FileSaveTask>(_dataPath + filePath, data, data ? size : 0, std::move(completion)));
     }
@@ -506,7 +506,9 @@ namespace foundation {
 
         printf("%s\n", g_buffer);
 
-        DebugBreak();
+        if (IsDebuggerPresent()) {
+            DebugBreak();
+        }
     }
 }
 

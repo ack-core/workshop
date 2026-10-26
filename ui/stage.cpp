@@ -859,7 +859,6 @@ namespace ui {
     , _fontAtlasProvider(fontAtlasProvider)
     , _touchEventsToken(nullptr)
     {
-        _uiShader = _rendering->createShader(g_uiShaderSrc, layouts::VTXUIUV);
         _touchEventsToken = _platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) {
             ui::Action action = ui::Action::RELEASE;
             
@@ -1035,6 +1034,10 @@ namespace ui {
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
         util::cleanupUnused(_topLevelElements);
+
+        if (_uiShader == nullptr) {
+            _uiShader = _rendering->createShader(g_uiShaderSrc, layouts::VTXUIUV);
+        }
         
         for (auto index = _namedElements.begin(); index != _namedElements.end(); ) {
             if (index->second.expired()) {

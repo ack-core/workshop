@@ -3,18 +3,23 @@
 ## Project
 Code-first C++ 3D engine for small lowpoly/voxel games
 
-## Structure
-cmake - toolchains for CMake
-foundation - low level engine interfaces and implementations
-providers - texture, model, font provides
-core - mid level 3d engine interfaces and implementations
-ui - 2d components
-game - contexts with game/editor logic
-package - platform specific prepared files
-testing - test suite
+## Structure folders
+- cmake : toolchains for CMake
+- foundation : low level engine interfaces and implementations
+- providers : texture, model, font provides
+- core : mid level 3d engine interfaces and implementations
+- ui : 2d user interface components
+- package : platform specific prepared files
+- testing : tests suite
 
-binary_* - built platform executables
-workshop_* - generated IDE projects
+## Shell scripts
+- make_<platform>_<app> : generate IDE projects 
+- build_<platform>_<app> : make and build executables
+- build_and_run_<platform>_tests : build and run tests
+
+generated folders:
+binary_<platform>_<app> : built platform executables
+workshop_<platform>_<app> : generated IDE projects
 
 ## Human interaction & communication
 

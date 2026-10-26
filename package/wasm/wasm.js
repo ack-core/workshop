@@ -169,7 +169,7 @@ const imports = {
         js_task: function(task) {
             worker.postMessage({type: EventType.BTASK, task: task});
         },
-        js_fetch: function(block, pathLen) {
+        js_fetch: function(block, pathLen, suppressOutput) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
 
@@ -182,17 +182,21 @@ const imports = {
                 const data = instance.exports.malloc(buffer.byteLength);
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
-                print("[WASM] " + path + " loaded successfully " + buffer.byteLength);
+                if (!suppressOutput) {
+                    print("[WASM] " + path + " loaded successfully " + buffer.byteLength);
+                }
                 return [data, buffer.byteLength];
             }, error => {
-                print("[WASM] " + path + " loading failed with " + error);
+                if (!suppressOutput) {
+                    print("[WASM] " + path + " loading failed with " + error);
+                }
                 return [0, 0];
             })
             .then(([data, length]) => {
                 instance.exports.fileLoaded(block, pathLen, data, length);
             });
         },
-        js_save: function(block, pathLen, data, dataLen) {
+        js_save: function(block, pathLen, data, dataLen, suppressOutput) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
             
@@ -210,7 +214,9 @@ const imports = {
                                 await writable.write(u8data);
                                 await writable.truncate(dataLen);
                                 await writable.close();
-                                print("[WASM] " + path + " saved successfully");
+                                if (!suppressOutput) {
+                                    print("[WASM] " + path + " saved successfully");
+                                }
                                 instance.exports.fileSaved(block, pathLen, true);
                                 instance.exports.free(data);
                             }
@@ -225,7 +231,9 @@ const imports = {
                     }
                 })
                 .catch(error => {
-                    print("[WASM] " + path + " saving failed with " + error);
+                    if (!suppressOutput) {
+                        print("[WASM] " + path + " saving failed with " + error);
+                    }
                     instance.exports.fileSaved(block, pathLen, false);
                 });
             }
@@ -245,7 +253,7 @@ const imports = {
         abort: function() {
             throw "aborted";
         },
-        webgl_createProgram: function(vsrc, vlen, fsrc, flen) {
+        webgl_createProgram: function(vsrc, vlen, fsrc, flen, suppressErrors) {
             const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
             const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
             const vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
@@ -279,17 +287,17 @@ const imports = {
                         glshaders[glShaderIDCounter] = program;
                         return glShaderIDCounter++;
                     }
-                    else {
+                    else if (!suppressErrors) {
                         print("[WebGL link] " + glcontext.getProgramInfoLog(program));
                         print(vsstr + "-----\n" + fsstr);
                     }
                 }
-                else {
+                else if (!suppressErrors) {
                     print("[WebGL fs] " + glcontext.getShaderInfoLog(fshader));
                     print(fsstr);
                 }
             }
-            else {
+            else if (!suppressErrors) {
                 print("[WebGL vs] " + glcontext.getShaderInfoLog(vshader));
                 print(vsstr);
             }

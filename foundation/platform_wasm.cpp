@@ -31,8 +31,8 @@ extern "C" {
     void js_log(const std::uint16_t *ptr, int length);
     void js_exit(int code);
     void js_task(const void *ptr);
-    void js_fetch(const void *ptr, int pathLen);
-    void js_save(const void *path, int pathLen, const void *data, int dataLen);
+    void js_fetch(const void *ptr, int pathLen, bool suppressOutput);
+    void js_save(const void *path, int pathLen, const void *data, int dataLen, bool suppressOutput);
     void js_editorMsg(const char *msg, int msglen, const char *data, int datalen);
 }
 
@@ -175,7 +175,7 @@ namespace foundation {
         return g_asyncWorkCount != 0;
     }
     
-    void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+    void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
         using cbtype = util::callback<void(ByteDataPtr &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
         const std::size_t len = fullPath.length();
@@ -191,9 +191,10 @@ namespace foundation {
         cbtype *cb = reinterpret_cast<cbtype *>(block);
         new (cb) cbtype(std::move(completion));
         
-        js_fetch(path, len);
+        js_fetch(path, len, suppressOutput);
+
     }
-    void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+    void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
         using cbtype = util::callback<void(bool)>;
         const std::size_t pathLen = std::strlen(filePath);
         g_asyncWorkCount++;
@@ -215,7 +216,7 @@ namespace foundation {
         cbtype *cb = reinterpret_cast<cbtype *>(block);
         new (cb) cbtype(std::move(completion));
         
-        js_save(path, pathLen, fileData, size);
+        js_save(path, pathLen, fileData, size, suppressOutput);
     }
     
     float WASMPlatform::getScreenWidth() const {

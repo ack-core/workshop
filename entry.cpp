@@ -15,6 +15,7 @@
 #elif defined(IS_TESTS)
 #include "testing/runner.h"
 #include "testing/math_tests.h"
+#include "testing/shader_tests.h"
 #include "testing/platform_tests.h"
 #include "testing/rendering_tests.h"
 #endif
@@ -91,6 +92,7 @@ extern "C" void initialize() {
     
     testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
     test::registerMathTests(*testRunner);
+    test::registerShaderTests(*testRunner);
     test::registerPlatformTests(*testRunner);
     test::registerRenderingTests(*testRunner);
 
