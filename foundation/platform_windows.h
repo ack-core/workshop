@@ -11,8 +11,8 @@ namespace foundation {
 
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
         bool isAsyncWorkInProgress() const override;
-        void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) override;
-        void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) override;
+        void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) override;
+        void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) override;
 
         float getScreenWidth() const override;
         float getScreenHeight() const override;

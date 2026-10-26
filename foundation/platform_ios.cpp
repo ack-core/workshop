@@ -350,7 +350,7 @@ namespace foundation {
         return g_asyncWorkCount != 0;
     }
     
-    void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
+    void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
         g_asyncWorkCount++;
         {
             std::lock_guard<std::mutex> guard(g_io.mutex);
@@ -358,7 +358,7 @@ namespace foundation {
         }
         g_io.notifier.notify_one();
     }
-    void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
+    void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
         completion(false);
     }
     

@@ -19,7 +19,7 @@ namespace test {
                 if (data) {
                     _content.assign(reinterpret_cast<const char *>(data.get()), size);
                 }
-            });
+            }, true);
         }
         bool testResult(const API &api) override {
             EXPECT_EQ(_content.size(), 5);
@@ -46,8 +46,8 @@ namespace test {
                     if (data) {
                         _content.assign(reinterpret_cast<const char *>(data.get()), size);
                     }
-                });
-            });
+                }, true);
+            }, true);
         }
         bool testResult(const API &api) override {
             EXPECT_TRUE(_saved);
@@ -74,8 +74,8 @@ namespace test {
                 platform->loadFile("platform_tests/file_saved.txt", [this](ByteDataPtr &&data, std::size_t size) {
                     _loaded = true;
                     _failed = data == nullptr && size == 0;
-                });
-            });
+                }, true);
+            }, true);
         }
         bool testResult(const API &api) override {
             EXPECT_TRUE(_deleted);

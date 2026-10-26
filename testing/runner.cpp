@@ -140,7 +140,7 @@ namespace test {
                             _api.platform->logMsg("[SCREENSHOT TEST] '%s' ref saving failed", name.data());
                         }
                         _screenshotFrameTGA = nullptr;
-                    });
+                    }, true);
                 }
 
                 _currentScreenshotTest.reset();
@@ -155,7 +155,7 @@ namespace test {
             _currentScreenshotTest->init(_api);
             _api.platform->loadFile(("rendering_tests/" + test.first + "_ref.tga").data(), [this](ByteDataPtr &&data, std::size_t size) {
                 _screenshotRef = decodeScreenshotTGA(data.get(), size);
-            });
+            }, true);
             return;
         }
 

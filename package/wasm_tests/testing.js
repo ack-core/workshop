@@ -51,7 +51,13 @@ https.createServer({
     const browser = await chromium.launch();
     const page = await browser.newPage({ ignoreHTTPSErrors: true });
 
-    page.on('console', msg => console.log(msg.text()));
+    page.on('console', msg => {
+        // network errors are reported by browser itself, file ops failures are expected by tests
+        if (msg.type() == 'error' && msg.text().startsWith('Failed to load resource')) {
+            return;
+        }
+        console.log(msg.text());
+    });
     page.on('pageerror', err => console.log(err.message));
 
     await page.goto('https://127.0.0.1:9002/index.html');
