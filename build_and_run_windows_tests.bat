@@ -5,4 +5,5 @@ pushd binary_windows_tests
 tests.exe
 set "RESULT=%ERRORLEVEL%"
 popd
+python tools/refs2png.py -b binary_windows_tests
 exit /b %RESULT%

@@ -1,38 +1,29 @@
 
 #include "runner.h"
+#include "thirdparty/upng/upng.h"
+#include <cstring>
 
 namespace {
-    // Decodes uncompressed 32-bit TGA of TESTING_RENDER_WIDTH x TESTING_RENDER_HEIGHT to RGBA top-down pixels
+    // Decodes RGBA8 PNG of TESTING_RENDER_WIDTH x TESTING_RENDER_HEIGHT to RGBA top-down pixels
     // @return nullptr if data is missing or has different format/size
     //
-    ByteDataPtr decodeScreenshotTGA(const std::uint8_t *data, std::size_t size) {
+    ByteDataPtr decodeScreenshotPNG(const std::uint8_t *data, std::size_t size) {
         const std::size_t w = foundation::TESTING_RENDER_WIDTH;
         const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
 
-        if (data == nullptr || size < 18) {
-            return nullptr;
-        }
-        const std::size_t width = std::size_t(data[12]) | (std::size_t(data[13]) << 8);
-        const std::size_t height = std::size_t(data[14]) | (std::size_t(data[15]) << 8);
-        const std::size_t offset = 18 + data[0];
-
-        if (data[2] != 2 || data[16] != 32 || width != w || height != h || size < offset + w * h * 4) {
+        if (data == nullptr || size < 4 || *reinterpret_cast<const std::uint32_t *>(data) != UPNG_HEAD) {
             return nullptr;
         }
 
-        const bool topDown = (data[17] & 0x20) != 0;
-        ByteDataPtr result = std::make_unique<std::uint8_t[]>(w * h * 4);
+        ByteDataPtr result;
+        upng_t *upng = upng_new_from_bytes(data, (unsigned long)(size));
 
-        for (std::size_t y = 0; y < h; y++) {
-            const std::uint8_t *src = data + offset + (topDown ? y : h - 1 - y) * w * 4;
-            std::uint8_t *dst = result.get() + y * w * 4;
-
-            for (std::size_t x = 0; x < w; x++) {
-                dst[x * 4 + 0] = src[x * 4 + 2];
-                dst[x * 4 + 1] = src[x * 4 + 1];
-                dst[x * 4 + 2] = src[x * 4 + 0];
-                dst[x * 4 + 3] = src[x * 4 + 3];
+        if (upng != nullptr) {
+            if (upng_decode(upng) == UPNG_EOK && upng_get_format(upng) == UPNG_RGBA8 && upng_get_width(upng) == w && upng_get_height(upng) == h) {
+                result = std::make_unique<std::uint8_t[]>(w * h * 4);
+                std::memcpy(result.get(), upng_get_buffer(upng), w * h * 4);
             }
+            upng_free(upng);
         }
 
         return result;
@@ -116,17 +107,17 @@ namespace test {
                     _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s' : frame capture isn't supported", name.data());
                     _testsFailed++;
                 }
-                else if (_screenshotRef && _currentScreenshotTest->testResult(_api, _screenshotRef.get(), frame.get())) {
-                    //_api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
-                }
-                else {
-                    if (_screenshotRef) {
+                else if (_screenshotRef) {
+                    if (_currentScreenshotTest->testResult(_api, _screenshotRef.get(), frame.get())) {
+                        //_api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
+                    }
+                    else {
                         _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s'", name.data());
                         _testsFailed++;
                     }
-                    else {
-                        _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
-                    }
+                }
+                else {
+                    _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
 
                     auto tga = util::writeTGA(frame.get(), foundation::TESTING_RENDER_WIDTH, foundation::TESTING_RENDER_HEIGHT);
                     _screenshotFrameTGA = std::move(tga.first);
@@ -148,8 +139,8 @@ namespace test {
             const auto &test = _screenshotTests[_screenshotTestIndex];
             _currentScreenshotTest = test.second();
             _currentScreenshotTest->init(_api);
-            _api.platform->loadFile(("rendering_tests/" + test.first + "_ref.tga").data(), [this](ByteDataPtr &&data, std::size_t size) {
-                _screenshotRef = decodeScreenshotTGA(data.get(), size);
+            _api.platform->loadFile(("rendering_tests/" + test.first + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
+                _screenshotRef = decodeScreenshotPNG(data.get(), size);
             }, true);
             return;
         }
