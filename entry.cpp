@@ -87,11 +87,8 @@ std::unique_ptr<test::TestRunner> testRunner;
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
-    scene = core::SceneInterface::instance(platform, rendering);
-    raycast = core::RaycastInterface::instance(platform, scene);
-    simulation = core::SimulationInterface::instance(platform, scene);
     
-    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering);
     test::registerMathTests(*testRunner);
     test::registerUtilTests(*testRunner);
     test::registerShaderTests(*testRunner);

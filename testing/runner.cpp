@@ -42,15 +42,10 @@ namespace {
 namespace test {
     TestRunner::TestRunner(
         const foundation::PlatformInterfacePtr& platform,
-        const foundation::RenderingInterfacePtr& rendering,
-        const resource::ResourceProviderPtr& resourceProvider,
-        const resource::FontAtlasProviderPtr& fontAtlasProvider,
-        const core::SceneInterfacePtr& scene,
-        const core::WorldInterfacePtr& world,
-        const core::RaycastInterfacePtr& raycast,
-        const core::SimulationInterfacePtr& simulation,
-        const ui::StageInterfacePtr& ui
-    ) : _api{platform, rendering, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, ui} {
+        const foundation::RenderingInterfacePtr& rendering
+    ) 
+    : _api{platform, rendering}
+    {
 
     }
 

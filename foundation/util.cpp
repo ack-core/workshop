@@ -20,6 +20,7 @@ namespace util {
             input += 2;
         }
 
+        const char *digits = input;
         while (true) {
             int digit;
 
@@ -34,6 +35,11 @@ namespace util {
 
             out = out * base + digit;
             input++;
+        }
+
+        if (input == digits) {
+            len = 0;
+            return 0;
         }
 
         len = input - s;
@@ -51,9 +57,11 @@ namespace util {
         }
 
         double value = 0.0;
+        std::size_t digitCount = 0;
 
         while (std::isdigit(static_cast<unsigned char>(*p))) {
             value = value * 10.0 + (*p - '0');
+            ++digitCount;
             ++p;
         }
 
@@ -63,8 +71,14 @@ namespace util {
             while (std::isdigit(static_cast<unsigned char>(*p))) {
                 value += (*p - '0') * factor;
                 factor *= 0.1;
+                ++digitCount;
                 ++p;
             }
+        }
+
+        if (digitCount == 0) {
+            len = 0;
+            return 0.0;
         }
 
         len = static_cast<std::size_t>(p - s);

@@ -6,6 +6,7 @@
 #include "core/raycast.h"
 #include "ui/stage.h"
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,22 @@
 
 #define EXPECT_NOT_EQ(a, b) \
     if ((a) == (b)) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define EXPECT_EQ_F(a, b) \
+    if (std::fabs(float(a) - float(b)) > 1.0e-5f) { \
+        const char *file = __FILE__; \
+        int line = __LINE__; \
+        api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
+        return false; \
+    }
+
+#define EXPECT_NOT_EQ_F(a, b) \
+    if (std::fabs(float(a) - float(b)) <= 1.0e-5f) { \
         const char *file = __FILE__; \
         int line = __LINE__; \
         api.platform->logMsg("[CHECK FAILED] %s:%d", file, line); \
@@ -59,13 +76,6 @@ namespace test {
     struct API {
         const foundation::PlatformInterfacePtr &platform;
         const foundation::RenderingInterfacePtr& rendering;
-        const resource::ResourceProviderPtr &resources;
-        const resource::FontAtlasProviderPtr &fonts;
-        const core::SceneInterfacePtr &scene;
-        const core::WorldInterfacePtr &world;
-        const core::RaycastInterfacePtr &raycast;
-        const core::SimulationInterfacePtr &simulation;
-        const ui::StageInterfacePtr &ui;
     };
 
     // testResult is called when async work is complete, but not earlier than next frame after init
@@ -98,14 +108,7 @@ namespace test {
     public:
         TestRunner(
             const foundation::PlatformInterfacePtr& platform,
-            const foundation::RenderingInterfacePtr& rendering,
-            const resource::ResourceProviderPtr& resourceProvider,
-            const resource::FontAtlasProviderPtr& fontAtlasProvider,
-            const core::SceneInterfacePtr& scene,
-            const core::WorldInterfacePtr& world,
-            const core::RaycastInterfacePtr& raycast,
-            const core::SimulationInterfacePtr& simulation,
-            const ui::StageInterfacePtr& ui
+            const foundation::RenderingInterfacePtr& rendering
         );
         ~TestRunner();
 
