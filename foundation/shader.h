@@ -9,5 +9,6 @@
 namespace foundation {
     struct InputLayout;
     std::tuple<std::string, std::string, std::uint32_t> makePlatformShaderSource(const char *src, const InputLayout &layout, std::string &error);
+    std::string makeLines(const std::string& src);
 }
 

@@ -7,6 +7,8 @@ set(
 	"${m_source_root}/runner.cpp"
 	"${m_source_root}/math_tests.h"
 	"${m_source_root}/math_tests.cpp"
+	"${m_source_root}/util_tests.h"
+	"${m_source_root}/util_tests.cpp"
 	"${m_source_root}/shader_tests.h"
 	"${m_source_root}/shader_tests.cpp"
 	"${m_source_root}/platform_tests.h"

@@ -10,8 +10,14 @@ namespace {
     const std::size_t TYPES_COUNT = 14;
     const std::size_t TYPES_PASS_COUNT = 4;
 
+    struct ShaderTypeInfo {
+        const char* typeName;
+        const char* nativeTypeName;
+        std::size_t sizeInBytes;
+    };
+
 #ifdef PLATFORM_IOS
-    const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
+    const ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
         // Passing from App side
         {"float4",  "float4",   16},
         {"int4",    "int4",     16},
@@ -31,7 +37,7 @@ namespace {
     };
 #endif
 #ifdef PLATFORM_WASM
-    const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
+    const ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
         // Passing from App side
         {"float4",  "vec4",   16},
         {"int4",    "ivec4",  16},
@@ -51,7 +57,7 @@ namespace {
     };
 #endif
 #ifdef PLATFORM_WINDOWS
-    const shaderUtils::ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
+    const ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
         // Passing from App side
         {"float4",  "float4",   16},
         {"int4",    "int4",     16},
@@ -166,6 +172,87 @@ namespace {
 #endif
 }
 
+namespace shaderUtils {
+    int getArrayMultiply(const std::string &varname) {
+        int  multiply = 1;
+        auto braceStart = varname.find('[');
+        auto braceEnd = varname.rfind(']');
+        
+        if (braceStart != std::string::npos && braceEnd != std::string::npos) {
+            std::size_t len;
+            std::int64_t value = util::strstream::atoi(varname.data() + braceStart + 1, len);
+            multiply = std::max(int(value), multiply);
+        }
+        
+        return multiply;
+    }
+    bool shaderGetTypeSize(const std::string &typeName, const ShaderTypeInfo *types, std::size_t typeCount, std::string &outNativeTypeName, std::size_t &outSize) {
+        for (std::size_t i = 0; i < typeCount; i++) {
+            if (types[i].typeName == typeName) {
+                outNativeTypeName = types[i].nativeTypeName;
+                outSize = types[i].sizeInBytes;
+                return true;
+            }
+        }
+        
+        return false;
+    };
+    void replace(std::string &target, const std::string &bit, const std::string &replacement, const std::string &prevAllowed, const std::initializer_list<std::string> &exceptions = {}) {
+        std::size_t start_pos = 0;
+        while ((start_pos = target.find(bit, start_pos)) != std::string::npos) {
+            bool skip = false;
+
+            for (const std::string &exception : exceptions) {
+                if (::memcmp(target.data() + start_pos, exception.data(), exception.length()) == 0) {
+                    skip = true;
+                }
+            }
+            if (skip == false) {
+                if (prevAllowed.find(target.data()[start_pos - 1]) != std::string::npos) {
+                    target.replace(start_pos, bit.length(), replacement);
+                    start_pos += replacement.length();
+                    continue;
+                }
+            }
+
+            start_pos++;
+        }
+    }
+    void replace(std::string &target, const std::string &bit, const std::string &replacement, const std::string &prevAllowed, const std::string &postAllowed) {
+        std::size_t start_pos = 0;
+        while ((start_pos = target.find(bit, start_pos)) != std::string::npos) {
+            if (start_pos == 0 || prevAllowed.find(target.data()[start_pos - 1]) != std::string::npos) {
+                if (postAllowed.find(target.data()[start_pos + bit.length()]) != std::string::npos) {
+                    target.replace(start_pos, bit.length(), replacement);
+                    start_pos += replacement.length();
+                    continue;
+                }
+            }
+            
+            start_pos++;
+        }
+    }
+    bool formCodeBlock(const std::string &indent, util::strstream &stream, std::string &output) {
+        stream.skipws();
+        int  braceCounter = 1;
+        char prev = '\n', next;
+        
+        while (stream && ((next = stream.getChar()) != '}' || --braceCounter > 0)) {
+            if (prev == '\n') {
+                for (int i = 0; i < braceCounter; i++) {
+                    output += indent;
+                }
+            }
+            if (next == '{') braceCounter++;
+            output += next;
+            if (next == '\n')  stream.skipws();
+            prev = next;
+        }
+        
+        return braceCounter == 0;
+    }
+}
+
 namespace foundation {
     std::uint32_t InputLayout::getStride() const {
         std::uint32_t stride = 0;
@@ -173,6 +260,26 @@ namespace foundation {
             stride += VTX_CONVERSION_TABLE[int(item.format)].size;
         }
         return stride;
+    }
+    
+    std::string makeLines(const std::string &src) {
+        std::string result;
+        std::string::const_iterator left = std::begin(src);
+        std::string::const_iterator right;
+        char line[] = "/* 0000 */  ";
+        int counter = 1;
+
+        while ((right = std::find(left, std::end(src), '\n')) != std::end(src)) {
+            line[6] = '0' + counter % 10;
+            line[5] = '0' + (counter / 10) % 10;
+            line[4] = '0' + (counter / 100) % 10;
+            line[3] = '0' + (counter / 1000) % 10;
+            result += std::string(line) + std::string(left, ++right);
+            left = right;
+            counter++;
+        }
+
+        return result;
     }
 }
 
@@ -203,7 +310,7 @@ namespace {
                 std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
                 std::string nativeTypeName;
                 
-                if (shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
+                if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
                     output += indent + nativeTypeName + " " + varname + ";\n";
                     totalLength += elementSize * elementCount;
                     continue;
@@ -499,7 +606,7 @@ std::uint32_t formVarsBlock(util::strstream &stream, std::string &output, std::s
             std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
             std::string nativeTypeName;
 
-            if (shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
+            if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
                 if (varyingsFS) {
                     // integer varyings must be flat
                     const std::string flat = nativeTypeName[0] == 'i' || nativeTypeName[0] == 'u' ? "flat " : "";
@@ -705,7 +812,7 @@ std::uint32_t formVarsBlock(util::strstream &stream, std::string &output, std::s
             std::size_t elementSize = 0, elementCount = shaderUtils::getArrayMultiply(varname);
             std::string nativeTypeName;
 
-            if (shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
+            if (shaderUtils::shaderGetTypeSize(arg, TYPE_SIZE_TABLE, allowedTypeCount, nativeTypeName, elementSize)) {
                 if (withSemantics) {
                     // integer values can't be interpolated
                     const std::string qualifier = nativeTypeName[0] == 'i' || nativeTypeName[0] == 'u' ? "nointerpolation " : "";
