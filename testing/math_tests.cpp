@@ -99,6 +99,207 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_arithmetic_operators_test(const API &api) {
+        // vector2f
+        const math::vector2f a2(1.0f, 2.0f);
+        const math::vector2f b2(4.0f, 8.0f);
+
+        math::vector2f r2 = a2 + b2;
+        EXPECT_EQ_F(r2.x, 5.0f);
+        EXPECT_EQ_F(r2.y, 10.0f);
+
+        r2 = b2 - a2;
+        EXPECT_EQ_F(r2.x, 3.0f);
+        EXPECT_EQ_F(r2.y, 6.0f);
+
+        r2 = a2 * b2;
+        EXPECT_EQ_F(r2.x, 4.0f);
+        EXPECT_EQ_F(r2.y, 16.0f);
+
+        r2 = b2 / a2;
+        EXPECT_EQ_F(r2.x, 4.0f);
+        EXPECT_EQ_F(r2.y, 4.0f);
+
+        r2 = a2 * 3.0f;
+        EXPECT_EQ_F(r2.x, 3.0f);
+        EXPECT_EQ_F(r2.y, 6.0f);
+
+        r2 = 3.0f * a2;
+        EXPECT_EQ_F(r2.x, 3.0f);
+        EXPECT_EQ_F(r2.y, 6.0f);
+
+        r2 = b2 / 2.0f;
+        EXPECT_EQ_F(r2.x, 2.0f);
+        EXPECT_EQ_F(r2.y, 4.0f);
+
+        r2 = 8.0f / b2;
+        EXPECT_EQ_F(r2.x, 2.0f);
+        EXPECT_EQ_F(r2.y, 1.0f);
+
+        // vector2f swizzles
+        r2 = a2.yx - a2;
+        EXPECT_EQ_F(r2.x, 1.0f);
+        EXPECT_EQ_F(r2.y, -1.0f);
+
+        r2 = a2.yy + b2.xx;
+        EXPECT_EQ_F(r2.x, 6.0f);
+        EXPECT_EQ_F(r2.y, 6.0f);
+
+        r2 = b2.yx / a2.yx;
+        EXPECT_EQ_F(r2.x, 4.0f);
+        EXPECT_EQ_F(r2.y, 4.0f);
+
+        r2 = a2.yx * 2.0f;
+        EXPECT_EQ_F(r2.x, 4.0f);
+        EXPECT_EQ_F(r2.y, 2.0f);
+
+        // vector3f
+        const math::vector3f a3(1.0f, 2.0f, 4.0f);
+        const math::vector3f b3(8.0f, 6.0f, 2.0f);
+
+        math::vector3f r3 = a3 + b3;
+        EXPECT_EQ_F(r3.x, 9.0f);
+        EXPECT_EQ_F(r3.y, 8.0f);
+        EXPECT_EQ_F(r3.z, 6.0f);
+
+        r3 = a3 - b3;
+        EXPECT_EQ_F(r3.x, -7.0f);
+        EXPECT_EQ_F(r3.y, -4.0f);
+        EXPECT_EQ_F(r3.z, 2.0f);
+
+        r3 = a3 * b3;
+        EXPECT_EQ_F(r3.x, 8.0f);
+        EXPECT_EQ_F(r3.y, 12.0f);
+        EXPECT_EQ_F(r3.z, 8.0f);
+
+        r3 = b3 / a3;
+        EXPECT_EQ_F(r3.x, 8.0f);
+        EXPECT_EQ_F(r3.y, 3.0f);
+        EXPECT_EQ_F(r3.z, 0.5f);
+
+        r3 = a3 * 2.0f;
+        EXPECT_EQ_F(r3.x, 2.0f);
+        EXPECT_EQ_F(r3.y, 4.0f);
+        EXPECT_EQ_F(r3.z, 8.0f);
+
+        r3 = 2.0f * a3;
+        EXPECT_EQ_F(r3.x, 2.0f);
+        EXPECT_EQ_F(r3.y, 4.0f);
+        EXPECT_EQ_F(r3.z, 8.0f);
+
+        r3 = a3 / 2.0f;
+        EXPECT_EQ_F(r3.x, 0.5f);
+        EXPECT_EQ_F(r3.y, 1.0f);
+        EXPECT_EQ_F(r3.z, 2.0f);
+
+        r3 = 8.0f / a3;
+        EXPECT_EQ_F(r3.x, 8.0f);
+        EXPECT_EQ_F(r3.y, 4.0f);
+        EXPECT_EQ_F(r3.z, 2.0f);
+
+        // vector3f swizzles
+        r3 = a3.zyx + a3;
+        EXPECT_EQ_F(r3.x, 5.0f);
+        EXPECT_EQ_F(r3.y, 4.0f);
+        EXPECT_EQ_F(r3.z, 5.0f);
+
+        r3 = b3.zxy - a3.xxx;
+        EXPECT_EQ_F(r3.x, 1.0f);
+        EXPECT_EQ_F(r3.y, 7.0f);
+        EXPECT_EQ_F(r3.z, 5.0f);
+
+        math::vector2f s2 = a3.xz * b3.zy;
+        EXPECT_EQ_F(s2.x, 2.0f);
+        EXPECT_EQ_F(s2.y, 24.0f);
+
+        s2 = 4.0f / a3.zy;
+        EXPECT_EQ_F(s2.x, 1.0f);
+        EXPECT_EQ_F(s2.y, 2.0f);
+
+        // vector4f
+        const math::vector4f a4(1.0f, 2.0f, 4.0f, 8.0f);
+        const math::vector4f b4(2.0f, 4.0f, 2.0f, 4.0f);
+
+        math::vector4f r4 = a4 + b4;
+        EXPECT_EQ_F(r4.x, 3.0f);
+        EXPECT_EQ_F(r4.y, 6.0f);
+        EXPECT_EQ_F(r4.z, 6.0f);
+        EXPECT_EQ_F(r4.w, 12.0f);
+
+        r4 = a4 - b4;
+        EXPECT_EQ_F(r4.x, -1.0f);
+        EXPECT_EQ_F(r4.y, -2.0f);
+        EXPECT_EQ_F(r4.z, 2.0f);
+        EXPECT_EQ_F(r4.w, 4.0f);
+
+        r4 = a4 * b4;
+        EXPECT_EQ_F(r4.x, 2.0f);
+        EXPECT_EQ_F(r4.y, 8.0f);
+        EXPECT_EQ_F(r4.z, 8.0f);
+        EXPECT_EQ_F(r4.w, 32.0f);
+
+        r4 = a4 / b4;
+        EXPECT_EQ_F(r4.x, 0.5f);
+        EXPECT_EQ_F(r4.y, 0.5f);
+        EXPECT_EQ_F(r4.z, 2.0f);
+        EXPECT_EQ_F(r4.w, 2.0f);
+
+        r4 = a4 * 0.5f;
+        EXPECT_EQ_F(r4.x, 0.5f);
+        EXPECT_EQ_F(r4.y, 1.0f);
+        EXPECT_EQ_F(r4.z, 2.0f);
+        EXPECT_EQ_F(r4.w, 4.0f);
+
+        r4 = 0.5f * a4;
+        EXPECT_EQ_F(r4.x, 0.5f);
+        EXPECT_EQ_F(r4.y, 1.0f);
+        EXPECT_EQ_F(r4.z, 2.0f);
+        EXPECT_EQ_F(r4.w, 4.0f);
+
+        r4 = a4 / 4.0f;
+        EXPECT_EQ_F(r4.x, 0.25f);
+        EXPECT_EQ_F(r4.y, 0.5f);
+        EXPECT_EQ_F(r4.z, 1.0f);
+        EXPECT_EQ_F(r4.w, 2.0f);
+
+        r4 = 8.0f / a4;
+        EXPECT_EQ_F(r4.x, 8.0f);
+        EXPECT_EQ_F(r4.y, 4.0f);
+        EXPECT_EQ_F(r4.z, 2.0f);
+        EXPECT_EQ_F(r4.w, 1.0f);
+
+        // vector4f swizzles
+        r4 = a4.wzyx + a4;
+        EXPECT_EQ_F(r4.x, 9.0f);
+        EXPECT_EQ_F(r4.y, 6.0f);
+        EXPECT_EQ_F(r4.z, 6.0f);
+        EXPECT_EQ_F(r4.w, 9.0f);
+
+        r4 = a4.wzyx - b4.xxyy;
+        EXPECT_EQ_F(r4.x, 6.0f);
+        EXPECT_EQ_F(r4.y, 2.0f);
+        EXPECT_EQ_F(r4.z, -2.0f);
+        EXPECT_EQ_F(r4.w, -3.0f);
+
+        r3 = a4.wyz / b4.xyx;
+        EXPECT_EQ_F(r3.x, 4.0f);
+        EXPECT_EQ_F(r3.y, 0.5f);
+        EXPECT_EQ_F(r3.z, 2.0f);
+
+        r3 = a4.xyw * 2.0f;
+        EXPECT_EQ_F(r3.x, 2.0f);
+        EXPECT_EQ_F(r3.y, 4.0f);
+        EXPECT_EQ_F(r3.z, 16.0f);
+
+        // chained expression
+        r3 = (a3 + b3) * 2.0f - a3 / 0.5f;
+        EXPECT_EQ_F(r3.x, 16.0f);
+        EXPECT_EQ_F(r3.y, 12.0f);
+        EXPECT_EQ_F(r3.z, 4.0f);
+
+        return true;
+    }
 }
 
 
@@ -106,5 +307,6 @@ namespace test {
     void registerMathTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(math_vector2f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector2f_swizzle_test);
+        REGISTER_UNIT_TEST(math_vector_arithmetic_operators_test);
     }
 }
