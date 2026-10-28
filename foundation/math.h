@@ -387,7 +387,7 @@ namespace math {
     template<int Ix, int Iy>
     inline vector2f &swizzle2f<Ix, Iy>::operator=(const swizzle2f<Ix, Iy> &other) {
         scalar (&flat)[4] = asFlat();
-        flat[Ix] = other[Ix]; flat[Iy] = other[Ix];
+        flat[Ix] = other[Ix]; flat[Iy] = other[Iy];
         return *reinterpret_cast<vector2f *>(this);
     }
     template<int Ix, int Iy, int Iz>

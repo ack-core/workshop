@@ -46,9 +46,9 @@ namespace core {
         {
             for (std::size_t i = 0; i < points.size(); i++) {
                 Sphere &element = _spheres.emplace_back(Sphere {});
-                element.positionAndRadius = math::vector4f(points[i], radiuses[i]);
+                element.positionAndRadius = math::vector4f(points[i], float(radiuses[i]));
                 element.finalTransform = math::transform3f::identity().translated(element.positionAndRadius.xyz);
-                element.visual = scene->addBoundingSphere(points[i], radiuses[i], math::color(1.0f, 0.0f, 1.0f, 0.7f));
+                element.visual = scene->addBoundingSphere(points[i], float(radiuses[i]), math::color(1.0f, 0.0f, 1.0f, 0.7f));
             }
         }
         ~SphereShapeImpl() override {

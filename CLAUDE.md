@@ -23,9 +23,8 @@ workshop_<platform>_<app> : generated IDE projects
 
 ## Human interaction & communication
 
-**Be very concise:** No conversational fillers, greetings, apologies, preambles and closing offers
-**Code first:** Start responces directly with required code or structural solutions
-**Do only what was asked:** No extra experiments or verifications beyond the request
-
-**Do not write python scripts for code editing automation**
-**Be aware of uncommitted user's edits**
+- **Be very concise:** No conversational fillers, greetings, apologies, preambles and closing offers
+- **Code first:** Start responces directly with required code or structural solutions
+- **Do only what was asked:** No extra experiments or verifications beyond the request
+- **Do not write python scripts for code editing automation**
+- **Be aware of uncommitted user's edits**

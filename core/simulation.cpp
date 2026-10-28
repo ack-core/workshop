@@ -196,8 +196,8 @@ namespace core {
             BodyPtr result;
             
             if (shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
-                const float mass = desc.getNumber("mass", 0.0f);
-                const float radius = desc.getNumber("radius", 1.0f);
+                const float mass = float(desc.getNumber("mass", 0.0));
+                const float radius = float(desc.getNumber("radius", 1.0));
                 result = _circlesXZ.emplace_back(std::make_shared<CircleXZImpl>(_scene, mass, radius));
             }
             else if (shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {

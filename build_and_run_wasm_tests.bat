@@ -6,4 +6,5 @@ pushd binary_wasm_tests
 node testing.js
 set "RESULT=%ERRORLEVEL%"
 popd
+python tools/refs2png.py -b binary_wasm_tests
 exit /b %RESULT%

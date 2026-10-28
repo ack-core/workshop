@@ -265,11 +265,11 @@ namespace foundation {
             std::string error;
             
             const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(src, layout, error);
-            const std::string nativeShader = shaderUtils::makeLines(vs + fs);
+            const std::string nativeShader = foundation::makeLines(vs + fs);
             
             if (error.empty()) {
-                const std::string linedVS = shaderUtils::makeLines(vs);
-                const std::string linedFS = shaderUtils::makeLines(fs);
+                const std::string linedVS = foundation::makeLines(vs);
+                const std::string linedFS = foundation::makeLines(fs);
                 createNativeSrc(nativeShaderVS, linedVS);
                 createNativeSrc(nativeShaderFS, linedFS);
 

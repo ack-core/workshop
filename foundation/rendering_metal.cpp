@@ -281,7 +281,7 @@ namespace foundation {
             std::string error;
             
             const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(shadersrc, layout, error);
-            const std::string nativeShader = shaderUtils::makeLines(vs + fs);
+            const std::string nativeShader = foundation::makeLines(vs + fs);
             
             if (error.empty()) {
                 @autoreleasepool {

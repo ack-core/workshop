@@ -486,11 +486,11 @@ namespace foundation {
                 }
             }
             else if (suppressErrors == false) {
-                _platform->logError("[Direct3D11Rendering::createShader] pixel shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), shaderUtils::makeLines(fs).data());
+                _platform->logError("[Direct3D11Rendering::createShader] pixel shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), foundation::makeLines(fs).data());
             }
         }
         else if (suppressErrors == false) {
-            _platform->logError("[Direct3D11Rendering::createShader] vertex shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), shaderUtils::makeLines(vs).data());
+            _platform->logError("[Direct3D11Rendering::createShader] vertex shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), foundation::makeLines(vs).data());
         }
 
         return result;

@@ -20,6 +20,7 @@ namespace util {
             input += 2;
         }
 
+        const char *digits = input;
         while (true) {
             int digit;
 
@@ -34,6 +35,11 @@ namespace util {
 
             out = out * base + digit;
             input++;
+        }
+
+        if (input == digits) {
+            len = 0;
+            return 0;
         }
 
         len = input - s;
@@ -51,9 +57,11 @@ namespace util {
         }
 
         double value = 0.0;
+        std::size_t digitCount = 0;
 
         while (std::isdigit(static_cast<unsigned char>(*p))) {
             value = value * 10.0 + (*p - '0');
+            ++digitCount;
             ++p;
         }
 
@@ -63,8 +71,14 @@ namespace util {
             while (std::isdigit(static_cast<unsigned char>(*p))) {
                 value += (*p - '0') * factor;
                 factor *= 0.1;
+                ++digitCount;
                 ++p;
             }
+        }
+
+        if (digitCount == 0) {
+            len = 0;
+            return 0.0;
         }
 
         len = static_cast<std::size_t>(p - s);
@@ -489,9 +503,9 @@ namespace util {
 
         header[2]  = 2;              // image type: uncompressed true-color
         header[12] = width  & 0xFF;  // width low byte
-        header[13] = width  >> 8;    // width high byte
+        header[13] = std::uint8_t(width >> 8);  // width high byte
         header[14] = height & 0xFF;  // height low byte
-        header[15] = height >> 8;    // height high byte
+        header[15] = std::uint8_t(height >> 8);  // height high byte
         header[16] = 32;             // bits per pixel
         header[17] = 0x20;           // image descriptor: origin top-left
 
