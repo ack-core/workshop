@@ -1,2 +1,4 @@
 binary_*/
 workshop_*/
+.claude/tmp/
+providers/resource_list.h
