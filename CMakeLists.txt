@@ -97,7 +97,9 @@ get_filename_component(m_package_app_root "${PROJECT_SOURCE_DIR}/package/${PLATF
 #file(REMOVE_RECURSE "${m_binary_root}")
 #file(MAKE_DIRECTORY "${m_binary_root}")
 
-file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
+if (EXISTS ${m_package_root})
+	file(COPY "${m_package_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
+endif()
 if (EXISTS ${m_package_app_root})
 	file(COPY "${m_package_app_root}/" DESTINATION "${m_binary_root}" FILES_MATCHING PATTERN "*")
 endif()
