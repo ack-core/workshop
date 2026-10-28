@@ -99,6 +99,86 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector3f_ctor_assignment_test(const API &api) {
+        // ctors
+        math::vector3f a(1.0f, 2.0f, 3.0f);
+        EXPECT_EQ_F(a.x, 1.0f);
+        EXPECT_EQ_F(a.y, 2.0f);
+        EXPECT_EQ_F(a.z, 3.0f);
+        EXPECT_EQ_F(a[0], 1.0f);
+        EXPECT_EQ_F(a[1], 2.0f);
+        EXPECT_EQ_F(a[2], 3.0f);
+        EXPECT_EQ_F(a.flat[0], 1.0f);
+        EXPECT_EQ_F(a.flat[1], 2.0f);
+        EXPECT_EQ_F(a.flat[2], 3.0f);
+
+        math::vector3f b(4.0f);
+        EXPECT_EQ_F(b.x, 4.0f);
+        EXPECT_EQ_F(b.y, 4.0f);
+        EXPECT_EQ_F(b.z, 4.0f);
+
+        const float arr[3] = {5.0f, 6.0f, 7.0f};
+        math::vector3f c(arr);
+        EXPECT_EQ_F(c.x, 5.0f);
+        EXPECT_EQ_F(c.y, 6.0f);
+        EXPECT_EQ_F(c.z, 7.0f);
+
+        math::vector3f d(a);
+        EXPECT_EQ_F(d.x, 1.0f);
+        EXPECT_EQ_F(d.y, 2.0f);
+        EXPECT_EQ_F(d.z, 3.0f);
+
+        // vector2f combinations
+        const math::vector2f v2(8.0f, 9.0f);
+        math::vector3f e(v2, 10.0f);
+        EXPECT_EQ_F(e.x, 8.0f);
+        EXPECT_EQ_F(e.y, 9.0f);
+        EXPECT_EQ_F(e.z, 10.0f);
+
+        math::vector3f f(10.0f, v2);
+        EXPECT_EQ_F(f.x, 10.0f);
+        EXPECT_EQ_F(f.y, 8.0f);
+        EXPECT_EQ_F(f.z, 9.0f);
+
+        math::vector3f g(v2.yx, 11.0f);
+        EXPECT_EQ_F(g.x, 9.0f);
+        EXPECT_EQ_F(g.y, 8.0f);
+        EXPECT_EQ_F(g.z, 11.0f);
+
+        math::vector3f h(a.zy, a.x);
+        EXPECT_EQ_F(h.x, 3.0f);
+        EXPECT_EQ_F(h.y, 2.0f);
+        EXPECT_EQ_F(h.z, 1.0f);
+
+        // assignment
+        math::vector3f k(0.0f);
+        k = a;
+        EXPECT_EQ_F(k.x, 1.0f);
+        EXPECT_EQ_F(k.y, 2.0f);
+        EXPECT_EQ_F(k.z, 3.0f);
+        EXPECT_NOT_EQ_F(k.x, k.z);
+
+        k = b = c;
+        EXPECT_EQ_F(b.x, 5.0f);
+        EXPECT_EQ_F(b.y, 6.0f);
+        EXPECT_EQ_F(b.z, 7.0f);
+        EXPECT_EQ_F(k.x, 5.0f);
+        EXPECT_EQ_F(k.y, 6.0f);
+        EXPECT_EQ_F(k.z, 7.0f);
+
+        k = k;
+        EXPECT_EQ_F(k.x, 5.0f);
+        EXPECT_EQ_F(k.y, 6.0f);
+        EXPECT_EQ_F(k.z, 7.0f);
+
+        // assignment must not disturb source
+        EXPECT_EQ_F(a.x, 1.0f);
+        EXPECT_EQ_F(a.y, 2.0f);
+        EXPECT_EQ_F(a.z, 3.0f);
+
+        return true;
+    }
 }
 
 
@@ -106,5 +186,6 @@ namespace test {
     void registerMathTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(math_vector2f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector2f_swizzle_test);
+        REGISTER_UNIT_TEST(math_vector3f_ctor_assignment_test);
     }
 }
