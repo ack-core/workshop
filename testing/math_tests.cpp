@@ -151,6 +151,50 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector4f_ctor_assignment_test(const API &api) {
+        auto eq = [](const math::vector4f &v, float x, float y, float z, float w) {
+            return v.x == x && v.y == y && v.z == z && v.w == w;
+        };
+
+        // ctors
+        math::vector4f a(1.0f, 2.0f, 3.0f, 4.0f);
+        EXPECT_TRUE(eq(a, 1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_EQ_F(a[3], 4.0f);
+        EXPECT_EQ_F(a.flat[3], 4.0f);
+
+        math::vector4f b(5.0f);
+        EXPECT_TRUE(eq(b, 5.0f, 5.0f, 5.0f, 5.0f));
+
+        const float arr[4] = {6.0f, 7.0f, 8.0f, 9.0f};
+        math::vector4f c(arr);
+        EXPECT_TRUE(eq(c, 6.0f, 7.0f, 8.0f, 9.0f));
+
+        const math::vector3f v3(1.0f, 2.0f, 3.0f);
+        EXPECT_TRUE(eq(math::vector4f(v3, 4.0f), 1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq(math::vector4f(4.0f, v3), 4.0f, 1.0f, 2.0f, 3.0f));
+
+        const math::vector2f v2a(1.0f, 2.0f);
+        const math::vector2f v2b(3.0f, 4.0f);
+        EXPECT_TRUE(eq(math::vector4f(5.0f, 6.0f, v2a), 5.0f, 6.0f, 1.0f, 2.0f));
+        EXPECT_TRUE(eq(math::vector4f(5.0f, v2a, 6.0f), 5.0f, 1.0f, 2.0f, 6.0f));
+        EXPECT_TRUE(eq(math::vector4f(v2a, 5.0f, 6.0f), 1.0f, 2.0f, 5.0f, 6.0f));
+        EXPECT_TRUE(eq(math::vector4f(v2a, v2b), 1.0f, 2.0f, 3.0f, 4.0f));
+
+        math::vector4f d(a);
+        EXPECT_TRUE(eq(d, 1.0f, 2.0f, 3.0f, 4.0f));
+
+        // assignment
+        math::vector4f e(0.0f);
+        e = a;
+        EXPECT_TRUE(eq(e, 1.0f, 2.0f, 3.0f, 4.0f));
+
+        e = b = c;
+        EXPECT_TRUE(eq(b, 6.0f, 7.0f, 8.0f, 9.0f));
+        EXPECT_TRUE(eq(e, 6.0f, 7.0f, 8.0f, 9.0f));
+
+        return true;
+    }
 }
 
 
@@ -159,5 +203,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector2f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector2f_swizzle_test);
         REGISTER_UNIT_TEST(math_vector3f_ctor_assignment_test);
+        REGISTER_UNIT_TEST(math_vector4f_ctor_assignment_test);
     }
 }
