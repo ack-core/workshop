@@ -1,0 +1,31 @@
+name: merge
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency: merge-${{ github.event.pull_request.number }}
+
+jobs:
+  merge:
+    if: github.event.review.state == 'approved' && github.event.review.user.login == github.repository_owner && github.event.pull_request.state == 'open' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Squash and merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          SHA: ${{ github.event.review.commit_id }}
+        run: |
+          [ "$(gh pr view "$PR" --json state -q .state)" = OPEN ] || exit 0
+          ISSUE=$(printf '%s' "$BODY" | grep -oiP '\bresolves:?\s*#\K[0-9]+' | head -n1 || true)
+          SUBJECT="$TITLE (#$PR)"
+          [ -n "$ISSUE" ] && SUBJECT="Resolves #$ISSUE - $SUBJECT"
+          gh pr merge "$PR" --repo "$GH_REPO" --squash --delete-branch --match-head-commit "$SHA" --subject "$SUBJECT" --body ""
