@@ -308,6 +308,17 @@ namespace foundation {
             return;
         }
 
+        D3D11_BUFFER_DESC dynamicDesc = {};
+        dynamicDesc.ByteWidth = DYNAMIC_BUFFER_LENGTH;
+        dynamicDesc.Usage = D3D11_USAGE_DYNAMIC;
+        dynamicDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_INDEX_BUFFER;
+        dynamicDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        if ((hresult = _device->CreateBuffer(&dynamicDesc, nullptr, &_dynamicBuffer)) != S_OK) {
+            _platform->logError("[RENDER] Dynamic buffer creation failed with result = %p", hresult);
+            return;
+        }
+
         // rasterizer state
 
         D3D11_RASTERIZER_DESC rasterDesc = {};
@@ -765,10 +776,73 @@ namespace foundation {
         }
     }
     void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
+        if (_currentShader && inputData) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            const Direct3D11Data *platformData = static_cast<const Direct3D11Data *>(inputData.get());
+            ID3D11Buffer *const vbuffer = platformData->getVertexes();
+            const UINT stride = platformData->getStride();
+            const UINT offset = 0;
 
+            _context->IASetVertexBuffers(0, 1, &vbuffer, &stride, &offset);
+
+            if (layout.repeat > 1) {
+                _applyDrawConstants(platformData->getVertexCount());
+                _context->DrawInstanced(layout.repeat, platformData->getVertexCount() * instanceCount, 0, 0);
+            }
+            else if (platformData->getIndexes()) {
+                _context->IASetIndexBuffer(platformData->getIndexes(), DXGI_FORMAT_R32_UINT, 0);
+                _context->DrawIndexedInstanced(platformData->getIndexCount(), instanceCount, 0, 0, 0);
+            }
+            else {
+                _context->DrawInstanced(platformData->getVertexCount(), instanceCount, 0, 0);
+            }
+        }
     }
     void Direct3D11Rendering::draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) {
-    
+        if (_currentShader && vcnt) {
+            const InputLayout &layout = _currentShader->getInputLayout();
+            const UINT stride = layout.getStride();
+            const UINT vlen = vcnt * stride;
+            const UINT ilen = indexes ? icnt * sizeof(std::uint32_t) : 0;
+            D3D11_MAP mapType = D3D11_MAP_WRITE_NO_OVERWRITE;
+
+            if (vlen + ilen > DYNAMIC_BUFFER_LENGTH) {
+                _platform->logError("[Direct3D11Rendering::draw] Out of dynamic buffer length\n");
+                return;
+            }
+            if (_dynamicBufferOffset + vlen + ilen > DYNAMIC_BUFFER_LENGTH) {                
+                mapType = D3D11_MAP_WRITE_DISCARD; // buffer is full: discard gives a fresh memory region without waiting for previous draws
+                _dynamicBufferOffset = 0;
+            }
+
+            D3D11_MAPPED_SUBRESOURCE mapped;
+
+            if (_context->Map(_dynamicBuffer.Get(), 0, mapType, 0, &mapped) == S_OK) {
+                std::uint8_t *memory = static_cast<std::uint8_t *>(mapped.pData) + _dynamicBufferOffset;
+                std::memcpy(memory, data, vlen);
+                if (ilen) {
+                    std::memcpy(memory + vlen, indexes, ilen);
+                }
+                _context->Unmap(_dynamicBuffer.Get(), 0);
+
+                const UINT offset = _dynamicBufferOffset;
+                _context->IASetVertexBuffers(0, 1, _dynamicBuffer.GetAddressOf(), &stride, &offset);
+
+                if (layout.repeat > 1) {
+                    _applyDrawConstants(vcnt);
+                    _context->DrawInstanced(layout.repeat, vcnt, 0, 0);
+                }
+                else if (ilen) {
+                    _context->IASetIndexBuffer(_dynamicBuffer.Get(), DXGI_FORMAT_R32_UINT, offset + vlen);
+                    _context->DrawIndexed(icnt, 0, 0);
+                }
+                else {
+                    _context->Draw(vcnt, 0);
+                }
+
+                _dynamicBufferOffset += (vlen + ilen + 15) & ~15u;
+            }
+        }
     }
 
     std::unique_ptr<std::uint8_t[]> Direct3D11Rendering::presentFrame() {

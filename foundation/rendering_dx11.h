@@ -163,6 +163,10 @@ namespace foundation {
         ComPtr<ID3D11DepthStencilView> _defaultDepthView;
         ComPtr<ID3D11Buffer> _frameConstantsBuffer;
         ComPtr<ID3D11Buffer> _drawConstantsBuffer;              // vertex count for repeated layouts
+        ComPtr<ID3D11Buffer> _dynamicBuffer;                    // ring buffer for dynamic vertexes and indexes
+
+        static const std::uint32_t DYNAMIC_BUFFER_LENGTH = 1024 * 1024;
+        std::uint32_t _dynamicBufferOffset = DYNAMIC_BUFFER_LENGTH; // forces discard on the first use
 
         ComPtr<ID3D11RasterizerState> _rasterState;
         ComPtr<ID3D11BlendState> _blendStates[4];               // index is BlendType value

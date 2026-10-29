@@ -20,6 +20,6 @@ Do these steps in exact order:
 5. Build and run tests (`build_and_run_*_tests.*`) that could be performed on this platform.
 6. Fix tests if the test is wrong, fix the code if the new tests actually found a problem.
 7. Commit the fixes, go to step 5 if there were fixes
-8. Push the branch to origin, stop and wait for human response, continue if you got answer like 'continue'
+8. Push the branch to origin
 9. Remove taken line from `.claude/tmp/tests-coverage-report.txt`. Remove that file if there are no more lines in the 'Candidates' block
 10. Using gh cli create a PR to master. Make PR's title with format `[TEST] <Very short title made from subject>`. In the PR's body place very short description of what is tested.
