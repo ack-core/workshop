@@ -12,7 +12,11 @@ LOG_PATH = os.path.join(REPO_ROOT, "dev-bot.log")
 
 
 def run(*cmd):
-    return subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout
+    result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+    if result.returncode != 0:
+        log(result.stdout + result.stderr)
+        result.check_returncode()
+    return result.stdout
 
 
 def is_repo_dirty():
