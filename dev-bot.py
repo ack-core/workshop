@@ -16,7 +16,7 @@ def run(*cmd):
 
 
 def is_repo_dirty():
-    return False #bool(run("git", "status", "--porcelain").strip())
+    return bool(run("git", "status", "--porcelain").strip())
 
 
 def has_candidates():
