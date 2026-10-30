@@ -193,6 +193,17 @@ namespace test {
         EXPECT_TRUE(eq(b, 6.0f, 7.0f, 8.0f, 9.0f));
         EXPECT_TRUE(eq(e, 6.0f, 7.0f, 8.0f, 9.0f));
 
+        math::vector2f f(0.0f);
+        f = math::vector4f(1.0f, 2.0f, 3.0f, 4.0f).xy;
+        EXPECT_EQ_F(f.x, 1.0f);
+        EXPECT_EQ_F(f.y, 2.0f);
+
+        math::vector3f g(0.0f);
+        g = math::vector4f(1.0f, 2.0f, 3.0f, 4.0f).xyz;
+        EXPECT_EQ_F(g.x, 1.0f);
+        EXPECT_EQ_F(g.y, 2.0f);
+        EXPECT_EQ_F(g.z, 3.0f);
+
         return true;
     }
 }
