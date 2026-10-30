@@ -233,6 +233,100 @@ namespace test {
 
         return true;
     }
+
+    bool util_strstream_extraction_test(const API &api) {
+        // integers of different types separated by any whitespace
+        int negative = 0, hex = 0;
+        std::int64_t large = 0;
+        std::uint8_t byte = 0;
+        util::strstream integers ("-12\t0x1F\n 9000000000 200", 24);
+        EXPECT_TRUE(integers >> negative >> hex >> large >> byte);
+        EXPECT_EQ(negative, -12);
+        EXPECT_EQ(hex, 31);
+        EXPECT_EQ(large, 9000000000ll);
+        EXPECT_EQ(byte, 200);
+        EXPECT_TRUE(integers.isEof());
+
+        // floats
+        float f0 = 0.0f, f1 = 0.0f;
+        double d = 0.0;
+        util::strstream floats ("1.5 -0.25 7", 11);
+        EXPECT_TRUE(floats >> f0 >> d >> f1);
+        EXPECT_EQ_F(f0, 1.5f);
+        EXPECT_EQ_F(d, -0.25f);
+        EXPECT_EQ_F(f1, 7.0f);
+        EXPECT_TRUE(floats.isEof());
+
+        // strings are split by whitespace only and replace the previous value
+        std::string s0 = "old", s1;
+        util::strstream strings ("  foo,bar\tbaz", 13);
+        EXPECT_TRUE(strings >> s0 >> s1);
+        EXPECT_EQ(s0, "foo,bar");
+        EXPECT_EQ(s1, "baz");
+
+        // different types in a row, number ends at the first non-number char
+        int i = 0;
+        std::string s2;
+        float f2 = 0.0f;
+        util::strstream mixed ("12abc 2.5", 9);
+        EXPECT_TRUE(mixed >> i >> s2 >> f2);
+        EXPECT_EQ(i, 12);
+        EXPECT_EQ(s2, "abc");
+        EXPECT_EQ_F(f2, 2.5f);
+
+        return true;
+    }
+
+    bool util_strstream_extraction_errors_test(const API &api) {
+        int i = 7;
+        float f = 7.0f;
+        std::string s = "old";
+
+        // bad input sets error, keeps the value and doesn't advance
+        const char *bad = "  abc";
+        util::strstream badInt (bad, 5);
+        EXPECT_FALSE(badInt >> i);
+        EXPECT_TRUE(badInt.isError());
+        EXPECT_EQ(i, 7);
+        EXPECT_EQ(badInt.current(), bad + 2);
+
+        util::strstream badFloat (bad, 5);
+        EXPECT_FALSE(badFloat >> f);
+        EXPECT_EQ_F(f, 7.0f);
+        EXPECT_EQ(badFloat.current(), bad + 2);
+
+        // no string in stream
+        util::strstream blank ("   ", 3);
+        EXPECT_FALSE(blank >> s);
+        EXPECT_EQ(s, "");
+
+        // error stays in a chain, the rest of values are not touched
+        int a = 0, b = 5, c = 5;
+        util::strstream chain ("1 x 3", 5);
+        EXPECT_FALSE(chain >> a >> b >> c);
+        EXPECT_EQ(a, 1);
+        EXPECT_EQ(b, 5);
+        EXPECT_EQ(c, 5);
+
+        // chars outside of the stream must stay invisible
+        util::strstream limitedInt ("12345", 2);
+        EXPECT_TRUE(limitedInt >> i);
+        EXPECT_EQ(i, 12);
+        EXPECT_TRUE(limitedInt.isEof());
+        EXPECT_FALSE(limitedInt >> i);
+        EXPECT_EQ(i, 12);
+
+        util::strstream limitedFloat ("1.5678 9", 3);
+        EXPECT_TRUE(limitedFloat >> f);
+        EXPECT_EQ_F(f, 1.5f);
+        EXPECT_TRUE(limitedFloat.isEof());
+
+        util::strstream limitedString ("abcd", 2);
+        EXPECT_TRUE(limitedString >> s);
+        EXPECT_EQ(s, "ab");
+
+        return true;
+    }
 }
 
 
@@ -241,5 +335,7 @@ namespace test {
         REGISTER_UNIT_TEST(util_callback_test);
         REGISTER_UNIT_TEST(util_strstream_atoi_atof_test);
         REGISTER_UNIT_TEST(util_strstream_char_reading_test);
+        REGISTER_UNIT_TEST(util_strstream_extraction_test);
+        REGISTER_UNIT_TEST(util_strstream_extraction_errors_test);
     }
 }
