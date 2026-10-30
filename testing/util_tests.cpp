@@ -173,6 +173,66 @@ namespace test {
 
         return true;
     }
+
+    bool util_strstream_char_reading_test(const API &api) {
+        // '#' is outside of the stream and must stay invisible
+        const char *text = " \t\n ab c#";
+        util::strstream stream (text, 8);
+        EXPECT_FALSE(stream.isEof());
+
+        // skipws stops at first printable char
+        stream.skipws();
+        EXPECT_EQ(stream.current(), text + 4);
+
+        // peekChar doesn't advance, getChar does
+        EXPECT_EQ(stream.peekChar(), 'a');
+        EXPECT_EQ(stream.peekChar(), 'a');
+        EXPECT_EQ(stream.current(), text + 4);
+        EXPECT_EQ(stream.getChar(), 'a');
+        EXPECT_EQ(stream.current(), text + 5);
+        EXPECT_EQ(stream.getChar(), 'b');
+
+        stream.skipws();
+        EXPECT_EQ(stream.current(), text + 7);
+        stream.skipws();
+        EXPECT_EQ(stream.current(), text + 7);
+        EXPECT_FALSE(stream.isEof());
+        EXPECT_EQ(stream.getChar(), 'c');
+
+        // end of stream
+        EXPECT_TRUE(stream.isEof());
+        EXPECT_TRUE(stream);
+        EXPECT_EQ(stream.peekChar(), 0);
+        EXPECT_EQ(stream.getChar(), 0);
+        EXPECT_EQ(stream.current(), text + 8);
+
+        // skipws stops at the end of stream
+        const char *blank = "  #";
+        util::strstream spaces (blank, 2);
+        spaces.skipws();
+        EXPECT_EQ(spaces.current(), blank + 2);
+        EXPECT_TRUE(spaces.isEof());
+
+        // empty stream
+        util::strstream empty ("", 0);
+        EXPECT_TRUE(empty.isEof());
+        EXPECT_TRUE(empty);
+        EXPECT_EQ(empty.getChar(), 0);
+
+        // error state is independent of position and stays until the end
+        util::strstream errors ("ab", 2);
+        EXPECT_TRUE(errors);
+        EXPECT_FALSE(errors.isError());
+        errors.setError();
+        EXPECT_TRUE(errors.isError());
+        EXPECT_FALSE(errors);
+        EXPECT_EQ(errors.getChar(), 'a');
+        EXPECT_FALSE(errors.isEof());
+        EXPECT_TRUE(errors.isError());
+        EXPECT_FALSE(errors);
+
+        return true;
+    }
 }
 
 
@@ -180,5 +240,6 @@ namespace test {
     void registerUtilTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(util_callback_test);
         REGISTER_UNIT_TEST(util_strstream_atoi_atof_test);
+        REGISTER_UNIT_TEST(util_strstream_char_reading_test);
     }
 }

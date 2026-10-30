@@ -161,7 +161,7 @@ namespace util {
             return _current < _end ? *_current++ : 0;
         }
         char peekChar() const {
-            return *_current;
+            return _current < _end ? *_current : 0;
         }
         void skipws() {
             while (_current < _end && std::isgraph(*_current) == false) _current++;
