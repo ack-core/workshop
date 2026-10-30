@@ -16,7 +16,7 @@ Do these steps in exact order:
    - Questions for self-check during implementation:
      - is there a simpler implementation? Simplify
 5. Commit the fixes
-6. Build and run ALL tests (`build_and_run_*_tests.*`) that could be performed on this platform.
+6. Build and run ALL tests (`build_and_run_*_tests.*`) that could be performed on this platform. Check for exit code and `[FAILED * TEST]` in output.
 7. Fix the code if tests actually found a problem, fix tests if they are wrong
 8. Commit the fixes, go to step 6 if there were fixes
 9. Push new commits, using gh cli re-request review from the repo owner

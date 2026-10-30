@@ -240,7 +240,13 @@ namespace foundation {
         ComPtr<ID3D11DeviceContext> tmpContext;
         ComPtr<ID3D11Device> tmpDevice;
 
-        if ((hresult = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, features, 1, D3D11_SDK_VERSION, &tmpDevice, &featureLevel, &tmpContext)) != S_OK) {
+#if defined(IS_TESTS)
+        const D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_WARP;
+#else
+        const D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_HARDWARE;
+#endif
+
+        if ((hresult = D3D11CreateDevice(nullptr, driverType, nullptr, flags, features, 1, D3D11_SDK_VERSION, &tmpDevice, &featureLevel, &tmpContext)) != S_OK) {
             _platform->logError("[RENDER] D3D11CreateDevice failed with result = %p", hresult);
             return;
         }

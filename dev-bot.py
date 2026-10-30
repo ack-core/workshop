@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-LOOP_WAIT_MAX_SEC = 60
+LOOP_WAIT_MAX_SEC = 1200
 OPEN_PR_MAX = 1
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
@@ -51,14 +51,18 @@ def specific_title_count(titles, marker):
     return sum(marker in title for title in titles)
 
 
-def log(msg):
-    print(msg, flush=True)
+def log_to_file(msg):
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(f"{msg}\n")
 
 
+def log(msg):
+    print(msg, flush=True)
+    log_to_file(msg)
+
+
 def claude(prompt, *allowed_tools):
-    cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--allowedTools", *allowed_tools)
+    cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--thinking", "adaptive", "--thinking-display", "summarized", "--allowedTools", *allowed_tools)
     with subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") as proc:
         try:
             for line in proc.stdout:
@@ -72,8 +76,10 @@ def claude(prompt, *allowed_tools):
                     for block in event.get("message", {}).get("content", []):
                         if block.get("type") == "text":
                             log(block.get("text"))
+                        elif block.get("type") == "thinking":
+                            log(block.get("thinking"))
                         elif block.get("type") == "tool_use":
-                            log(f"> {block.get('name')} {json.dumps(block.get('input'))[:200]}")
+                            log_to_file(f"> {block.get('name')} {json.dumps(block.get('input'))[:200]}")
                 elif event.get("type") == "result":
                     if event.get("is_error"):
                         log(f"Error: {event.get('result') or event.get('subtype')}")
@@ -93,19 +99,25 @@ def step():
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
     prs_count = len(titles)
-    log(f"open PRs: {prs_count}")
     if prs_count >= OPEN_PR_MAX:
+        log("There are maximum opened PRs, maybe changes requested...")
         owner = repo_owner()
         pr_url = next((pr["url"] for pr in prs if has_requested_changes(pr, owner)), None)
         if pr_url:
             log(f"Fixing requested changes in {pr_url}...")
             claude(f"/pr-requested-fix THE_PR={pr_url}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+        else:
+            log("No changes requested...")
         return
+    
+    log("There is a space for new PRs...")
+    
     if not has_candidates() and not specific_title_count(titles, "[TEST]"):
         log("Making test coverage report...")
         run("git", "switch", "master")
         run("git", "pull", "--ff-only")
         claude("/tests-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
+    
     if has_candidates():
         log("Writing a test...")
         claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")

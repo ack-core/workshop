@@ -1,0 +1,53 @@
+name: pr-QG
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-QG-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: cmd
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: pip install pypng
+      - name: Install D3D debug layer
+        run: dism /Online /Add-Capability /CapabilityName:Tools.Graphics.DirectX~~~~0.0.1.0
+      - run: build_and_run_windows_tests.bat
+
+  wasm:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install pypng ninja
+      - name: Install emsdk
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk ..\emsdk || exit /b 1
+          cd ..\emsdk
+          call emsdk.bat install 6.0.0 || exit /b 1
+          call emsdk.bat activate 6.0.0 || exit /b 1
+          call emsdk_env.bat
+          call upstream\emscripten\embuilder.bat build sysroot libc++-mt-noexcept libc++abi-mt-noexcept
+      - name: Install playwright
+        run: |
+          call npm install -g playwright || exit /b 1
+          call playwright install chromium
+      - run: build_and_run_wasm_tests.bat

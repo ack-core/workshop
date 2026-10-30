@@ -48,7 +48,7 @@ https.createServer({
         res.end(data);
     });
 }).listen(9002, async () => {
-    const browser = await chromium.launch();
+    const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ ignoreHTTPSErrors: true });
 
     page.on('console', msg => {
