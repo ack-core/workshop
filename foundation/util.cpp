@@ -3,19 +3,20 @@
 #include <cstring>
 
 namespace util {
-    std::int64_t strstream::atoi(const char *s, std::size_t &len) {
+    std::int64_t strstream::atoi(const char *s, std::size_t &len, std::size_t limit) {
+        const auto at = [s, limit](const char *c) -> char { return std::size_t(c - s) < limit ? *c : 0; };
         const char *input = s;
         std::int64_t sign = 1;
         std::int64_t out = 0;
 
-        if (*input == '+') input++;
-        if (*input == '-' && std::isdigit(*(input + 1))) {
+        if (at(input) == '+') input++;
+        if (at(input) == '-' && std::isdigit(at(input + 1))) {
             sign = -1;
             input++;
         }
 
         int base = 10;
-        if (input[0] == '0' && input[1] == 'x') {
+        if (at(input) == '0' && at(input + 1) == 'x') {
             base = 16;
             input += 2;
         }
@@ -24,11 +25,11 @@ namespace util {
         while (true) {
             int digit;
 
-            if (std::isdigit(*input))
+            if (std::isdigit(at(input)))
                 digit = *input - '0';
-            else if (base == 16 && *input >= 'a' && *input <= 'f')
+            else if (base == 16 && at(input) >= 'a' && at(input) <= 'f')
                 digit = *input - 'a' + 10;
-            else if (base == 16 && *input >= 'A' && *input <= 'F')
+            else if (base == 16 && at(input) >= 'A' && at(input) <= 'F')
                 digit = *input - 'A' + 10;
             else
                 break;
@@ -45,11 +46,12 @@ namespace util {
         len = input - s;
         return out * sign;
     }
-    double strstream::atof(const char *s, std::size_t &len) { // TODO: precision is not good
+    double strstream::atof(const char *s, std::size_t &len, std::size_t limit) { // TODO: precision is not good
+        const auto at = [s, limit](const char *c) -> char { return std::size_t(c - s) < limit ? *c : 0; };
         const char *p = s;
 
         int sign = 1;
-        if (*p == '+' || *p == '-') {
+        if (at(p) == '+' || at(p) == '-') {
             if (*p == '-') {
                 sign = -1;
             }
@@ -59,16 +61,16 @@ namespace util {
         double value = 0.0;
         std::size_t digitCount = 0;
 
-        while (std::isdigit(static_cast<unsigned char>(*p))) {
+        while (std::isdigit(static_cast<unsigned char>(at(p)))) {
             value = value * 10.0 + (*p - '0');
             ++digitCount;
             ++p;
         }
 
-        if (*p == '.') {
+        if (at(p) == '.') {
             ++p;
             double factor = 0.1;
-            while (std::isdigit(static_cast<unsigned char>(*p))) {
+            while (std::isdigit(static_cast<unsigned char>(at(p)))) {
                 value += (*p - '0') * factor;
                 factor *= 0.1;
                 ++digitCount;
