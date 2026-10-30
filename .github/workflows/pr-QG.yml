@@ -45,7 +45,7 @@ jobs:
           call emsdk.bat install 6.0.0 || exit /b 1
           call emsdk.bat activate 6.0.0 || exit /b 1
           call emsdk_env.bat
-          call upstream\emscripten\embuilder.bat build sysroot libc++-mt-noexcept libc++abi-mt-noexcept
+          embuilder build sysroot libc++-mt-noexcept libc++abi-mt-noexcept
       - name: Install playwright
         run: |
           call npm install -g playwright || exit /b 1
