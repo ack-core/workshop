@@ -1,18 +1,21 @@
+# Developer bot: an autonomous loop that runs Claude Code skills to develop the engine.
+
 import json
 import os
 import re
 import subprocess
+import sys
 import time
 
 LOOP_WAIT_MAX_SEC = 60
 OPEN_PR_MAX = 1
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-REPORT_PATH = os.path.join(REPO_ROOT, ".claude", "tmp", "tests-coverage-report.txt")
+REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
 LOG_PATH = os.path.join(REPO_ROOT, "dev-bot.log")
 
 
 def run(*cmd):
-    result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+    result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
         log(result.stdout + result.stderr)
         result.check_returncode()
@@ -30,29 +33,91 @@ def has_candidates():
         return re.search(r"Candidates:\s*-+\s*[^-\s]", f.read()) is not None
 
 
-def open_prs_count():
-    return len(json.loads(run("gh", "pr", "list", "--state", "open", "--json", "number", "--limit", "1000")))
+def open_prs():
+    return json.loads(run("gh", "pr", "list", "--state", "open", "--json", "title,url,latestReviews,reviewRequests", "--limit", "1000"))
+
+
+def repo_owner():
+    return run("gh", "repo", "view", "--json", "owner", "--jq", ".owner.login").strip()
+
+
+def has_requested_changes(pr, owner):
+    if any(request.get("login") == owner for request in pr["reviewRequests"]):
+        return False
+    return any(review["state"] == "CHANGES_REQUESTED" and review["author"]["login"] == owner for review in pr["latestReviews"])
+
+
+def specific_title_count(titles, marker):
+    return sum(marker in title for title in titles)
 
 
 def log(msg):
-    print(msg)
+    print(msg, flush=True)
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(f"{msg}\n")
 
 
+def claude(prompt, *allowed_tools):
+    cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--allowedTools", *allowed_tools)
+    with subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") as proc:
+        try:
+            for line in proc.stdout:
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    event = None
+                if not isinstance(event, dict):
+                    log(line.rstrip())
+                elif event.get("type") == "assistant":
+                    for block in event.get("message", {}).get("content", []):
+                        if block.get("type") == "text":
+                            log(block.get("text"))
+                        elif block.get("type") == "tool_use":
+                            log(f"> {block.get('name')} {json.dumps(block.get('input'))[:200]}")
+                elif event.get("type") == "result":
+                    if event.get("is_error"):
+                        log(f"Error: {event.get('result') or event.get('subtype')}")
+                    for denial in event.get("permission_denials") or []:
+                        log(f"Denied: {denial.get('tool_name')} {json.dumps(denial.get('tool_input'))[:200]}")
+        except BaseException:
+            proc.kill()
+            raise
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+
+def step():
+    if is_repo_dirty():
+        log("Repo is dirty")
+        return
+    prs = open_prs()
+    titles = [pr["title"] for pr in prs]
+    prs_count = len(titles)
+    log(f"open PRs: {prs_count}")
+    if prs_count >= OPEN_PR_MAX:
+        owner = repo_owner()
+        pr_url = next((pr["url"] for pr in prs if has_requested_changes(pr, owner)), None)
+        if pr_url:
+            log(f"Fixing requested changes in {pr_url}...")
+            claude(f"/pr-requested-fix THE_PR={pr_url}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+        return
+    if not has_candidates() and not specific_title_count(titles, "[TEST]"):
+        log("Making test coverage report...")
+        run("git", "switch", "master")
+        run("git", "pull", "--ff-only")
+        claude("/tests-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
+    if has_candidates():
+        log("Writing a test...")
+        claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+
+
 def main():
+    sys.stdout.reconfigure(errors="replace")
     while True:
-        if is_repo_dirty():
-            log("Repo is dirty")
-        else:
-            if not has_candidates():
-                log("Making test coverage report...")
-                log(run("claude", "-p", "/tests-coverage", "--allowedTools", "Read", "Glob", "Grep", "Edit(.claude/tmp/tests-coverage-report.txt)"))
-            prs_count = open_prs_count()
-            log(f"open PRs: {prs_count}")
-            if prs_count < OPEN_PR_MAX:
-                log("Writing a test...")
-                log(run("claude", "-p", "/test-writer", "--allowedTools", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell"))
+        try:
+            step()
+        except Exception as e:
+            log(f"Error: {e}")
         time.sleep(LOOP_WAIT_MAX_SEC)
 
 

@@ -21,7 +21,7 @@ Areas:
 Study areas being tested: what approximate percentage of their capabilities is tested, what capabilities are untested.
 Area % = tested capabilities ÷ all capabilities declared in the area
 
-Write the report to `.claude/tmp/tests-coverage-report.txt` (create the folder if missing, overwrite the file if it exists).
+Write the report to `tmp/tests-coverage-report.txt` (create the folder if missing, overwrite the file if it exists).
 The file must contain exactly two blocks, `Area:` and `Candidates:`, separated by one empty line, with nothing before, between or after them.
 The example below is for format only: do not copy its rows, and `...` stands for more rows of the same form.
 
