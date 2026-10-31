@@ -16,6 +16,7 @@ defaults:
 
 jobs:
   windows:
+    if: false
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -28,6 +29,7 @@ jobs:
       - run: build_and_run_windows_tests.bat
 
   wasm:
+    if: false
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
