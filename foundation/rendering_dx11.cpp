@@ -266,30 +266,9 @@ namespace foundation {
             return;
         }
 
-        ComPtr<ID3D11Texture2D> backBuffer;
-        _swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-        _device->CreateRenderTargetView(backBuffer.Get(), nullptr, &_defaultRTView);
-
-        // default depth
-
-        D3D11_TEXTURE2D_DESC depthDesc = {};
-        depthDesc.Width = width;
-        depthDesc.Height = height;
-        depthDesc.MipLevels = 1;
-        depthDesc.ArraySize = 1;
-        depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        depthDesc.SampleDesc.Count = 1;
-        depthDesc.Usage = D3D11_USAGE_DEFAULT;
-        depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-
-        ComPtr<ID3D11Texture2D> depthTexture;
-
-        if ((hresult = _device->CreateTexture2D(&depthDesc, nullptr, &depthTexture)) != S_OK) {
-            _platform->logError("[RENDER] Default depth texture creation failed with result = %p", hresult);
+        if (_createDefaultTargets() == false) {
             return;
         }
-
-        _device->CreateDepthStencilView(depthTexture.Get(), nullptr, &_defaultDepthView);
 
         // frame constants
 
@@ -388,6 +367,9 @@ namespace foundation {
         _device->CreateSamplerState(&samplerDesc, &_samplerStates[int(SamplerType::LINEAR)]);
 
 #if defined(IS_TESTS)
+        ComPtr<ID3D11Texture2D> backBuffer;
+        _swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+
         D3D11_TEXTURE2D_DESC readbackDesc = {};
         backBuffer->GetDesc(&readbackDesc);
         readbackDesc.Usage = D3D11_USAGE_STAGING;
@@ -425,10 +407,56 @@ namespace foundation {
         _frameConstants.rtBounds = math::vector4f(float(width), float(height), 0.0f, 0.0f);
         _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
 
+        _resizeToken = _platform->addResizeHandler([this]() {
+            // swap chain buffers can't be resized while referenced
+            _context->OMSetRenderTargets(0, nullptr, nullptr);
+            _defaultRTView.Reset();
+            _defaultDepthView.Reset();
+            _context->Flush();
+
+            const HRESULT hresult = _swapChain->ResizeBuffers(0, std::uint32_t(_platform->getScreenWidth()), std::uint32_t(_platform->getScreenHeight()), DXGI_FORMAT_UNKNOWN, 0);
+
+            if (hresult != S_OK) {
+                _platform->logError("[RENDER] Swap chain resize failed with result = %p", hresult);
+                return;
+            }
+
+            _createDefaultTargets();
+        });
+
         _platform->logMsg("[RENDER] Initialization : complete");
     }
 
-    Direct3D11Rendering::~Direct3D11Rendering() {}
+    Direct3D11Rendering::~Direct3D11Rendering() {
+        _platform->removeEventHandler(_resizeToken);
+    }
+
+    bool Direct3D11Rendering::_createDefaultTargets() {
+        ComPtr<ID3D11Texture2D> backBuffer;
+        _swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+        _device->CreateRenderTargetView(backBuffer.Get(), nullptr, &_defaultRTView);
+
+        D3D11_TEXTURE2D_DESC depthDesc = {};
+        depthDesc.Width = std::uint32_t(_platform->getScreenWidth());
+        depthDesc.Height = std::uint32_t(_platform->getScreenHeight());
+        depthDesc.MipLevels = 1;
+        depthDesc.ArraySize = 1;
+        depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        depthDesc.SampleDesc.Count = 1;
+        depthDesc.Usage = D3D11_USAGE_DEFAULT;
+        depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+        HRESULT hresult;
+        ComPtr<ID3D11Texture2D> depthTexture;
+
+        if ((hresult = _device->CreateTexture2D(&depthDesc, nullptr, &depthTexture)) != S_OK) {
+            _platform->logError("[RENDER] Default depth texture creation failed with result = %p", hresult);
+            return false;
+        }
+
+        _device->CreateDepthStencilView(depthTexture.Get(), nullptr, &_defaultDepthView);
+        return true;
+    }
 
     void Direct3D11Rendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
         _frameConstants.plmVPMatrix = vp;

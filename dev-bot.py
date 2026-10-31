@@ -62,6 +62,7 @@ def log(msg):
 
 
 def claude(prompt, *allowed_tools):
+    log("----------------------------------------------------------------")
     cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--thinking", "adaptive", "--thinking-display", "summarized", "--allowedTools", *allowed_tools)
     with subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") as proc:
         try:
@@ -90,6 +91,7 @@ def claude(prompt, *allowed_tools):
             raise
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd)
+    log("----------------------------------------------------------------")
 
 
 def step():
@@ -113,7 +115,7 @@ def step():
     log("There is a space for new PRs...")
     
     if not has_candidates() and not specific_title_count(titles, "[TEST]"):
-        log("Making test coverage report...")
+        log("But test coverage report is empty, making a new one...")
         run("git", "switch", "master")
         run("git", "pull", "--ff-only")
         claude("/tests-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")

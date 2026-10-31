@@ -151,10 +151,10 @@ namespace {
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformKeyboardEventArgs &)>>> g_keyboardHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<void()>>> g_resizeHandlers;
 
     util::callback<void(float)> g_updateAndDraw;
-    util::callback<void()> g_resizeHandler;
-    
+
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
 }
 
@@ -283,7 +283,12 @@ namespace foundation {
     EventHandlerToken WASMPlatform::addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) {
         return nullptr;
     }
-    
+    EventHandlerToken WASMPlatform::addResizeHandler(util::callback<void()> &&handler) {
+        EventHandlerToken token = g_tokenCounter++;
+        g_resizeHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        return token;
+    }
+
     void WASMPlatform::removeEventHandler(EventHandlerToken token) {
         for (auto index = g_editorHandlers.begin(); index != g_editorHandlers.end(); ++index) {
             if (index->first == token) {
@@ -303,14 +308,31 @@ namespace foundation {
                 return;
             }
         }
+        for (auto index = g_resizeHandlers.begin(); index != g_resizeHandlers.end(); ++index) {
+            if (index->first == token) {
+                g_resizeHandlers.erase(index);
+                return;
+            }
+        }
+    }
+
+    void WASMPlatform::sendPointerEvent(const PlatformPointerEventArgs &args) {
+        for (auto &index : g_pointerHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
+    }
+    void WASMPlatform::sendKeyboardEvent(const PlatformKeyboardEventArgs &args) {
+        for (auto &index : g_keyboardHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
     }
     
     void WASMPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
-    }
-    
-    void WASMPlatform::setResizeHandler(util::callback<void()> &&handler) {
-        g_resizeHandler = std::move(handler);
     }
     
     void WASMPlatform::exit(int returnCode) {
@@ -416,8 +438,8 @@ extern "C" {
         g_width = w;
         g_height = h;
         
-        if (g_resizeHandler) {
-            g_resizeHandler();
+        for (auto &index : g_resizeHandlers) {
+            index.second();
         }
     }
     void fileLoaded(std::uint16_t *block, std::size_t pathLen, std::uint8_t *data, std::size_t length) {

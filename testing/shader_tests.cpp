@@ -3,7 +3,7 @@
 
 namespace test {
     bool shader_bad_args_test(const API& api) {
-        // Shader should not be crated if attributes are empty and repeat <= 1
+        // Shader should not be crated if attributes are empty and repeat == 0
         //
         const char* shaderSrc0 = R"()";
         const char* shaderSrc1 = R"(
@@ -17,7 +17,9 @@ namespace test {
         const foundation::InputLayout layout0 = foundation::InputLayout{
             .repeat = 3
         };
-        const foundation::InputLayout layout1 = foundation::InputLayout{};
+        const foundation::InputLayout layout1 = foundation::InputLayout{
+            .repeat = 0
+        };
         foundation::RenderShaderPtr shader0 = api.rendering->createShader(shaderSrc0, layout0, true);
         EXPECT_EQ(shader0, nullptr);
         foundation::RenderShaderPtr shader1 = api.rendering->createShader(shaderSrc1, layout1, true);

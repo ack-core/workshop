@@ -654,7 +654,9 @@ namespace core {
         
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
-        
+
+        foundation::EventHandlerToken _resizeToken = foundation::INVALID_EVENT_TOKEN;
+
         foundation::RenderTexturePtr _palette;
         
         foundation::RenderShaderPtr _arrowShader;
@@ -997,7 +999,7 @@ namespace core {
     }
     
     SceneInterfaceImpl::~SceneInterfaceImpl() {
-        
+        _platform->removeEventHandler(_resizeToken);
     }
     
     void SceneInterfaceImpl::setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift) {
@@ -1142,7 +1144,7 @@ namespace core {
             });
 
             _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
-            _platform->setResizeHandler([&]() {
+            _resizeToken = _platform->addResizeHandler([this]() {
                 _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
             });
         }
