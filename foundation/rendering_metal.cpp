@@ -223,6 +223,7 @@ namespace foundation {
             _platform->logMsg("[RENDER] Initialization : Metal");
             
             _device = MTLCreateSystemDefaultDevice();
+            _platform->logMsg("[RENDER] Device : %s", _device ? _device.name.UTF8String : "nil");
             _commandQueue = [_device newCommandQueue];
             _frameBufferingSemaphore = dispatch_semaphore_create(BUFFERED_FRAMES_MAX);
             
@@ -717,16 +718,42 @@ namespace foundation {
     }
         
     std::unique_ptr<std::uint8_t[]> MetalRendering::presentFrame() {
+        std::unique_ptr<std::uint8_t[]> result;
         _finishRenderCommandEncoder();
-        
+
         if (_view && _currentCommandBuffer) {
             MetalRendering *m = this;
-            
+
+#if defined(IS_TESTS)
+            const std::uint32_t rowLength = TESTING_RENDER_WIDTH * 4;
+            const std::uint32_t frameLength = rowLength * TESTING_RENDER_HEIGHT;
+            id<MTLBuffer> readback = [_device newBufferWithLength:frameLength options:MTLResourceStorageModeShared];
+            id<MTLBlitCommandEncoder> blit = [_currentCommandBuffer blitCommandEncoder];
+
+            [blit copyFromTexture:_view.currentDrawable.texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(TESTING_RENDER_WIDTH, TESTING_RENDER_HEIGHT, 1) toBuffer:readback destinationOffset:0 destinationBytesPerRow:rowLength destinationBytesPerImage:frameLength];
+            [blit endEncoding];
+#endif
+
             [_currentCommandBuffer presentDrawable:_view.currentDrawable];
             [_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
                 dispatch_semaphore_signal(m->_frameBufferingSemaphore);
             }];
             [_currentCommandBuffer commit];
+
+#if defined(IS_TESTS)
+            [_currentCommandBuffer waitUntilCompleted];
+
+            const std::uint8_t *bgra = static_cast<const std::uint8_t *>([readback contents]);
+            result = std::make_unique<std::uint8_t[]>(frameLength);
+
+            for (std::uint32_t i = 0; i < frameLength; i += 4) {
+                result[i + 0] = bgra[i + 2];
+                result[i + 1] = bgra[i + 1];
+                result[i + 2] = bgra[i + 0];
+                result[i + 3] = bgra[i + 3];
+            }
+#endif
+
             _currentCommandBuffer = [_commandQueue commandBuffer];
             
             _constantsBuffersIndex = (_constantsBuffersIndex + 1) % BUFFERED_FRAMES_MAX;
@@ -738,10 +765,10 @@ namespace foundation {
             dispatch_semaphore_wait(_frameBufferingSemaphore, DISPATCH_TIME_FOREVER);
         }
 
-        return nullptr;
+        return result;
     }
     
-    void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
+    bool MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
         std::uint32_t roundedSize = roundTo256(size);
         
         if (_constantsBufferOffset + roundedSize < CONSTANT_BUFFER_OFFSET_MAX) {
