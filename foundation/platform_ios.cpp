@@ -412,6 +412,10 @@ namespace foundation {
     
     void *IOSPlatform::attachNativeRenderingContext(void *context) {
         g_mtkView.device = (__bridge id<MTLDevice>)context;
+#if defined(IS_TESTS)
+        g_mtkView.framebufferOnly = NO;
+        g_mtkView.drawableSize = CGSizeMake(TESTING_RENDER_WIDTH, TESTING_RENDER_HEIGHT);
+#endif
         return (__bridge void *)g_mtkView;
     }
     
