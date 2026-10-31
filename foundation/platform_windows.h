@@ -33,11 +33,11 @@ namespace foundation {
         EventHandlerToken addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) override;
         EventHandlerToken addPointerEventHandler(util::callback<bool(const PlatformPointerEventArgs &)> &&handler, bool setTop) override;
         EventHandlerToken addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) override;
+        EventHandlerToken addResizeHandler(util::callback<void()> &&handler) override;
 
         void removeEventHandler(EventHandlerToken token) override;
 
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
-        void setResizeHandler(util::callback<void()> &&handler) override;
         void exit(int returnCode) override;
 
         void logMsg(const char *fmt, ...) override;

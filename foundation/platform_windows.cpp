@@ -2,7 +2,6 @@
 // TODO:
 // + gamepad
 // + text input
-// + window resize
 
 #ifdef PLATFORM_WINDOWS
 
@@ -37,19 +36,23 @@ namespace {
 #endif
     const unsigned BUFFER_SIZE = 65536;
 
+    unsigned g_width = APP_WIDTH;
+    unsigned g_height = APP_HEIGHT;
+    RECT g_minWindowRect { 0, 0, LONG(APP_WIDTH), LONG(APP_HEIGHT) };
+
     char g_buffer[BUFFER_SIZE];
     std::atomic<bool> g_killed {false};
     int g_returnCode = 0;
 
     std::weak_ptr<foundation::PlatformInterface> g_instance;
     util::callback<void(float)> g_updateAndDraw;
-    util::callback<void()> g_resizeHandler;
 
     foundation::EventHandlerToken g_tokenCounter = reinterpret_cast<foundation::EventHandlerToken>(0x100);
 
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformKeyboardEventArgs &)>>> g_keyboardHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<void()>>> g_resizeHandlers;
 
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
@@ -200,6 +203,30 @@ namespace {
                 g_killed = true;
                 return 0;
             }
+            case WM_GETMINMAXINFO:
+            {
+                MINMAXINFO *info = reinterpret_cast<MINMAXINFO *>(lParam);
+                info->ptMinTrackSize.x = g_minWindowRect.right - g_minWindowRect.left;
+                info->ptMinTrackSize.y = g_minWindowRect.bottom - g_minWindowRect.top;
+                return 0;
+            }
+#if !defined(IS_TESTS)
+            case WM_SIZE:
+            {
+                const unsigned width = LOWORD(lParam);
+                const unsigned height = HIWORD(lParam);
+
+                if (wParam != SIZE_MINIMIZED && (width != g_width || height != g_height)) {
+                    g_width = width;
+                    g_height = height;
+
+                    for (auto &index : g_resizeHandlers) {
+                        index.second();
+                    }
+                }
+                break;
+            }
+#endif
             case WM_KEYDOWN:
             {
                 if ((lParam & 0x40000000) == 0) {
@@ -333,13 +360,10 @@ namespace foundation {
         wc.lpszMenuName = NULL;
         wc.lpszClassName = APP_CLASS_NAME;
 
-        int tmpstyle = (WS_SYSMENU | WS_MINIMIZEBOX);
-        int wndborderx = ::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER);
-        int wndbordery = ::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER);
-        int wndcaption = ::GetSystemMetrics(SM_CYCAPTION);
+        ::AdjustWindowRect(&g_minWindowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
         ::RegisterClassW(&wc);
-        _window = ::CreateWindowW(APP_CLASS_NAME, APP_CLASS_NAME, tmpstyle, CW_USEDEFAULT, CW_USEDEFAULT, APP_WIDTH + wndborderx * 2, APP_HEIGHT + wndcaption + wndbordery * 2, HWND_DESKTOP, NULL, _hinst, NULL);
+        _window = ::CreateWindowW(APP_CLASS_NAME, APP_CLASS_NAME, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, g_minWindowRect.right - g_minWindowRect.left, g_minWindowRect.bottom - g_minWindowRect.top, HWND_DESKTOP, NULL, _hinst, NULL);
 
         ::ShowWindow(_window, SW_NORMAL);
         ::UpdateWindow(_window);
@@ -375,10 +399,10 @@ namespace foundation {
     }
 
     float WindowsPlatform::getScreenWidth() const {
-        return float(APP_WIDTH);
+        return float(g_width);
     }
     float WindowsPlatform::getScreenHeight() const {
-        return float(APP_HEIGHT);
+        return float(g_height);
     }
 
     void *WindowsPlatform::attachNativeRenderingContext(void *context) {
@@ -398,8 +422,8 @@ namespace foundation {
 
             DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { 0 };
 
-            swapChainDesc.Width = APP_WIDTH;
-            swapChainDesc.Height = APP_HEIGHT;
+            swapChainDesc.Width = g_width;
+            swapChainDesc.Height = g_height;
             swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             swapChainDesc.Stereo = false;
             swapChainDesc.SampleDesc.Count = 1;
@@ -459,19 +483,19 @@ namespace foundation {
     EventHandlerToken WindowsPlatform::addGamepadEventHandler(util::callback<bool(const PlatformGamepadEventArgs &)> &&handler, bool setTop) {
         return nullptr;
     }
+    EventHandlerToken WindowsPlatform::addResizeHandler(util::callback<void()> &&handler) {
+        return addHandler(g_resizeHandlers, std::move(handler), false);
+    }
 
     void WindowsPlatform::removeEventHandler(EventHandlerToken token) {
         removeHandler(g_editorHandlers, token);
         removeHandler(g_pointerHandlers, token);
         removeHandler(g_keyboardHandlers, token);
+        removeHandler(g_resizeHandlers, token);
     }
 
     void WindowsPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
-    }
-
-    void WindowsPlatform::setResizeHandler(util::callback<void()> &&handler) {
-        g_resizeHandler = std::move(handler); // window has fixed size, so never called
     }
 
     void WindowsPlatform::exit(int returnCode) {

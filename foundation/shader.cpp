@@ -1014,7 +1014,7 @@ namespace foundation {
         std::string resultvs, resultfs;
         error.clear();
         
-        if (!layout.attributes.empty() || layout.repeat > 1) {
+        if (!layout.attributes.empty() || layout.repeat >= 1) {
             while (input >> blockName) {
                 if (fixedBlockDone == false && blockName == "fixed" && (input >> util::sequence("{"))) {
                     if (formFixedBlock(input, shaderBlockFixed) == false) {
@@ -1116,7 +1116,7 @@ namespace foundation {
             }
         }
         else {
-            error = "layout should either have vertex attributes or repeat > 1";
+            error = "layout should either have vertex attributes or repeat > 0";
         }
         
         if (error.empty()) {

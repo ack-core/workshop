@@ -185,21 +185,21 @@ namespace foundation {
         //
         virtual EventHandlerToken addGamepadEventHandler(util::callback<bool(const foundation::PlatformGamepadEventArgs &)> &&handler, bool setTop = false) = 0;
         
+        // Set handlers for window resize
+        // @return nullptr if not supported
+        //
+        virtual EventHandlerToken addResizeHandler(util::callback<void()> &&handler) = 0;
+
         // Remove handlers of any type
         //
         virtual void removeEventHandler(EventHandlerToken token) = 0;
-        
+
         // Start platform update cycle
         // This method blocks execution until application exited
         // Argument of @updateAndDraw is delta time in seconds
         //
         virtual void setLoop(util::callback<void(float)> &&updateAndDraw) = 0;
-        
-        // TODO: addResizeHandler as others
-        // Set handler for window resize
-        //
-        virtual void setResizeHandler(util::callback<void()> &&handler) = 0;
-        
+
         // Breaks platform update cycle and exits the app
         //
         virtual void exit(int returnCode) = 0;

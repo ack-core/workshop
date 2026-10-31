@@ -136,6 +136,7 @@ namespace foundation {
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
 
     private:
+        bool _createDefaultTargets();
         void _applyTextures(const std::pair<RenderTexturePtr, SamplerType> *textures, std::size_t size);
         void _applyDrawConstants(std::uint32_t vertexCount);
 
@@ -150,6 +151,7 @@ namespace foundation {
         _frameConstants;
 
         std::shared_ptr<PlatformInterface> _platform;
+        EventHandlerToken _resizeToken = INVALID_EVENT_TOKEN;
 
         std::shared_ptr<Direct3D11Shader> _currentShader;
         RenderTopology _currentTopology = RenderTopology::TRIANGLES;

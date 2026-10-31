@@ -423,6 +423,10 @@ namespace foundation {
         return nullptr;
     }
     
+    EventHandlerToken IOSPlatform::addResizeHandler(util::callback<void()> &&handler) {
+        return nullptr;
+    }
+
     void IOSPlatform::removeEventHandler(EventHandlerToken token) {
         for (auto index = g_pointerHandlers.begin(); index != g_pointerHandlers.end(); ++index) {
             if (index->first == token) {
@@ -434,10 +438,6 @@ namespace foundation {
     
     void IOSPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
-    }
-    
-    void IOSPlatform::setResizeHandler(util::callback<void()> &&handler) {
-        
     }
     
     void IOSPlatform::exit() {

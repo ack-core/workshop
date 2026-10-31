@@ -4,7 +4,7 @@ description: Skill to make a report about current tests coverage and candidates 
 disable-model-invocation: true
 ---
 
-Single interface/class capability - is ability of doing something that could be logically separated from other abilities:
+Single interface/class/function capability - is ability of doing something that could be logically separated from other abilities:
 - All ctors/dtors is a single capability. 
 - Ability to launch a task and return the result is other example of capability.
 - Ability to save different arguments in the passed lambda (callback test) - single capability.
@@ -17,7 +17,8 @@ Areas:
 - 'platform' is testing everything declared/defined by platform.h
 - 'rendering' is testing everything declared/defined by rendering.h
 
-In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_SCREENSHOT_TEST macro. Study areas and capabilities being tested. Find what is untested.
+In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_SCREENSHOT_TEST macro. Study areas and capabilities being tested. 
+Find what is untested and could be easily tested through existing code.
 Write the report to `tmp/tests-coverage-report.txt` (create the folder if missing, overwrite the file if it exists).
 The file must contain exactly one `Candidates:` block with the list of untested capabilities (candidates).
 The example below is for format only: do not copy its rows, and `...` stands for more rows of the same form.
