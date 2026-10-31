@@ -223,7 +223,6 @@ namespace foundation {
             _platform->logMsg("[RENDER] Initialization : Metal");
             
             _device = MTLCreateSystemDefaultDevice();
-            _platform->logMsg("[RENDER] Device : %s", _device ? _device.name.UTF8String : "nil");
             _commandQueue = [_device newCommandQueue];
             _frameBufferingSemaphore = dispatch_semaphore_create(BUFFERED_FRAMES_MAX);
             

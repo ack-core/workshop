@@ -16,11 +16,10 @@ defaults:
 
 jobs:
   windows:
-    if: false
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - run: pip install pypng
@@ -29,14 +28,13 @@ jobs:
       - run: build_and_run_windows_tests.bat
 
   wasm:
-    if: false
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - run: pip install pypng ninja
@@ -61,10 +59,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - run: pip install pypng
