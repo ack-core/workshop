@@ -471,6 +471,11 @@ namespace foundation {
     }
     
     void IOSPlatform::exit(int returnCode) {
+#if defined(IS_TESTS)
+        NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        std::ofstream(std::string(documents.UTF8String) + "/exit_code") << returnCode;
+#endif
+        fflush(stdout);
         _exit(returnCode);
     }
     
