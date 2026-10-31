@@ -28,6 +28,7 @@ namespace {
     
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const std::string &, const std::string &)>>> g_editorHandlers;
     std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformPointerEventArgs &)>>> g_pointerHandlers;
+    std::list<std::pair<foundation::EventHandlerToken, util::callback<bool(const foundation::PlatformKeyboardEventArgs &)>>> g_keyboardHandlers;
 
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
@@ -401,7 +402,14 @@ namespace foundation {
     }
     
     EventHandlerToken IOSPlatform::addKeyboardEventHandler(util::callback<bool(const PlatformKeyboardEventArgs &)> &&handler, bool setTop) {
-        return nullptr;
+        EventHandlerToken token = g_tokenCounter++;
+        if (setTop) {
+            g_keyboardHandlers.emplace_front(std::make_pair(token, std::move(handler)));
+        }
+        else {
+            g_keyboardHandlers.emplace_back(std::make_pair(token, std::move(handler)));
+        }
+        return token;
     }
     
     EventHandlerToken IOSPlatform::addInputEventHandler(util::callback<bool(const char(&utf8char)[4])> &&input, bool setTop) {
@@ -434,8 +442,30 @@ namespace foundation {
                 return;
             }
         }
+        for (auto index = g_keyboardHandlers.begin(); index != g_keyboardHandlers.end(); ++index) {
+            if (index->first == token) {
+                g_keyboardHandlers.erase(index);
+                return;
+            }
+        }
     }
-    
+
+    void IOSPlatform::sendPointerEvent(const PlatformPointerEventArgs &args) {
+        for (auto &index : g_pointerHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
+    }
+
+    void IOSPlatform::sendKeyboardEvent(const PlatformKeyboardEventArgs &args) {
+        for (auto &index : g_keyboardHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
+    }
+
     void IOSPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
     }

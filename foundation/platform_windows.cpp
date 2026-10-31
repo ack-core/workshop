@@ -494,6 +494,42 @@ namespace foundation {
         removeHandler(g_resizeHandlers, token);
     }
 
+    void WindowsPlatform::sendPointerEvent(const PlatformPointerEventArgs &args) {
+        using EventType = PlatformPointerEventArgs::EventType;
+
+        const bool right = args.flags.isRightButton != 0;
+        const WPARAM buttons = (right ? MK_RBUTTON : 0) | (args.flags.isLeftButton != 0 || !right ? MK_LBUTTON : 0);
+        const LPARAM position = MAKELPARAM(short(args.coordinateX), short(args.coordinateY));
+
+        POINT screenPosition { LONG(args.coordinateX), LONG(args.coordinateY) }; // wheel coordinates are in screen space
+        ::ClientToScreen(_window, &screenPosition);
+
+        switch (args.type) {
+            case EventType::START: ::SendMessage(_window, right ? WM_RBUTTONDOWN : WM_LBUTTONDOWN, buttons, position); return;
+            case EventType::FINISH: ::SendMessage(_window, right ? WM_RBUTTONUP : WM_LBUTTONUP, 0, position); return;
+            case EventType::MOVE: ::SendMessage(_window, WM_MOUSEMOVE, buttons, position); return;
+            case EventType::HOVER: ::SendMessage(_window, WM_MOUSEMOVE, 0, position); return;
+            case EventType::WHEEL: ::SendMessage(_window, WM_MOUSEWHEEL, MAKEWPARAM(0, args.flags.wheel * WHEEL_DELTA), MAKELPARAM(screenPosition.x, screenPosition.y)); return;
+        }
+
+        for (auto &index : g_pointerHandlers) { // no native message
+            if (index.second(args)) {
+                break;
+            }
+        }
+    }
+
+    void WindowsPlatform::sendKeyboardEvent(const PlatformKeyboardEventArgs &args) {
+        for (WPARAM vk = 0; vk < 256; vk++) {
+            Key key;
+
+            if (translateKey(vk, key) && key == args.key) {
+                ::SendMessage(_window, args.type == PlatformKeyboardEventArgs::EventType::PRESS ? WM_KEYDOWN : WM_KEYUP, vk, 0);
+                return;
+            }
+        }
+    }
+
     void WindowsPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);
     }

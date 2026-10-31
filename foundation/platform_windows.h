@@ -37,6 +37,9 @@ namespace foundation {
 
         void removeEventHandler(EventHandlerToken token) override;
 
+        void sendPointerEvent(const PlatformPointerEventArgs &args) override;
+        void sendKeyboardEvent(const PlatformKeyboardEventArgs &args) override;
+
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void exit(int returnCode) override;
 

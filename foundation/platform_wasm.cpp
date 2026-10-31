@@ -315,6 +315,21 @@ namespace foundation {
             }
         }
     }
+
+    void WASMPlatform::sendPointerEvent(const PlatformPointerEventArgs &args) {
+        for (auto &index : g_pointerHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
+    }
+    void WASMPlatform::sendKeyboardEvent(const PlatformKeyboardEventArgs &args) {
+        for (auto &index : g_keyboardHandlers) {
+            if (index.second(args)) {
+                break;
+            }
+        }
+    }
     
     void WASMPlatform::setLoop(util::callback<void(float)> &&updateAndDraw) {
         g_updateAndDraw = std::move(updateAndDraw);

@@ -194,6 +194,12 @@ namespace foundation {
         //
         virtual void removeEventHandler(EventHandlerToken token) = 0;
 
+        // Simulate user's input. Goes through the native event queue if platform allows, otherwise calls handlers directly
+        // On PC: START/MOVE/FINISH use left button if isRightButton is not set, MOVE without buttons is HOVER
+        //
+        virtual void sendPointerEvent(const foundation::PlatformPointerEventArgs &args) = 0;
+        virtual void sendKeyboardEvent(const foundation::PlatformKeyboardEventArgs& args) = 0;
+
         // Start platform update cycle
         // This method blocks execution until application exited
         // Argument of @updateAndDraw is delta time in seconds

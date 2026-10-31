@@ -40,7 +40,10 @@ namespace foundation {
         EventHandlerToken addResizeHandler(util::callback<void()> &&handler) override;
         
         void removeEventHandler(EventHandlerToken token) override;
-        
+
+        void sendPointerEvent(const PlatformPointerEventArgs &args) override;
+        void sendKeyboardEvent(const PlatformKeyboardEventArgs &args) override;
+
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void exit() override;
         
