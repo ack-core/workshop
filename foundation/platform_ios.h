@@ -53,5 +53,6 @@ namespace foundation {
     private:
         std::mutex _logMutex;
         std::string _executableDirectoryPath;
+        std::string _documentsPath;
     };
 }

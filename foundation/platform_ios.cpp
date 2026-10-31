@@ -284,12 +284,12 @@ namespace foundation {
         
         class FileLoadTask : public AsyncTask {
         public:
-            FileLoadTask(const char *filePath, util::callback<void(ByteDataPtr &&, std::size_t)> &&completion) : _path(filePath), _size(0), _completion(std::move(completion)) {}
+            FileLoadTask(std::string &&filePath, std::string &&fallbackPath, util::callback<void(ByteDataPtr &&, std::size_t)> &&completion) : _path(std::move(filePath)), _fallbackPath(std::move(fallbackPath)), _size(0), _completion(std::move(completion)) {}
             ~FileLoadTask() {}
             
         public:
             void executeInBackground() override {
-                std::fstream fileStream(_path, std::ios::binary | std::ios::in | std::ios::ate);
+                std::fstream fileStream(std::filesystem::exists(_path) ? _path : _fallbackPath, std::ios::binary | std::ios::in | std::ios::ate);
                 
                 if (fileStream.is_open() && fileStream.good()) {
                     std::size_t fileSize = std::size_t(fileStream.tellg());
@@ -305,9 +305,43 @@ namespace foundation {
             
         private:
             std::string _path;
+            std::string _fallbackPath;
             ByteDataPtr _data;
             std::size_t _size;
             util::callback<void(ByteDataPtr &&, std::size_t)> _completion;
+        };
+
+        class FileSaveTask : public AsyncTask {
+        public:
+            FileSaveTask(std::string &&filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) : _path(std::move(filePath)), _data(data, data + size), _result(false), _completion(std::move(completion)) {}
+            ~FileSaveTask() override {}
+
+        public:
+            void executeInBackground() override {
+                std::error_code error;
+
+                if (_data.empty()) {
+                    _result = std::filesystem::remove(_path, error);
+                }
+                else {
+                    std::filesystem::create_directories(std::filesystem::path(_path).parent_path(), error);
+                    std::fstream fileStream(_path, std::ios::binary | std::ios::out | std::ios::trunc);
+
+                    if (fileStream.is_open() && fileStream.good()) {
+                        fileStream.write((const char *)_data.data(), _data.size());
+                        _result = fileStream.good();
+                    }
+                }
+            }
+            void executeInMainThread() override {
+                _completion(_result);
+            }
+
+        private:
+            std::string _path;
+            std::vector<std::uint8_t> _data;
+            bool _result;
+            util::callback<void(bool)> _completion;
         };
     }
 }
@@ -328,6 +362,7 @@ namespace foundation {
 #endif
 
             _executableDirectoryPath = [[[NSBundle mainBundle] bundlePath] cStringUsingEncoding:NSUTF8StringEncoding];
+            _documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject.UTF8String;
         }
     }
     
@@ -355,12 +390,17 @@ namespace foundation {
         g_asyncWorkCount++;
         {
             std::lock_guard<std::mutex> guard(g_io.mutex);
-            g_io.queue.emplace_back(std::make_unique<FileLoadTask>((_executableDirectoryPath + "/" + filePath).data(), std::move(completion)));
+            g_io.queue.emplace_back(std::make_unique<FileLoadTask>(_executableDirectoryPath + "/" + filePath, _documentsPath + "/" + filePath, std::move(completion)));
         }
         g_io.notifier.notify_one();
     }
     void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
-        completion(false);
+        g_asyncWorkCount++;
+        {
+            std::lock_guard<std::mutex> guard(g_io.mutex);
+            g_io.queue.emplace_back(std::make_unique<FileSaveTask>(_documentsPath + "/" + filePath, data, data ? size : 0, std::move(completion)));
+        }
+        g_io.notifier.notify_one();
     }
     
     float IOSPlatform::getScreenWidth() const {
@@ -472,8 +512,7 @@ namespace foundation {
     
     void IOSPlatform::exit(int returnCode) {
 #if defined(IS_TESTS)
-        NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-        std::ofstream(std::string(documents.UTF8String) + "/exit_code") << returnCode;
+        std::ofstream(_documentsPath + "/exit_code") << returnCode;
 #endif
         fflush(stdout);
         _exit(returnCode);
