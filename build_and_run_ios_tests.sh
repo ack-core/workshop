@@ -8,7 +8,7 @@ xcrun simctl bootstatus "$UDID" -b > /dev/null &
 BOOT=$!
 
 cmake -S . -B ./workshop_ios_tests -G"Xcode" -DCMAKE_TOOLCHAIN_FILE="cmake/toolchain_ios.cmake" -DPLATFORM="PLATFORM_IOS" -DAPPTYPE="IS_TESTS"
-xcodebuild -project workshop_ios_tests/workshop.xcodeproj -target app -configuration Debug -sdk iphonesimulator ARCHS=$(uname -m) CODE_SIGNING_ALLOWED=NO build
+xcodebuild -quiet -project workshop_ios_tests/workshop.xcodeproj -target app -configuration Debug -sdk iphonesimulator ARCHS=$(uname -m) CODE_SIGNING_ALLOWED=NO build
 
 wait $BOOT
 xcrun simctl install "$UDID" "$BINARY/workshop.app"
