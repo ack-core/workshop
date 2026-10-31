@@ -141,7 +141,7 @@ namespace foundation {
         
     private:
         void _initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear);
-        void _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index);
+        bool _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index);
         void _finishRenderCommandEncoder();
         void _applyTextures(const std::pair<RenderTexturePtr, foundation::SamplerType> *textures, std::size_t size);
         

@@ -51,3 +51,19 @@ jobs:
           call npm install -g playwright || exit /b 1
           call playwright install chromium
       - run: build_and_run_wasm_tests.bat
+
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install pypng
+      - run: bash build_and_run_ios_tests.sh

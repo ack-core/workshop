@@ -223,6 +223,7 @@ namespace foundation {
             _platform->logMsg("[RENDER] Initialization : Metal");
             
             _device = MTLCreateSystemDefaultDevice();
+            _platform->logMsg("[RENDER] Device : %s", _device ? _device.name.UTF8String : "nil");
             _commandQueue = [_device newCommandQueue];
             _frameBufferingSemaphore = dispatch_semaphore_create(BUFFERED_FRAMES_MAX);
             
@@ -741,7 +742,7 @@ namespace foundation {
         return nullptr;
     }
     
-    void MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
+    bool MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {
         std::uint32_t roundedSize = roundTo256(size);
         
         if (_constantsBufferOffset + roundedSize < CONSTANT_BUFFER_OFFSET_MAX) {

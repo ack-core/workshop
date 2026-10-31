@@ -230,7 +230,7 @@ elseif (PLATFORM STREQUAL "PLATFORM_IOS")
 	endforeach()
 
 	set_property(TARGET app PROPERTY XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.ack-games.workshop")
-	set_property(TARGET app PROPERTY MACOSX_BUNDLE_INFO_PLIST "${m_binary_root}/info.plist")
+	set_property(TARGET app PROPERTY MACOSX_BUNDLE_INFO_PLIST "${m_binary_root}/Info.plist")
 	set_target_properties(app PROPERTIES OUTPUT_NAME "workshop")
 
 elseif (PLATFORM STREQUAL "PLATFORM_WASM")

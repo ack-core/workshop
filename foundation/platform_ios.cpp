@@ -470,8 +470,8 @@ namespace foundation {
         g_updateAndDraw = std::move(updateAndDraw);
     }
     
-    void IOSPlatform::exit() {
-        _exit(0);
+    void IOSPlatform::exit(int returnCode) {
+        _exit(returnCode);
     }
     
     void IOSPlatform::logMsg(const char *fmt, ...) {
