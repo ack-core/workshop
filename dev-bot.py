@@ -8,7 +8,7 @@ import sys
 import time
 
 LOOP_WAIT_MAX_SEC = 1200
-OPEN_PR_MAX = 1
+OPEN_PR_MAX = 3
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
 LOG_PATH = os.path.join(REPO_ROOT, "dev-bot.log")
@@ -33,8 +33,18 @@ def has_candidates():
         return re.search(r"Candidates:\s*-+\s*[^-\s]", f.read()) is not None
 
 
+def remove_gone_branches():
+    run("git", "fetch", "--prune")
+    refs = run("git", "for-each-ref", "--format=%(refname:short) %(upstream:track)", "refs/heads")
+    gone = [line.split()[0] for line in refs.splitlines() if line.endswith("[gone]")]
+    if gone:
+        log(f"Removing gone branches: {', '.join(gone)}")
+        run("git", "switch", "master")
+        run("git", "branch", "-D", *gone)
+
+
 def open_prs():
-    return json.loads(run("gh", "pr", "list", "--state", "open", "--json", "title,url,latestReviews,reviewRequests", "--limit", "1000"))
+    return json.loads(run("gh", "pr", "list", "--state", "open", "--json", "title,url,latestReviews,reviewRequests,mergeable,statusCheckRollup", "--limit", "1000"))
 
 
 def repo_owner():
@@ -45,6 +55,11 @@ def has_requested_changes(pr, owner):
     if any(request.get("login") == owner for request in pr["reviewRequests"]):
         return False
     return any(review["state"] == "CHANGES_REQUESTED" and review["author"]["login"] == owner for review in pr["latestReviews"])
+
+
+def is_unmergeable(pr):
+    failed = ("FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE", "ACTION_REQUIRED")
+    return pr["mergeable"] == "CONFLICTING" or any(check.get("conclusion") in failed or check.get("state") in failed for check in pr["statusCheckRollup"])
 
 
 def specific_title_count(titles, marker):
@@ -60,9 +75,8 @@ def log(msg):
     print(msg, flush=True)
     log_to_file(msg)
 
-
 def claude(prompt, *allowed_tools):
-    log("----------------------------------------------------------------")
+    log("--- agent run -------------------------------------------------------------")
     cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--thinking", "adaptive", "--thinking-display", "summarized", "--allowedTools", *allowed_tools)
     with subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") as proc:
         try:
@@ -91,38 +105,43 @@ def claude(prompt, *allowed_tools):
             raise
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd)
-    log("----------------------------------------------------------------")
+    log("--- agent end -------------------------------------------------------------")
 
 
 def step():
     if is_repo_dirty():
         log("Repo is dirty")
         return
+        
+    remove_gone_branches()
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
-    prs_count = len(titles)
-    if prs_count >= OPEN_PR_MAX:
+    
+    if specific_title_count(titles, "[TEST]") >= OPEN_PR_MAX:
         log("There are maximum opened PRs, maybe changes requested...")
         owner = repo_owner()
-        pr_url = next((pr["url"] for pr in prs if has_requested_changes(pr, owner)), None)
-        if pr_url:
+        pr_urls = [pr["url"] for pr in prs if has_requested_changes(pr, owner)]
+        for pr_url in pr_urls:
             log(f"Fixing requested changes in {pr_url}...")
             claude(f"/pr-requested-fix THE_PR={pr_url}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
-        else:
+        if not pr_urls:
             log("No changes requested...")
-        return
-    
-    log("There is a space for new PRs...")
-    
-    if not has_candidates() and not specific_title_count(titles, "[TEST]"):
-        log("But test coverage report is empty, making a new one...")
-        run("git", "switch", "master")
-        run("git", "pull", "--ff-only")
-        claude("/tests-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
-    
-    if has_candidates():
-        log("Writing a test...")
-        claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+            for pr in prs:
+                if is_unmergeable(pr):
+                    log(f"Failed checks or conflicts in {pr['url']}")
+            
+    else:
+        log("There is a space for new PRs...")
+
+        if not has_candidates() and not specific_title_count(titles, "[TEST]"):
+            log("But test coverage report is empty, making a new one...")
+            run("git", "switch", "master")
+            run("git", "pull", "--ff-only")
+            claude("/tests-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
+
+        if has_candidates():
+            log("Writing a test...")
+            claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
 
 
 def main():

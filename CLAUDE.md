@@ -13,13 +13,13 @@ Code-first C++ 3D engine for small lowpoly/voxel games
 - testing : tests suite
 
 ## Shell scripts
-- make_<platform>_<app> : generate IDE projects 
-- build_<platform>_<app> : make and build executables
-- build_and_run_<platform>_tests : build and run tests
+- `make_<platform>_<app>` : generate IDE projects 
+- `build_<platform>_<app>` : make and build executables
+- `build_and_run_<platform>_tests` : build and run tests
 
 generated folders:
-binary_<platform>_<app> : built platform executables
-workshop_<platform>_<app> : generated IDE projects
+- `binary_<platform>_<app>` : built platform executables
+- `workshop_<platform>_<app>` : generated IDE projects
 
 ## Human interaction & communication
 - **Be very concise:** No conversational fillers, greetings, apologies, preambles and closing offers

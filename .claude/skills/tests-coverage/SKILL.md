@@ -36,5 +36,5 @@ rendering_red_triangle_on_black_test - Testing ability to draw a single triangle
 - One line per test: `<test name> - <description of what is tested>`.
 - Test name: lowercase snake_case `<area>_<subject>_test`.
 - Test name must not match any name already passed to a `REGISTER_*_TEST` macro.
-- Exactly 20 lines, with no gaps (fewer only if fewer untested capabilities exist).
+- Exactly 10 lines, with no gaps (fewer only if fewer untested capabilities exist).
 - Rank by fundamentality: capability used by others come first. Include completely untested capability.
