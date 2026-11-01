@@ -340,22 +340,13 @@ namespace test {
         bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
             EXPECT_NOT_EQ(_shader, nullptr);
 
-            struct Pixel {
-                std::size_t x, y;
-                std::uint8_t r, b;
-            };
-            const Pixel pixels[] = {
-                { 40, 40, 255, 0 }, { 300, 40, 0, 255 },                    // inside triangles
-                { 220, 40, 0, 0 }, { 40, 300, 0, 0 }, { 300, 300, 0, 0 },   // outside
-            };
-
-            for (const Pixel &pixel : pixels) {
-                const std::size_t offset = (pixel.y * foundation::TESTING_RENDER_WIDTH + pixel.x) * 4;
-                EXPECT_EQ(frame[offset + 0], pixel.r);
-                EXPECT_EQ(frame[offset + 1], 0);
-                EXPECT_EQ(frame[offset + 2], pixel.b);
-                EXPECT_EQ(frame[offset + 3], 255);
-            }
+            // One check per line: the line in the log tells which draw failed
+            //
+            EXPECT_TRUE(isPixel(frame, 40, 40, 255, 0));    // first draw, red triangle
+            EXPECT_TRUE(isPixel(frame, 300, 40, 0, 255));   // second draw, blue triangle
+            EXPECT_TRUE(isPixel(frame, 220, 40, 0, 0));     // between triangles
+            EXPECT_TRUE(isPixel(frame, 40, 300, 0, 0));     // below first triangle
+            EXPECT_TRUE(isPixel(frame, 300, 300, 0, 0));    // below second triangle
             return true;
         }
 
@@ -364,6 +355,11 @@ namespace test {
             math::vector4f offset;
             math::vector4f color;
         };
+
+        static bool isPixel(const std::uint8_t *frame, std::size_t x, std::size_t y, std::uint8_t r, std::uint8_t b) {
+            const std::uint8_t *pixel = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+            return pixel[0] == r && pixel[1] == 0 && pixel[2] == b && pixel[3] == 255;
+        }
 
         foundation::RenderShaderPtr _shader;
     };
