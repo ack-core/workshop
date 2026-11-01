@@ -91,6 +91,33 @@ namespace test {
     };
 }
 
+namespace test {
+    class platform_execute_async_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<platform_execute_async_test>();
+        }
+        void init(const API &api) override {
+            struct Context {
+                int result = 0;
+            };
+            api.platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<Context>>([](Context &ctx) {
+                ctx.result = 42;
+            },
+            [this](Context &ctx) {
+                _result = ctx.result;
+            }));
+        }
+        bool testResult(const API &api) override {
+            EXPECT_EQ(_result, 42);
+            return true;
+        }
+
+    private:
+        int _result = 0;
+    };
+}
+
 
 namespace test {
     void registerPlatformTests(TestRunner& runner) {
@@ -98,5 +125,6 @@ namespace test {
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);
+        REGISTER_STEP_TEST(platform_execute_async_test);
     }
 }
