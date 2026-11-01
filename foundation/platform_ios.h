@@ -45,7 +45,7 @@ namespace foundation {
         void sendKeyboardEvent(const PlatformKeyboardEventArgs &args) override;
 
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
-        void exit() override;
+        void exit(int returnCode) override;
         
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;
@@ -53,5 +53,6 @@ namespace foundation {
     private:
         std::mutex _logMutex;
         std::string _executableDirectoryPath;
+        std::string _documentsPath;
     };
 }

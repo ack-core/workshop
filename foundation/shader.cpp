@@ -1119,6 +1119,9 @@ namespace foundation {
             error = "layout should either have vertex attributes or repeat > 0";
         }
         
+        if (error.empty() && (vssrcBlockDone == false || fssrcBlockDone == false)) {
+            error = "shader must have 'vssrc' and 'fssrc' blocks";
+        }
         if (error.empty()) {
             return std::make_tuple(std::move(resultvs), std::move(resultfs), constBlockLength);
         }
