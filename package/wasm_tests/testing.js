@@ -58,7 +58,10 @@ https.createServer({
         }
         console.log(msg.text());
     });
-    page.on('pageerror', err => console.log(err.message));
+    page.on('pageerror', err => {
+        console.log(err.message);
+        process.exit(1); // uncaught error stops the tests, they never report the result
+    });
 
     await page.goto('https://127.0.0.1:9002/index.html');
     const request = await page.waitForRequest(/\/(success|fail)$/, { timeout: 0 });

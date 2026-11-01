@@ -113,6 +113,7 @@ def step():
         log("Repo is dirty")
         return
         
+    run("git", "switch", "master")
     remove_gone_branches()
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
