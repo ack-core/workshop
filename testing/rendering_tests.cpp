@@ -300,8 +300,6 @@ namespace test {
             return std::make_unique<rendering_shader_constants_test>();
         }
         void init(const API &api) override {
-            // Triangle in the top-left corner, moved and colored by constants
-            //
             const char *shaderSrc = R"(
                 fixed {
                     triangle[3] : float2 = [-0.9, 0.9][-0.4, 0.9][-0.9, 0.4]
@@ -326,8 +324,6 @@ namespace test {
             api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
 
-                // Constants have to be applied per draw: the second draw must not reuse values of the first one
-                //
                 const Constants left = { { 0.0f, 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } };
                 const Constants right = { { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } };
 
@@ -340,8 +336,6 @@ namespace test {
         bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
             EXPECT_NOT_EQ(_shader, nullptr);
 
-            // One check per line: the line in the log tells which draw failed
-            //
             EXPECT_TRUE(isPixel(frame, 40, 40, 255, 0));    // first draw, red triangle
             EXPECT_TRUE(isPixel(frame, 300, 40, 0, 255));   // second draw, blue triangle
             EXPECT_TRUE(isPixel(frame, 220, 40, 0, 0));     // between triangles
