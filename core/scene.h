@@ -115,6 +115,8 @@ namespace core {
         virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
         
         virtual auto getCameraPosition() const -> math::vector3f = 0;
+        virtual auto getCameraDirection() const -> math::vector3f = 0;
+        virtual auto getCameraRight() const -> math::vector3f = 0;
         virtual auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f = 0;
         virtual auto getWorldDirection(const math::vector2f &screenPosition, math::vector3f *outCamPosition = nullptr) const -> math::vector3f = 0;
         

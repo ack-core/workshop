@@ -93,6 +93,7 @@ namespace core {
             const math::vector3f translation = math::vector3f(trfm.m41, trfm.m42, trfm.m43);
             const float yaw = std::atan2(trfm.m31, trfm.m33);
             math::transform3f ctransform = math::transform3f({0, 1, 0}, -yaw).translated(translation);
+            points.clear();
             for (auto &point : _src) {
                 points.emplace_back(point.transformed(ctransform, true));
             }
