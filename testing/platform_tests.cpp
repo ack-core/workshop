@@ -23,7 +23,7 @@ namespace test {
         }
         bool testResult(const API &api) override {
             EXPECT_EQ(_content.size(), 5);
-            EXPECT_EQ(_content, "test5");
+            EXPECT_EQ(_content, "test6");
             return true;
         }
 
