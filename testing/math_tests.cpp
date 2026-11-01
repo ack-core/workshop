@@ -206,6 +206,65 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_arithmetic_test(const API &api) {
+        auto eq2 = [](const math::vector2f &v, float x, float y) { return v.x == x && v.y == y; };
+        auto eq3 = [](const math::vector3f &v, float x, float y, float z) { return v.x == x && v.y == y && v.z == z; };
+        auto eq4 = [](const math::vector4f &v, float x, float y, float z, float w) { return v.x == x && v.y == y && v.z == z && v.w == w; };
+
+        // vector2f
+        const math::vector2f a2(8.0f, 6.0f);
+        const math::vector2f b2(2.0f, 3.0f);
+        EXPECT_TRUE(eq2(a2 + b2, 10.0f, 9.0f));
+        EXPECT_TRUE(eq2(a2 - b2, 6.0f, 3.0f));
+        EXPECT_TRUE(eq2(a2 * b2, 16.0f, 18.0f));
+        EXPECT_TRUE(eq2(a2 / b2, 4.0f, 2.0f));
+        EXPECT_TRUE(eq2(a2 * 2.0f, 16.0f, 12.0f));
+        EXPECT_TRUE(eq2(2.0f * a2.yx, 12.0f, 16.0f));
+        EXPECT_TRUE(eq2(a2.yx / 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq2(24.0f / a2, 3.0f, 4.0f));
+        EXPECT_TRUE(eq2(a2.yx + b2, 8.0f, 11.0f));
+        EXPECT_TRUE(eq2(a2.yx - b2.yx, 3.0f, 6.0f));
+        EXPECT_TRUE(eq2(a2.yy * b2.xx, 12.0f, 12.0f));
+        EXPECT_TRUE(eq2(a2.yx / b2.yx, 2.0f, 4.0f));
+
+        // vector3f
+        const math::vector3f a3(8.0f, 6.0f, 4.0f);
+        const math::vector3f b3(2.0f, 3.0f, 4.0f);
+        EXPECT_TRUE(eq3(a3 + b3, 10.0f, 9.0f, 8.0f));
+        EXPECT_TRUE(eq3(a3 - b3, 6.0f, 3.0f, 0.0f));
+        EXPECT_TRUE(eq3(a3 * b3, 16.0f, 18.0f, 16.0f));
+        EXPECT_TRUE(eq3(a3 / b3, 4.0f, 2.0f, 1.0f));
+        EXPECT_TRUE(eq3(a3 * 2.0f, 16.0f, 12.0f, 8.0f));
+        EXPECT_TRUE(eq3(2.0f * a3.zyx, 8.0f, 12.0f, 16.0f));
+        EXPECT_TRUE(eq3(a3.zyx / 2.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq3(24.0f / a3, 3.0f, 4.0f, 6.0f));
+        EXPECT_TRUE(eq3(a3.zyx + b3, 6.0f, 9.0f, 12.0f));
+        EXPECT_TRUE(eq3(a3.zyx - b3.zxy, 0.0f, 4.0f, 5.0f));
+        EXPECT_TRUE(eq3(a3.zyx * b3, 8.0f, 18.0f, 32.0f));
+        EXPECT_TRUE(eq3(a3.zyx / b3.zyx, 1.0f, 2.0f, 4.0f));
+        EXPECT_TRUE(eq2(a3.zx + b3.xy, 6.0f, 11.0f));
+
+        // vector4f
+        const math::vector4f a4(8.0f, 6.0f, 4.0f, 2.0f);
+        const math::vector4f b4(2.0f, 3.0f, 4.0f, 1.0f);
+        EXPECT_TRUE(eq4(a4 + b4, 10.0f, 9.0f, 8.0f, 3.0f));
+        EXPECT_TRUE(eq4(a4 - b4, 6.0f, 3.0f, 0.0f, 1.0f));
+        EXPECT_TRUE(eq4(a4 * b4, 16.0f, 18.0f, 16.0f, 2.0f));
+        EXPECT_TRUE(eq4(a4 / b4, 4.0f, 2.0f, 1.0f, 2.0f));
+        EXPECT_TRUE(eq4(a4 * 2.0f, 16.0f, 12.0f, 8.0f, 4.0f));
+        EXPECT_TRUE(eq4(2.0f * a4.wzyx, 4.0f, 8.0f, 12.0f, 16.0f));
+        EXPECT_TRUE(eq4(a4.wzyx / 2.0f, 1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq4(24.0f / a4, 3.0f, 4.0f, 6.0f, 12.0f));
+        EXPECT_TRUE(eq4(a4.wzyx + b4, 4.0f, 7.0f, 10.0f, 9.0f));
+        EXPECT_TRUE(eq4(a4.wzyx - b4.wzyx, 1.0f, 0.0f, 3.0f, 6.0f));
+        EXPECT_TRUE(eq4(a4.wzyx * b4, 4.0f, 12.0f, 24.0f, 8.0f));
+        EXPECT_TRUE(eq4(a4.wzyx / b4.wzyx, 2.0f, 1.0f, 2.0f, 4.0f));
+        EXPECT_TRUE(eq2(a4.wy * b4.zx, 8.0f, 12.0f));
+        EXPECT_TRUE(eq3(a4.xyz - b4.zyx, 4.0f, 3.0f, 2.0f));
+
+        return true;
+    }
 }
 
 
@@ -215,5 +274,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector2f_swizzle_test);
         REGISTER_UNIT_TEST(math_vector3f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector4f_ctor_assignment_test);
+        REGISTER_UNIT_TEST(math_vector_arithmetic_test);
     }
 }
