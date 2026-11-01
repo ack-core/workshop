@@ -288,7 +288,6 @@ namespace foundation {
                     NSError *nsError = nil;
                     MTLCompileOptions* compileOptions = [MTLCompileOptions new];
                     compileOptions.languageVersion = MTLLanguageVersion2_0;
-                    compileOptions.fastMathEnabled = true;
                     
                     id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
                     
