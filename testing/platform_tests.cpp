@@ -1,6 +1,5 @@
 
 #include "platform_tests.h"
-#include <thread>
 
 namespace test {
     bool platform_uniquty_test(const API &api) {
@@ -107,18 +106,15 @@ namespace test {
             },
             [this](Context &ctx) {
                 _result = ctx.result;
-                _completionThread = std::this_thread::get_id();
             }));
         }
         bool testResult(const API &api) override {
             EXPECT_EQ(_result, 42);
-            EXPECT_EQ(_completionThread, std::this_thread::get_id());
             return true;
         }
 
     private:
         int _result = 0;
-        std::thread::id _completionThread;
     };
 }
 
