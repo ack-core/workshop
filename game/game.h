@@ -72,7 +72,7 @@ namespace game {
         //    &makeContext<GameDataContext>,
         //    &makeContext<CommonUIContext, GameDataInterface>,
         //    &makeContext<CastleContext, GameDataInterface>,
-        //    &makeContext<ConstructionUIContext, CastleInterface>,
+        //    &makeContext<ConstructionUIContext, GameDataInterface, CastleInterface>,
         //}},
         //{"battle", {
         //    &makeContext<GameDataContext>,

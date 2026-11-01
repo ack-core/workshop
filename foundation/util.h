@@ -569,7 +569,7 @@ namespace util {
         void goTo_1() {
             _direction = true;
         }
-        void update(float dtSec) {
+        bool update(float dtSec) {
             _reached = false;
             if (_direction) {
                 if (_koeff < 1.0f) {
@@ -578,6 +578,7 @@ namespace util {
                         _koeff = 1.0f;
                         _reached = true;
                     }
+                    return true;
                 }
             }
             else {
@@ -587,8 +588,10 @@ namespace util {
                         _koeff = 0.0f;
                         _reached = true;
                     }
+                    return true;
                 }
             }
+            return false;
         }
         bool hasReached_0() {
             if (_direction == false && _reached) {
@@ -601,6 +604,19 @@ namespace util {
             if (_direction == true && _reached) {
                 _reached = false;
                 return true;
+            }
+            return false;
+        }
+        bool inProgress() const {
+            if (_direction) {
+                if (_koeff < 1.0f) {
+                    return true;
+                }
+            }
+            else {
+                if (_koeff > 0.0f) {
+                    return true;
+                }
             }
             return false;
         }

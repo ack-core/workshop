@@ -633,6 +633,8 @@ namespace core {
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) -> ParticlesPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
+        auto getCameraDirection() const -> math::vector3f override;
+        auto getCameraRight() const -> math::vector3f override;
         auto getScreenCoordinates(const math::vector3f &worldPosition) const -> math::vector2f override;
         auto getWorldDirection(const math::vector2f &screenPosition, math::vector3f *outCamPosition) const -> math::vector3f override;
         void updateAndDraw(float dtSec) override;
@@ -1074,6 +1076,12 @@ namespace core {
     
     math::vector3f SceneInterfaceImpl::getCameraPosition() const {
         return _camera.position;
+    }
+    math::vector3f SceneInterfaceImpl::getCameraDirection() const {
+        return _camera.forward;
+    }
+    math::vector3f SceneInterfaceImpl::getCameraRight() const {
+        return _camera.right;
     }
     
     math::vector2f SceneInterfaceImpl::getScreenCoordinates(const math::vector3f &worldPosition) const {
