@@ -16,7 +16,7 @@ namespace {
         std::size_t sizeInBytes;
     };
 
-#ifdef PLATFORM_IOS
+#if PLATFORM_IOS || PLATFORM_MAC
     const ShaderTypeInfo TYPE_SIZE_TABLE[TYPES_COUNT] = {
         // Passing from App side
         {"float4",  "float4",   16},
@@ -86,7 +86,7 @@ namespace {
         std::uint32_t components;
     };
 
-#ifdef PLATFORM_IOS
+#if PLATFORM_IOS || PLATFORM_MAC
     const NativeVertexFormat VTX_CONVERSION_TABLE[] = { // index is InputAttributeFormat value
         {"float2",  "packed_half2",          4, 2},
         {"float4",  "packed_half4",          8, 4},
@@ -284,7 +284,7 @@ namespace foundation {
 }
 
 namespace {
-#ifdef PLATFORM_IOS
+#if PLATFORM_IOS || PLATFORM_MAC
     static const std::uint32_t VS_INPUT_VERTEX_COUNT = 3;
 
     void transformTypes(std::string &code) {

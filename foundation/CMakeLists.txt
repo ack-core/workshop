@@ -13,6 +13,8 @@ set(
 	"${m_source_root}/platform_windows.cpp"
 	"${m_source_root}/platform_ios.h"
 	"${m_source_root}/platform_ios.cpp"
+	"${m_source_root}/platform_mac.h"
+	"${m_source_root}/platform_mac.cpp"
 	"${m_source_root}/platform_wasm.h"
 	"${m_source_root}/platform_wasm.cpp"
 	"${m_source_root}/layouts.h"
@@ -45,9 +47,10 @@ add_library(foundation
 
 set_property(TARGET foundation PROPERTY FOLDER "engine")
 
-if(${PLATFORM} STREQUAL "PLATFORM_IOS")
+if(${PLATFORM} STREQUAL "PLATFORM_IOS" OR ${PLATFORM} STREQUAL "PLATFORM_MAC")
 	target_compile_options(foundation PUBLIC "-fobjc-arc")
 	set_source_files_properties(${m_source_root}/platform_ios.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
+	set_source_files_properties(${m_source_root}/platform_mac.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
 	set_source_files_properties(${m_source_root}/rendering_metal.cpp PROPERTIES XCODE_EXPLICIT_FILE_TYPE sourcecode.cpp.objcpp)
 endif()
 

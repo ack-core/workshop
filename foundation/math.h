@@ -777,7 +777,7 @@ namespace math {
         scalar yS = scalar(1.0f) / std::tan(fovY * scalar(0.5));
         scalar xS = yS / aspect;
         
-#if PLATFORM_IOS
+#if PLATFORM_IOS || PLATFORM_MAC
         scalar dN = scalar(0.0f);
         scalar dF = scalar(1.0f);
 #elif PLATFORM_WASM

@@ -2,7 +2,7 @@
 #include <vector>
 #include <algorithm>
 
-#ifdef PLATFORM_IOS
+#if PLATFORM_IOS || PLATFORM_MAC
 
 #if ! __has_feature(objc_arc)
 #error "ARC is off"
@@ -810,4 +810,4 @@ namespace foundation {
     }
 }
 
-#endif // PLATFORM_IOS
+#endif // PLATFORM_IOS || PLATFORM_MAC
