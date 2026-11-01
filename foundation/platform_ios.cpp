@@ -68,7 +68,14 @@ namespace {
             }
         }
     }
-    
+    void backgroundThreadPush(BackgroundThread &threadData, std::unique_ptr<foundation::AsyncTask> &&task) {
+        g_asyncWorkCount++;
+        {
+            std::lock_guard<std::mutex> guard(threadData.mutex);
+            threadData.queue.emplace_back(std::move(task));
+        }
+        threadData.notifier.notify_one();
+    }
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
@@ -374,12 +381,7 @@ namespace foundation {
     }
     
     void IOSPlatform::executeAsync(std::unique_ptr<AsyncTask> &&task) {
-        g_asyncWorkCount++;
-        {
-            std::lock_guard<std::mutex> guard(g_worker.mutex);
-            g_worker.queue.emplace_back(std::move(task));
-        }
-        g_worker.notifier.notify_one();
+        backgroundThreadPush(g_worker, std::move(task));
     }
     
     bool IOSPlatform::isAsyncWorkInProgress() const {
@@ -387,20 +389,10 @@ namespace foundation {
     }
     
     void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
-        g_asyncWorkCount++;
-        {
-            std::lock_guard<std::mutex> guard(g_io.mutex);
-            g_io.queue.emplace_back(std::make_unique<FileLoadTask>(_executableDirectoryPath + "/" + filePath, _documentsPath + "/" + filePath, std::move(completion)));
-        }
-        g_io.notifier.notify_one();
+        backgroundThreadPush(g_io, std::make_unique<FileLoadTask>(_executableDirectoryPath + "/" + filePath, _documentsPath + "/" + filePath, std::move(completion)));
     }
     void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
-        g_asyncWorkCount++;
-        {
-            std::lock_guard<std::mutex> guard(g_io.mutex);
-            g_io.queue.emplace_back(std::make_unique<FileSaveTask>(_documentsPath + "/" + filePath, data, data ? size : 0, std::move(completion)));
-        }
-        g_io.notifier.notify_one();
+        backgroundThreadPush(g_io, std::make_unique<FileSaveTask>(_documentsPath + "/" + filePath, data, data ? size : 0, std::move(completion)));
     }
     
     float IOSPlatform::getScreenWidth() const {

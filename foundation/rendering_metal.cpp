@@ -2,7 +2,7 @@
 #include <vector>
 #include <algorithm>
 
-#ifdef PLATFORM_IOS
+#if PLATFORM_IOS || PLATFORM_MAC
 
 #if ! __has_feature(objc_arc)
 #error "ARC is off"
@@ -288,7 +288,6 @@ namespace foundation {
                     NSError *nsError = nil;
                     MTLCompileOptions* compileOptions = [MTLCompileOptions new];
                     compileOptions.languageVersion = MTLLanguageVersion2_0;
-                    compileOptions.fastMathEnabled = true;
                     
                     id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
                     
@@ -810,4 +809,4 @@ namespace foundation {
     }
 }
 
-#endif // PLATFORM_IOS
+#endif // PLATFORM_IOS || PLATFORM_MAC
