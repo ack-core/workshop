@@ -187,7 +187,7 @@ namespace util {
         template<typename T, typename std::enable_if_t<std::is_integral_v<T>>* = nullptr> strstream &operator >> (T& value) {
             skipws();
             std::size_t len = 0;
-            const std::int64_t v = atoi(_current, len);
+            const std::int64_t v = atoi(_current, len, _end - _current);
             if (len) {
                 value = T(v);
                 _current += len;
@@ -200,7 +200,7 @@ namespace util {
         template<typename T, typename std::enable_if_t<std::is_floating_point_v<T>>* = nullptr> strstream &operator >> (T& value) {
             skipws();
             std::size_t len = 0;
-            const double v = atof(_current, len);
+            const double v = atof(_current, len, _end - _current);
             if (len) {
                 value = T(v);
                 _current += len;
@@ -222,8 +222,8 @@ namespace util {
             return *this;
         }
         
-        static std::int64_t atoi(const char *s, std::size_t &len);
-        static double atof(const char *s, std::size_t &len);
+        static std::int64_t atoi(const char *s, std::size_t &len, std::size_t limit = SIZE_MAX);
+        static double atof(const char *s, std::size_t &len, std::size_t limit = SIZE_MAX);
         
         static std::size_t ptow(std::uint16_t *p, const void *ptr);
         static std::size_t ltow(std::uint16_t *p, std::int64_t value);
