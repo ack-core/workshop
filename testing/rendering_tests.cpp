@@ -180,9 +180,9 @@ namespace test {
             // Triangle in the bottom-right corner, 0.1 margin from screen edges in NDC
             //
             const float vertexes[] = {
-                0.9f, -0.9f, 0.0f, 1.0f, 0.0f, 1.0f,
+                0.9f, -0.9f, 1.0f, 0.0f, 0.0f, 1.0f,
                 0.4f, -0.9f, 0.0f, 1.0f, 0.0f, 1.0f,
-                0.9f, -0.4f, 0.0f, 1.0f, 0.0f, 1.0f,
+                0.9f, -0.4f, 0.0f, 0.0f, 1.0f, 1.0f,
             };
             _shader = api.rendering->createShader(shaderSrc, layout);
             _data = api.rendering->createData(layout, vertexes, 3);
@@ -199,18 +199,19 @@ namespace test {
 
             struct Pixel {
                 std::size_t x, y;
-                bool green;
+                int r, g, b;
             };
             const Pixel pixels[] = {
-                { 480, 480, true }, { 370, 480, true }, { 480, 370, true },     // inside corners
-                { 420, 491, false }, { 491, 420, false }, { 417, 417, false },  // outside edges
+                { 484, 484, 255, 0, 0 }, { 361, 484, 0, 255, 0 }, { 484, 361, 0, 0, 255 },  // near corners
+                { 420, 491, 0, 0, 0 }, { 491, 420, 0, 0, 0 }, { 417, 417, 0, 0, 0 },        // outside edges
             };
+            const int tolerance = 16;
 
             for (const Pixel &pixel : pixels) {
                 const std::size_t offset = (pixel.y * foundation::TESTING_RENDER_WIDTH + pixel.x) * 4;
-                EXPECT_EQ(frame[offset + 0], 0);
-                EXPECT_EQ(frame[offset + 1], pixel.green ? 255 : 0);
-                EXPECT_EQ(frame[offset + 2], 0);
+                EXPECT_LT(std::abs(frame[offset + 0] - pixel.r), tolerance);
+                EXPECT_LT(std::abs(frame[offset + 1] - pixel.g), tolerance);
+                EXPECT_LT(std::abs(frame[offset + 2] - pixel.b), tolerance);
                 EXPECT_EQ(frame[offset + 3], 255);
             }
             return true;
