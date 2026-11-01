@@ -244,11 +244,15 @@ namespace {
 - (void)rightMouseUp:(NSEvent *)event {
     [self pointerEvent:foundation::PlatformPointerEventArgs::EventType::FINISH event:event left:false right:true wheel:0];
 }
+- (void)dragged:(NSEvent *)event {
+    const NSUInteger buttons = NSEvent.pressedMouseButtons;
+    [self pointerEvent:foundation::PlatformPointerEventArgs::EventType::MOVE event:event left:(buttons & 1) != 0 right:(buttons & 2) != 0 wheel:0];
+}
 - (void)mouseDragged:(NSEvent *)event {
-    [self pointerEvent:foundation::PlatformPointerEventArgs::EventType::MOVE event:event left:true right:false wheel:0];
+    [self dragged:event];
 }
 - (void)rightMouseDragged:(NSEvent *)event {
-    [self pointerEvent:foundation::PlatformPointerEventArgs::EventType::MOVE event:event left:false right:true wheel:0];
+    [self dragged:event];
 }
 - (void)mouseMoved:(NSEvent *)event {
     [self pointerEvent:foundation::PlatformPointerEventArgs::EventType::HOVER event:event left:false right:false wheel:0];
