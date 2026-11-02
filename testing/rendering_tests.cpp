@@ -152,6 +152,77 @@ namespace test {
     };
 }
 
+namespace test {
+    class rendering_static_data_triangle_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<rendering_static_data_triangle_test>();
+        }
+        void init(const API &api) override {
+            const char *shaderSrc = R"(
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(vertex_position, 0.5, 1.0);
+                    output_color = vertex_color;
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT2},
+                    {"color", foundation::InputAttributeFormat::FLOAT4},
+                }
+            };
+            // Triangle in the bottom-right corner, 0.1 margin from screen edges in NDC
+            //
+            const float vertexes[] = {
+                0.9f, -0.9f, 1.0f, 0.0f, 0.0f, 1.0f,
+                0.4f, -0.9f, 0.0f, 1.0f, 0.0f, 1.0f,
+                0.9f, -0.4f, 0.0f, 0.0f, 1.0f, 1.0f,
+            };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+            _data = api.rendering->createData(layout, vertexes, 3);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(_data);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_data, nullptr);
+
+            struct Pixel {
+                std::size_t x, y;
+                int r, g, b;
+            };
+            const Pixel pixels[] = {
+                { 484, 484, 255, 0, 0 }, { 361, 484, 0, 255, 0 }, { 484, 361, 0, 0, 255 },  // near corners
+                { 420, 491, 0, 0, 0 }, { 491, 420, 0, 0, 0 }, { 417, 417, 0, 0, 0 },        // outside edges
+            };
+            const int tolerance = 16;
+
+            for (const Pixel &pixel : pixels) {
+                const std::size_t offset = (pixel.y * foundation::TESTING_RENDER_WIDTH + pixel.x) * 4;
+                EXPECT_LT(std::abs(frame[offset + 0] - pixel.r), tolerance);
+                EXPECT_LT(std::abs(frame[offset + 1] - pixel.g), tolerance);
+                EXPECT_LT(std::abs(frame[offset + 2] - pixel.b), tolerance);
+                EXPECT_EQ(frame[offset + 3], 255);
+            }
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderDataPtr _data;
+    };
+}
+
 
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
@@ -159,5 +230,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST(rendering_fill_green_test);
         REGISTER_SCREENSHOT_TEST(rendering_white_line_on_black_test);
         REGISTER_SCREENSHOT_TEST(rendering_red_triangle_on_black_test);
+        REGISTER_SCREENSHOT_TEST(rendering_static_data_triangle_test);
     }
 }
