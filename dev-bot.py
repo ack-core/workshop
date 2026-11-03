@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-LOOP_WAIT_MAX_SEC = 1200
+LOOP_WAIT_MAX_SEC = 600
 OPEN_PR_MAX = 3
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
@@ -45,6 +45,10 @@ def remove_gone_branches():
 
 def open_prs():
     return json.loads(run("gh", "pr", "list", "--state", "open", "--json", "title,url,latestReviews,reviewRequests,mergeable,statusCheckRollup", "--limit", "1000"))
+
+
+def assigned_issues():
+    return run("gh", "issue", "list", "--assignee", "@me", "--json", "number", "--jq", ".[].number", "--limit", "1000").split()
 
 
 def repo_owner():
@@ -117,9 +121,13 @@ def step():
     remove_gone_branches()
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
-    
+
+    issues = assigned_issues()
+    if issues:
+        log(f"Assigned issues: {', '.join(issues)}")
+
     if specific_title_count(titles, "[TEST]") >= OPEN_PR_MAX:
-        log("There are maximum opened PRs, maybe changes requested...")
+        log("There are maximum opened PRs with tests, maybe changes requested...")
         owner = repo_owner()
         pr_urls = [pr["url"] for pr in prs if has_requested_changes(pr, owner)]
         for pr_url in pr_urls:
@@ -130,6 +138,7 @@ def step():
             for pr in prs:
                 if is_unmergeable(pr):
                     log(f"Failed checks or conflicts in {pr['url']}")
+                    claude(f"/pr-advance THE_PR={pr['url']}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
             
     else:
         log("There is a space for new PRs...")
