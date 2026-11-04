@@ -4,7 +4,7 @@
 namespace layouts {
     namespace {
         const foundation::InputLayout VTXMVOX = foundation::InputLayout {
-            .repeat = 12,
+            .repeat = 18,
             .attributes = {
                 {"position_color_mask", foundation::InputAttributeFormat::SHORT4},
             }
