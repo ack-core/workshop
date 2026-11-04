@@ -223,6 +223,76 @@ namespace test {
     };
 }
 
+namespace test {
+    class rendering_strip_quads_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<rendering_strip_quads_test>();
+        }
+        void init(const API &api) override {
+            // Two strip quads: red in the top-left, green in the bottom-right, 0.1 margin from screen edges and center in NDC
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.8][0.8, 0.8][0.0, 0.0][0.8, 0.0]
+                    offset[2] : float2 = [-0.9, 0.1][0.1, -0.9]
+                    color[2] : float4 = [1.0, 0.0, 0.0, 1.0][0.0, 1.0, 0.0, 1.0]
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] + fixed_offset[vertex_ID], 0.5, 1.0);
+                    output_color = fixed_color[vertex_ID];
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 4
+            };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(2);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == 0 && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(35, 35, 255, 0));    // red quad: top-left (1st triangle)
+            EXPECT_TRUE(pixelIs(220, 35, 255, 0));   // red quad: top-right
+            EXPECT_TRUE(pixelIs(35, 220, 255, 0));   // red quad: bottom-left
+            EXPECT_TRUE(pixelIs(220, 220, 255, 0));  // red quad: bottom-right (2nd triangle)
+            EXPECT_TRUE(pixelIs(128, 128, 255, 0));  // red quad: center
+            EXPECT_TRUE(pixelIs(291, 291, 0, 255));  // green quad: top-left (1st triangle)
+            EXPECT_TRUE(pixelIs(476, 291, 0, 255));  // green quad: top-right
+            EXPECT_TRUE(pixelIs(291, 476, 0, 255));  // green quad: bottom-left
+            EXPECT_TRUE(pixelIs(476, 476, 0, 255));  // green quad: bottom-right (2nd triangle)
+            EXPECT_TRUE(pixelIs(384, 384, 0, 255));  // green quad: center
+            EXPECT_TRUE(pixelIs(15, 128, 0, 0));     // outside red quad: left
+            EXPECT_TRUE(pixelIs(240, 128, 0, 0));    // outside red quad: right
+            EXPECT_TRUE(pixelIs(128, 240, 0, 0));    // outside red quad: bottom
+            EXPECT_TRUE(pixelIs(496, 384, 0, 0));    // outside green quad: right
+            EXPECT_TRUE(pixelIs(384, 496, 0, 0));    // outside green quad: bottom
+            EXPECT_TRUE(pixelIs(384, 128, 0, 0));    // empty top-right corner
+            EXPECT_TRUE(pixelIs(128, 384, 0, 0));    // empty bottom-left corner
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _shader;
+    };
+}
+
 
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
@@ -231,5 +301,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST(rendering_white_line_on_black_test);
         REGISTER_SCREENSHOT_TEST(rendering_red_triangle_on_black_test);
         REGISTER_SCREENSHOT_TEST(rendering_static_data_triangle_test);
+        REGISTER_SCREENSHOT_TEST(rendering_strip_quads_test);
     }
 }
