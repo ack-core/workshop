@@ -804,10 +804,10 @@ namespace {
     )";
     const char *g_voxelMeshShaderSrc = R"(
         fixed {
-            cube[12] : float4 =
-                [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
-                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, -0.5, 1.0]
-                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
+            cube[18] : float4 =
+                [-0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, -0.5, 0.5, 1.0][0.5, -0.5, 0.5, 1.0]
+                [0.5, -0.5, 0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, -0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][0.5, 0.5, -0.5, 1.0]
+                [0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, -0.5, 1.0][-0.5, 0.5, -0.5, 1.0][0.5, 0.5, 0.5, 1.0][-0.5, 0.5, 0.5, 1.0]
             normal[6] : float4 =
                 [0.0, 0.0, -1.0, 0.0][-1.0, 0.0, 0.0, 0.0][0.0, -1.0, 0.0, 0.0][0.0, 0.0, 1.0, 0.0][1.0, 0.0, 0.0, 0.0][0.0, 1.0, 0.0, 0.0]
         }
@@ -822,7 +822,7 @@ namespace {
             float3 worldCubePos = _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
             float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - worldCubePos, 0.0)).xyz);
             
-            uint faceIndex = uint(repeat_ID / 4) + uint((toCamSign.zxy[repeat_ID / 4] * 1.5 + 1.5));
+            uint faceIndex = uint(repeat_ID / 6) + uint((toCamSign.zxy[repeat_ID / 6] * 1.5 + 1.5));
             uint colorIndex = uint(vertex_position_color_mask.w & 0xff);
             uint mask = uint((vertex_position_color_mask.w >> (uint(8) + faceIndex)) & 1);
             
@@ -947,7 +947,7 @@ namespace {
                 [1.12,0.43,0.50][-0.24,-0.56,-0.73][-0.60,0.35,-0.28][0.22,0.20,-0.52][0.38,-0.27,-0.19][-0.03,0.35,-0.19][-0.22,-0.26,0.07][-0.11,0.05,-0.27]
                 [0.43,-1.16,-0.41][0.42,0.66,-0.54][0.35,-0.08,0.66][-0.44,0.02,0.41][0.46,0.20,0.01][0.36,-0.17,0.04][0.12,0.22,0.25][0.10,-0.24,0.15]
                 [-0.45,-0.84,0.88][-0.64,-0.31,-0.63][-0.31,0.68,0.02][-0.28,0.35,-0.40][0.05,-0.01,0.50][0.14,-0.22,-0.30][0.11,0.32,0.10][-0.29,0.05,0.04]
-            quad[4] : float4 = [-1, 1, 0, 0][1, 1, 1, 0][-1, -1, 0, 1][1, -1, 1, 1]
+            quad[6] : float4 = [-1, 1, 0, 0][1, 1, 1, 0][-1, -1, 0, 1][-1, -1, 0, 1][1, 1, 1, 0][1, -1, 1, 1]
         }
         inout {
             uv : float2
@@ -1148,7 +1148,7 @@ namespace core {
                 .repeat = 4
             });
             _gbufferToScreenShader = _rendering->createShader(g_gbufferToScreenShaderSrc, foundation::InputLayout{
-                .repeat = 4
+                .repeat = 6
             });
 
             _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
@@ -1182,7 +1182,7 @@ namespace core {
                     }
                 }
             
-                rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
+                rendering.applyShader(_voxelMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
                 for (const auto &voxelMesh : _voxelMeshes) {
                     if (voxelMesh->enabled) {
                         const math::transform3f transform = voxelMesh->getFinalTransform();
@@ -1199,7 +1199,7 @@ namespace core {
 
             });
             _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
-                rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
                 rendering.applyTextures({
                     {_palette, foundation::SamplerType::NEAREST},
                     {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
