@@ -28,4 +28,4 @@ jobs:
           ISSUE=$(printf '%s' "$BODY" | grep -oiP '\bresolves:?\s*#\K[0-9]+' | head -n1 || true)
           SUBJECT="$TITLE (#$PR)"
           [ -n "$ISSUE" ] && SUBJECT="Resolves #$ISSUE - $SUBJECT"
-          gh pr merge "$PR" --repo "$GH_REPO" --squash --delete-branch --match-head-commit "$SHA" --subject "$SUBJECT" --body ""
+          gh pr merge "$PR" --repo "$GH_REPO" --auto --squash --delete-branch --match-head-commit "$SHA" --subject "$SUBJECT" --body ""
