@@ -293,6 +293,72 @@ namespace test {
     };
 }
 
+namespace test {
+    class rendering_shader_constants_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<rendering_shader_constants_test>();
+        }
+        void init(const API &api) override {
+            const char *shaderSrc = R"(
+                fixed {
+                    triangle[3] : float2 = [-0.9, 0.9][-0.4, 0.9][-0.9, 0.4]
+                }
+                const {
+                    offset : float4
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_triangle[repeat_ID], 0.5, 1.0) + const_offset;
+                }
+                fssrc {
+                    output_color[0] = const_color;
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 3
+            };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+
+                const Constants left = { { 0.0f, 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } };
+                const Constants right = { { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } };
+
+                rendering.applyShaderConstants(&left);
+                rendering.draw(1);
+                rendering.applyShaderConstants(&right);
+                rendering.draw(1);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+
+            EXPECT_TRUE(isPixel(frame, 40, 40, 255, 0));    // first draw, red triangle
+            EXPECT_TRUE(isPixel(frame, 300, 40, 0, 255));   // second draw, blue triangle
+            EXPECT_TRUE(isPixel(frame, 220, 40, 0, 0));     // between triangles
+            EXPECT_TRUE(isPixel(frame, 40, 300, 0, 0));     // below first triangle
+            EXPECT_TRUE(isPixel(frame, 300, 300, 0, 0));    // below second triangle
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f offset;
+            math::vector4f color;
+        };
+
+        static bool isPixel(const std::uint8_t *frame, std::size_t x, std::size_t y, std::uint8_t r, std::uint8_t b) {
+            const std::uint8_t *pixel = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+            return pixel[0] == r && pixel[1] == 0 && pixel[2] == b && pixel[3] == 255;
+        }
+
+        foundation::RenderShaderPtr _shader;
+    };
+}
+
 
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
@@ -302,5 +368,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST(rendering_red_triangle_on_black_test);
         REGISTER_SCREENSHOT_TEST(rendering_static_data_triangle_test);
         REGISTER_SCREENSHOT_TEST(rendering_strip_quads_test);
+        REGISTER_SCREENSHOT_TEST(rendering_shader_constants_test);
     }
 }
