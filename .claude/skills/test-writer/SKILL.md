@@ -5,7 +5,6 @@ disable-model-invocation: true
 ---
 
 We are adding a new test to the test suite (`testing` folder).
-If at any step it is not possible to continue as described, stop immediately, discard uncommitted changes and report what happened.
 Do these steps in exact order:
 
 1. In the file `tmp/tests-coverage-report.txt` get the first line in the 'Candidates' block. It has the format `<test name> - <description of what is tested>`, one line per test.
@@ -13,6 +12,7 @@ Do these steps in exact order:
 2. Switch the repo to the fresh master. Make a branch named `test/<area>_<subject>` or similar and switch to it.
 3. Study some existing tests and how they work. Implement the described test and register it with suitable `REGISTER_*(...)` macro
    - If the test is more than 60 (for unit tests) and 120 (for step/rendering tests) lines of code split it into a few logically different tests with their own class/function names.
+   - Assertion line is the only information available if a test fails. Make sure that different checks don't end up on the same line.
    - Questions for self-check during implementation:
      - is there a simpler implementation? Simplify
      - is it already tested somewhere or repeating itself? Test what aren’t covered yet

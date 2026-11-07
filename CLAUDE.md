@@ -30,3 +30,4 @@ generated folders:
 
 ## Code values
 - **Less code - is better**
+- **Good code doesn't need comments**
