@@ -216,7 +216,7 @@ namespace foundation {
         //
         virtual void exit(int returnCode) = 0;
 
-        // Returns count of registered event handlers and alive file tasks
+        // Returns counters usable in statistics and testing
         //
         virtual const StatInfo &getStatistics() const = 0;
 
