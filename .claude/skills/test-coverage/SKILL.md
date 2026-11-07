@@ -1,5 +1,5 @@
 ---
-name: tests-coverage
+name: test-coverage
 description: Skill to make a report about current tests coverage and candidates for new tests
 disable-model-invocation: true
 ---
