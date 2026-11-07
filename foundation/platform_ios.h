@@ -46,6 +46,7 @@ namespace foundation {
 
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void exit(int returnCode) override;
+        const StatInfo &getStatistics() const override;
         
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;

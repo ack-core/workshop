@@ -19,6 +19,7 @@ namespace {
     std::uint32_t g_width;
     std::uint32_t g_height;
     std::size_t g_asyncWorkCount = 0;
+    foundation::PlatformInterface::StatInfo g_statistics;
 }
 
 void fatal() {
@@ -180,6 +181,7 @@ namespace foundation {
         const std::string fullPath = _dataPath + filePath;
         const std::size_t len = fullPath.length();
         g_asyncWorkCount++;
+        g_statistics.fileLoadTasksCount++;
 
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * len));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
@@ -198,6 +200,7 @@ namespace foundation {
         using cbtype = util::callback<void(bool)>;
         const std::size_t pathLen = std::strlen(filePath);
         g_asyncWorkCount++;
+        g_statistics.fileSaveTasksCount++;
         
         std::uint8_t *block = reinterpret_cast<std::uint8_t *>(malloc(sizeof(cbtype) + sizeof(std::uint16_t) * pathLen));
         std::uint16_t *path = reinterpret_cast<std::uint16_t *>(block + sizeof(cbtype));
@@ -338,6 +341,11 @@ namespace foundation {
     void WASMPlatform::exit(int returnCode) {
         js_exit(returnCode);
     }
+
+    const WASMPlatform::StatInfo &WASMPlatform::getStatistics() const {
+        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
+        return g_statistics;
+    }
     
     void WASMPlatform::logMsg(const char *fmt, ...) {
         va_list arglist;
@@ -449,6 +457,7 @@ extern "C" {
         cb->~cbtype();
         ::free(cb);
         g_asyncWorkCount--;
+        g_statistics.fileLoadTasksCount--;
     }
     void fileSaved(std::uint16_t *block, std::size_t pathLen, int result) {
         using cbtype = util::callback<void(bool)>;
@@ -457,6 +466,7 @@ extern "C" {
         cb->~cbtype();
         ::free(cb);
         g_asyncWorkCount--;
+        g_statistics.fileSaveTasksCount--;
     }
     void taskExecute(foundation::AsyncTask *ptr) {
         // TODO:

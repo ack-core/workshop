@@ -57,6 +57,7 @@ namespace {
     std::vector<std::unique_ptr<foundation::AsyncTask>> g_foregroundQueue;
     std::mutex g_foregroundMutex;
     std::size_t g_asyncWorkCount = 0;
+    foundation::PlatformInterface::StatInfo g_statistics;
 
     struct BackgroundThread {
         std::thread thread;
@@ -283,8 +284,12 @@ namespace foundation {
     namespace {
         class FileLoadTask : public AsyncTask {
         public:
-            FileLoadTask(std::string &&filePath, util::callback<void(ByteDataPtr &&, std::size_t)> &&completion) : _path(std::move(filePath)), _size(0), _completion(std::move(completion)) {}
-            ~FileLoadTask() override {}
+            FileLoadTask(std::string &&filePath, util::callback<void(ByteDataPtr &&, std::size_t)> &&completion) : _path(std::move(filePath)), _size(0), _completion(std::move(completion)) {
+                g_statistics.fileLoadTasksCount++;
+            }
+            ~FileLoadTask() override {
+                g_statistics.fileLoadTasksCount--;
+            }
 
         public:
             void executeInBackground() override {
@@ -311,8 +316,12 @@ namespace foundation {
 
         class FileSaveTask : public AsyncTask {
         public:
-            FileSaveTask(std::string &&filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) : _path(std::move(filePath)), _data(data, data + size), _result(false), _completion(std::move(completion)) {}
-            ~FileSaveTask() override {}
+            FileSaveTask(std::string &&filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) : _path(std::move(filePath)), _data(data, data + size), _result(false), _completion(std::move(completion)) {
+                g_statistics.fileSaveTasksCount++;
+            }
+            ~FileSaveTask() override {
+                g_statistics.fileSaveTasksCount--;
+            }
 
         public:
             void executeInBackground() override {
@@ -535,6 +544,11 @@ namespace foundation {
     void WindowsPlatform::exit(int returnCode) {
         g_killed = true;
         g_returnCode = returnCode;
+    }
+
+    const WindowsPlatform::StatInfo &WindowsPlatform::getStatistics() const {
+        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
+        return g_statistics;
     }
 
     void WindowsPlatform::logMsg(const char *fmt, ...) {
