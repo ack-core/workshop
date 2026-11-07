@@ -4,7 +4,7 @@ description: Skill to advance unmergeable PR
 disable-model-invocation: true
 ---
 
-Input: THE_PR - pull request (PR) on github
+Input: $ARGUMENTS - THE_PR, pull request (PR) on github
 We are investigating/fixing what is needed for PR to be mergeable.
 Do these steps in exact order:
 

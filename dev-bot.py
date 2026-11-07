@@ -44,7 +44,7 @@ def remove_gone_branches():
 
 
 def open_prs():
-    return json.loads(run("gh", "pr", "list", "--state", "open", "--json", "title,url,latestReviews,reviewRequests,mergeable,statusCheckRollup", "--limit", "1000"))
+    return json.loads(run("gh", "pr", "list", "--state", "open", "--json", "title,url,latestReviews,reviewRequests,mergeable,statusCheckRollup,closingIssuesReferences", "--limit", "1000"))
 
 
 def assigned_issues():
@@ -80,6 +80,7 @@ def log(msg):
     log_to_file(msg)
 
 def claude(prompt, *allowed_tools):
+    run("git", "switch", "--discard-changes", "master")
     log("--- agent run -------------------------------------------------------------")
     cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--thinking", "adaptive", "--thinking-display", "summarized", "--allowedTools", *allowed_tools)
     with subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") as proc:
@@ -125,6 +126,11 @@ def step():
     issues = assigned_issues()
     if issues:
         log(f"Assigned issues: {', '.join(issues)}")
+        resolving = {str(issue["number"]) for pr in prs for issue in pr["closingIssuesReferences"]}
+        for issue in issues:
+            if issue not in resolving:
+                log(f"Implementing issue #{issue}...")
+                claude(f"/issue-implementation THE_ISSUE={issue}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
 
     if specific_title_count(titles, "[TEST]") >= OPEN_PR_MAX:
         log("There are maximum opened PRs with tests, maybe changes requested...")
