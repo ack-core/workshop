@@ -20,14 +20,18 @@ namespace test {
                     _content.assign(reinterpret_cast<const char *>(data.get()), size);
                 }
             }, true);
+            _loadTasksCount = api.platform->getStatistics().fileLoadTasksCount;
         }
         bool testResult(const API &api) override {
+            EXPECT_EQ(_loadTasksCount, 1);
+            EXPECT_EQ(api.platform->getStatistics().fileLoadTasksCount, 0);
             EXPECT_EQ(_content.size(), 5);
             EXPECT_EQ(_content, "test5");
             return true;
         }
 
     private:
+        std::size_t _loadTasksCount = 0;
         std::string _content;
     };
 }
@@ -48,8 +52,12 @@ namespace test {
                     }
                 }, true);
             }, true);
+            _saveTasksCount = api.platform->getStatistics().fileSaveTasksCount;
         }
         bool testResult(const API &api) override {
+            EXPECT_EQ(_saveTasksCount, 1);
+            EXPECT_EQ(api.platform->getStatistics().fileSaveTasksCount, 0);
+            EXPECT_EQ(api.platform->getStatistics().fileLoadTasksCount, 0);
             EXPECT_TRUE(_saved);
             EXPECT_EQ(_content.size(), 10);
             EXPECT_EQ(_content, "write-read");
@@ -57,6 +65,7 @@ namespace test {
         }
 
     private:
+        std::size_t _saveTasksCount = 0;
         bool _saved = false;
         std::string _content;
     };
@@ -78,6 +87,8 @@ namespace test {
             }, true);
         }
         bool testResult(const API &api) override {
+            EXPECT_EQ(api.platform->getStatistics().fileSaveTasksCount, 0);
+            EXPECT_EQ(api.platform->getStatistics().fileLoadTasksCount, 0);
             EXPECT_TRUE(_deleted);
             EXPECT_TRUE(_loaded);
             EXPECT_TRUE(_failed);
