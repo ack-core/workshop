@@ -11,6 +11,9 @@ namespace {
     bool eq4(const math::vector4f &v, float x, float y, float z, float w) {
         return v.x == x && v.y == y && v.z == z && v.w == w;
     }
+    bool near4(const float *r, float x, float y, float z, float w) {
+        return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f && std::fabs(r[3] - w) < 1.0e-5f;
+    }
 }
 
 namespace test {
@@ -313,6 +316,52 @@ namespace test {
 
         return true;
     }
+
+    bool math_transform3f_identity_multiply_test(const API &api) {
+        const math::transform3f id = math::transform3f::identity();
+        EXPECT_TRUE(near4(id.row0, 1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(id.row1, 0.0f, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(id.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near4(id.row3, 0.0f, 0.0f, 0.0f, 1.0f));
+
+        const math::transform3f a({1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16});
+        EXPECT_EQ_F(a.m12, 2.0f);
+        EXPECT_EQ_F(a.m23, 7.0f);
+        EXPECT_EQ_F(a.flat[8], 9.0f);
+        EXPECT_EQ_F(a.v3.w, 16.0f);
+
+        math::transform3f c;
+        c = a;
+        EXPECT_TRUE(near4(c.row2, 9.0f, 10.0f, 11.0f, 12.0f));
+
+        const math::transform3f ai = a * id;
+        EXPECT_TRUE(near4(ai.row0, 1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(near4(ai.row3, 13.0f, 14.0f, 15.0f, 16.0f));
+        const math::transform3f ia = id * a;
+        EXPECT_TRUE(near4(ia.row1, 5.0f, 6.0f, 7.0f, 8.0f));
+        EXPECT_TRUE(near4(ia.row2, 9.0f, 10.0f, 11.0f, 12.0f));
+
+        const math::transform3f b({2, 0, 0, 0}, {0, 3, 0, 0}, {0, 0, 4, 0}, {1, 2, 3, 1});
+        const math::transform3f ab = a * b;
+        EXPECT_TRUE(near4(ab.row0, 6.0f, 14.0f, 24.0f, 4.0f));
+        EXPECT_TRUE(near4(ab.row3, 42.0f, 74.0f, 108.0f, 16.0f));
+        const math::transform3f ba = b * a;
+        EXPECT_TRUE(near4(ba.row0, 2.0f, 4.0f, 6.0f, 8.0f));
+        EXPECT_TRUE(near4(ba.row3, 51.0f, 58.0f, 65.0f, 72.0f));
+
+        const math::transform3f r({0, 0, 1}, MATH_PI * 0.5f);
+        EXPECT_TRUE(near4(r.row0, 0.0f, -1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(r.row1, 1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(r.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near4(r.row3, 0.0f, 0.0f, 0.0f, 1.0f));
+
+        const math::transform3f rr = r * r;
+        EXPECT_TRUE(near4(rr.row0, -1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(rr.row1, 0.0f, -1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(rr.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+
+        return true;
+    }
 }
 
 
@@ -324,5 +373,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector4f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector_arithmetic_test);
         REGISTER_UNIT_TEST(math_vector_dot_cross_test);
+        REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
     }
 }
