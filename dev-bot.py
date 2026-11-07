@@ -81,6 +81,7 @@ def log(msg):
 
 def claude(prompt, *allowed_tools):
     run("git", "switch", "--discard-changes", "master")
+    run("git", "clean", "-fd")
     log("--- agent run -------------------------------------------------------------")
     cmd = ("claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--thinking", "adaptive", "--thinking-display", "summarized", "--allowedTools", *allowed_tools)
     with subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace") as proc:
