@@ -114,7 +114,13 @@ namespace foundation {
         // Gets or creates an instance. There can be only one instance
         //
         static std::shared_ptr<PlatformInterface> instance();
-        
+
+        struct StatInfo {
+            std::size_t eventHandlersCount = 0;
+            std::size_t fileLoadTasksCount = 0;
+            std::size_t fileSaveTasksCount = 0;
+        };
+
     public:
         // Execute task in Working Thread
         // @task     - task to be executed
@@ -209,7 +215,11 @@ namespace foundation {
         // Breaks platform update cycle and exits the app
         //
         virtual void exit(int returnCode) = 0;
-        
+
+        // Returns counters usable in statistics and testing
+        //
+        virtual const StatInfo &getStatistics() const = 0;
+
     public:
         virtual ~PlatformInterface() = default;
     };
