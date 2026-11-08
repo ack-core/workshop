@@ -1,5 +1,9 @@
-# Tool to make a palette from 'main colors'
-# https://pickcoloronline.com/
+from __future__ import annotations
+
+"""
+Tool to make a palette from 'main colors'
+https://pickcoloronline.com/
+"""
 
 import colorsys
 import png

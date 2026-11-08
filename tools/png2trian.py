@@ -1,16 +1,18 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
-# Tool to convert the pixels of one color in a *.png to a flat triangle mesh
-#
-# Pixel (x, y) is the vertex (x, 0, y) - image column is 'x', image row is 'z', 'y' is
-# always 0. All four image corners must carry the color, so the mesh spans the whole
-# image rectangle and the triangulation needs no artificial vertices to start from.
-#
-# Output, four lines:
-#   vertex count
-#   vertices, single space inside one, double space between them
-#   index count (3 per triangle)
-#   indices, single space inside a triangle, double space between triangles
+"""
+Tool to convert the pixels of one color in a *.png to a flat triangle mesh
+
+Pixel (x, y) is the vertex (x, 0, y) - image column is 'x', image row is 'z', 'y' is
+always 0. All four image corners must carry the color, so the mesh spans the whole
+image rectangle and the triangulation needs no artificial vertices to start from.
+
+Format:
+vertex count
+vertices, single space inside one, double space between them
+index count (3 per triangle)
+indices, single space inside a triangle, double space between triangles
+"""
 
 import argparse
 import re

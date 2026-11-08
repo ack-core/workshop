@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
-# Tool to adjust an image to existing palette
+"""
+Tool to adjust an image to existing palette
+"""
 
 import argparse
 import colorsys
@@ -404,7 +406,7 @@ def load_image_rgb(path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Adjust image colors to palette.")
+    parser = argparse.ArgumentParser(description="Tool to adjust an image to existing palette")
     parser.add_argument("-p", "--palette", required=True, help="Path to palette PNG (e.g. 8x32)")
     parser.add_argument("-s", "--source", required=True, dest="source", help="Path to input image PNG to adjust")
     parser.add_argument("attractors", nargs="+", help="Attractor strings X.Y.S.M, e.g. 40.221.4t1.3")
