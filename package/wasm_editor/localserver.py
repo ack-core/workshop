@@ -19,7 +19,7 @@ sys.path.insert(1, toolsRoot)
 import gen_meshes
 import gen_emitters
 import gen_grounds
-import prefabs
+import gen_prefabs
 
 class CustomRequestHandler (SimpleHTTPRequestHandler):
     def end_headers (self):
@@ -41,7 +41,7 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
         if self.path == "/host_cmd_update":
             # when it becomes critical make update for specific resources
             print("Updating engine resources...")
-            prefabs.main(resourcesRoot + "/prefabs", None, binaryRoot + "/data/prefabs.bin")
+            gen_prefabs.main(resourcesRoot + "/prefabs", None, binaryRoot + "/data/prefabs.bin")
             gen_meshes.main(resourcesRoot + "/meshes", binaryRoot + "/data/meshes", 1)
             gen_emitters.main(resourcesRoot + "/emitters", binaryRoot + "/data/emitters")
             gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")
