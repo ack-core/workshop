@@ -237,7 +237,7 @@ namespace shaderUtils {
         int  braceCounter = 1;
         char prev = '\n', next;
         
-        while (stream && ((next = stream.getChar()) != '}' || --braceCounter > 0)) {
+        while (stream && (next = stream.getChar()) && (next != '}' || --braceCounter > 0)) {
             if (prev == '\n') {
                 for (int i = 0; i < braceCounter; i++) {
                     output += indent;

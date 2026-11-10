@@ -317,6 +317,60 @@ namespace test {
         EXPECT_EQ(badShader0, nullptr);
         return true;
     }
+
+    bool shader_fndef_block_test(const API& api) {
+        // 'fndef' functions are callable from vertex, fragment and other 'fndef' code
+        //
+        const char* shaderSrc0 = R"(
+            fixed {
+                quad[4] : float2 = [-0.5, 0.5][0.5, 0.5][-0.5, -0.5][0.5, -0.5]
+            }
+            const {
+                color : float4
+            }
+            fndef getPosition(int index, float depth) -> float4 {
+                return float4(fixed_quad[index], depth, 1.0);
+            }
+            fndef getColor(float3 rgb) -> float4 {
+                return float4(rgb * const_color.rgb, 1.0);
+            }
+            fndef getGray(float1 value) -> float4 {
+                return getColor(float3(value, value, value));
+            }
+            vssrc {
+                output_position = getPosition(repeat_ID, 0.5);
+            }
+            fssrc {
+                output_color[0] = getGray(0.5) + getColor(float3(0.1, 0.2, 0.3));
+            }
+        )";
+        const char* badShaderSrc0 = R"(
+            fndef getColor(float3 rgb) float4 {
+                return float4(rgb, 1.0);
+            }
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc {
+                output_color[0] = getColor(float3(1.0, 1.0, 1.0));
+            }
+        )";
+        const char* badShaderSrc1 = R"(
+            fndef getColor(float3 rgb) -> float4 {
+                return float4(rgb, 1.0);
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .repeat = 4
+        };
+        foundation::RenderShaderPtr shader0 = api.rendering->createShader(shaderSrc0, layout);
+        EXPECT_NOT_EQ(shader0, nullptr);
+
+        foundation::RenderShaderPtr badShader0 = api.rendering->createShader(badShaderSrc0, layout, true);
+        EXPECT_EQ(badShader0, nullptr);
+        foundation::RenderShaderPtr badShader1 = api.rendering->createShader(badShaderSrc1, layout, true);
+        EXPECT_EQ(badShader1, nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -329,5 +383,6 @@ namespace test {
         REGISTER_UNIT_TEST(shader_fixed_block_test);
         REGISTER_UNIT_TEST(shader_const_block_test);
         REGISTER_UNIT_TEST(shader_inout_block_test);
+        REGISTER_UNIT_TEST(shader_fndef_block_test);
     }
 }
