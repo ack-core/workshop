@@ -269,6 +269,50 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_dot_cross_test(const API &api) {
+        const math::vector2f a2(1.0f, 2.0f);
+        const math::vector2f b2(3.0f, 4.0f);
+        EXPECT_EQ_F(a2.dot(b2), 11.0f);
+        EXPECT_EQ_F(a2.cross(b2), -2.0f);
+        EXPECT_EQ_F(b2.cross(a2), 2.0f);
+        EXPECT_EQ_F(a2.yx.dot(b2), 10.0f);
+        EXPECT_EQ_F(a2.yx.cross(b2), 5.0f);
+
+        const math::vector3f a3(1.0f, 2.0f, 3.0f);
+        const math::vector3f b3(4.0f, 5.0f, 6.0f);
+        EXPECT_EQ_F(a3.dot(b3), 32.0f);
+        EXPECT_EQ_F(a3.zyx.dot(b3), 28.0f);
+
+        const math::vector3f c = a3.cross(b3);
+        EXPECT_EQ_F(c.x, -3.0f);
+        EXPECT_EQ_F(c.y, 6.0f);
+        EXPECT_EQ_F(c.z, -3.0f);
+        EXPECT_EQ_F(c.dot(a3), 0.0f);
+        EXPECT_EQ_F(c.dot(b3), 0.0f);
+
+        const math::vector3f d = b3.cross(a3);
+        EXPECT_EQ_F(d.x, 3.0f);
+        EXPECT_EQ_F(d.y, -6.0f);
+        EXPECT_EQ_F(d.z, 3.0f);
+
+        const math::vector3f e = a3.zyx.cross(b3);
+        EXPECT_EQ_F(e.x, 7.0f);
+        EXPECT_EQ_F(e.y, -14.0f);
+        EXPECT_EQ_F(e.z, 7.0f);
+
+        const math::vector3f z = math::vector3f(1.0f, 0.0f, 0.0f).cross(math::vector3f(0.0f, 1.0f, 0.0f));
+        EXPECT_EQ_F(z.x, 0.0f);
+        EXPECT_EQ_F(z.y, 0.0f);
+        EXPECT_EQ_F(z.z, 1.0f);
+
+        const math::vector4f a4(1.0f, 2.0f, 3.0f, 4.0f);
+        const math::vector4f b4(5.0f, 6.0f, 7.0f, 8.0f);
+        EXPECT_EQ_F(a4.dot(b4), 70.0f);
+        EXPECT_EQ_F(a4.wzyx.dot(b4), 60.0f);
+
+        return true;
+    }
 }
 
 
@@ -279,5 +323,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector3f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector4f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector_arithmetic_test);
+        REGISTER_UNIT_TEST(math_vector_dot_cross_test);
     }
 }
