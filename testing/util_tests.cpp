@@ -16,7 +16,11 @@ namespace {
     };
 
     std::string narrow(const std::uint16_t *p, std::size_t len) {
-        return std::string(p, p + len);
+        std::string result;
+        for (std::size_t i = 0; i < len; i++) {
+            result.push_back(char(p[i]));
+        }
+        return result;
     }
 }
 
