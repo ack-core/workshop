@@ -460,13 +460,8 @@ namespace util {
             return nullptr;
         }
         template <typename T> const T &_getAnyOrDefault(const char *name, const T &def) const {
-            auto index = this->find(name);
-            if (index != this->end()) {
-                return *std::get_if<T>(&index->second);
-            }
-            else {
-                return def;
-            }
+            const T *value = _getAnyValue<T>(name);
+            return value ? *value : def;
         }
         template <typename T> std::vector<T> _getAllValues(const char *name) const {
             std::vector<T> result;
