@@ -327,6 +327,77 @@ namespace test {
 
         return true;
     }
+
+    bool util_description_set_get_test(const API &api) {
+        util::Description desc;
+        EXPECT_TRUE(desc.setBool("b", true));
+        EXPECT_TRUE(desc.setInteger("i", -5));
+        EXPECT_TRUE(desc.setNumber("n", 2.5));
+        EXPECT_TRUE(desc.setString("s", "abc"));
+        EXPECT_TRUE(desc.setVector3f("v", math::vector3f(1.0f, 2.0f, 3.0f)));
+        EXPECT_TRUE(desc.setVector3i("vi", math::vector3i(4, 5, 6)));
+        EXPECT_EQ(desc.size(), 6u);
+
+        EXPECT_EQ(*desc.getBool("b"), true);
+        EXPECT_EQ(*desc.getInteger("i"), -5);
+        EXPECT_EQ_F(*desc.getNumber("n"), 2.5f);
+        EXPECT_EQ(*desc.getString("s"), "abc");
+        EXPECT_EQ_F(desc.getVector3f("v")->z, 3.0f);
+        EXPECT_EQ(desc.getVector3i("vi")->y, 5);
+
+        // missing name or another type
+        EXPECT_EQ(desc.getInteger("missing"), nullptr);
+        EXPECT_EQ(desc.getInteger("n"), nullptr);
+        EXPECT_EQ(desc.getVector3i("v"), nullptr);
+        EXPECT_EQ(desc.getDescription("s"), nullptr);
+
+        // type mismatch doesn't change anything
+        EXPECT_FALSE(desc.setString("i", "x"));
+        EXPECT_FALSE(desc.setNumber("i", 1.0, false));
+        EXPECT_EQ(desc.setDescription("i"), nullptr);
+        EXPECT_EQ(*desc.getInteger("i"), -5);
+        EXPECT_EQ(desc.size(), 6u);
+
+        // replace overwrites, no replace adds one more value
+        EXPECT_TRUE(desc.setInteger("i", 7));
+        EXPECT_EQ(desc.size(), 6u);
+        EXPECT_EQ(*desc.getInteger("i"), 7);
+        EXPECT_TRUE(desc.setInteger("i", 8, false));
+        EXPECT_EQ(desc.size(), 7u);
+        EXPECT_EQ(desc.getIntegers("i"), std::vector<std::int64_t>({7, 8}));
+
+        // nested description is cleared only with replace
+        desc.setDescription("d")->setInteger("x", 1);
+        EXPECT_EQ(*desc.getDescription("d")->getInteger("x"), 1);
+        EXPECT_EQ(desc.setDescription("d", false)->size(), 1u);
+        EXPECT_TRUE(desc.setDescription("d")->empty());
+        EXPECT_EQ(desc.size(), 8u);
+
+        return true;
+    }
+
+    bool util_description_default_values_test(const API &api) {
+        util::Description desc;
+        desc.setInteger("i", 3);
+        desc.setString("s", "abc");
+
+        EXPECT_EQ(desc.getInteger("i", 9), 3);
+        EXPECT_EQ(desc.getString("s", "def"), "abc");
+
+        // missing name
+        EXPECT_EQ(desc.getInteger("missing", 9), 9);
+        EXPECT_EQ(desc.getBool("missing", true), true);
+        EXPECT_EQ_F(desc.getNumber("missing", 1.5), 1.5f);
+        EXPECT_EQ(desc.getString("missing", "def"), "def");
+        EXPECT_EQ(desc.getVector2i("missing", math::vector2i(1, 2)).y, 2);
+
+        // another type
+        EXPECT_EQ(desc.getInteger("s", 9), 9);
+        EXPECT_EQ(desc.getString("i", "def"), "def");
+        EXPECT_EQ_F(desc.getNumber("i", 1.5), 1.5f);
+
+        return true;
+    }
 }
 
 
@@ -337,5 +408,7 @@ namespace test {
         REGISTER_UNIT_TEST(util_strstream_char_reading_test);
         REGISTER_UNIT_TEST(util_strstream_extraction_test);
         REGISTER_UNIT_TEST(util_strstream_extraction_errors_test);
+        REGISTER_UNIT_TEST(util_description_set_get_test);
+        REGISTER_UNIT_TEST(util_description_default_values_test);
     }
 }
