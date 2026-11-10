@@ -14,6 +14,10 @@ namespace {
     private:
         int _sum = 0;
     };
+
+    std::string narrow(const std::uint16_t *p, std::size_t len) {
+        return std::string(p, p + len);
+    }
 }
 
 namespace test {
@@ -403,6 +407,43 @@ namespace test {
         return true;
     }
 
+    bool util_strstream_number_writing_test(const API &api) {
+        char a[32];
+        std::uint16_t w[32];
+
+        // ltoa
+        EXPECT_EQ(std::string(a, util::strstream::ltoa(a, 0)), "0");
+        EXPECT_EQ(std::string(a, util::strstream::ltoa(a, 7)), "7");
+        EXPECT_EQ(std::string(a, util::strstream::ltoa(a, -45)), "-45");
+        EXPECT_EQ(std::string(a, util::strstream::ltoa(a, 9000000000ll)), "9000000000");
+
+        // ltow
+        EXPECT_EQ(narrow(w, util::strstream::ltow(w, 0)), "0");
+        EXPECT_EQ(narrow(w, util::strstream::ltow(w, 1230)), "1230");
+        EXPECT_EQ(narrow(w, util::strstream::ltow(w, -9000000000ll)), "-9000000000");
+
+        // ftos rounds to precision
+        EXPECT_EQ(util::strstream::ftos(0.0), "0.0000");
+        EXPECT_EQ(util::strstream::ftos(1.5), "1.5000");
+        EXPECT_EQ(util::strstream::ftos(-0.25), "-0.2500");
+        EXPECT_EQ(util::strstream::ftos(123.45678), "123.4568");
+        EXPECT_EQ(util::strstream::ftos(9.99996), "10.0000");
+        EXPECT_EQ(util::strstream::ftos(2.5, 1), "2.5");
+        EXPECT_EQ(util::strstream::ftos(2.6, 0), "3");
+
+        // ftow
+        EXPECT_EQ(narrow(w, util::strstream::ftow(w, 0.5)), "0.500000");
+        EXPECT_EQ(narrow(w, util::strstream::ftow(w, -12.126, 2)), "-12.13");
+        EXPECT_EQ(narrow(w, util::strstream::ftow(w, 7.4, 0)), "7");
+
+        // ptow writes all hex digits of pointer
+        const std::string zeros (2 * sizeof(void *) - 4, '0');
+        EXPECT_EQ(narrow(w, util::strstream::ptow(w, reinterpret_cast<const void *>(0x1A2F))), zeros + "1A2F");
+        EXPECT_EQ(narrow(w, util::strstream::ptow(w, nullptr)), zeros + "0000");
+
+        return true;
+    }
+
     bool util_description_set_get_test(const API &api) {
         util::Description desc;
         EXPECT_TRUE(desc.setBool("b", true));
@@ -485,6 +526,7 @@ namespace test {
         REGISTER_UNIT_TEST(util_strstream_extraction_errors_test);
         REGISTER_UNIT_TEST(util_strstream_helpers_test);
         REGISTER_UNIT_TEST(util_strstream_helpers_errors_test);
+        REGISTER_UNIT_TEST(util_strstream_number_writing_test);
         REGISTER_UNIT_TEST(util_description_set_get_test);
         REGISTER_UNIT_TEST(util_description_default_values_test);
     }
