@@ -1,6 +1,8 @@
 
 #pragma once
 #include <memory>
+#include <string_view>
+#include <initializer_list>
 
 #include "providers/resource_provider.h"
 #include "core/scene.h"
@@ -8,7 +10,6 @@
 #include "core/raycast.h"
 #include "ui/stage.h"
 #include "game/state_manager.h"
-#include "datahub/datahub.h"
 
 namespace game {
     struct API {
@@ -61,4 +62,9 @@ namespace game {
     }
     
     using MakeContextFunc = std::shared_ptr<Context>(*)(API &&api, Interface **existInterfaces, std::size_t count);
+
+    struct State {
+        std::string_view name;
+        std::initializer_list<MakeContextFunc> makers;
+    };
 }

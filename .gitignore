@@ -3,3 +3,8 @@ workshop_*/
 /tmp/
 providers/resource_list.h
 dev-bot.log
+game/game.h
+game/.gitignore
+game/README.md
+game/contexts/
+game/resources/

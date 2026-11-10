@@ -1,9 +1,48 @@
 
+#include "context.h"
 #include "state_manager.h"
-#include "game.h"
 
+#include <algorithm>
 #include <unordered_map>
 #include <vector>
+
+#if __has_include("game.h")
+#include "game.h"
+#elif defined(IS_EDITOR)
+#include "editor/editor_main_context.h"
+#include "editor/editor_camera_context.h"
+#include "editor/editor_prefab_context.h"
+#include "editor/editor_voxel_mesh_context.h"
+#include "editor/editor_ground_context.h"
+#include "editor/editor_particles_context.h"
+#include "editor/editor_raycast_shape_context.h"
+#include "editor/editor_collision_shape_context.h"
+
+namespace game {
+    inline const State STATES[] = {
+        {"default", {
+            &makeContext<EditorCameraContext>,
+            &makeContext<EditorMainContext, CameraAccessInterface>,
+            &makeContext<EditorPrefabContext, NodeAccessInterface>,
+            &makeContext<EditorVoxelMeshContext, NodeAccessInterface>,
+            &makeContext<EditorGroundContext, NodeAccessInterface>,
+            &makeContext<EditorRaycastShapeContext, NodeAccessInterface, CameraAccessInterface>,
+            &makeContext<EditorCollisionShapeContext, NodeAccessInterface, CameraAccessInterface>,
+            &makeContext<EditorParticlesContext, NodeAccessInterface, CameraAccessInterface>
+        }}
+    };
+}
+#else
+#include "experimental/render_dev.h"
+
+namespace game {
+    inline const State STATES[] = {
+        {"default", {
+            &makeContext<RenderDevContext>
+        }}
+    };
+}
+#endif
 
 namespace game {
     class StateManagerImpl : public StateManager, public std::enable_shared_from_this<StateManagerImpl> {
@@ -50,41 +89,40 @@ namespace game {
     };
     
     void StateManagerImpl::switchToState(const char *name) {
-        for (auto index = std::begin(STATES); index != std::end(STATES); ++index) {
-            if (::strcmp(name, index->name) == 0) {
-                std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> newContextList;
-                std::vector<Interface *> interfaces;
-                
-                for (auto& makeContextFunction : index->makers) {
-                    std::shared_ptr<Context> ctx = nullptr;
-                    
-                    auto index = _currentContextList.find(makeContextFunction);
-                    if (index == _currentContextList.end()) {
-                        ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _fontAtlasProvider, _scene, _world, _raycast, _ui }, interfaces.data(), interfaces.size());
-                    }
-                    else {
-                        ctx = index->second;
-                    }
-                    
-                    if (ctx) {
-                        if (Interface *iface = dynamic_cast<Interface *>(ctx.get())) {
-                            interfaces.push_back(iface);
-                        }
-                        
-                        newContextList.emplace(makeContextFunction, std::move(ctx));
-                    }
-                    else {
-                        _platform->logError("[StateManager] Unexpected state while switching to '%s'");
-                    }
+        auto state = std::find_if(std::begin(STATES), std::end(STATES), [name](const State &s) { return s.name == name; });
+        if (state == std::end(STATES)) {
+            _platform->logError("[StateManager] '%s' state not found");
+            return;
+        }
+
+        std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> newContextList;
+        std::vector<Interface *> interfaces;
+
+        for (auto& makeContextFunction : state->makers) {
+            std::shared_ptr<Context> ctx = nullptr;
+
+            auto index = _currentContextList.find(makeContextFunction);
+            if (index == _currentContextList.end()) {
+                ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _fontAtlasProvider, _scene, _world, _raycast, _ui }, interfaces.data(), interfaces.size());
+            }
+            else {
+                ctx = index->second;
+            }
+
+            if (ctx) {
+                if (Interface *iface = dynamic_cast<Interface *>(ctx.get())) {
+                    interfaces.push_back(iface);
                 }
 
-                _currentStateName = name;
-                std::swap(_currentContextList, newContextList);
-                return;
+                newContextList.emplace(makeContextFunction, std::move(ctx));
+            }
+            else {
+                _platform->logError("[StateManager] Unexpected state while switching to '%s'");
             }
         }
-        
-        _platform->logError("[StateManager] '%s' state not found");
+
+        _currentStateName = name;
+        std::swap(_currentContextList, newContextList);
     }
     
     void StateManagerImpl::update(float dtSec) {

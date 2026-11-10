@@ -74,15 +74,8 @@ namespace util {
         }
         
         decltype(auto) callAndReset(Args... args) {
-            struct Guard {
-                Data &toClean;
-                ~Guard() {
-                    toClean.clean(toClean.target);
-                    toClean = {};
-                }
-            }
-            guard {_data};
-            return _data.call ? _data.call(_data.target, std::forward<Args>(args)...) : R();
+            callback current = std::move(*this);
+            return current(std::forward<Args>(args)...);
         }
         
     private:
@@ -500,13 +493,13 @@ namespace util {
 
 namespace util {
     template<typename T> void cleanupUnused(std::vector<T> &v) {
-        for (auto index = v.begin(); index != v.end(); ) {
-            if (index->use_count() <= 1) {
-                *index = std::move(v.back());
+        for (std::size_t i = 0; i < v.size(); ) {
+            if (v[i].use_count() <= 1) {
+                v[i] = std::move(v.back());
                 v.pop_back();
             }
             else {
-                ++index;
+                ++i;
             }
         }
     }
