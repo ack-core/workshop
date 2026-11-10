@@ -172,7 +172,7 @@ if (APPTYPE STREQUAL "IS_GAME")
 	endif()
 	message(STATUS "Generating game's prefabs...")
 	execute_process(
-		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -g ${m_game_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
+		COMMAND python ${m_tools_root}/gen_prefabs.py -s ${m_resources_root}/prefabs -g ${m_game_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
 endif()
@@ -184,7 +184,7 @@ endif()
 if (APPTYPE STREQUAL "IS_EDITOR")
 	message(STATUS "Generating prefabs...")
 	execute_process(
-		COMMAND python ${m_tools_root}/prefabs.py -s ${m_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
+		COMMAND python ${m_tools_root}/gen_prefabs.py -s ${m_resources_root}/prefabs -d ${m_binary_root}/data/prefabs.bin 
 		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	)
 endif()

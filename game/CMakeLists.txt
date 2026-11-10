@@ -3,11 +3,13 @@ get_filename_component(m_source_root "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 set(
 	m_sources_list
-	"${m_source_root}/game.h"
 	"${m_source_root}/state_manager.h"
 	"${m_source_root}/state_manager.cpp"
 	"${m_source_root}/context.h"
 )
+if(EXISTS "${m_source_root}/game.h")
+	list(APPEND m_sources_list "${m_source_root}/game.h")
+endif()
 source_group("" FILES ${m_sources_list})
 
 file(GLOB_RECURSE m_experimental_contexts_list "${m_source_root}/experimental/*.h" "${m_source_root}/experimental/*.cpp")

@@ -1,13 +1,15 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
-# Tool to convert a flat *.vox model to *.png
-# Format: https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt
-#
-# 'VOX ' + version
-# MAIN
-#   PACK      - optional, number of models
-#   SIZE/XYZI - one pair per model
-#   RGBA      - palette, color [0-254] is mapped to palette index [1-255]
+"""
+Tool to convert a flat *.vox model to *.png
+Format: https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt
+
+'VOX ' + version
+MAIN
+  PACK      - optional, number of models
+  SIZE/XYZI - one pair per model
+  RGBA      - palette, color [0-254] is mapped to palette index [1-255]
+"""
 
 import argparse
 import struct

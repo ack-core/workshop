@@ -252,7 +252,6 @@ namespace ui {
             float _sectorEndDeg = 360;
             bool _dirty = true;
         };
-        using ImgSectorPtr = std::shared_ptr<ImgSector>;
         struct ImgSectorParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
@@ -260,7 +259,7 @@ namespace ui {
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             const char *texture = "";
 
-            static auto make(StageInterface &stage, const std::optional<std::string> &name, const std::shared_ptr<StageInterface::Element> &parent, ImgSectorParams &&params) -> ImgSectorPtr {
+            static auto make(StageInterface &stage, const std::optional<std::string> &name, const std::shared_ptr<StageInterface::Element> &parent, ImgSectorParams &&params) -> std::shared_ptr<ImgSector> {
                 const resource::ResourceProviderPtr res = stage.getResourceProvider();
                 const char *shaderSrc = R"(
                     inout {
@@ -290,7 +289,7 @@ namespace ui {
                         .shaderSource = shaderSrc,
                         .texture = params.texture
                     });
-                    ImgSectorPtr result = std::make_shared<ImgSector>(img);
+                    std::shared_ptr<ImgSector> result = std::make_shared<ImgSector>(img);
                     img->setSize(math::vector2f(math::scalar(info->width), math::scalar(info->height)));
                     img->setDrawHandler([weak = std::weak_ptr<ImgSector>(result)](StageInterface::ImgCustom &img) {
                         if (auto owner = weak.lock()) {
@@ -355,6 +354,7 @@ namespace ui {
                 return nullptr;
             }
         };
+        using ImgSectorPtr = std::shared_ptr<ImgSector>;
 
         
     }

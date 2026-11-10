@@ -9,8 +9,7 @@
 #include "core/simulation.h"
 #include "ui/stage.h"
 
-#if defined(IS_GAME)
-#include "game/game.h"
+#if defined(IS_GAME) || defined(IS_EDITOR)
 #include "game/state_manager.h"
 #elif defined(IS_TESTS)
 #include "testing/runner.h"
@@ -31,7 +30,7 @@ core::RaycastInterfacePtr raycast;
 core::SimulationInterfacePtr simulation;
 ui::StageInterfacePtr stage;
 
-#if defined(IS_GAME)
+#if defined(IS_GAME) || defined(IS_EDITOR)
 game::StateManagerPtr stateManager;
 
 extern "C" void initialize() {

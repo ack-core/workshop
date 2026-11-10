@@ -1,10 +1,12 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
-# Tool to convert rendering tests references saved as *.tga to *.png and move them to testing resources
-# Launched from the repository root
-#
-# <binary>/data/rendering_tests/<name>_ref.tga -> testing/resources/rendering_tests/<name>_ref.png
-# TGA: uncompressed 32-bit BGRA, origin top-left or bottom-left
+"""
+Tool to convert rendering tests references saved as *.tga to *.png and move them to testing resources
+Launched from the repository root
+
+<binary>/data/rendering_tests/<name>_ref.tga -> testing/resources/rendering_tests/<name>_ref.png
+TGA: uncompressed 32-bit BGRA, origin top-left or bottom-left
+"""
 
 import argparse
 import os

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Tool to make engine resources list (*.vox, *.plc)
+Tool to make engine resources list (*.vxm, *.grd)
 """
 
 import typing
