@@ -17,10 +17,8 @@ Areas:
 - 'platform' is testing everything declared/defined by platform.h
 - 'rendering' is testing everything declared/defined by rendering.h
 
-In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_SCREENSHOT_TEST macro. Study areas and capabilities being tested. 
-Find what is untested and could be easily tested through existing code.
-Write the report to `tmp/tests-coverage-report.txt` (create the folder if missing, overwrite the file if it exists).
-The file must contain exactly one `Candidates:` block with the list of untested capabilities (candidates).
+We are adding untested capabilities (candidates) to the file `tmp/tests-coverage-report.txt`.
+The file contains exactly one `Candidates:` block with the list of untested capabilities (candidates).
 The example below is for format only: do not copy its rows, and `...` stands for more rows of the same form.
 
 ```text
@@ -35,6 +33,11 @@ rendering_red_triangle_on_black_test - Testing ability to draw a single triangle
 
 - One line per test: `<test name> - <description of what is tested>`.
 - Test name: lowercase snake_case `<area>_<subject>_test`.
-- Test name must not match any name already passed to a `REGISTER_*_TEST` macro.
-- Exactly 10 lines, with no gaps (fewer only if fewer untested capabilities exist).
-- Rank by fundamentality: capability used by others come first. Include completely untested capability.
+- Test name must not match any name already passed to a `REGISTER_*_TEST` macro or any other test in the list.
+
+In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_SCREENSHOT_TEST macro. Study areas and capabilities being tested. 
+Find up to 3 untested capabilities (candidates) which could be easily tested through existing code.
+Ensure that candidates aren't in the list and there is no open pull requests in https://github.com/ack-core/workshop/pulls which already implement them.
+
+Create file `tmp/tests-coverage-report.txt` if it's missing (create the folder if missing). Fix the file format if it's not as described in the example.
+Append new candidates at the end of the list in the file.
