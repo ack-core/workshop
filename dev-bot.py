@@ -138,13 +138,15 @@ def step():
     if is_repo_dirty():
         log("Repo is dirty")
         return
-        
+    
+    log("Preparing...")
     run("git", "switch", "master")
     run("git", "pull", "--ff-only")
     remove_gone_branches()
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
 
+    log("Maybe there are unimplemented issues...")
     issues = assigned_issues()
     if issues:
         implemented = False
@@ -158,6 +160,7 @@ def step():
         if implemented:
             return
 
+    log("Maybe some PRs need to advance...")
     if specific_title_count(titles, "[TEST]") >= OPEN_PR_MAX:
         owner = repo_owner()
         pr_urls = [pr["url"] for pr in prs if has_requested_changes(pr, owner)]
@@ -174,6 +177,7 @@ def step():
         log("There is a space for new PRs, writing a test...")
         claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
 
+    log("Checking if there is enough candidates for new tests...")
     if candidates() < CANDIDATES_MIN:
         log("Test coverage report is short, appending candidates...")
         claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)", "Bash(gh pr list:*)")
