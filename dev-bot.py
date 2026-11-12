@@ -172,7 +172,7 @@ def step():
 
     if candidates() < CANDIDATES_MIN:
         log("Test coverage report is short, appending candidates...")
-        claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
+        claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)", "Bash(gh pr list:*)")
 
 def main():
     sys.stdout.reconfigure(errors="replace")

@@ -37,7 +37,7 @@ rendering_red_triangle_on_black_test - Testing ability to draw a single triangle
 
 In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_SCREENSHOT_TEST macro. Study areas and capabilities being tested. 
 Find up to 3 untested capabilities (candidates) which could be easily tested through existing code.
-Ensure that candidates aren't in the list and there is no open pull requests in https://github.com/ack-core/workshop/pulls which already implement them.
+Ensure that candidates aren't in the list and there are no open pull requests which already implement them (Use `gh pr list --repo ack-core/workshop --state open --json title,body`)
 
 Create file `tmp/tests-coverage-report.txt` if it's missing (create the folder if missing). Fix the file format if it's not as described in the example.
 Append new candidates at the end of the list in the file.
