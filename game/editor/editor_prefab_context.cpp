@@ -165,8 +165,10 @@ namespace game {
     }
 
     bool EditorPrefabContext::_reloadPrefabs(const std::string &data) {
-        _api.resources->reloadPrefabs([this]() {
-            _api.platform->sendEditorMsg("engine.resourcesReloaded", "");
+        _api.platform->loadFile(resource::PREFAB_BIN, [this](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
+            if (_api.resources->setPrefabsData(prefabsData.get(), prefabsSize)) {
+                _api.platform->sendEditorMsg("engine.resourcesReloaded", "");
+            }
         });
         return true;
     }

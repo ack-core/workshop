@@ -43,9 +43,7 @@ namespace resource {
     public:
         static std::shared_ptr<ResourceProvider> instance(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
-            const ByteDataPtr &prefabSrcData,
-            std::size_t prefabSrcLength
+            const foundation::RenderingInterfacePtr &rendering
         );
         
     public:
@@ -97,10 +95,18 @@ namespace resource {
         //
         virtual void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) = 0;
 
-        // Get prefab description. All prefabs are loaded synchronously at start
-        // @prefabPath - path without extension
+        // Replace all prefabs with ones from prefabs binary
+        // @data - prefabs binary
+        // @length - binary length
+        // @return - false if binary is invalid
         //
-        virtual auto getPrefab(const char *prefabPath) -> const util::Description & = 0;
+        virtual bool setPrefabsData(const std::uint8_t *data, std::size_t length) = 0;
+
+        // Get prefab description
+        // @prefabPath - path without extension
+        // @return - description or nullptr
+        //
+        virtual auto getPrefab(const char *prefabPath) -> const std::unique_ptr<util::Description> & = 0;
         
         // TODO: preload prefab resources
         
@@ -111,7 +117,6 @@ namespace resource {
         virtual void removeGround(const char *groundPath) = 0;
         virtual void removeEmitter(const char *configPath) = 0;
         virtual void removeDescription(const char *descPath) = 0;
-        virtual void reloadPrefabs(util::callback<void()> &&completion) = 0;
 
         // Provider tracks resources life time and tries to free them
         //
