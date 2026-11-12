@@ -104,9 +104,9 @@ namespace resource {
 
         // Get prefab description
         // @prefabPath - path without extension
-        // @return - description copy or nullptr
+        // @return - description or nullptr
         //
-        virtual auto getPrefab(const char *prefabPath) -> std::unique_ptr<util::Description> = 0;
+        virtual auto getPrefab(const char *prefabPath) -> const std::unique_ptr<util::Description> & = 0;
         
         // TODO: preload prefab resources
         

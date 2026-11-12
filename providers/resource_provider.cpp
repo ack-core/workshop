@@ -261,7 +261,7 @@ namespace resource {
         void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) override;
         
         bool setPrefabsData(const std::uint8_t *data, std::size_t length) override;
-        auto getPrefab(const char *prefabPath) -> std::unique_ptr<util::Description> override;
+        auto getPrefab(const char *prefabPath) -> const std::unique_ptr<util::Description> & override;
         
         void removeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
@@ -704,16 +704,17 @@ namespace resource {
         return true;
     }
 
-    std::unique_ptr<util::Description> ResourceProviderImpl::getPrefab(const char *prefabPath) {
+    const std::unique_ptr<util::Description> &ResourceProviderImpl::getPrefab(const char *prefabPath) {
+        static const std::unique_ptr<util::Description> notFound;
         auto index = _prefabs.find(prefabPath);
         if (index != _prefabs.end()) {
-            return std::make_unique<util::Description>(*index->second);
+            return index->second;
         }
         else {
             _platform->logError("[ResourceProviderImpl::getPrefab] Unable to find prefab '%s'", prefabPath);
         }
 
-        return nullptr;
+        return notFound;
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {
