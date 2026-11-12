@@ -577,18 +577,18 @@ namespace core {
     }
     WorldInterface::ObjectPtr WorldImpl::createObject(const char *prefabPath, std::uint64_t typeMask, const char *name) {
         const std::uint64_t newId = getNextUniqueId();
-        const util::Description desc = _resourceProvider->getPrefab(prefabPath);
-        if (desc.empty() == false) {
+        const std::unique_ptr<util::Description> desc = _resourceProvider->getPrefab(prefabPath);
+        if (desc && desc->empty() == false) {
             if (name) {
                 if (_namedObjects.find(name) == _namedObjects.end()) {
-                    return _namedObjects.emplace(std::string(name), std::make_shared<ObjectImpl>(shared_from_this(), newId, desc, typeMask)).first->second;
+                    return _namedObjects.emplace(std::string(name), std::make_shared<ObjectImpl>(shared_from_this(), newId, *desc, typeMask)).first->second;
                 }
                 else {
                     _platform->logError("[WorldImpl::createObject] Object with name '%s' already exists in the world", name);
                 }
             }
             else {
-                return _unnamedObjects.emplace(newId, std::make_shared<ObjectImpl>(shared_from_this(), newId, desc, typeMask)).first->second;
+                return _unnamedObjects.emplace(newId, std::make_shared<ObjectImpl>(shared_from_this(), newId, *desc, typeMask)).first->second;
             }
         }
         else {

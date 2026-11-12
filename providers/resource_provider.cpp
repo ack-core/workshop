@@ -220,8 +220,8 @@ namespace {
         }
     }
 
-    bool readPrefabs(std::unordered_map<std::string, util::Description> &prefabs, const std::uint8_t *data) {
-        if (memcmp(data, "PREFABS!", 4) == 0) {
+    bool readPrefabs(std::unordered_map<std::string, std::unique_ptr<util::Description>> &prefabs, const std::uint8_t *data, std::size_t length) {
+        if (data && length >= 12 && memcmp(data, "PREFABS!", 4) == 0) {
             std::uint32_t prefabsCount = *(std::uint32_t *)(data + 8);
             data += 12;
             prefabs.clear();
@@ -230,7 +230,7 @@ namespace {
                 std::string prefabPath = reinterpret_cast<const char *>(data + 4);
                 data += *(std::uint32_t *)(data + 0);
                 const std::size_t descLen = *(std::uint32_t *)(data + 0) - 4;
-                prefabs.emplace(std::move(prefabPath), util::Description::parse(data + 4, descLen));
+                prefabs.emplace(std::move(prefabPath), std::make_unique<util::Description>(util::Description::parse(data + 4, descLen)));
                 data += *(std::uint32_t *)(data + 0);
             }
             
@@ -246,9 +246,7 @@ namespace resource {
     public:
         ResourceProviderImpl(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
-            const ByteDataPtr &prefabSrcData,
-            std::size_t prefabSrcLength
+            const foundation::RenderingInterfacePtr &rendering
         );
         ~ResourceProviderImpl() override;
         
@@ -262,7 +260,8 @@ namespace resource {
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadDescription(const char *descPath, util::callback<void(const util::Description &)> &&completion) override;
         
-        auto getPrefab(const char *prefabPath) -> const util::Description & override;
+        bool setPrefabsData(const std::uint8_t *data, std::size_t length) override;
+        auto getPrefab(const char *prefabPath) -> std::unique_ptr<util::Description> override;
         
         void removeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
@@ -309,7 +308,7 @@ namespace resource {
         std::unordered_map<std::string, Emitter> _emitters;
         std::unordered_map<std::string, Description> _descriptions;
 
-        std::unordered_map<std::string, util::Description> _prefabs;
+        std::unordered_map<std::string, std::unique_ptr<util::Description>> _prefabs;
         
         struct QueueEntryTexture {
             std::string texPath;
@@ -343,23 +342,12 @@ namespace resource {
     
     ResourceProviderImpl::ResourceProviderImpl(
         const foundation::PlatformInterfacePtr &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        const ByteDataPtr &prefabSrcData,
-        std::size_t prefabSrcLength
+        const foundation::RenderingInterfacePtr &rendering
     )
     : _platform(platform)
     , _rendering(rendering)
     , _asyncInProgress(false)
-    {
-        if (prefabSrcData) {
-            if (readPrefabs(_prefabs, prefabSrcData.get()) == false) {
-                _platform->logError("[ResourceProviderImpl::ResourceProviderImpl] Invalid prefabs.bin");
-            }
-        }
-        else {
-            _platform->logMsg("[ResourceProviderImpl::ResourceProviderImpl] Empty prefabs.bin");
-        }
-    }
+    {}
     
     ResourceProviderImpl::~ResourceProviderImpl() {
     
@@ -708,16 +696,24 @@ namespace resource {
         }
     }
     
-    const util::Description &ResourceProviderImpl::getPrefab(const char *prefabPath) {
+    bool ResourceProviderImpl::setPrefabsData(const std::uint8_t *data, std::size_t length) {
+        if (readPrefabs(_prefabs, data, length) == false) {
+            _platform->logError("[ResourceProviderImpl::setPrefabsData] Invalid prefabs data");
+            return false;
+        }
+        return true;
+    }
+
+    std::unique_ptr<util::Description> ResourceProviderImpl::getPrefab(const char *prefabPath) {
         auto index = _prefabs.find(prefabPath);
         if (index != _prefabs.end()) {
-            return index->second;
+            return std::make_unique<util::Description>(*index->second);
         }
         else {
             _platform->logError("[ResourceProviderImpl::getPrefab] Unable to find prefab '%s'", prefabPath);
         }
-        
-        return util::Description::emptyDesc;
+
+        return nullptr;
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {
@@ -752,12 +748,9 @@ namespace resource {
     }
     void ResourceProviderImpl::reloadPrefabs(util::callback<void()> &&completion) {
         _platform->loadFile(resource::PREFAB_BIN, [this, cb = std::move(completion)](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
-            if (prefabsSize && readPrefabs(_prefabs, prefabsData.get())) {
+            if (setPrefabsData(prefabsData.get(), prefabsSize)) {
                 cb();
                 _platform->logMsg("[ResourceProviderImpl::reloadPrefabs] prefabs.bin reloaded");
-            }
-            else {
-                _platform->logError("[ResourceProviderImpl::reloadPrefabs] Invalid prefabs.bin");
             }
         });
     }
@@ -794,11 +787,9 @@ namespace resource {
 namespace resource {
     std::shared_ptr<ResourceProvider> ResourceProvider::instance(
         const foundation::PlatformInterfacePtr &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        const ByteDataPtr &prefabSrcData,
-        std::size_t prefabSrcLength
+        const foundation::RenderingInterfacePtr &rendering
     )
     {
-        return std::make_shared<ResourceProviderImpl>(platform, rendering, prefabSrcData, prefabSrcLength);
+        return std::make_shared<ResourceProviderImpl>(platform, rendering);
     }
 }

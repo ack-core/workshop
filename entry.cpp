@@ -38,7 +38,8 @@ extern "C" void initialize() {
     platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t[]>&& prefabsData, std::size_t prefabsSize) {
         platform->loadFile("primary.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t[]>&& fontData, std::size_t fontSize) {
             rendering = foundation::RenderingInterface::instance(platform);
-            resourceProvider = resource::ResourceProvider::instance(platform, rendering, prefabsData, prefabsSize);
+            resourceProvider = resource::ResourceProvider::instance(platform, rendering);
+            resourceProvider->setPrefabsData(prefabsData.get(), prefabsSize);
             fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
             scene = core::SceneInterface::instance(platform, rendering);
             raycast = core::RaycastInterface::instance(platform, scene);
