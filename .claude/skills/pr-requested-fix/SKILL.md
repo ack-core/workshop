@@ -4,7 +4,7 @@ description: Skill to fix requested changes in PR
 disable-model-invocation: true
 ---
 
-Input: Input: $ARGUMENTS - THE_PR, pull request (PR) on github
+Input: $ARGUMENTS - THE_PR, pull request (PR) on github
 We are fixing the code by request from PR reviewer on github.
 Do these steps in exact order:
 

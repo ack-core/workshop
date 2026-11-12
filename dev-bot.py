@@ -9,6 +9,7 @@ import time
 
 LOOP_WAIT_MAX_SEC = 60
 OPEN_PR_MAX = 3
+CANDIDATES_MIN = 10
 USAGE_LIMIT_MAX = 0.5
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
@@ -28,11 +29,12 @@ def is_repo_dirty():
     return bool(run("git", "status", "--porcelain").strip())
 
 
-def has_candidates():
+def candidates():
     if not os.path.isfile(REPORT_PATH):
-        return False
+        return 0
     with open(REPORT_PATH, encoding="utf-8") as f:
-        return re.search(r"Candidates:\s*-+\s*[^-\s]", f.read()) is not None
+        blocks = re.split(r"^---.*$", f.read(), flags=re.MULTILINE)
+    return sum(bool(line.strip()) for line in blocks[1].splitlines()) if len(blocks) > 2 else 0
 
 
 def remove_gone_branches():
@@ -138,6 +140,7 @@ def step():
         return
         
     run("git", "switch", "master")
+    run("git", "pull", "--ff-only")
     remove_gone_branches()
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
@@ -149,6 +152,7 @@ def step():
             if issue not in linked:
                 log(f"Looking into issue #{issue}...")
                 claude(f"/issue-implementation THE_ISSUE={issue}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+        return
 
     if specific_title_count(titles, "[TEST]") >= OPEN_PR_MAX:
         owner = repo_owner()
@@ -163,13 +167,11 @@ def step():
                     claude(f"/pr-advance THE_PR={pr['url']}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
             
     else:
-        if not has_candidates() and not specific_title_count(titles, "[TEST]"):
-            log("Test coverage report is empty, making a new one...")
-            run("git", "switch", "master")
-            run("git", "pull", "--ff-only")
+        if candidates() < CANDIDATES_MIN:
+            log("Test coverage report is short, appending candidates...")
             claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
 
-        if has_candidates():
+        if candidates():
             log("There is a space for new PRs, writing a test...")
             claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
 

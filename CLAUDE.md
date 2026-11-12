@@ -12,7 +12,7 @@ Code-first C++ 3D engine for small lowpoly/voxel games
 - package : platform specific prepared files
 - testing : tests suite
 
-## Shell scripts
+## Shell scripts (run from the repo root)
 - `make_<platform>_<app>` : generate IDE projects 
 - `build_<platform>_<app>` : make and build executables
 - `build_and_run_<platform>_tests` : build and run tests

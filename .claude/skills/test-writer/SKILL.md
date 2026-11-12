@@ -11,7 +11,7 @@ Do these steps in exact order:
    - Test name has format `<area>_<subject>_test`, each area has its `testing/<area>_tests.cpp` file where tests are implemented.
 2. Switch the repo to the fresh master. Make a branch named `test/<area>_<subject>` or similar and switch to it.
 3. Study some existing tests and how they work. Implement the described test and register it with suitable `REGISTER_*(...)` macro
-   - If the test is more than 60 (for unit tests) and 120 (for step/rendering tests) lines of code split it into a few logically different tests with their own class/function names.
+   - If the test is more than 60 (for unit tests) and 160 (for step/rendering tests) lines of code split it into a few logically different tests with their own class/function names.
    - Assertion line is the only information available if a test fails. Make sure that different checks don't end up on the same line.
    - Questions for self-check during implementation:
      - is there a simpler implementation? Simplify
@@ -21,6 +21,6 @@ Do these steps in exact order:
 6. Fix tests if the test is wrong, fix the code if the new tests actually found a problem.
 7. Commit the fixes, go to step 5 if there were fixes
 8. Push the branch to origin
-9. Remove taken line from `tmp/tests-coverage-report.txt`. Remove that file if there are no more lines in the 'Candidates' block
+9. Remove taken line from `tmp/tests-coverage-report.txt`. 
 10. Using gh cli create a PR to master. Make PR's title with format `[TEST] <Very short title made from subject>`. In the PR's body place very short description of what is tested.
 11. Request PR review from repo-owner
