@@ -268,7 +268,6 @@ namespace resource {
         void removeGround(const char *groundPath) override;
         void removeEmitter(const char *configPath) override;
         void removeDescription(const char *descPath) override;
-        void reloadPrefabs(util::callback<void()> &&completion) override;
         
         void update(float dtSec) override;
         
@@ -746,14 +745,6 @@ namespace resource {
         if (index != _descriptions.end()) {
             index->second.outdated = true;
         }
-    }
-    void ResourceProviderImpl::reloadPrefabs(util::callback<void()> &&completion) {
-        _platform->loadFile(resource::PREFAB_BIN, [this, cb = std::move(completion)](std::unique_ptr<std::uint8_t []> &&prefabsData, std::size_t prefabsSize) {
-            if (setPrefabsData(prefabsData.get(), prefabsSize)) {
-                cb();
-                _platform->logMsg("[ResourceProviderImpl::reloadPrefabs] prefabs.bin reloaded");
-            }
-        });
     }
     
     void ResourceProviderImpl::update(float dtSec) {
