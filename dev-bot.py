@@ -165,16 +165,14 @@ def step():
                 if is_unmergeable(pr):
                     log(f"Failed checks or conflicts in {pr['url']}, advancing...")
                     claude(f"/pr-advance THE_PR={pr['url']}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
-            
-    else:
-        if candidates() < CANDIDATES_MIN:
-            log("Test coverage report is short, appending candidates...")
-            claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
 
-        if candidates():
-            log("There is a space for new PRs, writing a test...")
-            claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+    elif candidates():
+        log("There is a space for new PRs, writing a test...")
+        claude("/test-writer", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
 
+    if candidates() < CANDIDATES_MIN:
+        log("Test coverage report is short, appending candidates...")
+        claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)")
 
 def main():
     sys.stdout.reconfigure(errors="replace")
