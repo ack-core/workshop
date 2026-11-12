@@ -328,6 +328,81 @@ namespace test {
         return true;
     }
 
+    bool util_strstream_helpers_test(const API &api) {
+        // shader-like signature
+        std::string name, args, type;
+        util::strstream signature ("  calc0(a(b) c)->float {", 24);
+        EXPECT_TRUE(signature >> util::word(name) >> util::braced(args, '(', ')') >> util::sequence("->") >> type >> util::sequence("{"));
+        EXPECT_EQ(name, "calc0");
+        EXPECT_EQ(args, "a(b) c");
+        EXPECT_EQ(type, "float");
+        EXPECT_TRUE(signature.isEof());
+
+        // nested braces and same opening/closing chars
+        std::string nested, quoted;
+        util::strstream braces (" {a{b{c}}d} \"x y\"", 17);
+        EXPECT_TRUE(braces >> util::braced(nested, '{', '}') >> util::braced(quoted, '"', '"'));
+        EXPECT_EQ(nested, "a{b{c}}d");
+        EXPECT_EQ(quoted, "x y");
+
+        // word stops at first non-alphanumeric char
+        std::string w0, w1;
+        util::strstream words ("abc12_def", 9);
+        EXPECT_TRUE(words >> util::word(w0) >> util::sequence("_") >> util::word(w1));
+        EXPECT_EQ(w0, "abc12");
+        EXPECT_EQ(w1, "def");
+
+        // nlist reads count then values and appends to output
+        std::vector<int> ints = {9};
+        std::vector<std::string> strings;
+        util::strstream lists ("3 1 -2 0x10 2 aa bb", 19);
+        EXPECT_TRUE(lists >> util::nlist(ints) >> util::nlist(strings));
+        EXPECT_EQ(ints, std::vector<int>({9, 1, -2, 16}));
+        EXPECT_EQ(strings, std::vector<std::string>({"aa", "bb"}));
+
+        std::vector<float> empty;
+        util::strstream emptyList ("0", 1);
+        EXPECT_TRUE(emptyList >> util::nlist(empty));
+        EXPECT_TRUE(empty.empty());
+
+        return true;
+    }
+
+    bool util_strstream_helpers_errors_test(const API &api) {
+        // sequence mismatch
+        util::strstream badSequence ("-> x", 4);
+        EXPECT_FALSE(badSequence >> util::sequence("=>"));
+        util::strstream shortSequence ("-", 1);
+        EXPECT_FALSE(shortSequence >> util::sequence("->"));
+
+        // braced without opening or closing
+        std::string out;
+        util::strstream noOpening ("a}", 2);
+        EXPECT_FALSE(noOpening >> util::braced(out, '{', '}'));
+        util::strstream noClosing ("{a{b}", 5);
+        EXPECT_FALSE(noClosing >> util::braced(out, '{', '}'));
+
+        // braced content outside of the stream must stay invisible
+        util::strstream limitedBraced ("{ab}", 3);
+        EXPECT_FALSE(limitedBraced >> util::braced(out, '{', '}'));
+
+        // word in empty stream
+        std::string w;
+        util::strstream blank ("   ", 3);
+        EXPECT_FALSE(blank >> util::word(w));
+
+        // nlist without count or with less values than count
+        std::vector<int> ints;
+        util::strstream noCount ("x 1", 3);
+        EXPECT_FALSE(noCount >> util::nlist(ints));
+        EXPECT_TRUE(ints.empty());
+        util::strstream lessValues ("3 1 2", 5);
+        EXPECT_FALSE(lessValues >> util::nlist(ints));
+        EXPECT_EQ(ints, std::vector<int>({1, 2}));
+
+        return true;
+    }
+
     bool util_description_set_get_test(const API &api) {
         util::Description desc;
         EXPECT_TRUE(desc.setBool("b", true));
@@ -408,6 +483,8 @@ namespace test {
         REGISTER_UNIT_TEST(util_strstream_char_reading_test);
         REGISTER_UNIT_TEST(util_strstream_extraction_test);
         REGISTER_UNIT_TEST(util_strstream_extraction_errors_test);
+        REGISTER_UNIT_TEST(util_strstream_helpers_test);
+        REGISTER_UNIT_TEST(util_strstream_helpers_errors_test);
         REGISTER_UNIT_TEST(util_description_set_get_test);
         REGISTER_UNIT_TEST(util_description_default_values_test);
     }

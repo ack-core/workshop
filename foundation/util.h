@@ -277,6 +277,10 @@ namespace util {
                 stream.peekChar() == target._opening ? (void)stream.getChar() : stream.setError();
                 
                 while (stream.isError() == false) {
+                    if (stream.isEof()) {
+                        stream.setError();
+                        break;
+                    }
                     if (stream.peekChar() == target._closing) {
                         if (--counter == 0) {
                             stream.getChar();
