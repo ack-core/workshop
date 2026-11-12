@@ -147,12 +147,16 @@ def step():
 
     issues = assigned_issues()
     if issues:
+        implemented = False
         linked = issues_with_prs()
         for issue in issues:
             if issue not in linked:
                 log(f"Looking into issue #{issue}...")
                 claude(f"/issue-implementation THE_ISSUE={issue}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
-        return
+                implemented = True
+
+        if implemented:
+            return
 
     if specific_title_count(titles, "[TEST]") >= OPEN_PR_MAX:
         owner = repo_owner()
