@@ -385,7 +385,7 @@ namespace test {
             EXPECT_TRUE(isPixel(frame, 40, 300, 0, 0));     // below first triangle
             EXPECT_TRUE(isPixel(frame, 300, 300, 0, 0));    // below second triangle
             EXPECT_LT(_frameId, api.rendering->getStatistics().frameId);
-            EXPECT_EQ(api.rendering->getStatistics().vertexCount, 6);
+            EXPECT_EQ(api.rendering->getStatistics().lastFrameVertices, 6);
             return true;
         }
 

@@ -790,7 +790,7 @@ namespace foundation {
         }
 
         g_statistics.frameId++;
-        g_statistics.vertexCount = g_frameVertexCount;
+        g_statistics.lastFrameVertices = g_frameVertexCount;
         g_frameVertexCount = 0;
         return result;
     }

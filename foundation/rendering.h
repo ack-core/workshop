@@ -137,7 +137,7 @@ namespace foundation {
             std::size_t dataCount = 0;
             std::size_t objectsCount = 0;
             std::uint64_t frameId = 0;
-            std::uint64_t vertexCount = 0;
+            std::uint64_t lastFrameVertices = 0;
         };
 
     public:

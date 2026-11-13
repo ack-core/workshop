@@ -935,7 +935,7 @@ namespace foundation {
         _swapChain->Present(1, 0);
 
         g_statistics.frameId++;
-        g_statistics.vertexCount = g_frameVertexCount;
+        g_statistics.lastFrameVertices = g_frameVertexCount;
         g_frameVertexCount = 0;
         return result;
     }
