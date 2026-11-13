@@ -411,6 +411,26 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_transformed_test(const API &api) {
+        math::transform2f t2;
+        const float t2flat[9] = {1, 2, 0, 0, 1, 0, 5, 6, 1};
+        std::copy(t2flat, t2flat + 9, t2.flat);
+        EXPECT_TRUE(eq2(math::vector2f(1.0f, 1.0f).transformed(t2, true), 6.0f, 9.0f));
+        EXPECT_TRUE(eq2(math::vector2f(1.0f, 1.0f).transformed(t2), 1.0f, 3.0f));
+        EXPECT_TRUE(eq2(math::vector2f(1.0f, 2.0f).yx.transformed(t2, true), 7.0f, 11.0f));
+
+        const math::transform3f t3({1, 2, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, -1}, {10, 20, 30, 1});
+        EXPECT_TRUE(eq3(math::vector3f(1.0f, 1.0f, 1.0f).transformed(t3, true), 11.0f, 23.0f, 31.0f));
+        EXPECT_TRUE(eq3(math::vector3f(1.0f, 1.0f, 1.0f).transformed(t3), 1.0f, 3.0f, 1.0f));
+        EXPECT_TRUE(eq3(math::vector3f(1.0f, 2.0f, 3.0f).zyx.transformed(t3, true), 13.0f, 28.0f, 31.0f));
+
+        EXPECT_TRUE(eq4(math::vector4f(1.0f, 1.0f, 1.0f, 1.0f).transformed(t3), 11.0f, 23.0f, 31.0f, 0.0f));
+        EXPECT_TRUE(eq4(math::vector4f(1.0f, 1.0f, 1.0f, 0.0f).transformed(t3), 1.0f, 3.0f, 1.0f, -1.0f));
+        EXPECT_TRUE(eq4(math::vector4f(1.0f, 2.0f, 3.0f, 0.0f).wzyx.transformed(t3), 10.0f, 23.0f, 32.0f, -1.0f));
+
+        return true;
+    }
 }
 
 
@@ -424,5 +444,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector_dot_cross_test);
         REGISTER_UNIT_TEST(math_vector_length_normalize_test);
         REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
+        REGISTER_UNIT_TEST(math_vector_transformed_test);
     }
 }
