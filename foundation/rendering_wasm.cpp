@@ -99,6 +99,8 @@ namespace {
     };
 
     std::weak_ptr<foundation::RenderingInterface> g_instance;
+    foundation::RenderingInterface::StatInfo g_statistics;
+    std::uint64_t g_frameVertexCount = 0;
 }
 
 namespace foundation {
@@ -107,9 +109,11 @@ namespace foundation {
         , _constBufferLength(constBufferLength)
         , _inputLayout(layout)
     {
+        g_statistics.shadersCount++;
     }
     WASMShader::~WASMShader() {
         webgl_deleteProgram(_shader);
+        g_statistics.shadersCount--;
     }
     const InputLayout &WASMShader::getInputLayout() const {
         return _inputLayout;
@@ -129,9 +133,11 @@ namespace foundation {
         , _icount(icount)
         , _stride(stride)
     {
+        g_statistics.dataCount++;
     }
     WASMData::~WASMData() {
         webgl_deleteData(_data);
+        g_statistics.dataCount--;
     }
     std::uint32_t WASMData::getVertexCount() const {
         return _vcount;
@@ -148,6 +154,12 @@ namespace foundation {
 }
 
 namespace foundation {
+    WASMTexBase::WASMTexBase() {
+        g_statistics.texturesCount++;
+    }
+    WASMTexBase::~WASMTexBase() {
+        g_statistics.texturesCount--;
+    }
     WASMTexture::WASMTexture(WebGLId texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
         : _texture(texture)
         , _format(fmt)
@@ -189,12 +201,14 @@ namespace foundation {
         if (depth) {
             _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
         }
+        g_statistics.targetsCount++;
     }
     WASMTarget::RTTexture::~RTTexture() {
         webgl_deleteTexture(_texture);
     }
     WASMTarget::~WASMTarget() {
         webgl_deleteTarget(_target);
+        g_statistics.targetsCount--;
     }
     std::uint32_t WASMTarget::getWidth() const {
         return _width;
@@ -256,9 +270,9 @@ namespace foundation {
             }
         };
         
-        auto shaderIndex = _shaders.find(shaderName);
-        if (shaderIndex != _shaders.end()) {
-            return shaderIndex->second;
+        std::weak_ptr<RenderShader> &cached = _shaders[shaderName];
+        if (RenderShaderPtr shader = cached.lock()) {
+            return shader;
         }
         else {
             util::strstream input(src, strlen(src));
@@ -282,7 +296,8 @@ namespace foundation {
                 _platform->logError("[MetalRendering::createShader] shader error : %s\n", error.data());
             }
         }
-        
+
+        cached = result;
         return result;
     }
     
@@ -443,9 +458,11 @@ namespace foundation {
             
             if (layout.repeat > 1) {
                 webgl_drawDefault(0, layout.repeat, vertexCount, g_topologies[int(_topology)]);
+                g_frameVertexCount += layout.repeat * vertexCount;
             }
             else {
                 webgl_drawDefault(0, vertexCount, 1, g_topologies[int(_topology)]);
+                g_frameVertexCount += vertexCount;
             }
         }
     }
@@ -466,13 +483,16 @@ namespace foundation {
             
             if (layout.repeat > 1) {
                 webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, vcount * instanceCount, g_topologies[int(_topology)]);
+                g_frameVertexCount += layout.repeat * vcount * instanceCount;
             }
             else {
                 if (platformData->getIndexCount()) {
                     webgl_drawIndexed(id, platformData->getIndexCount(), instanceCount, g_topologies[int(_topology)]);
+                    g_frameVertexCount += platformData->getIndexCount() * instanceCount;
                 }
                 else {
                     webgl_drawDefault(id, vcount, instanceCount, g_topologies[int(_topology)]);
+                    g_frameVertexCount += vcount * instanceCount;
                 }
             }
         }
@@ -491,6 +511,7 @@ namespace foundation {
                 
                 memcpy(memory + layout.attributes.size(), data, stride * vcnt);
                 webgl_drawDynamic(memory, layout.attributes.size(), memory + layout.attributes.size(), vcnt * stride, stride, indexes, icnt, layout.repeat, g_topologies[int(_topology)]);
+                g_frameVertexCount += layout.repeat > 1 ? layout.repeat * vcnt : (indexes ? icnt : vcnt);
             }
         }
     }
@@ -500,6 +521,10 @@ namespace foundation {
             webgl_applyTexture(i, 0, 0);
         }
 
+        g_statistics.frameId++;
+        g_statistics.lastFrameVertices = g_frameVertexCount;
+        g_frameVertexCount = 0;
+
 #if defined(IS_TESTS)
         auto pixels = std::make_unique<std::uint8_t[]>(TESTING_RENDER_WIDTH * TESTING_RENDER_HEIGHT * 4);
         webgl_readPixels(pixels.get(), TESTING_RENDER_WIDTH, TESTING_RENDER_HEIGHT);
@@ -508,7 +533,12 @@ namespace foundation {
         return nullptr;
 #endif
     }
-    
+
+    auto WASMRendering::getStatistics() const -> const StatInfo & {
+        g_statistics.objectsCount = g_statistics.shadersCount + g_statistics.texturesCount + g_statistics.targetsCount + g_statistics.dataCount;
+        return g_statistics;
+    }
+
     std::uint8_t *WASMRendering::_getUploadBuffer(std::size_t requiredLength) {
         if (requiredLength > _uploadBufferLength) {
             _uploadBufferLength = roundTo4096(requiredLength);

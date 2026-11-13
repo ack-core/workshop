@@ -18,6 +18,8 @@
 
 namespace {
     std::weak_ptr<foundation::RenderingInterface> g_instance;
+    foundation::RenderingInterface::StatInfo g_statistics;
+    std::uint64_t g_frameVertexCount = 0;
 
     const std::uint32_t MAX_TEXTURES = 4; // texture slots in shader
 
@@ -81,9 +83,13 @@ namespace foundation {
         , _vshader(vs)
         , _pshader(ps)
         , _constBuffer(cb)
-    {}
+    {
+        g_statistics.shadersCount++;
+    }
 
-    Direct3D11Shader::~Direct3D11Shader() {}
+    Direct3D11Shader::~Direct3D11Shader() {
+        g_statistics.shadersCount--;
+    }
 
     auto Direct3D11Shader::getInputLayout() const -> const InputLayout & {
         return _layout;
@@ -123,9 +129,13 @@ namespace foundation {
         , _width(w)
         , _height(h)
         , _mipCount(mipCount)
-    {}
+    {
+        g_statistics.texturesCount++;
+    }
 
-    Direct3D11Texture::~Direct3D11Texture() {}
+    Direct3D11Texture::~Direct3D11Texture() {
+        g_statistics.texturesCount--;
+    }
 
     auto Direct3D11Texture::getWidth() const -> std::uint32_t {
         return _width;
@@ -160,9 +170,12 @@ namespace foundation {
             _textures[i] = textures[i];
             _views[i] = views[i];
         }
+        g_statistics.targetsCount++;
     }
 
-    Direct3D11Target::~Direct3D11Target() {}
+    Direct3D11Target::~Direct3D11Target() {
+        g_statistics.targetsCount--;
+    }
 
     auto Direct3D11Target::getWidth() const -> std::uint32_t {
         return _width;
@@ -200,9 +213,13 @@ namespace foundation {
         , _vcount(vcnt)
         , _icount(icnt)
         , _stride(stride)
-    {}
+    {
+        g_statistics.dataCount++;
+    }
 
-    Direct3D11Data::~Direct3D11Data() {}
+    Direct3D11Data::~Direct3D11Data() {
+        g_statistics.dataCount--;
+    }
 
     auto Direct3D11Data::getVertexCount() const -> std::uint32_t {
         return _vcount;
@@ -468,6 +485,11 @@ namespace foundation {
     }
 
     auto Direct3D11Rendering::createShader(const char *src, const InputLayout &layout, bool suppressErrors) -> RenderShaderPtr {
+        std::weak_ptr<RenderShader> &cached = _shaders[std::to_string(std::hash<std::string>{}(src))];
+        if (RenderShaderPtr shader = cached.lock()) {
+            return shader;
+        }
+
         std::string error;
         const auto &[vs, fs, constLength] = foundation::makePlatformShaderSource(src, layout, error);
 
@@ -538,6 +560,7 @@ namespace foundation {
             _platform->logError("[Direct3D11Rendering::createShader] vertex shader compilation error:\n%s\n%s\n", (const char *)errorBlob->GetBufferPointer(), foundation::makeLines(vs).data());
         }
 
+        cached = result;
         return result;
     }
 
@@ -803,9 +826,11 @@ namespace foundation {
             if (layout.repeat > 1) {
                 _applyDrawConstants(vertexCount);
                 _context->DrawInstanced(layout.repeat, vertexCount, 0, 0);
+                g_frameVertexCount += layout.repeat * vertexCount;
             }
             else {
                 _context->Draw(vertexCount, 0);
+                g_frameVertexCount += vertexCount;
             }
         }
     }
@@ -822,13 +847,16 @@ namespace foundation {
             if (layout.repeat > 1) {
                 _applyDrawConstants(platformData->getVertexCount());
                 _context->DrawInstanced(layout.repeat, platformData->getVertexCount() * instanceCount, 0, 0);
+                g_frameVertexCount += layout.repeat * platformData->getVertexCount() * instanceCount;
             }
             else if (platformData->getIndexes()) {
                 _context->IASetIndexBuffer(platformData->getIndexes(), DXGI_FORMAT_R32_UINT, 0);
                 _context->DrawIndexedInstanced(platformData->getIndexCount(), instanceCount, 0, 0, 0);
+                g_frameVertexCount += platformData->getIndexCount() * instanceCount;
             }
             else {
                 _context->DrawInstanced(platformData->getVertexCount(), instanceCount, 0, 0);
+                g_frameVertexCount += platformData->getVertexCount() * instanceCount;
             }
         }
     }
@@ -865,13 +893,16 @@ namespace foundation {
                 if (layout.repeat > 1) {
                     _applyDrawConstants(vcnt);
                     _context->DrawInstanced(layout.repeat, vcnt, 0, 0);
+                    g_frameVertexCount += layout.repeat * vcnt;
                 }
                 else if (ilen) {
                     _context->IASetIndexBuffer(_dynamicBuffer.Get(), DXGI_FORMAT_R32_UINT, offset + vlen);
                     _context->DrawIndexed(icnt, 0, 0);
+                    g_frameVertexCount += icnt;
                 }
                 else {
                     _context->Draw(vcnt, 0);
+                    g_frameVertexCount += vcnt;
                 }
 
                 _dynamicBufferOffset += (vlen + ilen + 15) & ~15u;
@@ -902,7 +933,16 @@ namespace foundation {
 #endif
 
         _swapChain->Present(1, 0);
+
+        g_statistics.frameId++;
+        g_statistics.lastFrameVertices = g_frameVertexCount;
+        g_frameVertexCount = 0;
         return result;
+    }
+
+    auto Direct3D11Rendering::getStatistics() const -> const StatInfo & {
+        g_statistics.objectsCount = g_statistics.shadersCount + g_statistics.texturesCount + g_statistics.targetsCount + g_statistics.dataCount;
+        return g_statistics;
     }
 }
 

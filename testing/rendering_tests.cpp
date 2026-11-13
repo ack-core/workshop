@@ -6,6 +6,48 @@ namespace test {
         EXPECT_EQ(api.rendering.get(), foundation::RenderingInterface::instance(api.platform).get());
         return true;
     }
+
+    bool rendering_statistics_test(const API &api) {
+        const foundation::RenderingInterface::StatInfo before = api.rendering->getStatistics();
+        const char *shaderSrc = R"(
+            vssrc {
+                output_position = float4(vertex_position, 0.5, 1.0);
+            }
+            fssrc {
+                output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+            }
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .attributes = {
+                {"position", foundation::InputAttributeFormat::FLOAT2},
+            }
+        };
+        const float vertexes[] = { 0.0f, 0.0f };
+        const std::uint32_t pixel = 0xffffffff;
+        {
+            foundation::RenderShaderPtr shader = api.rendering->createShader(shaderSrc, layout);
+            foundation::RenderShaderPtr sameShader = api.rendering->createShader(shaderSrc, layout);
+            foundation::RenderTexturePtr texture = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 1, { &pixel });
+            foundation::RenderTargetPtr target = api.rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, 4, 4, true);
+            foundation::RenderDataPtr data = api.rendering->createData(layout, vertexes, 1);
+
+            const foundation::RenderingInterface::StatInfo &stats = api.rendering->getStatistics();
+            EXPECT_NOT_EQ(shader, nullptr);
+            EXPECT_EQ(shader, sameShader);
+            EXPECT_EQ(stats.shadersCount, before.shadersCount + 1);
+            EXPECT_EQ(stats.texturesCount, before.texturesCount + 3);
+            EXPECT_EQ(stats.targetsCount, before.targetsCount + 1);
+            EXPECT_EQ(stats.dataCount, before.dataCount + 1);
+            EXPECT_EQ(stats.objectsCount, before.objectsCount + 6);
+        }
+        const foundation::RenderingInterface::StatInfo &after = api.rendering->getStatistics();
+        EXPECT_EQ(after.shadersCount, before.shadersCount);
+        EXPECT_EQ(after.texturesCount, before.texturesCount);
+        EXPECT_EQ(after.targetsCount, before.targetsCount);
+        EXPECT_EQ(after.dataCount, before.dataCount);
+        EXPECT_EQ(after.objectsCount, before.objectsCount);
+        return true;
+    }
 }
 
 namespace test {
@@ -319,6 +361,7 @@ namespace test {
                 .repeat = 3
             };
             _shader = api.rendering->createShader(shaderSrc, layout);
+            _frameId = api.rendering->getStatistics().frameId;
         }
         void updateAndDraw(const API &api) override {
             api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
@@ -341,6 +384,8 @@ namespace test {
             EXPECT_TRUE(isPixel(frame, 220, 40, 0, 0));     // between triangles
             EXPECT_TRUE(isPixel(frame, 40, 300, 0, 0));     // below first triangle
             EXPECT_TRUE(isPixel(frame, 300, 300, 0, 0));    // below second triangle
+            EXPECT_LT(_frameId, api.rendering->getStatistics().frameId);
+            EXPECT_EQ(api.rendering->getStatistics().lastFrameVertices, 6);
             return true;
         }
 
@@ -356,6 +401,7 @@ namespace test {
         }
 
         foundation::RenderShaderPtr _shader;
+        std::uint64_t _frameId = 0;
     };
 }
 
@@ -363,6 +409,7 @@ namespace test {
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
+        REGISTER_UNIT_TEST(rendering_statistics_test);
         REGISTER_SCREENSHOT_TEST(rendering_fill_green_test);
         REGISTER_SCREENSHOT_TEST(rendering_white_line_on_black_test);
         REGISTER_SCREENSHOT_TEST(rendering_red_triangle_on_black_test);

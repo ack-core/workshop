@@ -39,7 +39,8 @@ namespace foundation {
     
     class WASMTexBase : public RenderTexture {
     public:
-        ~WASMTexBase() override {}
+        WASMTexBase();
+        ~WASMTexBase() override;
         virtual WebGLId getWebGLTexture() const = 0;
     };
 
@@ -128,7 +129,8 @@ namespace foundation {
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override;
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
-        
+        auto getStatistics() const -> const StatInfo & override;
+
     private:
         auto _getUploadBuffer(std::size_t requiredLength) -> std::uint8_t *;
         
@@ -147,7 +149,7 @@ namespace foundation {
         ByteDataPtr _uploadBufferData;
         std::size_t _uploadBufferLength;
         
-        std::unordered_map<std::string, std::shared_ptr<WASMShader>> _shaders;
+        std::unordered_map<std::string, std::weak_ptr<RenderShader>> _shaders;
         std::shared_ptr<WASMShader> _currentShader;
         
         RenderTargetPtr _currentTarget;

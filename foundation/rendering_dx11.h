@@ -4,6 +4,8 @@
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <wrl.h>
+#include <string>
+#include <unordered_map>
 
 namespace foundation {
     using Microsoft::WRL::ComPtr;
@@ -134,6 +136,7 @@ namespace foundation {
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
 
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
+        auto getStatistics() const -> const StatInfo & override;
 
     private:
         bool _createDefaultTargets();
@@ -153,6 +156,7 @@ namespace foundation {
         std::shared_ptr<PlatformInterface> _platform;
         EventHandlerToken _resizeToken = INVALID_EVENT_TOKEN;
 
+        std::unordered_map<std::string, std::weak_ptr<RenderShader>> _shaders;
         std::shared_ptr<Direct3D11Shader> _currentShader;
         RenderTopology _currentTopology = RenderTopology::TRIANGLES;
         bool _isForTarget = false;

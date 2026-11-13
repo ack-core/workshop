@@ -28,7 +28,8 @@ namespace foundation {
 
     class MetalTexBase : public RenderTexture {
     public:
-        ~MetalTexBase() override {}
+        MetalTexBase();
+        ~MetalTexBase() override;
         virtual id<MTLTexture> getNativeTexture() const = 0;
     };
 
@@ -138,7 +139,8 @@ namespace foundation {
         void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override;
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
-        
+        auto getStatistics() const -> const StatInfo & override;
+
     private:
         void _initializeDefaultRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor, const math::color &clear);
         bool _appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index);
@@ -166,7 +168,7 @@ namespace foundation {
         id<MTLCommandQueue> _commandQueue = nil;
         dispatch_semaphore_t _frameBufferingSemaphore;
         
-        std::unordered_map<std::string, std::shared_ptr<MetalShader>> _shaders;
+        std::unordered_map<std::string, std::weak_ptr<RenderShader>> _shaders;
         std::unordered_map<std::string, id<MTLRenderPipelineState>> _renderPipelineStates;
         
         id<MTLSamplerState> _samplerStates[2];
