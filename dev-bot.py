@@ -55,6 +55,10 @@ def assigned_issues():
     return run("gh", "issue", "list", "--assignee", "@me", "--json", "number", "--jq", ".[].number", "--limit", "1000").split()
 
 
+def planning_issues():
+    return run("gh", "issue", "list", "--label", "planning", "--search", "no:assignee", "--json", "number", "--jq", ".[].number", "--limit", "1000").split()
+
+
 def issues_with_prs():
     return run("gh", "pr", "list", "--state", "all", "--json", "closingIssuesReferences", "--jq", ".[].closingIssuesReferences[].number", "--limit", "1000").split()
 
@@ -146,6 +150,14 @@ def step():
     prs = open_prs()
     titles = [pr["title"] for pr in prs]
 
+    log("Maybe there are issues to elaborate...")
+    issues = planning_issues()
+    for issue in issues:
+        log(f"Elaborating issue #{issue}...")
+        claude(f"/issue-planning THE_ISSUE={issue}", "Read", "Glob", "Grep", "Bash", "PowerShell")
+    if issues:
+        return
+
     log("Maybe there are unimplemented issues...")
     issues = assigned_issues()
     if issues:
@@ -153,7 +165,7 @@ def step():
         linked = issues_with_prs()
         for issue in issues:
             if issue not in linked:
-                log(f"Looking into issue #{issue}...")
+                log(f"Looking into issue #{issue} to implement...")
                 claude(f"/issue-implementation THE_ISSUE={issue}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
                 implemented = True
 
