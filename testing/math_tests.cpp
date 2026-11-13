@@ -317,6 +317,55 @@ namespace test {
         return true;
     }
 
+    bool math_vector_length_normalize_test(const API &api) {
+        const math::vector2f a2(3.0f, -4.0f);
+        EXPECT_EQ_F(a2.min(), -4.0f);
+        EXPECT_EQ_F(a2.max(), 3.0f);
+        EXPECT_EQ_F(a2.length(), 5.0f);
+        EXPECT_EQ_F(a2.lengthSq(), 25.0f);
+        EXPECT_EQ_F(a2.yx.min(), -4.0f);
+        EXPECT_EQ_F(a2.yy.max(), -4.0f);
+        EXPECT_EQ_F(a2.xx.length(), std::sqrt(18.0f));
+        EXPECT_EQ_F(a2.xx.lengthSq(), 18.0f);
+        EXPECT_EQ_F(a2.distanceTo({0.0f, 0.0f}), 5.0f);
+        EXPECT_EQ_F(a2.yx.distanceTo({-1.0f, 7.0f}), 5.0f);
+
+        const math::vector2f n2 = a2.normalized();
+        EXPECT_EQ_F(n2.x, 0.6f);
+        EXPECT_EQ_F(n2.y, -0.8f);
+        const math::vector2f s2 = a2.yx.normalized(10.0f);
+        EXPECT_EQ_F(s2.x, -8.0f);
+        EXPECT_EQ_F(s2.y, 6.0f);
+        EXPECT_TRUE(eq2(math::vector2f(0.0f).normalized(), 0.0f, 0.0f));
+
+        const math::vector3f a3(2.0f, -3.0f, 6.0f);
+        EXPECT_EQ_F(a3.min(), -3.0f);
+        EXPECT_EQ_F(a3.max(), 6.0f);
+        EXPECT_EQ_F(a3.length(), 7.0f);
+        EXPECT_EQ_F(a3.lengthSq(), 49.0f);
+        EXPECT_EQ_F(a3.xxy.min(), -3.0f);
+        EXPECT_EQ_F(a3.xxy.max(), 2.0f);
+        EXPECT_EQ_F(a3.xxy.lengthSq(), 17.0f);
+        EXPECT_EQ_F(a3.zx.length(), std::sqrt(40.0f));
+        EXPECT_EQ_F(a3.distanceTo({0.0f, 0.0f, 0.0f}), 7.0f);
+        EXPECT_EQ_F(a3.zyx.distanceTo({9.0f, 0.0f, 5.0f}), 3.0f * std::sqrt(3.0f));
+
+        const math::vector3f n3 = a3.normalized();
+        EXPECT_EQ_F(n3.x, 2.0f / 7.0f);
+        EXPECT_EQ_F(n3.y, -3.0f / 7.0f);
+        EXPECT_EQ_F(n3.z, 6.0f / 7.0f);
+        EXPECT_EQ_F(n3.length(), 1.0f);
+        EXPECT_EQ_F(a3.zyx.normalized(14.0f).x, 12.0f);
+        EXPECT_EQ_F(a3.zyx.normalized(14.0f).z, 4.0f);
+        EXPECT_TRUE(eq3(math::vector3f(0.0f).normalized(), 0.0f, 0.0f, 0.0f));
+
+        EXPECT_TRUE(eq3(a3.signs(), 1.0f, -1.0f, 1.0f));
+        EXPECT_TRUE(eq3(a3.yzx.signs(), -1.0f, 1.0f, 1.0f));
+        EXPECT_TRUE(eq3(math::vector3f(0.0f, -0.0f, 0.0f).signs(), 1.0f, -1.0f, 1.0f));
+
+        return true;
+    }
+
     bool math_transform3f_identity_multiply_test(const API &api) {
         const math::transform3f id = math::transform3f::identity();
         EXPECT_TRUE(near4(id.row0, 1.0f, 0.0f, 0.0f, 0.0f));
@@ -373,6 +422,7 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector4f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector_arithmetic_test);
         REGISTER_UNIT_TEST(math_vector_dot_cross_test);
+        REGISTER_UNIT_TEST(math_vector_length_normalize_test);
         REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
     }
 }
