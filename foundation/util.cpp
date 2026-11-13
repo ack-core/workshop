@@ -411,20 +411,7 @@ namespace util {
                             result += std::string(ident, ' ') + index->first + " : bool = " + ((*v) ? "true\r\n" : "false\r\n");
                         }
                         else if (const std::string *v = std::get_if<std::string>(&index->second)) {
-                            if (next == desc.end() || next->first != index->first) {
-                                if (arrayCount) {
-                                    result += std::string(ident, ' ') + index->first + "[" + std::to_string(arrayCount + 1) + "] : string = " + arrayString + "\"" + *v + "\"\r\n";
-                                    arrayString.clear();
-                                    arrayCount = 0;
-                                }
-                                else {
-                                    result += std::string(ident, ' ') + index->first + " : string = \"" + *v + "\"\r\n";
-                                }
-                            }
-                            else {
-                                arrayString += "\"" + *v + "\"  ";
-                                arrayCount++;
-                            }
+                            accumulateOrPut("\"" + *v + "\"", "string");
                         }
                         else if (const math::vector2f *v = std::get_if<math::vector2f>(&index->second)) {
                             const std::string stringValue = strstream::ftos(v->x) + " " + strstream::ftos(v->y);
