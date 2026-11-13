@@ -377,6 +377,7 @@ namespace foundation {
 
         ::ShowWindow(_window, SW_NORMAL);
         ::UpdateWindow(_window);
+        _screenScale = float(::GetDpiForWindow(_window)) / REFERENCE_DENSITY;
 
         ::GetModuleFileNameA(nullptr, g_buffer, BUFFER_SIZE);
         *(strrchr(g_buffer, '\\') + 1) = 0;
@@ -412,7 +413,7 @@ namespace foundation {
         return float(g_height);
     }
     float WindowsPlatform::getScreenScale() const {
-        return float(::GetDpiForWindow(_window)) / REFERENCE_DENSITY;
+        return _screenScale;
     }
 
     void *WindowsPlatform::attachNativeRenderingContext(void *context) {

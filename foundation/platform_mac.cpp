@@ -399,6 +399,12 @@ namespace foundation {
             [g_window makeKeyAndOrderFront:nil];
             [NSApp activateIgnoringOtherApps:YES];
 
+            NSScreen *screen = g_window.screen ? g_window.screen : NSScreen.mainScreen;
+            const CGDirectDisplayID displayID = [screen.deviceDescription[@"NSScreenNumber"] unsignedIntValue];
+            const CGSize sizeMM = ::CGDisplayScreenSize(displayID);
+            const CGFloat ppi = sizeMM.width > 0.0 ? screen.frame.size.width * screen.backingScaleFactor * 25.4 / sizeMM.width : screen.backingScaleFactor * 72.0;
+            _screenScale = float(ppi) / REFERENCE_DENSITY;
+
             NSBundle *bundle = [NSBundle mainBundle];
             _dataPath = std::string(bundle.resourcePath.UTF8String) + "/data/";
 #if defined(IS_TESTS)
@@ -436,11 +442,7 @@ namespace foundation {
         return float(g_height);
     }
     float MacPlatform::getScreenScale() const {
-        NSScreen *screen = g_window.screen ? g_window.screen : NSScreen.mainScreen;
-        const CGDirectDisplayID displayID = [screen.deviceDescription[@"NSScreenNumber"] unsignedIntValue];
-        const CGSize sizeMM = ::CGDisplayScreenSize(displayID);
-        const CGFloat ppi = sizeMM.width > 0.0 ? screen.frame.size.width * screen.backingScaleFactor * 25.4 / sizeMM.width : screen.backingScaleFactor * 72.0;
-        return float(ppi) / REFERENCE_DENSITY;
+        return _screenScale;
     }
 
     void *MacPlatform::attachNativeRenderingContext(void *context) {

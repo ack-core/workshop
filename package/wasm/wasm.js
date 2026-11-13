@@ -166,6 +166,7 @@ const imports = {
         js_exit: function(code) {
             window.location.href = "/" + (code == 0 ? "success" : "fail");
         },
+        js_pixelRatio: () => window.devicePixelRatio,
         js_task: function(task) {
             worker.postMessage({type: EventType.BTASK, task: task});
         },
@@ -649,7 +650,7 @@ worker.onmessage = (msg) => {
 
         recreateDefaultFBO();
         instance.exports.initialize();
-        instance.exports.resized(targetWidth, targetHeight, window.devicePixelRatio);
+        instance.exports.resized(targetWidth, targetHeight);
 
         function getCoord(event) {
             const rect = canvas.getBoundingClientRect();
@@ -767,7 +768,7 @@ worker.onmessage = (msg) => {
                         targetWidth = canvas.width = w;
                         targetHeight = canvas.height = h;
                         recreateDefaultFBO();
-                        instance.exports.resized(targetWidth, targetHeight, window.devicePixelRatio);
+                        instance.exports.resized(targetWidth, targetHeight);
                         print("[PLATFORM] Resized to " + targetWidth + " " + targetHeight);
                     }
                 }

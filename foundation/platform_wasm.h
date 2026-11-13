@@ -49,5 +49,6 @@ namespace foundation {
         void _output(bool error, const char *fmt, va_list arglist);
 
         std::string _dataPath;
+        float _screenScale;
     };
 }

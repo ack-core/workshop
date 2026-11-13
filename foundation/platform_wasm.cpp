@@ -18,7 +18,6 @@ namespace {
     
     std::uint32_t g_width;
     std::uint32_t g_height;
-    float g_pixelRatio = 1.0f;
     std::size_t g_asyncWorkCount = 0;
     foundation::PlatformInterface::StatInfo g_statistics;
 }
@@ -32,6 +31,7 @@ extern "C" {
     void js_dbg(const void *ptr0, const void *ptr1, const void *ptr2);
     void js_log(const std::uint16_t *ptr, int length);
     void js_exit(int code);
+    float js_pixelRatio();
     void js_task(const void *ptr);
     void js_fetch(const void *ptr, int pathLen, bool suppressOutput);
     void js_save(const void *path, int pathLen, const void *data, int dataLen, bool suppressOutput);
@@ -161,8 +161,8 @@ namespace {
 }
 
 namespace foundation {
-    WASMPlatform::WASMPlatform() : _dataPath("data/") {
-        
+    WASMPlatform::WASMPlatform() : _dataPath("data/"), _screenScale(js_pixelRatio() * 96.0f / REFERENCE_DENSITY) {
+
     }
     WASMPlatform::~WASMPlatform() {
         
@@ -230,7 +230,7 @@ namespace foundation {
         return g_height;
     }
     float WASMPlatform::getScreenScale() const {
-        return g_pixelRatio * 96.0f / REFERENCE_DENSITY;
+        return _screenScale;
     }
     
     void *WASMPlatform::attachNativeRenderingContext(void *context) {
@@ -446,10 +446,9 @@ extern "C" {
             g_updateAndDraw(dt);
         }
     }
-    void resized(std::uint32_t w, std::uint32_t h, float pixelRatio) {
+    void resized(std::uint32_t w, std::uint32_t h) {
         g_width = w;
         g_height = h;
-        g_pixelRatio = pixelRatio;
         
         for (auto &index : g_resizeHandlers) {
             index.second();

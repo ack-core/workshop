@@ -52,5 +52,6 @@ namespace foundation {
         std::mutex _logMutex;
         std::string _dataPath;
         std::string _writablePath;
+        float _screenScale;
     };
 }

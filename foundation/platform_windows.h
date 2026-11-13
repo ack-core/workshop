@@ -54,5 +54,6 @@ namespace foundation {
 
         HINSTANCE _hinst;
         HWND _window;
+        float _screenScale;
     };
 }
