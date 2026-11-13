@@ -18,6 +18,7 @@ namespace {
     
     std::uint32_t g_width;
     std::uint32_t g_height;
+    float g_pixelRatio = 1.0f;
     std::size_t g_asyncWorkCount = 0;
     foundation::PlatformInterface::StatInfo g_statistics;
 }
@@ -227,6 +228,9 @@ namespace foundation {
     }
     float WASMPlatform::getScreenHeight() const {
         return g_height;
+    }
+    float WASMPlatform::getScreenScale() const {
+        return g_pixelRatio * 96.0f / REFERENCE_DENSITY;
     }
     
     void *WASMPlatform::attachNativeRenderingContext(void *context) {
@@ -442,9 +446,10 @@ extern "C" {
             g_updateAndDraw(dt);
         }
     }
-    void resized(std::uint32_t w, std::uint32_t h) {
+    void resized(std::uint32_t w, std::uint32_t h, float pixelRatio) {
         g_width = w;
         g_height = h;
+        g_pixelRatio = pixelRatio;
         
         for (auto &index : g_resizeHandlers) {
             index.second();

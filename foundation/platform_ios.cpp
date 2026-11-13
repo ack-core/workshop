@@ -410,6 +410,9 @@ namespace foundation {
     float IOSPlatform::getScreenHeight() const {
         return g_nativeScreenHeight;
     }
+    float IOSPlatform::getScreenScale() const {
+        return g_nativeScreenScale * 163.0f / REFERENCE_DENSITY;
+    }
     
     void *IOSPlatform::attachNativeRenderingContext(void *context) {
         g_mtkView.device = (__bridge id<MTLDevice>)context;

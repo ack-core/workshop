@@ -411,6 +411,9 @@ namespace foundation {
     float WindowsPlatform::getScreenHeight() const {
         return float(g_height);
     }
+    float WindowsPlatform::getScreenScale() const {
+        return float(::GetDpiForWindow(_window)) / REFERENCE_DENSITY;
+    }
 
     void *WindowsPlatform::attachNativeRenderingContext(void *context) {
         IDXGISwapChain1 *swapChain = nullptr;

@@ -649,7 +649,7 @@ worker.onmessage = (msg) => {
 
         recreateDefaultFBO();
         instance.exports.initialize();
-        instance.exports.resized(targetWidth, targetHeight);
+        instance.exports.resized(targetWidth, targetHeight, window.devicePixelRatio);
 
         function getCoord(event) {
             const rect = canvas.getBoundingClientRect();
@@ -767,7 +767,7 @@ worker.onmessage = (msg) => {
                         targetWidth = canvas.width = w;
                         targetHeight = canvas.height = h;
                         recreateDefaultFBO();
-                        instance.exports.resized(targetWidth, targetHeight);
+                        instance.exports.resized(targetWidth, targetHeight, window.devicePixelRatio);
                         print("[PLATFORM] Resized to " + targetWidth + " " + targetHeight);
                     }
                 }

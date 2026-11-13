@@ -435,6 +435,13 @@ namespace foundation {
     float MacPlatform::getScreenHeight() const {
         return float(g_height);
     }
+    float MacPlatform::getScreenScale() const {
+        NSScreen *screen = g_window.screen ? g_window.screen : NSScreen.mainScreen;
+        const CGDirectDisplayID displayID = [screen.deviceDescription[@"NSScreenNumber"] unsignedIntValue];
+        const CGSize sizeMM = ::CGDisplayScreenSize(displayID);
+        const CGFloat ppi = sizeMM.width > 0.0 ? screen.frame.size.width * screen.backingScaleFactor * 25.4 / sizeMM.width : screen.backingScaleFactor * 72.0;
+        return float(ppi) / REFERENCE_DENSITY;
+    }
 
     void *MacPlatform::attachNativeRenderingContext(void *context) {
         g_view.device = (__bridge id<MTLDevice>)context;

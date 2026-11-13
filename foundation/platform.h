@@ -115,6 +115,9 @@ namespace foundation {
         //
         static std::shared_ptr<PlatformInterface> instance();
 
+        // Texture pixels per inch
+        static constexpr float REFERENCE_DENSITY = 160.0f;
+
         struct StatInfo {
             std::size_t eventHandlersCount = 0;
             std::size_t fileLoadTasksCount = 0;
@@ -146,7 +149,11 @@ namespace foundation {
         //
         virtual float getScreenWidth() const = 0;
         virtual float getScreenHeight() const = 0;
-        
+
+        // Returns screen pixels per inch / REFERENCE_DENSITY
+        //
+        virtual float getScreenScale() const = 0;
+
         // Connecting render with native window. Used by RenderingInterface implementation. Must be called before run()
         // @context  - platform-dependent handle (ID3D11Device * for windows, EAGLContext * for gles, etc)
         // @return   - platform-dependent result (IDXGISwapChain * for windows)
