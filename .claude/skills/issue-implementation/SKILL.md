@@ -9,7 +9,7 @@ We are implementing a feature described in the github issue.
 Do these steps in exact order:
 
 1. Fetch and switch to the fresh master overwriting local changes.
-2. Read all information from the github issue to understand what is the feature about. 
+2. Read all information (including comments) from the github issue to understand what is the feature about. 
 3. Make a new branch with name `dev/<what_is_feature_about>` and switch to it
 4. Study feature-related code and make a short step-by-step implementation plan with what and where to change.
    - Questions for self-check during planning:
