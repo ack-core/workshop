@@ -59,6 +59,7 @@ var canvas = document.getElementById("render_target");
 var eventSource = document.getElementById("editor") || document.getElementById("render_target");
 var targetWidth = window.devicePixelRatio * canvas.scrollWidth;
 var targetHeight = window.devicePixelRatio * canvas.scrollHeight;
+var targetPixelRatio = window.devicePixelRatio;
 var activePointerIDs = {};
 var prevFrameTimeStamp = null;
 var glShaderIDCounter = 0x10000000;
@@ -166,7 +167,6 @@ const imports = {
         js_exit: function(code) {
             window.location.href = "/" + (code == 0 ? "success" : "fail");
         },
-        js_pixelRatio: () => window.devicePixelRatio,
         js_task: function(task) {
             worker.postMessage({type: EventType.BTASK, task: task});
         },
@@ -650,7 +650,7 @@ worker.onmessage = (msg) => {
 
         recreateDefaultFBO();
         instance.exports.initialize();
-        instance.exports.resized(targetWidth, targetHeight);
+        instance.exports.resized(targetWidth, targetHeight, targetPixelRatio);
 
         function getCoord(event) {
             const rect = canvas.getBoundingClientRect();
@@ -764,11 +764,12 @@ worker.onmessage = (msg) => {
                 const h = window.devicePixelRatio * canvas.scrollHeight;
 
                 if (w > h) {
-                    if (w != targetWidth || h != targetHeight) {
+                    if (w != targetWidth || h != targetHeight || window.devicePixelRatio != targetPixelRatio) {
                         targetWidth = canvas.width = w;
                         targetHeight = canvas.height = h;
+                        targetPixelRatio = window.devicePixelRatio;
                         recreateDefaultFBO();
-                        instance.exports.resized(targetWidth, targetHeight);
+                        instance.exports.resized(targetWidth, targetHeight, targetPixelRatio);
                         print("[PLATFORM] Resized to " + targetWidth + " " + targetHeight);
                     }
                 }

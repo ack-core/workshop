@@ -66,8 +66,8 @@ namespace ui {
             _positionChanged = true;
         }
         virtual void updateCoordinates() {
-            math::vector2f lt = math::vector2f(0.0f, 0.0f);
             const foundation::PlatformInterfacePtr &platform = _facility.getPlatform();
+            math::vector2f lt = math::vector2f(0.0f, 0.0f);
             math::vector2f rb = math::vector2f(platform->getScreenWidth(), platform->getScreenHeight()) / platform->getScreenScale();
             
             if (auto target = _anchorTarget.lock()) {

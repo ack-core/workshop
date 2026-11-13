@@ -29,7 +29,6 @@ onmessage = (msg) => {
                     console.log(String.fromCharCode(...u16str));
                 },
                 js_exit: (code) => { throw "can't exit from background" },
-                js_pixelRatio: () => { throw "can't access window from background" },
                 js_task: (task) => { throw "can't start task in background" },
                 js_fetch: (block, pathLen, suppressOutput) => { throw "can't read files in background" },
                 js_save: (block, pathLen, data, dataLen, suppressOutput) => { throw "can't write files in background" },
