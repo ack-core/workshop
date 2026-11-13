@@ -14,6 +14,10 @@ namespace {
     private:
         int _sum = 0;
     };
+
+    util::Description parseText(const std::string &text) {
+        return util::Description::parse(reinterpret_cast<const std::uint8_t *>(text.data()), text.length());
+    }
 }
 
 namespace test {
@@ -473,6 +477,105 @@ namespace test {
 
         return true;
     }
+
+    bool util_description_parse_test(const API &api) {
+        const util::Description desc = parseText(
+            "i : integer = -5\n"
+            "n : number = 2.5\n"
+            "b : bool = true\n"
+            "s : string = \"a b\"\n"
+            "v2f : vector2f = 1.5 -2\n"
+            "v3f : vector3f = 1 2 3\n"
+            "v4f : vector4f = 1 2 3 4.5\n"
+            "v2i : vector2i = 1 2\n"
+            "v3i : vector3i = 4 5 6\n"
+            "v4i : vector4i = 0x10 -1 2 3\n"
+            "ints : integer[3] = 1 2 3\n"
+            "strs : string[2] = \"x\" \"y\"\n"
+            "d {\n"
+            "    x : integer = 1\n"
+            "    inner { f : bool = false }\n"
+            "}\n"
+        );
+        EXPECT_EQ(desc.size(), 16u);
+        EXPECT_EQ(*desc.getInteger("i"), -5);
+        EXPECT_EQ_F(*desc.getNumber("n"), 2.5f);
+        EXPECT_EQ(*desc.getBool("b"), true);
+        EXPECT_EQ(*desc.getString("s"), "a b");
+        EXPECT_EQ_F(desc.getVector2f("v2f")->y, -2.0f);
+        EXPECT_EQ_F(desc.getVector3f("v3f")->z, 3.0f);
+        EXPECT_EQ_F(desc.getVector4f("v4f")->w, 4.5f);
+        EXPECT_EQ(desc.getVector2i("v2i")->y, 2);
+        EXPECT_EQ(desc.getVector3i("v3i")->z, 6);
+        EXPECT_EQ(desc.getVector4i("v4i")->x, 16);
+        EXPECT_EQ(desc.getVector4i("v4i")->y, -1);
+        EXPECT_EQ(desc.getIntegers("ints"), std::vector<std::int64_t>({1, 2, 3}));
+        EXPECT_EQ(desc.getStrings("strs"), std::vector<std::string>({"x", "y"}));
+
+        const util::Description *d = desc.getDescription("d");
+        EXPECT_TRUE(d != nullptr);
+        EXPECT_EQ(*d->getInteger("x"), 1);
+        EXPECT_EQ(*d->getDescription("inner")->getBool("f"), false);
+
+        // any error makes the whole result empty
+        EXPECT_TRUE(parseText("a : unknown = 1").empty());
+        EXPECT_TRUE(parseText("a : integer[2] = 1").empty());
+        EXPECT_TRUE(parseText("a : integer 1").empty());
+        EXPECT_TRUE(parseText("d { a : integer = 1").empty());
+        EXPECT_TRUE(parseText("d { a : integer = x }").empty());
+        EXPECT_TRUE(parseText("a = 1").empty());
+
+        return true;
+    }
+
+    bool util_description_serialize_test(const API &api) {
+        util::Description src;
+        src.setInteger("i", -5);
+        src.setNumber("n", -2.25);
+        src.setBool("b", false);
+        src.setString("s", "a b");
+        src.setVector2f("v2f", math::vector2f(1.5f, -2.0f));
+        src.setVector3f("v3f", math::vector3f(1.0f, 2.0f, 3.0f));
+        src.setVector4f("v4f", math::vector4f(1.0f, 2.0f, 3.0f, 4.5f));
+        src.setVector2i("v2i", math::vector2i(1, 2));
+        src.setVector3i("v3i", math::vector3i(4, 5, 6));
+        src.setVector4i("v4i", math::vector4i(7, -1, 2, 3));
+        src.setInteger("ints", 1, false);
+        src.setInteger("ints", 2, false);
+        src.setString("strs", "x", false);
+        src.setString("strs", "y", false);
+        src.setBool("bools", true, false);
+        src.setBool("bools", false, false);
+        util::Description *d = src.setDescription("d");
+        d->setInteger("x", 1);
+        d->setDescription("inner")->setString("t", "z");
+        d->setDescription("empty");
+
+        const util::Description desc = parseText(util::Description::serialize(src));
+        EXPECT_EQ(desc.size(), src.size());
+        EXPECT_EQ(*desc.getInteger("i"), -5);
+        EXPECT_EQ_F(*desc.getNumber("n"), -2.25f);
+        EXPECT_EQ(*desc.getBool("b"), false);
+        EXPECT_EQ(*desc.getString("s"), "a b");
+        EXPECT_EQ_F(desc.getVector2f("v2f")->y, -2.0f);
+        EXPECT_EQ_F(desc.getVector3f("v3f")->z, 3.0f);
+        EXPECT_EQ_F(desc.getVector4f("v4f")->w, 4.5f);
+        EXPECT_EQ(desc.getVector2i("v2i")->y, 2);
+        EXPECT_EQ(desc.getVector3i("v3i")->z, 6);
+        EXPECT_EQ(desc.getVector4i("v4i")->y, -1);
+        EXPECT_EQ(desc.getIntegers("ints"), std::vector<std::int64_t>({1, 2}));
+        EXPECT_EQ(desc.getStrings("strs"), std::vector<std::string>({"x", "y"}));
+        EXPECT_EQ(*desc.getBool("bools"), true);
+
+        const util::Description *rd = desc.getDescription("d");
+        EXPECT_TRUE(rd != nullptr);
+        EXPECT_EQ(rd->size(), 3u);
+        EXPECT_EQ(*rd->getInteger("x"), 1);
+        EXPECT_EQ(*rd->getDescription("inner")->getString("t"), "z");
+        EXPECT_TRUE(rd->getDescription("empty")->empty());
+
+        return true;
+    }
 }
 
 
@@ -487,5 +590,7 @@ namespace test {
         REGISTER_UNIT_TEST(util_strstream_helpers_errors_test);
         REGISTER_UNIT_TEST(util_description_set_get_test);
         REGISTER_UNIT_TEST(util_description_default_values_test);
+        REGISTER_UNIT_TEST(util_description_parse_test);
+        REGISTER_UNIT_TEST(util_description_serialize_test);
     }
 }
