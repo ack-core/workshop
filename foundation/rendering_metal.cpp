@@ -67,6 +67,8 @@ namespace {
     };
 
     std::weak_ptr<foundation::RenderingInterface> g_instance;
+    foundation::RenderingInterface::StatInfo g_statistics;
+    std::uint64_t g_frameVertexCount = 0;
 }
 
 namespace foundation {
@@ -75,10 +77,13 @@ namespace foundation {
         , _layout(layout)
         , _constBufferLength(constBufferLength)
         , _library(library)
-    {}
-    
+    {
+        g_statistics.shadersCount++;
+    }
+
     MetalShader::~MetalShader() {
         _library = nil;
+        g_statistics.shadersCount--;
     }
     
     const InputLayout &MetalShader::getInputLayout() const {
@@ -103,6 +108,14 @@ namespace foundation {
 }
 
 namespace foundation {
+    MetalTexBase::MetalTexBase() {
+        g_statistics.texturesCount++;
+    }
+
+    MetalTexBase::~MetalTexBase() {
+        g_statistics.texturesCount--;
+    }
+
     MetalTexture::MetalTexture(id<MTLTexture> texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount)
         : _texture(texture)
         , _format(fmt)
@@ -149,13 +162,15 @@ namespace foundation {
         if (depth) {
             _depth = std::make_shared<RTTexture>(*this, RenderTextureFormat::R32F, depth);
         }
+        g_statistics.targetsCount++;
     }
-    
+
     MetalTarget::~MetalTarget() {
         for (unsigned i = 0; i < _count; i++) {
             _textures[i] = nullptr;
         }
         _depth = nullptr;
+        g_statistics.targetsCount--;
     }
     
     std::uint32_t MetalTarget::getWidth() const {
@@ -191,11 +206,13 @@ namespace foundation {
         , _icount(icnt)
         , _stride(stride)
     {
+        g_statistics.dataCount++;
     }
-    
+
     MetalData::~MetalData() {
         _vertices = nil;
         _indexes = nil;
+        g_statistics.dataCount--;
     }
     
     std::uint32_t MetalData::getVertexCount() const {
@@ -272,9 +289,9 @@ namespace foundation {
         std::shared_ptr<RenderShader> result;
         std::string shaderName = std::to_string(std::hash<std::string>{}(shadersrc));
         
-        auto shaderIndex = _shaders.find(shaderName);
-        if (shaderIndex != _shaders.end()) {
-            return shaderIndex->second;
+        std::weak_ptr<RenderShader> &cached = _shaders[shaderName];
+        if (RenderShaderPtr shader = cached.lock()) {
+            return shader;
         }
         else {
             util::strstream input(shadersrc, strlen(shadersrc));
@@ -305,6 +322,7 @@ namespace foundation {
             }
         }
 
+        cached = result;
         return result;
     }
     
@@ -632,9 +650,11 @@ namespace foundation {
             if (layout.repeat > 1) {
                 [_currentRenderCommandEncoder setVertexBytes:&vertexCount length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vertexCount];
+                g_frameVertexCount += layout.repeat * vertexCount;
             }
             else {
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vertexCount];
+                g_frameVertexCount += vertexCount;
             }
         }
     }
@@ -663,13 +683,16 @@ namespace foundation {
             if (layout.repeat > 1) {
                 [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt * instanceCount];
+                g_frameVertexCount += layout.repeat * vcnt * instanceCount;
             }
             else {
                 if (ibuffer) {
                     [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:icnt indexType:MTLIndexTypeUInt32 indexBuffer:ibuffer indexBufferOffset:0 instanceCount:instanceCount];
+                    g_frameVertexCount += icnt * instanceCount;
                 }
                 else if (vbuffer) {
                     [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vcnt instanceCount:instanceCount];
+                    g_frameVertexCount += vcnt * instanceCount;
                 }
             }
         }
@@ -699,14 +722,17 @@ namespace foundation {
             if (layout.repeat > 1) {
                 [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt];
+                g_frameVertexCount += layout.repeat * vcnt;
             }
             else {
                 if (indexes) {
                     const std::uint32_t ioff = _dynamicBufferOffset + vlen;
                     [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:icnt indexType:MTLIndexTypeUInt32 indexBuffer:_dynamicBuffers[_dynamicBuffersIndex] indexBufferOffset:ioff];
+                    g_frameVertexCount += icnt;
                 }
                 else {
                     [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vcnt];
+                    g_frameVertexCount += vcnt;
                 }
             }
             
@@ -763,7 +789,15 @@ namespace foundation {
             dispatch_semaphore_wait(_frameBufferingSemaphore, DISPATCH_TIME_FOREVER);
         }
 
+        g_statistics.frameId++;
+        g_statistics.vertexCount = g_frameVertexCount;
+        g_frameVertexCount = 0;
         return result;
+    }
+
+    auto MetalRendering::getStatistics() const -> const StatInfo & {
+        g_statistics.objectsCount = g_statistics.shadersCount + g_statistics.texturesCount + g_statistics.targetsCount + g_statistics.dataCount;
+        return g_statistics;
     }
     
     bool MetalRendering::_appendConstantBuffer(const void *buffer, std::uint32_t size, std::uint32_t index) {

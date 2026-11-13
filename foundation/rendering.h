@@ -129,7 +129,17 @@ namespace foundation {
         // Gets or creates an instance. There can be only one instance
         //
         static std::shared_ptr<RenderingInterface> instance(const std::shared_ptr<PlatformInterface> &platform);
-        
+
+        struct StatInfo {
+            std::size_t shadersCount = 0;
+            std::size_t texturesCount = 0;
+            std::size_t targetsCount = 0;
+            std::size_t dataCount = 0;
+            std::size_t objectsCount = 0;
+            std::uint64_t frameId = 0;
+            std::uint64_t vertexCount = 0;
+        };
+
     public:
         // Set global per-frame constants, available from shaders
         // @vp   - proj matrix with platform-dependent z-range in clip space
@@ -265,7 +275,11 @@ namespace foundation {
         // @return - IS_TESTS: RGBA8 pixels of the frame, TESTING_RENDER_WIDTH x TESTING_RENDER_HEIGHT. nullptr otherwise
         //
         virtual std::unique_ptr<std::uint8_t[]> presentFrame() = 0;
-        
+
+        // Live objects count, last presented frame Id and vertices rendered in that frame
+        //
+        virtual auto getStatistics() const -> const StatInfo & = 0;
+
     public:
         virtual ~RenderingInterface() = default;
     };
