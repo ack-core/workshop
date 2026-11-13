@@ -365,6 +365,9 @@ namespace util {
         }
         else return {};
     }
+    Description Description::parse(const std::string &text) {
+        return parse(reinterpret_cast<const std::uint8_t *>(text.data()), text.length());
+    }
     std::string Description::serialize(const util::Description &desc) {
         struct fn {
             static bool serializeScope(int ident, const Description &desc, std::string &result) {

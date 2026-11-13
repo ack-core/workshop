@@ -14,10 +14,6 @@ namespace {
     private:
         int _sum = 0;
     };
-
-    util::Description parseText(const std::string &text) {
-        return util::Description::parse(reinterpret_cast<const std::uint8_t *>(text.data()), text.length());
-    }
 }
 
 namespace test {
@@ -479,7 +475,7 @@ namespace test {
     }
 
     bool util_description_parse_test(const API &api) {
-        const util::Description desc = parseText(
+        const util::Description desc = util::Description::parse(
             "i : integer = -5\n"
             "n : number = 2.5\n"
             "b : bool = true\n"
@@ -518,12 +514,12 @@ namespace test {
         EXPECT_EQ(*d->getDescription("inner")->getBool("f"), false);
 
         // any error makes the whole result empty
-        EXPECT_TRUE(parseText("a : unknown = 1").empty());
-        EXPECT_TRUE(parseText("a : integer[2] = 1").empty());
-        EXPECT_TRUE(parseText("a : integer 1").empty());
-        EXPECT_TRUE(parseText("d { a : integer = 1").empty());
-        EXPECT_TRUE(parseText("d { a : integer = x }").empty());
-        EXPECT_TRUE(parseText("a = 1").empty());
+        EXPECT_TRUE(util::Description::parse("a : unknown = 1").empty());
+        EXPECT_TRUE(util::Description::parse("a : integer[2] = 1").empty());
+        EXPECT_TRUE(util::Description::parse("a : integer 1").empty());
+        EXPECT_TRUE(util::Description::parse("d { a : integer = 1").empty());
+        EXPECT_TRUE(util::Description::parse("d { a : integer = x }").empty());
+        EXPECT_TRUE(util::Description::parse("a = 1").empty());
 
         return true;
     }
@@ -551,7 +547,7 @@ namespace test {
         d->setDescription("inner")->setString("t", "z");
         d->setDescription("empty");
 
-        const util::Description desc = parseText(util::Description::serialize(src));
+        const util::Description desc = util::Description::parse(util::Description::serialize(src));
         EXPECT_EQ(desc.size(), src.size());
         EXPECT_EQ(*desc.getInteger("i"), -5);
         EXPECT_EQ_F(*desc.getNumber("n"), -2.25f);
