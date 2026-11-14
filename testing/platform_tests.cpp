@@ -6,6 +6,10 @@ namespace test {
         EXPECT_EQ(api.platform.get(), foundation::PlatformInterface::instance().get());
         return true;
     }
+    bool platform_screen_scale_test(const API &api) {
+        EXPECT_LT(0.0f, api.platform->getScreenScale());
+        return true;
+    }
 }
 
 namespace test {
@@ -133,6 +137,7 @@ namespace test {
 namespace test {
     void registerPlatformTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(platform_uniquty_test);
+        REGISTER_UNIT_TEST(platform_screen_scale_test);
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);

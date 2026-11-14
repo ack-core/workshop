@@ -16,6 +16,7 @@ namespace foundation {
 
         float getScreenWidth() const override;
         float getScreenHeight() const override;
+        float getScreenScale() const override;
 
         void *attachNativeRenderingContext(void *context) override;
 
@@ -51,5 +52,6 @@ namespace foundation {
         std::mutex _logMutex;
         std::string _dataPath;
         std::string _writablePath;
+        float _screenScale;
     };
 }

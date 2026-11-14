@@ -1,5 +1,5 @@
 
-// TODO: dpi-scaling, sub-tree full transform
+// TODO: sub-tree full transform
 // + scale inheritance
 // + ImageSector
 

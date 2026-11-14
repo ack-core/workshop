@@ -1,6 +1,4 @@
 
-// TODO: dpi-scaling
-
 #pragma once
 #include "ui/stage.h"
 #include "foundation/util.h"

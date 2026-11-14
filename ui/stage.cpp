@@ -66,8 +66,9 @@ namespace ui {
             _positionChanged = true;
         }
         virtual void updateCoordinates() {
+            const foundation::PlatformInterfacePtr &platform = _facility.getPlatform();
             math::vector2f lt = math::vector2f(0.0f, 0.0f);
-            math::vector2f rb = math::vector2f(_facility.getPlatform()->getScreenWidth(), _facility.getPlatform()->getScreenHeight());
+            math::vector2f rb = math::vector2f(platform->getScreenWidth(), platform->getScreenHeight()) / platform->getScreenScale();
             
             if (auto target = _anchorTarget.lock()) {
                 lt = target->_globalPosition;
@@ -292,8 +293,9 @@ namespace ui {
                     tpos.z /= tpos.w;
                     
                     if (tpos.z > 0.0f) {
-                        _globalPosition.x = (tpos.x + 1.0f) * 0.5f * _facility.getPlatform()->getScreenWidth();
-                        _globalPosition.y = (1.0f - tpos.y) * 0.5f * _facility.getPlatform()->getScreenHeight();
+                        const foundation::PlatformInterfacePtr &platform = _facility.getPlatform();
+                        _globalPosition.x = (tpos.x + 1.0f) * 0.5f * platform->getScreenWidth() / platform->getScreenScale();
+                        _globalPosition.y = (1.0f - tpos.y) * 0.5f * platform->getScreenHeight() / platform->getScreenScale();
                     }
                 }
                 
@@ -361,7 +363,7 @@ namespace ui {
             
             if (_texture) {
                 DrawingInstance instance;
-                instance.positionAndSize = math::vector4f(_globalPosition, _size);
+                instance.positionAndSize = math::vector4f(_globalPosition, _size) * _facility.getPlatform()->getScreenScale();
                 instance.uvCoords = math::vector4f(0, 0, _size.x / float(_texture->getWidth()), _size.y / float(_texture->getHeight()));
                 instance.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
                 instance.args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
@@ -526,6 +528,7 @@ namespace ui {
                     edgeOffset.y += _sliceArgs.y;
                 }
                 for (int i = 0; i < index; i++) {
+                    instances[i].positionAndSize = instances[i].positionAndSize * _facility.getPlatform()->getScreenScale();
                     instances[i].color = math::color(1.0f, 1.0f, 1.0f, 1.0f);
                     instances[i].args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
                 }
@@ -571,7 +574,7 @@ namespace ui {
                 
                 for (const auto &ch : src) {
                     if (ch.pxSize.x > std::numeric_limits<float>::epsilon()) {
-                        _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offset.y, ch.pxSize.x, ch.pxSize.y);
+                        _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offset.y, ch.pxSize.x, ch.pxSize.y) * _facility.getPlatform()->getScreenScale();
                         _instances[instanceCount].uvCoords = math::vector4f(ch.txLT, ch.txRB);
                         _instances[instanceCount].color = color;
                         _instances[instanceCount].args = math::vector4f(1.0f, 0.0f, 0.0f, 0.0f);
@@ -710,7 +713,7 @@ namespace ui {
                     for (std::size_t li = index; li < lineBreak; li++) {
                         const resource::FontCharInfo &ch = src[li];
                         if (ch.pxSize.x > std::numeric_limits<float>::epsilon()) {
-                            _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offsetY, ch.pxSize.x, ch.pxSize.y);
+                            _instances[instanceCount].positionAndSize = math::vector4f(_globalPosition.x + offsetX + ch.lsb, _globalPosition.y + ch.voffset + offsetY, ch.pxSize.x, ch.pxSize.y) * _facility.getPlatform()->getScreenScale();
                             _instances[instanceCount].uvCoords = math::vector4f(ch.txLT, ch.txRB);
                             _instances[instanceCount].color = color;
                             _instances[instanceCount].args = math::vector4f(1.0f, 0.0f, 0.0f, 0.0f);
@@ -870,7 +873,7 @@ namespace ui {
             }
             
             for (const auto &topLevelElement : _topLevelElements) {
-                if (topLevelElement->onInteraction(action, args.pointerID, args.coordinateX, args.coordinateY)) {
+                if (topLevelElement->onInteraction(action, args.pointerID, args.coordinateX / _platform->getScreenScale(), args.coordinateY / _platform->getScreenScale())) {
                     return true;
                 }
             }

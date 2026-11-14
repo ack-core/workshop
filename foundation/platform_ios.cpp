@@ -369,6 +369,7 @@ namespace foundation {
     	@autoreleasepool {
             CGRect frame = UIScreen.mainScreen.bounds;
             g_nativeScreenScale = UIScreen.mainScreen.nativeScale;
+            _screenScale = g_nativeScreenScale * 163.0f / REFERENCE_DENSITY;
 #if defined(IS_TESTS)
             g_nativeScreenWidth = TESTING_RENDER_WIDTH;
             g_nativeScreenHeight = TESTING_RENDER_HEIGHT;
@@ -409,6 +410,9 @@ namespace foundation {
     }
     float IOSPlatform::getScreenHeight() const {
         return g_nativeScreenHeight;
+    }
+    float IOSPlatform::getScreenScale() const {
+        return _screenScale;
     }
     
     void *IOSPlatform::attachNativeRenderingContext(void *context) {
