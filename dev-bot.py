@@ -166,7 +166,7 @@ def step():
         for issue in issues:
             if issue not in linked:
                 log(f"Looking into issue #{issue} to implement...")
-                claude(f"/issue-implementation THE_ISSUE={issue}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+                claude(f"/issue-implementation THE_ISSUE={issue}", "Read", "Glob", "Grep", "Edit", "Write", "Bash", "PowerShell")
                 implemented = True
 
         if implemented:
@@ -178,7 +178,7 @@ def step():
         pr_urls = [pr["url"] for pr in prs if has_requested_changes(pr, owner)]
         for pr_url in pr_urls:
             log(f"Fixing requested changes in {pr_url}...")
-            claude(f"/pr-requested-fix THE_PR={pr_url}", "Read", "Glob", "Grep", "Edit", "Bash", "PowerShell")
+            claude(f"/pr-requested-fix THE_PR={pr_url}", "Read", "Glob", "Grep", "Edit", "Write", "Bash", "PowerShell")
         if not pr_urls:
             for pr in prs:
                 if is_unmergeable(pr):
@@ -192,7 +192,7 @@ def step():
     log("Checking if there is enough candidates for new tests...")
     if candidates() < CANDIDATES_MIN:
         log("Test coverage report is short, appending candidates...")
-        claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)", "Bash(gh pr list:*)")
+        claude("/test-coverage", "Read", "Glob", "Grep", "Edit(tmp/tests-coverage-report.txt)", "Write(tmp/tests-coverage-report.txt)", "Bash(gh pr list:*)")
 
 def main():
     sys.stdout.reconfigure(errors="replace")
