@@ -438,6 +438,11 @@ const imports = {
             if (depth) {
                 const depthTexture = gltextures[depth]
                 glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.TEXTURE_2D, depthTexture, 0);
+
+                for (let i = 0; i < 4; i++) {
+                    glcontext.activeTexture(glcontext.TEXTURE0 + i);
+                    glcontext.bindTexture(glcontext.TEXTURE_2D, null);
+                }
             }
 
             glcontext.drawBuffers(target.attachments);
