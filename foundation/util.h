@@ -339,6 +339,7 @@ namespace util {
     {
         static Description emptyDesc;
         static Description parse(const std::uint8_t *data, std::size_t length);
+        static Description parse(const std::string &text);
         static std::string serialize(const util::Description &desc);
         
         Description() {}
