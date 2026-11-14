@@ -18,6 +18,7 @@
 #include "testing/shader_tests.h"
 #include "testing/platform_tests.h"
 #include "testing/rendering_tests.h"
+#include "testing/resource_provider_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;
@@ -85,16 +86,18 @@ std::unique_ptr<test::TestRunner> testRunner;
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
-    
-    testRunner = std::make_unique<test::TestRunner>(platform, rendering);
+    resourceProvider = resource::ResourceProvider::instance(platform, rendering);
+
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider);
     test::registerMathTests(*testRunner);
     test::registerUtilTests(*testRunner);
     test::registerShaderTests(*testRunner);
     test::registerPlatformTests(*testRunner);
     test::registerRenderingTests(*testRunner);
+    test::registerResourceProviderTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
-        testRunner->nextFrame();
+        testRunner->nextFrame(dtSec);
     });
 }
 

@@ -9,6 +9,8 @@
 #include <memory>
 
 namespace {
+    const std::unique_ptr<util::Description> NOT_FOUND_PREFAB;
+
     struct TextureAsyncContext {
         ByteDataPtr data;
         std::uint32_t w, h;
@@ -704,7 +706,6 @@ namespace resource {
     }
 
     const std::unique_ptr<util::Description> &ResourceProviderImpl::getPrefab(const char *prefabPath) {
-        static const std::unique_ptr<util::Description> notFound;
         auto index = _prefabs.find(prefabPath);
         if (index != _prefabs.end()) {
             return index->second;
@@ -713,7 +714,7 @@ namespace resource {
             _platform->logError("[ResourceProviderImpl::getPrefab] Unable to find prefab '%s'", prefabPath);
         }
 
-        return notFound;
+        return NOT_FOUND_PREFAB;
     }
 
     void ResourceProviderImpl::removeTexture(const char *texturePath) {

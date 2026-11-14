@@ -76,6 +76,7 @@ namespace test {
     struct API {
         const foundation::PlatformInterfacePtr &platform;
         const foundation::RenderingInterfacePtr& rendering;
+        const resource::ResourceProviderPtr& resourceProvider;
     };
 
     // testResult is called when async work is complete, but not earlier than next frame after init
@@ -108,7 +109,8 @@ namespace test {
     public:
         TestRunner(
             const foundation::PlatformInterfacePtr& platform,
-            const foundation::RenderingInterfacePtr& rendering
+            const foundation::RenderingInterfacePtr& rendering,
+            const resource::ResourceProviderPtr& resourceProvider
         );
         ~TestRunner();
 
@@ -118,7 +120,7 @@ namespace test {
         void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)());
         void registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)());
 
-        void nextFrame();
+        void nextFrame(float dtSec);
 
     private:
         API _api;
