@@ -167,13 +167,13 @@ namespace core {
                         
                         if (desc.vegetation.size()) {
                             const math::vector2i msize = math::vector2i(t->getWidth() + 1, t->getHeight() + 1);
-                            for (std::size_t i = 0; i < desc.vegetation.size(); i++) {
-                                const auto &vg = desc.vegetation[i];
+                            for (const auto &vg : desc.vegetation) {
+                                const math::vector3i margs = math::vector3i(msize.x, msize.y, vg.mapIndex);
                                 if (vg.texture) {
-                                    _vegetation.emplace_back(world->getScene().addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.texture));
+                                    _vegetation.emplace_back(world->getScene().addVegetation(desc.map, margs, vg.description, vg.texture));
                                 }
                                 else if (vg.voxmesh.size()) {
-                                    _vegetation.emplace_back(world->getScene().addVegetation(desc.map, math::vector3i(msize.x, msize.y, 1 << i), vg.description, vg.voxmesh));
+                                    _vegetation.emplace_back(world->getScene().addVegetation(desc.map, margs, vg.description, vg.voxmesh));
                                 }
                             }
 

@@ -47,7 +47,7 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
     matches = re.findall(pattern, cfgstring)
     vg_source_array = [match[1] for match in matches]
 
-    if len(vg_color_array) > 8:
+    if len(vg_color_array) > 255:
         print("---- Error: too many vegetations")
         return
 
@@ -64,13 +64,13 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
 
         mapw = tx_w + 1
         maph = tx_h + 1
-        vg_bits = defaultdict(int)
+        vg_indexes = defaultdict(lambda: 255)
         for i, color in enumerate(vg_color_array):
-            vg_bits[color] |= 1 << i
-        vg_mask = bytes(map(lambda c: vg_bits[c & 0xFFFFFF], memoryview(vg_data).cast('I')))
+            vg_indexes.setdefault(color, i)
+        vg_mask = bytes(map(lambda c: vg_indexes[c & 0xFFFFFF], memoryview(vg_data).cast('I')))
 
         maps_data = bytearray(mapw * maph * 4)
-        maps_data[1::4] = b''.join(vg_mask[tx_w * y:tx_w * y + mapw].ljust(mapw, b'\0') for y in range(maph))
+        maps_data[1::4] = b''.join(vg_mask[tx_w * y:tx_w * y + mapw].ljust(mapw, b'\xff') for y in range(maph))
         maps_data[2::4] = random.randbytes(mapw * maph)
 
         with open(dst, mode="wb") as f:

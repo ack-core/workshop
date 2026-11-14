@@ -379,7 +379,7 @@ namespace core {
             
             for (int y = 0; y < margs.y; y++) {
                 for (int x = 0; x < margs.x; x++) {
-                    if (map[4 * (y * margs.x + x) + 1] & margs.z) {
+                    if (map[4 * (y * margs.x + x) + 1] == margs.z) {
                         const std::uint32_t currv = std::uint32_t(vertices.size());
                         const std::uint32_t curri = std::uint32_t(indexes.size());
                         const float px = float(x);
@@ -424,7 +424,7 @@ namespace core {
             
             for (int y = 0; y < margs.y; y++) {
                 for (int x = 0; x < margs.x; x++) {
-                    if (map[4 * (y * margs.x + x) + 1] & margs.z) {
+                    if (map[4 * (y * margs.x + x) + 1] == margs.z) {
                         const std::uint32_t currv = std::uint32_t(vertices.size());
                         const std::uint32_t curri = std::uint32_t(indexes.size());
                         const int mapi = 4 * (y * margs.x + x) + 2;
@@ -471,7 +471,7 @@ namespace core {
             
             for (int y = 0; y < margs.y; y++) {
                 for (int x = 0; x < margs.x; x++) {
-                    if (map[4 * (y * margs.x + x) + 1] & margs.z) {
+                    if (map[4 * (y * margs.x + x) + 1] == margs.z) {
                         const std::uint32_t currv = std::uint32_t(voxels.size());
                         const int rindex = map[4 * (y * margs.x + x) + 2] % vxm.size();
                         const std::pair<std::uint32_t, ByteDataPtr> &srcMesh = vxm[rindex];
@@ -499,8 +499,11 @@ namespace core {
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
         }
+        void setPosition(const math::vector3f &position) override {
+            transform = math::transform3f::identity().translated(position);
+        }
     };
-    
+
     //---
     
     class ParticleEmitterImpl : public SceneInterface::Particles {

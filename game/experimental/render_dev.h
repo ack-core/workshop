@@ -24,8 +24,7 @@ namespace game {
         core::WorldInterface::ObjectPtr _ptc;
         core::SceneInterface::VoxelMeshPtr _knight;
         core::SceneInterface::GroundMeshPtr _ground;
-        core::SceneInterface::VegetationPtr _grass;
-        core::SceneInterface::VegetationPtr _trees;
+        std::vector<core::SceneInterface::VegetationPtr> _vg;
         
         ui::InteractorPtr _joystick;
         std::shared_ptr<ui::StageInterface::Image> _img0;

@@ -82,6 +82,29 @@ namespace game {
         //    _knight = _api.scene->addVoxelMesh(frames, desc);
         //    _knight->setPosition({10, 0, 5});
         //});
+
+        _api.resources->getOrLoadGround("grounds/vegetation", [this](const foundation::RenderDataPtr& msh, const foundation::RenderTexturePtr& t, const resource::GroundMapDescription& desc) {
+            if (msh) {
+                _ground = _api.scene->addGroundMesh(msh, t);
+                _ground->setPosition({ -64, 0, -64 });
+
+                if (desc.vegetation.size()) {
+                    const math::vector2i msize = math::vector2i(t->getWidth() + 1, t->getHeight() + 1);
+                    for (const auto& vg : desc.vegetation) {
+                        const math::vector3i margs = math::vector3i(msize.x, msize.y, vg.mapIndex);
+                        if (vg.texture) {
+                            _vg.emplace_back(_api.scene->addVegetation(desc.map, margs, vg.description, vg.texture));
+                            _vg.back()->setPosition({ -64, 0, -64 });
+                        }
+                        else if (vg.voxmesh.size()) {
+                            _vg.emplace_back(_api.scene->addVegetation(desc.map, margs, vg.description, vg.voxmesh));
+                            _vg.back()->setPosition({ -64, 0, -64 });
+                        }
+                    }
+
+                }
+            }
+        });
         
     }
     

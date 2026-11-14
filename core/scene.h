@@ -77,6 +77,7 @@ namespace core {
         struct Vegetation {
             virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
             virtual ~Vegetation() = default;
         };
         struct Particles {
@@ -143,7 +144,7 @@ namespace core {
 
         // Textured vegetation (grass, foliage) placed by map
         // @map         - 4 bytes per cell
-        // @margs       - (map width, map height, layer mask)
+        // @margs       - (map width, map height, vegetation map index, 255 is empty)
         // @desc        - vegetation description
         // @tx          - R8UN palette indexes (same palette as voxel meshes), 0 is transparent
         //

@@ -32,6 +32,7 @@ namespace resource {
             util::Description description;
             foundation::RenderTexturePtr texture;
             std::vector<std::pair<std::uint32_t, ByteDataPtr>> voxmesh;
+            std::uint8_t mapIndex = 0;
 
             Vegetation() = default;
             Vegetation(Vegetation &&) = default;

@@ -1,0 +1,12 @@
+vegetation {
+    color : integer = 0x0000FF
+    geometry : integer = 1
+    source : string = "auxiliary/textures/foliage"
+    size : vector2i = 9 10
+    voffset : number[2] = 5.0 4.0
+}
+vegetation {
+    color : integer = 0x0000FF
+    geometry : integer = 2
+    source : string = "auxiliary/meshes/trunk"
+}
