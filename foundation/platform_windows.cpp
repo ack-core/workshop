@@ -637,7 +637,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         foregroundQueue.clear();
 
         auto curFrameTime = std::chrono::high_resolution_clock::now();
-        float dt = float(std::chrono::duration_cast<std::chrono::milliseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
+        float dt = std::chrono::duration<float>(curFrameTime - prevFrameTime).count();
 
         if (g_updateAndDraw) {
             g_updateAndDraw(dt);
