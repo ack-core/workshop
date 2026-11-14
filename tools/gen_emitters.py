@@ -56,18 +56,14 @@ def convert_emitter(src: str, map: str, dst: str):
 
 
 def main(src: str, dst: str):
-    src = os.path.abspath(src)
-    dst = os.path.abspath(dst)
+    src = Path(src).resolve()
+    dst = Path(dst).resolve()
 
-    for path, _, files in os.walk(src):
-        for file in files:
-            if file.endswith(".txt"):
-                relpath_to = os.path.join(os.path.relpath(path, src), file)
-                fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
-                fullpath_to = fullpath_to.replace(".txt", ".bin")
-                fullpath_from = os.path.join(path, file)
-                fullpath_map = fullpath_from.replace(".txt", ".tga");
-                convert_emitter(fullpath_from, fullpath_map, fullpath_to)
+    for txt in src.rglob("*.txt"):
+        fullpath_to = (dst / txt.relative_to(src)).with_suffix(".bin").as_posix()
+        fullpath_from = txt.as_posix()
+        fullpath_map = fullpath_from.replace(".txt", ".tga")
+        convert_emitter(fullpath_from, fullpath_map, fullpath_to)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tool to generate binary emitters")

@@ -22,25 +22,10 @@ from pathlib import Path
 
 def collect_prefabs(src: str, game: str, dst: str):
     prefabs = {}
-    fullpath_to = os.path.normpath(os.path.join(dst, "prefabs.bin"))
-    for path, _, files in os.walk(src):
-        for file in files:
-            if file.endswith(".txt"):
-                fullpath_from = os.path.join(path, file)
-                relpath_from = Path(os.path.normpath(os.path.join(os.path.basename(src), os.path.relpath(path, src), file))).as_posix()
-                print("---- ", fullpath_from)
-                with open(fullpath_from, mode="r", encoding="utf-8") as src_file:
-                   prefabs[relpath_from.replace(".txt", "")] = src_file.read()
-
-    if game:
-        for path, _, files in os.walk(game):
-            for file in files:
-                if file.endswith(".txt"):
-                    fullpath_from = os.path.join(path, file)
-                    relpath_from = Path(os.path.normpath(os.path.join(os.path.basename(game), os.path.relpath(path, game), file))).as_posix()
-                    print("---- ", fullpath_from)
-                    with open(fullpath_from, mode="r", encoding="utf-8") as src_file:
-                       prefabs[relpath_from.replace(".txt", "")] = src_file.read()                   
+    for root in filter(None, (src, game)):
+        for txt in root.rglob("*.txt"):
+            print("---- ", txt.as_posix())
+            prefabs[txt.relative_to(root.parent).with_suffix("").as_posix()] = txt.read_text(encoding="utf-8")
 
     with open(dst, mode="wb") as dst_file:
         dst_file.write(b'PREFABS!')
@@ -54,9 +39,9 @@ def collect_prefabs(src: str, game: str, dst: str):
 
 
 def main(src: str, game: str, dst: str):
-    src = os.path.abspath(src)
-    game = os.path.abspath(game) if game else None
-    dst = os.path.abspath(dst)
+    src = Path(src).resolve()
+    game = Path(game).resolve() if game else None
+    dst = Path(dst).resolve().as_posix()
 
     collect_prefabs(src, game, dst)
 

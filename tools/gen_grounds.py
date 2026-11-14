@@ -15,6 +15,7 @@ from PIL import Image
 from gen_meshes import make_vxm_data as make_vxm_data
 import time
 import traceback
+from pathlib import Path
 
 class Palette:
     def __init__(self, img: bytes):
@@ -121,12 +122,12 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
 
                 if vg_source_array[i].startswith("auxiliary/textures"):
                     spath = vg_source_array[i] + ".png"
-                    data, w, h = get_paletted_texture(os.path.join(resroot, spath), palette)
+                    data, w, h = get_paletted_texture(f"{resroot}/{spath}", palette)
                     writer = png.Writer(width=w, height=h, greyscale=True, alpha=False, compression=1)
                     writer.write_array(f, pixels=data)
                 if vg_source_array[i].startswith("auxiliary/meshes"):
                     spath = vg_source_array[i] + ".vox"
-                    frames = make_vxm_data(os.path.join(resroot, spath), 1)
+                    frames = make_vxm_data(f"{resroot}/{spath}", 1)
                     if frames:
                         f.write(struct.pack("<i", len(frames)))
                         for frame in range(0, len(frames)):
@@ -149,10 +150,10 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
         traceback.print_exc()
 
 def main(src: str, dst: str, palette: str):
-    src = os.path.abspath(src)
-    dst = os.path.abspath(dst)
-    palette = os.path.abspath(palette)
-    resroot = os.path.normpath(os.path.join(src, ".."))
+    src = Path(src).resolve()
+    dst = Path(dst).resolve()
+    palette = Path(palette).resolve().as_posix()
+    resroot = src.parent.as_posix()
 
     try:
         palette_reader = png.Reader(filename=palette)
@@ -161,18 +162,14 @@ def main(src: str, dst: str, palette: str):
         if palette_w * palette_h == 256:
             palette_object = Palette(bytes().join([bytes(e) for e in palette_data]))
 
-            for path, _, files in os.walk(src):
-                for file in files:
-                    if file.endswith(".png"):
-                        relpath_to = os.path.join(os.path.relpath(path, src), file)
-                        fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
-                        fullpath_to = fullpath_to.replace(".png", ".grd")
-                        fullpath_texture_from = os.path.join(path, file)
-                        fullpath_txt_from = fullpath_texture_from.replace(".png", ".txt")
-                        fullpath_vg_from = fullpath_texture_from.replace(".png", ".vg.tga")
-                        st = time.perf_counter()
-                        generate_place(resroot, fullpath_txt_from, fullpath_texture_from, fullpath_vg_from, fullpath_to, palette_object)
-                        print("time: ", time.perf_counter() - st)
+            for texture in src.rglob("*.png"):
+                fullpath_to = (dst / texture.relative_to(src)).with_suffix(".grd").as_posix()
+                fullpath_texture_from = texture.as_posix()
+                fullpath_txt_from = fullpath_texture_from.replace(".png", ".txt")
+                fullpath_vg_from = fullpath_texture_from.replace(".png", ".vg.tga")
+                st = time.perf_counter()
+                generate_place(resroot, fullpath_txt_from, fullpath_texture_from, fullpath_vg_from, fullpath_to, palette_object)
+                print("time: ", time.perf_counter() - st)
 
         else:
             print("------ Error: '{}' has incorrect size".format(palette))
