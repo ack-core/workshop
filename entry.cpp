@@ -18,6 +18,7 @@
 #include "testing/shader_tests.h"
 #include "testing/platform_tests.h"
 #include "testing/rendering_tests.h"
+#include "testing/resource_provider_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;
@@ -94,6 +95,7 @@ extern "C" void initialize() {
     test::registerShaderTests(*testRunner);
     test::registerPlatformTests(*testRunner);
     test::registerRenderingTests(*testRunner);
+    test::registerResourceProviderTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
         testRunner->nextFrame();

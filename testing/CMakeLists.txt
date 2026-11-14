@@ -15,6 +15,8 @@ set(
 	"${m_source_root}/platform_tests.cpp"
 	"${m_source_root}/rendering_tests.h"
 	"${m_source_root}/rendering_tests.cpp"
+	"${m_source_root}/resource_provider_tests.h"
+	"${m_source_root}/resource_provider_tests.cpp"
 )
 source_group("" FILES ${m_sources_list})
 
