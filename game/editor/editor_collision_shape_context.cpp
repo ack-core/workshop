@@ -26,8 +26,8 @@ namespace game {
                 shapeType = static_cast<core::SimulationInterface::ShapeType>(desc.getInteger("type", 1));
                                 
                 if (shapeType == core::SimulationInterface::ShapeType::CircleXZ) {
-                    mass = desc.getNumber("mass", 0.0f);
-                    radius = desc.getNumber("radius", 1.0f);
+                    mass = float(desc.getNumber("mass", 0.0f));
+                    radius = float(desc.getNumber("radius", 1.0f));
                 }
                 else if (shapeType == core::SimulationInterface::ShapeType::ObstaclePolygonXZ) {
                     obstaclePoints.clear();

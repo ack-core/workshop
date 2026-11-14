@@ -30,8 +30,8 @@ namespace game {
                     const std::vector<double> radiuses = description.getNumbers("radiuses");
                     for (std::size_t i = 0; i < p.size(); i++) {
                         points.emplace(getNextId(), Point {
-                            p[i], math::vector3f(radiuses[i], 0, 0),
-                            api.scene->addBoundingSphere(p[i], radiuses[i], math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
+                            p[i], math::vector3f(float(radiuses[i]), 0, 0),
+                            api.scene->addBoundingSphere(p[i], float(radiuses[i]), math::color(1.0f, 0.0f, 1.0f, 0.7f)), nullptr
                         });
                     }
                 }
