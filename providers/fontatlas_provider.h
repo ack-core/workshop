@@ -9,6 +9,8 @@
 #include <memory>
 
 namespace resource {
+    inline const char *FONT_TTF = "primary.ttf";
+
     struct FontCharInfo {
         math::vector2f txLT;
         math::vector2f txRB;
@@ -21,9 +23,7 @@ namespace resource {
     public:
         static std::shared_ptr<FontAtlasProvider> instance(
             const foundation::PlatformInterfacePtr &platform,
-            const foundation::RenderingInterfacePtr &rendering,
-            ByteDataPtr &&ttfData,
-            std::size_t ttfLen
+            const foundation::RenderingInterfacePtr &rendering
         );
         
     public:
