@@ -67,10 +67,15 @@ def generate_place(resroot: str, src_txt: str, src_texture: str, src_vg: str, ds
         vg_indexes = defaultdict(lambda: 255)
         for i, color in enumerate(vg_color_array):
             vg_indexes.setdefault(color, i)
-        vg_mask = bytes(map(lambda c: vg_indexes[c & 0xFFFFFF], memoryview(vg_data).cast('I')))
+        vg_mask = bytes(map(lambda c: vg_indexes[c & 0xFFFFFF] if c >> 24 else 255, memoryview(vg_data).cast('I')))
+
+        vg_layer = bytearray(b'\xff' * (mapw * maph))
+        rowcount = len(vg_mask) // tx_w
+        for y in range(rowcount):
+            vg_layer[mapw * y:mapw * y + tx_w] = vg_mask[tx_w * y:tx_w * (y + 1)]
 
         maps_data = bytearray(mapw * maph * 4)
-        maps_data[1::4] = b''.join(vg_mask[tx_w * y:tx_w * y + mapw].ljust(mapw, b'\xff') for y in range(maph))
+        maps_data[1::4] = vg_layer
         maps_data[2::4] = random.randbytes(mapw * maph)
 
         with open(dst, mode="wb") as f:

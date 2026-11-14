@@ -355,15 +355,15 @@ namespace core {
         VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const foundation::RenderTexturePtr &tx)
         : texture(tx)
         {
-            const math::vector2i size = desc.getVector2i("size", {});
             const int geometryType = int(desc.getInteger("geometry", 0));
-            const std::vector<double> voffs = desc.getNumbers("voffset");
 
             if (geometryType == 0) { // grass
-                fillGeometryGrass(rendering, map, margs, size);
+                fillGeometryGrass(rendering, map, margs, desc.getVector2i("size", {}));
             }
             if (geometryType == 1) { // tree leafs
-                fillGeometryFoliage(rendering, map, margs, size, voffs);
+                const int rowSize = int(desc.getInteger("textureRowSize", 1));
+                const float vspace = float(desc.getInteger("vspace", 0));
+                fillGeometryFoliage(rendering, map, margs, rowSize, vspace, desc.getNumbers("voffset"));
             }
         }
         VegetationImpl(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) {
@@ -385,26 +385,34 @@ namespace core {
                         const float px = float(x);
                         const float pz = float(y);
                         
-                        vertices.resize(vertices.size() + 5);
-                        indexes.resize(indexes.size() + 6);
-                        
-                        vertices[currv + 0].posdyn = math::vector4f(px - 0.5f * size.x, -0.5f, pz, 0.0f);
-                        vertices[currv + 0].uv = math::vector2f(0.0f, 1.0f);
-                        vertices[currv + 1].posdyn = math::vector4f(px, -0.5f, pz - 0.5f * size.x, 0.0f);
-                        vertices[currv + 1].uv = math::vector2f(0.0f, 1.0f);
-                        vertices[currv + 2].posdyn = math::vector4f(px + 0.5f * size.x, -0.5f, pz, 0.0f);
-                        vertices[currv + 2].uv = math::vector2f(1.0f, 1.0f);
-                        vertices[currv + 3].posdyn = math::vector4f(px, -0.5f, pz + 0.5f * size.x, 0.0f);
-                        vertices[currv + 3].uv = math::vector2f(1.0f, 1.0f);
-                        vertices[currv + 4].posdyn = math::vector4f(px, size.y - 0.5f, pz, 0.0f);
-                        vertices[currv + 4].uv = math::vector2f(0.5f, 0.0f);
-                        
-                        indexes[curri + 0] = currv + 0;
-                        indexes[curri + 1] = currv + 4;
-                        indexes[curri + 2] = currv + 2;
-                        indexes[curri + 3] = currv + 1;
-                        indexes[curri + 4] = currv + 4;
-                        indexes[curri + 5] = currv + 3;
+                        const float hw = 0.5f * size.x;
+                        const float top = size.y - 0.5f;
+
+                        vertices.resize(vertices.size() + 8);
+                        indexes.resize(indexes.size() + 12);
+
+                        for (int i = 0; i < 2; i++) {
+                            const float dx = i ? 0.0f : hw;
+                            const float dz = i ? hw : 0.0f;
+                            const std::uint32_t vstart = currv + i * 4;
+                            const std::uint32_t istart = curri + i * 6;
+
+                            vertices[vstart + 0].posdyn = math::vector4f(px - dx, -0.5f, pz - dz, 0.0f);
+                            vertices[vstart + 0].uv = math::vector2f(0.0f, 1.0f);
+                            vertices[vstart + 1].posdyn = math::vector4f(px + dx, -0.5f, pz + dz, 0.0f);
+                            vertices[vstart + 1].uv = math::vector2f(1.0f, 1.0f);
+                            vertices[vstart + 2].posdyn = math::vector4f(px + dx, top, pz + dz, 0.0f);
+                            vertices[vstart + 2].uv = math::vector2f(1.0f, 0.0f);
+                            vertices[vstart + 3].posdyn = math::vector4f(px - dx, top, pz - dz, 0.0f);
+                            vertices[vstart + 3].uv = math::vector2f(0.0f, 0.0f);
+
+                            indexes[istart + 0] = vstart + 0;
+                            indexes[istart + 1] = vstart + 3;
+                            indexes[istart + 2] = vstart + 1;
+                            indexes[istart + 3] = vstart + 1;
+                            indexes[istart + 4] = vstart + 3;
+                            indexes[istart + 5] = vstart + 2;
+                        }
                     }
                 }
             }
@@ -412,13 +420,12 @@ namespace core {
                 mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
             }
         }
-        void fillGeometryFoliage(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2i &size, const std::vector<double> &voffs) {
+        void fillGeometryFoliage(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, int rowSize, float vinc, const std::vector<double> &voffs) {
             std::vector<VTXVEG> vertices;
             std::vector<std::uint32_t> indexes;
-            
-            const int vsegcnt = std::max(1, int(texture->getWidth()) / size.x);
-            const int rcount = std::max(1, int(texture->getHeight()) / size.x);
-            const float vinc = vsegcnt > 1 ? size.y / float(vsegcnt - 1) : 0.0f;
+
+            const int vsegcnt = std::max(1, int(texture->getWidth()) / rowSize);
+            const int rcount = std::max(1, int(texture->getHeight()) / rowSize);
             const float tw = 1.0f / float(vsegcnt);
             const float th = 1.0f / float(rcount);
             
@@ -427,9 +434,9 @@ namespace core {
                     if (map[4 * (y * margs.x + x) + 1] == margs.z) {
                         const std::uint32_t currv = std::uint32_t(vertices.size());
                         const std::uint32_t curri = std::uint32_t(indexes.size());
-                        const int mapi = 4 * (y * margs.x + x) + 2;
-                        const int rindex = map[mapi] % rcount;
-                        const int voffsIndex = map[mapi] % voffs.size();
+                        const int maprnd = 4 * (y * margs.x + x) + 2;
+                        const int rindex = map[maprnd] % rcount;
+                        const int voffsIndex = map[maprnd] % voffs.size();
                         const float px = float(x);
                         const float pz = float(y);
                         const float tv = rindex * th;
@@ -443,13 +450,13 @@ namespace core {
                             const int vstart = currv + i * 4;
                             const int istart = curri + i * 6;
                             
-                            vertices[vstart + 0].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
+                            vertices[vstart + 0].posdyn = math::vector4f(px - 0.5f * rowSize, voff, pz - 0.5f * rowSize, 0.0f);
                             vertices[vstart + 0].uv = math::vector2f(tu, tv);
-                            vertices[vstart + 1].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz - 0.5f * size.x, 0.0f);
+                            vertices[vstart + 1].posdyn = math::vector4f(px + 0.5f * rowSize, voff, pz - 0.5f * rowSize, 0.0f);
                             vertices[vstart + 1].uv = math::vector2f(tu + tw, tv);
-                            vertices[vstart + 2].posdyn = math::vector4f(px + 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
+                            vertices[vstart + 2].posdyn = math::vector4f(px + 0.5f * rowSize, voff, pz + 0.5f * rowSize, 0.0f);
                             vertices[vstart + 2].uv = math::vector2f(tu + tw, tv + th);
-                            vertices[vstart + 3].posdyn = math::vector4f(px - 0.5f * size.x, voff, pz + 0.5f * size.x, 0.0f);
+                            vertices[vstart + 3].posdyn = math::vector4f(px - 0.5f * rowSize, voff, pz + 0.5f * rowSize, 0.0f);
                             vertices[vstart + 3].uv = math::vector2f(tu, tv + th);
                             
                             indexes[istart + 0] = vstart + 0;

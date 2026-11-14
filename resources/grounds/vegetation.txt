@@ -1,8 +1,15 @@
 vegetation {
+    color : integer = 0xFFFF00
+    geometry : integer = 0
+    source : string = "auxiliary/textures/grass"
+    size : vector2i = 9 4
+}
+vegetation {
     color : integer = 0x0000FF
     geometry : integer = 1
     source : string = "auxiliary/textures/foliage"
-    size : vector2i = 9 10
+    textureRowSize : integer = 9
+    vspace : integer = 2
     voffset : number[2] = 5.0 4.0
 }
 vegetation {
