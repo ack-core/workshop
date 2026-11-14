@@ -431,6 +431,44 @@ namespace test {
 
         return true;
     }
+
+    bool math_transform3f_translated_inverted_test(const API &api) {
+        const math::transform3f t = math::transform3f::identity().translated({1.0f, 2.0f, 3.0f});
+        EXPECT_TRUE(near4(t.row0, 1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(t.row1, 0.0f, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(t.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near4(t.row3, 1.0f, 2.0f, 3.0f, 1.0f));
+
+        const math::transform3f tt = t.translated({-4.0f, 0.5f, 1.0f});
+        EXPECT_TRUE(near4(tt.row3, -3.0f, 2.5f, 4.0f, 1.0f));
+
+        const math::transform3f ti = t.inverted();
+        EXPECT_TRUE(near4(ti.row0, 1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(ti.row1, 0.0f, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(ti.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near4(ti.row3, -1.0f, -2.0f, -3.0f, 1.0f));
+
+        const math::transform3f m = math::transform3f({0, 2, 0, 0}, {0, 0, 4, 0}, {-0.5f, 0, 0, 0}, {1, 2, 3, 1}).translated({4.0f, 5.0f, 6.0f});
+        const math::transform3f mi = m.inverted();
+        EXPECT_TRUE(near4(mi.row0, 0.0f, 0.0f, -2.0f, 0.0f));
+        EXPECT_TRUE(near4(mi.row1, 0.5f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(mi.row2, 0.0f, 0.25f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(mi.row3, -3.5f, -2.25f, 10.0f, 1.0f));
+
+        const math::transform3f mmi = m * mi;
+        EXPECT_TRUE(near4(mmi.row0, 1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(mmi.row1, 0.0f, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(mmi.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near4(mmi.row3, 0.0f, 0.0f, 0.0f, 1.0f));
+
+        const math::transform3f mim = mi * m;
+        EXPECT_TRUE(near4(mim.row0, 1.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(mim.row1, 0.0f, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near4(mim.row2, 0.0f, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near4(mim.row3, 0.0f, 0.0f, 0.0f, 1.0f));
+
+        return true;
+    }
 }
 
 
@@ -445,5 +483,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector_length_normalize_test);
         REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
         REGISTER_UNIT_TEST(math_vector_transformed_test);
+        REGISTER_UNIT_TEST(math_transform3f_translated_inverted_test);
     }
 }
