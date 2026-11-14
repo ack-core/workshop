@@ -528,11 +528,6 @@ namespace foundation {
         g_returnCode = returnCode;
     }
 
-    const MacPlatform::StatInfo &MacPlatform::getStatistics() const {
-        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
-        return g_statistics;
-    }
-
     void MacPlatform::logMsg(const char *fmt, ...) {
         std::lock_guard<std::mutex> guard(_logMutex);
 
@@ -557,6 +552,11 @@ namespace foundation {
         if (isDebuggerPresent()) {
             __builtin_debugtrap();
         }
+    }
+
+    const MacPlatform::StatInfo& MacPlatform::getStatistics() const {
+        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
+        return g_statistics;
     }
 }
 

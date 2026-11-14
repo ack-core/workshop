@@ -41,9 +41,9 @@ namespace {
     RECT g_minWindowRect { 0, 0, LONG(APP_WIDTH), LONG(APP_HEIGHT) };
 
     char g_buffer[BUFFER_SIZE];
-    std::atomic<bool> g_killed {false};
     int g_returnCode = 0;
 
+    std::atomic<bool> g_killed{ false };
     std::weak_ptr<foundation::PlatformInterface> g_instance;
     util::callback<void(float)> g_updateAndDraw;
 
@@ -550,11 +550,6 @@ namespace foundation {
         g_returnCode = returnCode;
     }
 
-    const WindowsPlatform::StatInfo &WindowsPlatform::getStatistics() const {
-        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
-        return g_statistics;
-    }
-
     void WindowsPlatform::logMsg(const char *fmt, ...) {
         std::lock_guard<std::mutex> guard(_logMutex);
 
@@ -585,6 +580,11 @@ namespace foundation {
         if (IsDebuggerPresent()) {
             DebugBreak();
         }
+    }
+
+    const WindowsPlatform::StatInfo& WindowsPlatform::getStatistics() const {
+        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
+        return g_statistics;
     }
 }
 

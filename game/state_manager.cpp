@@ -82,7 +82,6 @@ namespace game {
         const core::RaycastInterfacePtr _raycast;
         const core::SimulationInterfacePtr _simulation;
         const ui::StageInterfacePtr _ui;
-        const dh::DataHubPtr _dh;
         
         std::string _currentStateName;
         std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> _currentContextList;

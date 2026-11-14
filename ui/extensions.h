@@ -283,9 +283,9 @@ namespace ui {
                         .anchorH = params.anchorH,
                         .anchorV = params.anchorV,
                         .anchorOffset = params.anchorOffset,
+                        .texture = params.texture,
                         .layout = layout,
-                        .shaderSource = shaderSrc,
-                        .texture = params.texture
+                        .shaderSource = shaderSrc
                     });
                     std::shared_ptr<ImgSector> result = std::make_shared<ImgSector>(img);
                     img->setSize(math::vector2f(math::scalar(info->width), math::scalar(info->height)));

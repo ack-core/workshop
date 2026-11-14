@@ -73,7 +73,9 @@ namespace resource {
                 math::vector2f txLT;
                 math::vector2f txRB;
                 math::vector2f pxSize;
-                float advance = 0.0f, lsb = 0.0f, voffset = 0.0f;
+                float advance = 0.0f;
+                float lsb = 0.0f;
+                float voffset = 0.0f;
                 std::uint32_t u16ch = 0;
                 std::uint8_t blur = 0;
             };

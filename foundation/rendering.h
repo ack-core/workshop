@@ -142,9 +142,9 @@ namespace foundation {
 
     public:
         // Set global per-frame constants, available from shaders
-        // @vp   - proj matrix with platform-dependent z-range in clip space
-        // @svp  - proj matrix with [0..1] z-range in clip space
-        // @ivp  - inverted svp
+        // @vp   - proj matrix with platform-dependent z-range in clip space (in shader: 'frame_plmVPMatrix')
+        // @svp  - proj matrix with [0..1] z-range in clip space (in shader: 'frame_stdVPMatrix')
+        // @ivp  - inverted svp (in shader: 'frame_invVPMatrix')
         // Matrices are row-major
         //
         virtual void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
@@ -276,7 +276,7 @@ namespace foundation {
         //
         virtual std::unique_ptr<std::uint8_t[]> presentFrame() = 0;
 
-        // Live objects count, last presented frame Id and vertices rendered in that frame
+        // Returns counters usable in statistics and testing
         //
         virtual auto getStatistics() const -> const StatInfo & = 0;
 

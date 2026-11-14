@@ -526,11 +526,6 @@ namespace foundation {
         fflush(stdout);
         _exit(returnCode);
     }
-
-    const IOSPlatform::StatInfo &IOSPlatform::getStatistics() const {
-        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size();
-        return g_statistics;
-    }
     
     void IOSPlatform::logMsg(const char *fmt, ...) {
         std::lock_guard<std::mutex> guard(_logMutex);
@@ -553,6 +548,11 @@ namespace foundation {
         
         printf("%s\n", g_buffer);
         __builtin_debugtrap();
+    }
+
+    const IOSPlatform::StatInfo& IOSPlatform::getStatistics() const {
+        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size();
+        return g_statistics;
     }
 }
 

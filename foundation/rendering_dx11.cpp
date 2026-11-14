@@ -18,8 +18,8 @@
 
 namespace {
     std::weak_ptr<foundation::RenderingInterface> g_instance;
-    foundation::RenderingInterface::StatInfo g_statistics;
     std::uint64_t g_frameVertexCount = 0;
+    foundation::RenderingInterface::StatInfo g_statistics;
 
     const std::uint32_t MAX_TEXTURES = 4; // texture slots in shader
 
