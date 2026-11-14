@@ -9,13 +9,14 @@ Single interface/class/function capability - is ability of doing something that 
 - Ability to launch a task and return the result is other example of capability.
 - Ability to save different arguments in the passed lambda (callback test) - single capability.
 - Each shader language construct handled in shader.cpp (inout blocks, uniforms, ...) is one capability.
+- Each possible way of rendering in RenderingInterface is single capability
 
 Areas:
 - 'math' is testing everything declared/defined in math.h
 - 'util' is testing everything declared/defined in util.h/util.cpp
 - 'shader' is testing compilation of different shaders using makePlatformShaderSource from shader.h/shader.cpp, read the implementation here to understand how shaders are written.
 - 'platform' is testing everything declared/defined by platform.h
-- 'rendering' is testing everything declared/defined by rendering.h
+- 'rendering' is testing everything declared/defined by rendering.h and primitives rendering at different state of RenderingInterface
 
 We are adding untested capabilities (candidates) to the file `tmp/tests-coverage-report.txt`.
 The file contains exactly one `Candidates:` block with the list of untested capabilities (candidates).

@@ -27,4 +27,4 @@ Do these steps in exact order:
 11. Commit the fixes, go to step 9 if there were fixes
 12. Push the branch
 13. Using gh cli create a PR on github with a short description about what was implemented. Start the description with single line `Resolves #N` where N is THE_ISSUE number. 
-14. Request review from the repo owner
+14. Lock conversation in the PR, request review from the repo owner
