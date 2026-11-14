@@ -91,7 +91,7 @@ namespace resource {
         };
         
     public:
-        FontAtlasProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering, ByteDataPtr &&ttfData, std::size_t ttfLen);
+        FontAtlasProviderImpl(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering);
         ~FontAtlasProviderImpl() override;
         
         auto getTextWidth(const char *text, std::uint8_t fontSize) const -> math::vector2f override;
@@ -105,8 +105,8 @@ namespace resource {
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
         const std::shared_ptr<foundation::RenderingInterface> _rendering;
-        const ByteDataPtr _ttfData;
-        const std::size_t _ttfLen;
+        ByteDataPtr _ttfData;
+        std::size_t _ttfLen;
         
         stbtt_fontinfo _ttfInfo;
         
@@ -124,24 +124,13 @@ namespace resource {
     
     FontAtlasProviderImpl::FontAtlasProviderImpl(
         const std::shared_ptr<foundation::PlatformInterface> &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        ByteDataPtr &&ttfData,
-        std::size_t ttfLen
+        const foundation::RenderingInterfacePtr &rendering
     )
     : _platform(platform)
     , _rendering(rendering)
-    , _ttfData(std::move(ttfData))
-    , _ttfLen(ttfLen)
+    , _ttfLen(0)
     , _asyncInProgress(false)
     {
-        if (_ttfData) {
-            if (stbtt_InitFont(&_ttfInfo, _ttfData.get(), 0) == 0) {
-                _platform->logError("[FontAtlasProviderImpl::FontAtlasProviderImpl] ttf is not valid true type file\n");
-            }
-        }
-        else {
-            _platform->logMsg("[FontAtlasProviderImpl::FontAtlasProviderImpl] ttf file data is empty\n");
-        }
     }
     
     FontAtlasProviderImpl::~FontAtlasProviderImpl() {
@@ -149,6 +138,11 @@ namespace resource {
     }
     
     math::vector2f FontAtlasProviderImpl::getTextWidth(const char *text, std::uint8_t size) const {
+        if (_ttfData == nullptr) {
+            _platform->logError("[FontAtlasProviderImpl::getTextWidth] '%s' is not loaded\n", FONT_TTF);
+            return {};
+        }
+
         const float scale = stbtt_ScaleForMappingEmToPixels(&_ttfInfo, float(size));
         float result = 0.0f;
                 
@@ -170,13 +164,34 @@ namespace resource {
     }
     
     void FontAtlasProviderImpl::prepareFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, util::callback<void()> &&completion) {
-        if (_asyncInProgress) {
+        if (_asyncInProgress || _ttfData == nullptr) {
             _callsQueue.emplace_back(QueueEntry{
                 .text = text,
                 .fontSize = fontSize,
                 .blur = blur,
                 .callback = std::move(completion)
             });
+
+            if (_asyncInProgress == false) {
+                _asyncInProgress = true;
+                _platform->loadFile(FONT_TTF, [weak = weak_from_this()](ByteDataPtr &&data, std::size_t size) {
+                    if (std::shared_ptr<FontAtlasProviderImpl> self = weak.lock()) {
+                        self->_ttfData = std::move(data);
+                        self->_ttfLen = size;
+
+                        if (self->_ttfData == nullptr || stbtt_InitFont(&self->_ttfInfo, self->_ttfData.get(), 0) == 0) {
+                            self->_platform->logError("[FontAtlasProviderImpl::prepareFontAtlas] '%s' is not valid true type file\n", FONT_TTF);
+                            self->_ttfData = nullptr;
+
+                            for (QueueEntry &entry : std::exchange(self->_callsQueue, {})) {
+                                entry.callback();
+                            }
+                        }
+
+                        self->_asyncInProgress = false;
+                    }
+                });
+            }
             return;
         }
         
@@ -297,6 +312,11 @@ namespace resource {
     }
     
     const foundation::RenderTexturePtr &FontAtlasProviderImpl::getTextFontAtlas(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<resource::FontCharInfo> &outInfo) {
+        if (_ttfData == nullptr) {
+            _platform->logError("[FontAtlasProviderImpl::getTextFontAtlas] '%s' is not loaded\n", FONT_TTF);
+            return g_empty;
+        }
+
         std::vector<FontCharInfo> readyChars;
         std::unordered_set<std::uint64_t> toLoad;
         FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
@@ -364,11 +384,9 @@ namespace resource {
 namespace resource {
     std::shared_ptr<FontAtlasProvider> FontAtlasProvider::instance(
         const std::shared_ptr<foundation::PlatformInterface> &platform,
-        const foundation::RenderingInterfacePtr &rendering,
-        ByteDataPtr &&ttfData,
-        std::size_t ttfLen
+        const foundation::RenderingInterfacePtr &rendering
     ) {
-        return std::make_shared<FontAtlasProviderImpl>(platform, rendering, std::move(ttfData), ttfLen);
+        return std::make_shared<FontAtlasProviderImpl>(platform, rendering);
     }
 }
 

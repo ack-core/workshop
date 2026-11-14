@@ -36,34 +36,32 @@ game::StateManagerPtr stateManager;
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     platform->loadFile(resource::PREFAB_BIN, [](std::unique_ptr<std::uint8_t[]>&& prefabsData, std::size_t prefabsSize) {
-        platform->loadFile("primary.ttf", [prefabsData = std::move(prefabsData), prefabsSize](std::unique_ptr<std::uint8_t[]>&& fontData, std::size_t fontSize) {
-            rendering = foundation::RenderingInterface::instance(platform);
-            resourceProvider = resource::ResourceProvider::instance(platform, rendering);
-            resourceProvider->setPrefabsData(prefabsData.get(), prefabsSize);
-            fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering, std::move(fontData), fontSize);
-            scene = core::SceneInterface::instance(platform, rendering);
-            raycast = core::RaycastInterface::instance(platform, scene);
-            simulation = core::SimulationInterface::instance(platform, scene);
-            world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
-            stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
+        rendering = foundation::RenderingInterface::instance(platform);
+        resourceProvider = resource::ResourceProvider::instance(platform, rendering);
+        resourceProvider->setPrefabsData(prefabsData.get(), prefabsSize);
+        fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering);
+        scene = core::SceneInterface::instance(platform, rendering);
+        raycast = core::RaycastInterface::instance(platform, scene);
+        simulation = core::SimulationInterface::instance(platform, scene);
+        world = core::WorldInterface::instance(platform, resourceProvider, scene, raycast, simulation);
+        stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
 
-            stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
-            stateManager->switchToState("default");
+        stateManager = game::StateManager::instance(platform, resourceProvider, fontAtlasProvider, scene, world, raycast, simulation, stage);
+        stateManager->switchToState("default");
 
-            platform->setLoop([](float dtSec) {
-                dtSec = std::min(dtSec, 0.035f);
-                stateManager->update(dtSec);
-                raycast->update(dtSec);
-                simulation->update(dtSec);
-                world->update(dtSec);
+        platform->setLoop([](float dtSec) {
+            dtSec = std::min(dtSec, 0.035f);
+            stateManager->update(dtSec);
+            raycast->update(dtSec);
+            simulation->update(dtSec);
+            world->update(dtSec);
 
-                scene->updateAndDraw(dtSec);
-                stage->updateAndDraw(dtSec);
-                rendering->presentFrame();
+            scene->updateAndDraw(dtSec);
+            stage->updateAndDraw(dtSec);
+            rendering->presentFrame();
 
-                resourceProvider->update(dtSec);
-                fontAtlasProvider->update(dtSec);
-            });
+            resourceProvider->update(dtSec);
+            fontAtlasProvider->update(dtSec);
         });
     });
 }
