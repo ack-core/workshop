@@ -88,8 +88,9 @@ std::unique_ptr<test::TestRunner> testRunner;
 extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
-    
-    testRunner = std::make_unique<test::TestRunner>(platform, rendering);
+    resourceProvider = resource::ResourceProvider::instance(platform, rendering);
+
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider);
     test::registerMathTests(*testRunner);
     test::registerUtilTests(*testRunner);
     test::registerShaderTests(*testRunner);
@@ -98,7 +99,7 @@ extern "C" void initialize() {
     test::registerResourceProviderTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
-        testRunner->nextFrame();
+        testRunner->nextFrame(dtSec);
     });
 }
 

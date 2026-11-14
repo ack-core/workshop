@@ -33,9 +33,10 @@ namespace {
 namespace test {
     TestRunner::TestRunner(
         const foundation::PlatformInterfacePtr& platform,
-        const foundation::RenderingInterfacePtr& rendering
-    ) 
-    : _api{platform, rendering}
+        const foundation::RenderingInterfacePtr& rendering,
+        const resource::ResourceProviderPtr& resourceProvider
+    )
+    : _api{platform, rendering, resourceProvider}
     {
 
     }
@@ -56,7 +57,9 @@ namespace test {
         _screenshotTests.emplace_back(name, makeTestInstance);
     }
 
-    void TestRunner::nextFrame() {
+    void TestRunner::nextFrame(float dtSec) {
+        _api.resourceProvider->update(dtSec);
+
         // Unit tests
         if (_unitTestIndex < _unitTests.size()) {
             for (std::size_t i = 0; i < MAX_UNIT_TESTS_PER_FRAME && _unitTestIndex < _unitTests.size(); i++, _unitTestIndex++) {
