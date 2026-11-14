@@ -175,6 +175,7 @@ namespace ui {
         };
         
     public:
+        virtual auto getPlatform() const -> const foundation::PlatformInterfacePtr & = 0;
         virtual auto getResourceProvider() const -> const resource::ResourceProviderPtr & = 0;
 
         // Get element added with name
