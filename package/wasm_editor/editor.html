@@ -216,7 +216,7 @@
             },
             updateResourcesList: async function() {
                 for (const func of listResFunctions) {
-                    await func();
+                    await func().catch(e => console.warn(e.message));
                 }
             },
             setWorkingDirectories: async function() {
@@ -253,7 +253,13 @@
                 section.id = config.id;
                 section.innerHTML = '<div class="editor_inspect_header" onclick="uiBindings.inspectToggle(this)">' + config.header + '</div><div class="editor_inspect_body"></div>';
                 document.getElementById("inspect").appendChild(section);
-                webix.ui({ container: section.lastElementChild, ...config.body });
+                if (config.html) {
+                    section.lastElementChild.classList.add("editor_inspect_form");
+                    section.lastElementChild.innerHTML = config.html;
+                }
+                else {
+                    webix.ui({ container: section.lastElementChild, ...config.body });
+                }
                 section.classList.toggle("editor_inspect_collapsed", !!config.collapsed);
                 section.hidden = true;
             },
@@ -536,108 +542,85 @@
             uiInspectMappingEdit["inspect_mesh"] = ["voxel_mesh_edit_0", "voxel_mesh_edit_1"];
             resourcesExtMapping["inspect_mesh"] = [".vox", ".txt"];
 
-            uiBindings.meshOffset = function(e, nv, old) {
-                let args = $$("inspect_mesh_cx").getValue() + " " + $$("inspect_mesh_cy").getValue() + " " + $$("inspect_mesh_cz").getValue()
+            uiBindings.meshOffset = function() {
+                let args = ["cx", "cy", "cz"].map(a => document.getElementById("inspect_mesh_" + a).value).join(" ");
                 uiEditor.sendMsg("editor.mesh.offset", args);
             };
-            uiBindings.meshAddAnimation = function(e) {
+            uiBindings.meshAddAnimation = function() {
                 uiEditor.sendMsg("editor.mesh.animationAdd", "");
             };
-            uiBindings.meshRemoveAnimation = function(e) {
-                const list = $$("inspect_mesh_anim_list");
-                const id = list.getSelectedId();
-                if (list.exists(id)) {
-                    list.remove(id);
+            uiBindings.meshRemoveAnimation = function() {
+                const list = document.getElementById("inspect_mesh_anim_list");
+                const id = list.value;
+                if (id) {
+                    list.selectedOptions[0].remove();
                     utility.setElementValue("inspect_mesh_anim_name", "");
                     uiEditor.sendMsg("editor.mesh.animationRemoved", id);
-                    list.select(list.getFirstId());
+                    if (list.options.length) {
+                        list.selectedIndex = 0;
+                        uiEditor.sendMsg("editor.mesh.animationSelected", list.value);
+                    }
                 }
             };
-            uiBindings.meshAnimationParameters = function(e, nv, old) {
-                let args = $$("inspect_mesh_anim_name").getValue() + " " + $$("inspect_mesh_anim_first").getValue() + " ";
-                args += $$("inspect_mesh_anim_last").getValue() + " " + $$("inspect_mesh_anim_time").getValue();
+            uiBindings.meshAnimationParameters = function() {
+                let args = ["name", "first", "last", "time"].map(a => document.getElementById("inspect_mesh_anim_" + a).value).join(" ");
                 uiEditor.sendMsg("editor.mesh.animationParameters", args);
             };
-            uiBindings.meshAnimationPlay = function(e) {
+            uiBindings.meshAnimationPlay = function() {
                 uiEditor.sendMsg("editor.mesh.animationPlay", "0");
             };
-            uiBindings.meshAnimationLoop = function(e) {
+            uiBindings.meshAnimationLoop = function() {
                 uiEditor.sendMsg("editor.mesh.animationPlay", "1");
             };
 
             utility.addNodeMenuItem("10", "Add Voxel Mesh");
             utility.addInspectSection({
                 id: "voxel_mesh_edit_0", header: "Edit Mesh",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Center point:"),
-                            {},
-                            elements.number("inspect_mesh_cx", null, 54, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset),
-                            elements.number("inspect_mesh_cy", null, 54, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset),
-                            elements.number("inspect_mesh_cz", null, 54, "11111.0", 0, 0.5, -99, 99, uiBindings.meshOffset)
-                        ]},
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Center point:</label>
+                        <input type="number" id="inspect_mesh_cx" step="0.5" min="-99" max="99" onchange="uiBindings.meshOffset()">
+                        <input type="number" id="inspect_mesh_cy" step="0.5" min="-99" max="99" onchange="uiBindings.meshOffset()">
+                        <input type="number" id="inspect_mesh_cz" step="0.5" min="-99" max="99" onchange="uiBindings.meshOffset()">
+                    </div>`
             });
             utility.addInspectSection({
                 id: "voxel_mesh_edit_1", header: "Animation",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Name:"), {},
-                            elements.text("inspect_mesh_anim_name", "", 183, false, uiBindings.meshAnimationParameters),
-                        ]},
-                        {cols: [
-                            elements.label("First:"),
-                            elements.number("inspect_mesh_anim_first", null, 44, "11", 0, 1, 0, 99, uiBindings.meshAnimationParameters), {},
-                            elements.label("Last:"),
-                            elements.number("inspect_mesh_anim_last", null, 44, "11", 0, 1, 0, 99, uiBindings.meshAnimationParameters), {},
-                            elements.label("Ms:"),
-                            elements.number("inspect_mesh_anim_time", null, 66, "1111", 100, 10, 100, 9000, uiBindings.meshAnimationParameters)
-                        ]},
-                        {
-                            css: {"margin-top": "3px !important"},
-                            cols: [
-                                {rows: [
-                                    elements.list("inspect_mesh_anim_list", 200, (obj, id) => { 
-                                        uiEditor.sendMsg("editor.mesh.animationSelected", id);
-                                    }),
-                                    { height: 16 }
-                                ]},
-                                {
-                                    width: 28,
-                                    css: {"margin-left": "3px !important"},
-                                    rows: [
-                                        elements.button("\u25B6", "Play animation", uiBindings.meshAnimationPlay),
-                                        elements.button("\u27F3", "Loop animation", uiBindings.meshAnimationLoop),
-                                        elements.button("\u2795", "Add animation", uiBindings.meshAddAnimation),
-                                        elements.button("\u274C", "Delete animation", uiBindings.meshRemoveAnimation)
-                                    ]
-                                }
-                            ]
-                        },
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Name:</label>
+                        <input type="text" id="inspect_mesh_anim_name" onchange="uiBindings.meshAnimationParameters()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>First:</label>
+                        <input type="number" id="inspect_mesh_anim_first" style="width: 44px" step="1" min="0" max="99" onchange="uiBindings.meshAnimationParameters()">
+                        <label>Last:</label>
+                        <input type="number" id="inspect_mesh_anim_last" style="width: 44px" step="1" min="0" max="99" onchange="uiBindings.meshAnimationParameters()">
+                        <label>Ms:</label>
+                        <input type="number" id="inspect_mesh_anim_time" style="width: 66px" step="10" min="100" max="9000" value="100" onchange="uiBindings.meshAnimationParameters()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <select id="inspect_mesh_anim_list" size="10" style="height: 200px" onchange="uiEditor.sendMsg('editor.mesh.animationSelected', this.value)"></select>
+                        <div class="editor_nodes_buttons">
+                            <button class="editor_top_button" title="Play animation" onclick="uiBindings.meshAnimationPlay()">&#x25B6;</button>
+                            <button class="editor_top_button" title="Loop animation" onclick="uiBindings.meshAnimationLoop()">&#x27F3;</button>
+                            <button class="editor_top_button" title="Add animation" onclick="uiBindings.meshAddAnimation()">&#x2795;</button>
+                            <button class="editor_top_button" title="Delete animation" onclick="uiBindings.meshRemoveAnimation()">&#x274C;</button>
+                        </div>
+                    </div>`
             });
-            
+
             uiEditor["engine.mesh.animationUpdate"] = function(data) {
-                const list = $$("inspect_mesh_anim_list");
+                const list = document.getElementById("inspect_mesh_anim_list");
                 const [name, first, last, time, isNew] = data.split(' ');
-                const oldName = isNew == "new" ?  "" : list.getSelectedId();
-                
+                const oldName = isNew == "new" ?  "" : list.value;
+
                 if (oldName != name) {
-                    list.blockEvent();
-                    if (list.exists(oldName)) {
-                        list.remove(oldName);
+                    if (oldName) {
+                        list.selectedOptions[0].remove();
                     }
-                    list.add({ id: name, value: name });
-                    list.select(name);
-                    list.unblockEvent();
+                    list.add(new Option(name));
+                    list.value = name;
                 }
 
                 utility.setElementValue("inspect_mesh_anim_name", name);
@@ -646,7 +629,7 @@
                 utility.setElementValue("inspect_mesh_anim_time", time);
             }
             uiEditor["engine.mesh.editing"] = function(data) {
-                $$("inspect_mesh_anim_list").clearAll();
+                document.getElementById("inspect_mesh_anim_list").replaceChildren();
                 utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_mesh"].forEach(item => {

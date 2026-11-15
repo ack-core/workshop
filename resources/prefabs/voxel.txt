@@ -1,0 +1,6 @@
+root {
+    position : vector3f = 0.0000 0.0000 0.0000
+    resourcePath : string = "meshes/1x1x1.vox"
+    type : integer = 10
+}
+

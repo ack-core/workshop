@@ -1,0 +1,8 @@
+animations {
+    attack : vector3i = 7 13 700
+    death : vector3i = 14 23 1200
+    idle : vector3i = 0 0 1000
+    walk : vector3i = 1 6 1000
+}
+
+offset : vector3f = 7.0000 0.0000 7.0000
