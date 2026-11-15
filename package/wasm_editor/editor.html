@@ -28,7 +28,14 @@
                 <button class="editor_top_button" title="Discard changes in the resource &amp; Exit" onclick="uiBindings.resourceDiscardAndExit()">&#x1F6AB;</button>
             </div>
         </div>
-        <div class="nodes" id="nodes"></div>
+        <div class="nodes" id="nodes">
+            <div class="editor_nodes_buttons">
+                <button class="editor_top_button" title="New node" onclick="uiBindings.treeNewNode(this)">&#x2795;</button>
+                <button class="editor_top_button" title="Delete node" onclick="uiBindings.treeDeleteNode()">&#x274C;</button>
+                <button class="editor_top_button" title="Save prefab" onclick="uiBindings.prefabSave()">&#x1F4BE;</button>
+            </div>
+            <div class="editor_nodes_tree" id="node_tree"></div>
+        </div>
         <div class="inspect" id="inspect"></div>
     </div>
 
@@ -203,42 +210,41 @@
                 e.setValue(value);
                 e.unblockEvent();
             },
-            adjustTree: function(id, index) {
-                uiNodeTree.define("width", 1000);
-                uiNodeTree.resize();
-                const leaves = uiNodeTree.$view.getElementsByClassName("webix_tree_leaves")[0];
-                uiNodeTree.define("width", leaves.clientWidth);
-                uiNodeTree.define("height", leaves.clientHeight);
-                uiNodeTree.resize();
+            nodeTreeItem: function(id) {
+                return uiNodeTree.querySelector('[data-id="' + id + '"]');
+            },
+            selectedNodeId: function() {
+                return uiNodeTree.querySelector(".editor_nodes_selected")?.parentNode.dataset.id;
+            },
+            unselectNode: function() {
+                uiNodeTree.querySelector(".editor_nodes_selected")?.classList.remove("editor_nodes_selected");
+            },
+            selectNode: function(id) {
+                utility.unselectNode();
+                utility.nodeTreeItem(id).firstElementChild.classList.add("editor_nodes_selected");
+                uiBindings.treeNodeSelected(id);
             },
             insertItemToNodeTree: function(name) {
-                var lastParent = null;
+                var parent = uiNodeTree;
+                var current = null;
                 name.split('.').forEach(node => {
-                    const current = lastParent ? lastParent + "." + node : node;
-                    if (uiNodeTree.exists(current) == false) {
-                        uiNodeTree.data.add({id: current, value: node, open: true}, -1, lastParent );
+                    current = current ? current + "." + node : node;
+                    let item = utility.nodeTreeItem(current);
+                    if (item == null) {
+                        item = document.createElement("div");
+                        item.className = "editor_nodes_item";
+                        item.dataset.id = current;
+                        item.innerHTML = '<div class="editor_nodes_row"><span class="editor_nodes_toggle"></span><input type="checkbox">' + node + '</div><div class="editor_nodes_children"></div>';
+                        parent.appendChild(item);
                     }
-                    if (lastParent) {
-                        uiNodeTree.open(lastParent);
-                    }
-                    lastParent = current;
+                    item.classList.remove("editor_nodes_closed");
+                    parent = item.lastElementChild;
                 });
             },
             addItemToNodeTree: function(name, isPrefab) {
                 utility.insertItemToNodeTree(name);
-
-                if (isPrefab) {
-                    uiNodeTree.getItem(name).isPrefab = isPrefab;
-                    utility.highlightSubTree(name);
-                }
-                uiNodeTree.select(name);
-            },
-            highlightSubTree: function(id) {
-                uiNodeTree.addCss(id, "highlight");
-                uiNodeTree.data.eachSubItem(id, function(child) {
-                    uiNodeTree.addCss(child.id, "highlight");
-                });
-                uiNodeTree.refresh(id);
+                utility.nodeTreeItem(name).classList.toggle("editor_nodes_prefab", !!isPrefab);
+                utility.selectNode(name);
             },
             hostUpdateResources: async function(handler) {
                 try {
@@ -325,10 +331,10 @@
                 $$("node_1_resource_list").show();
             },
             treeNewNode: function(e) {
-                $$("add_node_menu").show(e.getNode(), {pos: "right"});
+                $$("add_node_menu").show(e, {pos: "right"});
             },
             treeDeleteNode: function(e) {
-                uiEditor.sendMsg("editor.deleteNode", uiNodeTree.getSelectedId());
+                uiEditor.sendMsg("editor.deleteNode", utility.selectedNodeId());
             },
             treeNodeSelected: function(id) {
                 document.getElementById("edit_resource_buttons").hidden = true;
@@ -338,7 +344,7 @@
             spaceClick: function(e) {
                 document.getElementById("edit_resource_buttons").hidden = true;
                 uiEditor.sendMsg("editor.stopEditing", "");
-                uiNodeTree.unselectAll();
+                utility.unselectNode();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
                     $$(item).hide();
@@ -423,31 +429,6 @@
         }
         
         webix.ui({
-            container: "nodes",
-            cols: [
-                {rows: [
-                        elements.button("\u2795", "New node", uiBindings.treeNewNode),
-                        elements.button("\u274C", "Delete node", uiBindings.treeDeleteNode),
-                        elements.button("\uD83D\uDCBE", "Save prefab", uiBindings.prefabSave),
-                        {}
-                ]},
-                {rows: [
-                        {
-                            id: "node_tree", view: "tree", type: "lineTree", select: true, borderless: true, scroll: false, checkbox: true, data: [],
-                            template: "{common.icon()}{common.checkbox()}&nbsp;#value#",
-                            css: { "background" : "transparent", "color" : "lightGray" },
-                            on: {
-                                onAfterOpen: utility.adjustTree,
-                                onAfterClose: utility.adjustTree,
-                                onAfterAdd: utility.adjustTree,
-                                onAfterSelect: uiBindings.treeNodeSelected
-                            }
-                        },
-                        { id: "space"}
-                ]}
-            ]
-        });
-        webix.ui({
             id: "add_node_menu", container: "editor", view: "contextmenu", master: "nodes",
             data: [],
             submenuConfig: {
@@ -524,10 +505,21 @@
                 ]
             }
         });
-        webix.event($$("space").getNode(), "click", uiBindings.spaceClick);
         webix.message.position = "bottom";
 
-        uiNodeTree = $$("node_tree");
+        uiNodeTree = document.getElementById("node_tree");
+        uiNodeTree.addEventListener("click", (e) => {
+            const row = e.target.closest(".editor_nodes_row");
+            if (row == null) {
+                if (e.target == uiNodeTree) uiBindings.spaceClick(e);
+            }
+            else if (e.target.classList.contains("editor_nodes_toggle")) {
+                row.parentNode.classList.toggle("editor_nodes_closed");
+            }
+            else if (e.target.type != "checkbox") {
+                utility.selectNode(row.parentNode.dataset.id);
+            }
+        });
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
 
@@ -1267,9 +1259,7 @@
             }
             uiEditor["engine.nodeDeleted"] = function(data) {
                 console.log("[JS] engine.nodeDeleted", data);
-                uiNodeTree.remove(uiNodeTree.getSelectedId());
-                utility.adjustTree();
-                uiNodeTree.refresh();
+                utility.nodeTreeItem(utility.selectedNodeId()).remove();
                 uiBindings.spaceClick(null);
             }
             uiEditor["engine.nodeSelected"] = function(data) {
@@ -1299,8 +1289,9 @@
                 console.log(data);
                 var [success, old, nv] = data.split(' ');
                 if (success == "ok") {
-                    let isPrefab = uiNodeTree.getItem(old).isPrefab;
-                    uiNodeTree.remove(old);
+                    const item = utility.nodeTreeItem(old);
+                    const isPrefab = item.classList.contains("editor_nodes_prefab");
+                    item.remove();
                     utility.addItemToNodeTree(nv, isPrefab);
                 }
                 else {
