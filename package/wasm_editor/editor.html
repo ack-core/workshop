@@ -263,6 +263,32 @@
                 section.classList.toggle("editor_inspect_collapsed", !!config.collapsed);
                 section.hidden = true;
             },
+            updateListPoint: function(listId, id, text, isNew) {
+                const list = document.getElementById(listId);
+                const oldId = isNew == "new" ? "" : list.value;
+                if (oldId != id) {
+                    if (oldId) {
+                        list.selectedOptions[0].remove();
+                    }
+                    list.add(new Option(text, id));
+                }
+                else {
+                    list.selectedOptions[0].text = text;
+                }
+                list.value = id;
+            },
+            removeListPoint: function(listId, removeMsg, selectMsg) {
+                const list = document.getElementById(listId);
+                const id = list.value;
+                if (id) {
+                    list.selectedOptions[0].remove();
+                    uiEditor.sendMsg(removeMsg, id);
+                    if (list.options.length) {
+                        list.selectedIndex = 0;
+                        uiEditor.sendMsg(selectMsg, list.value);
+                    }
+                }
+            },
             nodeTreeItem: function(id) {
                 return uiNodeTree.querySelector('[data-id="' + id + '"]');
             },
@@ -903,12 +929,6 @@
             }
         }
         function registerRaycastShapeResource() {
-            const uiRaycastShapeTypes = [
-                { id: 1, value: "Sphere shape approx"}, 
-                { id: 2, value: "Boxes shape approx"},
-                { id: 3, value: "Convex triangle shape"}
-            ];
-
             listResFunctions.push(async function() {
                 listResources["inspect_raycast"] = await dirResources.getDirectoryHandle("raycast").then(r => utility.listFilesInDirectory("raycast", r, "txt"));
                 listResources["inspect_raycast"].sort();
@@ -917,94 +937,57 @@
             uiInspectMappingEdit["inspect_raycast"] = ["raycast_edit_0"];
             resourcesExtMapping["inspect_raycast"] = [".txt"];
 
-            uiBindings.raycastPointType = function(e, nv, old) {
-                uiEditor.sendMsg("editor.raycast.pointType", nv);
-                $$("inspect_raycast_shape_pointlist").clearAll();
+            uiBindings.raycastPointType = function(e) {
+                uiEditor.sendMsg("editor.raycast.pointType", e.value);
+                document.getElementById("inspect_raycast_shape_pointlist").replaceChildren();
             };
-            uiBindings.raycastAddPoint = function(e) {
+            uiBindings.raycastAddPoint = function() {
                 uiEditor.sendMsg("editor.raycast.pointAdd", "");
             };
-            uiBindings.raycastRemovePoint = function(e) {
-                const list = $$("inspect_raycast_shape_pointlist");
-                const id = list.getSelectedId();
-                if (list.exists(id)) {
-                    list.remove(id);
-                    uiEditor.sendMsg("editor.raycast.pointRemove", id);
-                    list.select(list.getFirstId());
-                }
+            uiBindings.raycastRemovePoint = function() {
+                utility.removeListPoint("inspect_raycast_shape_pointlist", "editor.raycast.pointRemove", "editor.raycast.pointSelected");
             };
-            uiBindings.raycastPointArgs = function(e, nv, old) {
-                let args = $$("inspect_raycast_shape_point_x").getValue() + " " + $$("inspect_raycast_shape_point_y").getValue() + " ";
-                args += $$("inspect_raycast_shape_point_z").getValue() + " " + $$("inspect_raycast_shape_arg_x").getValue() + " ";
-                args += $$("inspect_raycast_shape_arg_y").getValue() + " " + $$("inspect_raycast_shape_arg_z").getValue();
+            uiBindings.raycastPointArgs = function() {
+                let args = ["point_x", "point_y", "point_z", "arg_x", "arg_y", "arg_z"].map(a => document.getElementById("inspect_raycast_shape_" + a).value).join(" ");
                 uiEditor.sendMsg("editor.raycast.pointArgs", args);
             };
 
             utility.addNodeMenuItem("30", "Add Raycast Shape");
             utility.addInspectSection({
                 id: "raycast_edit_0", header: "Edit Raycast Shape",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Shape type:"), {},
-                            elements.combo("inspect_raycast_shape_type", 1, uiRaycastShapeTypes, 160, uiBindings.raycastPointType)
-                        ]},
-                        {cols: [
-                            elements.label("Coordinates:"),
-                            {},
-                            elements.number("inspect_raycast_shape_point_x", null, 54, "111.0", 0.0, 0.1, -999.0, 999.0, uiBindings.raycastPointArgs),
-                            elements.number("inspect_raycast_shape_point_y", null, 54, "111.0", 0.0, 0.1, -999.0, 999.0, uiBindings.raycastPointArgs),
-                            elements.number("inspect_raycast_shape_point_z", null, 54, "111.0", 0.0, 0.1, -999.0, 999.0, uiBindings.raycastPointArgs)
-                        ]},
-                        {cols: [
-                            elements.label("Args:"),
-                            {},
-                            elements.number("inspect_raycast_shape_arg_x", null, 54, "111.0", 0.0, 0.1, 0.0, 999.0, uiBindings.raycastPointArgs),
-                            elements.number("inspect_raycast_shape_arg_y", null, 54, "111.0", 0.0, 0.1, 0.0, 999.0, uiBindings.raycastPointArgs),
-                            elements.number("inspect_raycast_shape_arg_z", null, 54, "111.0", 0.0, 0.1, 0.0, 999.0, uiBindings.raycastPointArgs)
-                        ]},
-                        {
-                            css: {"margin-top": "3px !important"},
-                            cols: [
-                                {rows: [
-                                    elements.list("inspect_raycast_shape_pointlist", 200, (obj, id) => { 
-                                        uiEditor.sendMsg("editor.raycast.pointSelected", id);
-                                    }),
-                                    { height: 16 }
-                                ]},
-                                {
-                                    width: 28,
-                                    css: {"margin-left": "3px !important"},
-                                    rows: [
-                                        elements.button("\u2795", "Add point", uiBindings.raycastAddPoint),
-                                        elements.button("\u274C", "Delete point", uiBindings.raycastRemovePoint)
-                                    ]
-                                }
-                            ]
-                        },
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Shape type:</label>
+                        <select id="inspect_raycast_shape_type" style="width: 160px" onchange="uiBindings.raycastPointType(this)">
+                            <option value="1">Sphere shape approx</option>
+                            <option value="2">Boxes shape approx</option>
+                            <option value="3">Convex triangle shape</option>
+                        </select>
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Coordinates:</label>
+                        <input type="number" id="inspect_raycast_shape_point_x" step="0.1" min="-999" max="999" onchange="uiBindings.raycastPointArgs()">
+                        <input type="number" id="inspect_raycast_shape_point_y" step="0.1" min="-999" max="999" onchange="uiBindings.raycastPointArgs()">
+                        <input type="number" id="inspect_raycast_shape_point_z" step="0.1" min="-999" max="999" onchange="uiBindings.raycastPointArgs()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Args:</label>
+                        <input type="number" id="inspect_raycast_shape_arg_x" step="0.1" min="0" max="999" onchange="uiBindings.raycastPointArgs()">
+                        <input type="number" id="inspect_raycast_shape_arg_y" step="0.1" min="0" max="999" onchange="uiBindings.raycastPointArgs()">
+                        <input type="number" id="inspect_raycast_shape_arg_z" step="0.1" min="0" max="999" onchange="uiBindings.raycastPointArgs()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <select id="inspect_raycast_shape_pointlist" size="10" style="height: 200px" onchange="uiEditor.sendMsg('editor.raycast.pointSelected', this.value)"></select>
+                        <div class="editor_nodes_buttons">
+                            <button class="editor_top_button" title="Add point" onclick="uiBindings.raycastAddPoint()">&#x2795;</button>
+                            <button class="editor_top_button" title="Delete point" onclick="uiBindings.raycastRemovePoint()">&#x274C;</button>
+                        </div>
+                    </div>`
             });
 
             uiEditor["engine.raycast.pointUpdate"] = function(data) {
-                const list = $$("inspect_raycast_shape_pointlist");
                 const [id, x, y, z, argx, argy, argz, isNew] = data.split(' ');
-                const oldId = isNew == "new" ?  "" : list.getSelectedId();
-
-                list.blockEvent();
-                if (oldId != id) {
-                    if (list.exists(oldId)) {
-                        list.remove(oldId);
-                    }
-                    list.add({ id: id, value: x + " " + y + " " + z });                    
-                }
-                else {
-                    list.updateItem(id, { value: x + " " + y + " " + z });
-                }
-                list.select(id);
-                list.unblockEvent();
+                utility.updateListPoint("inspect_raycast_shape_pointlist", id, x + " " + y + " " + z, isNew);
 
                 utility.setElementValue("inspect_raycast_shape_point_x", x);
                 utility.setElementValue("inspect_raycast_shape_point_y", y);
@@ -1014,7 +997,7 @@
                 utility.setElementValue("inspect_raycast_shape_arg_z", argz);
             }
             uiEditor["engine.raycast.editing"] = function(data) {
-                $$("inspect_raycast_shape_pointlist").clearAll();
+                document.getElementById("inspect_raycast_shape_pointlist").replaceChildren();
                 utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 utility.setElementValue("inspect_raycast_shape_type", data);
@@ -1024,13 +1007,12 @@
             }
         }
         function registerCollisionShapeResource() {
-            const uiCollisionShapeTypes = [
-                { id: 1, value: "CircleXZ"}, 
-                { id: 2, value: "ObstaclePolygonXZ"}
-            ];
             const uiCollisionPanelMap = {
                 "1": "actor",
                 "2": "obstacle",
+            };
+            const showCollisionPanel = function(panel) {
+                Object.values(uiCollisionPanelMap).forEach(p => utility.showSection("collision_edit_0_" + p, p == panel));
             };
 
             listResFunctions.push(async function() {
@@ -1041,104 +1023,70 @@
             uiInspectMappingEdit["inspect_collision"] = ["collision_edit_0"];
             resourcesExtMapping["inspect_collision"] = [".txt"];
 
-            uiBindings.collisionShapeType = function(e, nv, old) {
-                uiEditor.sendMsg("editor.collision.shapeType", nv);
-                $$("inspect_collision_shape_pointlist").clearAll();
-                $$("collision_edit_0_" + uiCollisionPanelMap[old]).hide();
-                $$("collision_edit_0_" + uiCollisionPanelMap[nv]).show();
+            uiBindings.collisionShapeType = function(e) {
+                uiEditor.sendMsg("editor.collision.shapeType", e.value);
+                document.getElementById("inspect_collision_shape_pointlist").replaceChildren();
+                showCollisionPanel(uiCollisionPanelMap[e.value]);
             };
-            uiBindings.collisionActorArgs = function(e, nv, old) {
-                let args = $$("inspect_collision_shape_mass").getValue() + " ";
-                args += $$("inspect_collision_shape_radius").getValue() + " " + $$("inspect_collision_shape_height").getValue();
+            uiBindings.collisionActorArgs = function() {
+                let args = ["mass", "radius", "height"].map(a => document.getElementById("inspect_collision_shape_" + a).value).join(" ");
                 uiEditor.sendMsg("editor.collision.actorArgs", args);
             };
-            uiBindings.collisionAddPoint = function(e) {
+            uiBindings.collisionAddPoint = function() {
                 uiEditor.sendMsg("editor.collision.pointAdd", "");
             };
-            uiBindings.collisionRemovePoint = function(e) {
-                const list = $$("inspect_collision_shape_pointlist");
-                const id = list.getSelectedId();
-                if (list.exists(id)) {
-                    list.remove(id);
-                    uiEditor.sendMsg("editor.collision.pointRemove", id);
-                    list.select(list.getFirstId());
-                }
+            uiBindings.collisionRemovePoint = function() {
+                utility.removeListPoint("inspect_collision_shape_pointlist", "editor.collision.pointRemove", "editor.collision.pointSelected");
             };
-            uiBindings.collisionPointArgs = function(e, nv, old) {
-                let args = $$("inspect_collision_shape_p1").getValue() + " " + $$("inspect_collision_shape_p2").getValue();
+            uiBindings.collisionPointArgs = function() {
+                let args = ["p1", "p2"].map(a => document.getElementById("inspect_collision_shape_" + a).value).join(" ");
                 uiEditor.sendMsg("editor.collision.pointArgs", args);
             };
 
             utility.addNodeMenuItem("31", "Add Collision Shape");
             utility.addInspectSection({
                 id: "collision_edit_0", header: "Edit Collision Shape",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Shape type:"), {},
-                            elements.combo("inspect_collision_shape_type", 1, uiCollisionShapeTypes, 160, uiBindings.collisionShapeType),
-                        ]},
-                        {
-                            id: "collision_edit_0_actor",
-                            cols: [
-                                elements.label("Mass:"),{},
-                                elements.number("inspect_collision_shape_mass", null, 47, "111.0", 0, 0.1, 1.0, 999.0, uiBindings.collisionActorArgs), 
-                                elements.label("R:"),
-                                elements.number("inspect_collision_shape_radius", "Radius", 44, "11.0", 0, 0.1, 1.0, 99.0, uiBindings.collisionActorArgs),
-                                {
-                                    cols: [
-                                        elements.label("H:"),
-                                        elements.number("inspect_collision_shape_height", "Height", 44, "111.0", 0, 0.1, 0.0, 99.0, uiBindings.collisionActorArgs),
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            id: "collision_edit_0_obstacle", hidden: true,
-                            rows: [
-                                {cols: [
-                                    elements.label("Coordinates:"), {},
-                                    elements.number("inspect_collision_shape_p1", null, 54, "1111.0", 0, 0.1, -999.0, 999.0, uiBindings.collisionPointArgs),
-                                    elements.number("inspect_collision_shape_p2", null, 54, "1111.0", 0, 0.1, -999.0, 999.0, uiBindings.collisionPointArgs)
-                                ]},
-                                {
-                                    css: {"margin-top": "3px !important"},
-                                    cols: [
-                                        {rows: [
-                                            elements.list("inspect_collision_shape_pointlist", 200, (obj, id) => { 
-                                                uiEditor.sendMsg("editor.collision.pointSelected", id);
-                                            }),
-                                            { height: 16 }
-                                        ]},
-                                        {
-                                            width: 28,
-                                            css: {"margin-left": "3px !important"},
-                                            rows: [
-                                                elements.button("\u2795", "Add point", uiBindings.collisionAddPoint),
-                                                elements.button("\u274C", "Delete point", uiBindings.collisionRemovePoint)
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Shape type:</label>
+                        <select id="inspect_collision_shape_type" style="width: 160px" onchange="uiBindings.collisionShapeType(this)">
+                            <option value="1">CircleXZ</option>
+                            <option value="2">ObstaclePolygonXZ</option>
+                        </select>
+                    </div>
+                    <div class="editor_inspect_row" id="collision_edit_0_actor">
+                        <label>Mass:</label>
+                        <input type="number" id="inspect_collision_shape_mass" style="width: 47px" step="0.1" min="1" max="999" onchange="uiBindings.collisionActorArgs()">
+                        <label>R:</label>
+                        <input type="number" id="inspect_collision_shape_radius" title="Radius" style="width: 44px" step="0.1" min="1" max="99" onchange="uiBindings.collisionActorArgs()">
+                        <label>H:</label>
+                        <input type="number" id="inspect_collision_shape_height" title="Height" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.collisionActorArgs()">
+                    </div>
+                    <div class="editor_inspect_group" id="collision_edit_0_obstacle" hidden>
+                        <div class="editor_inspect_row">
+                            <label>Coordinates:</label>
+                            <input type="number" id="inspect_collision_shape_p1" step="0.1" min="-999" max="999" onchange="uiBindings.collisionPointArgs()">
+                            <input type="number" id="inspect_collision_shape_p2" step="0.1" min="-999" max="999" onchange="uiBindings.collisionPointArgs()">
+                        </div>
+                        <div class="editor_inspect_row">
+                            <select id="inspect_collision_shape_pointlist" size="10" style="height: 200px" onchange="uiEditor.sendMsg('editor.collision.pointSelected', this.value)"></select>
+                            <div class="editor_nodes_buttons">
+                                <button class="editor_top_button" title="Add point" onclick="uiBindings.collisionAddPoint()">&#x2795;</button>
+                                <button class="editor_top_button" title="Delete point" onclick="uiBindings.collisionRemovePoint()">&#x274C;</button>
+                            </div>
+                        </div>
+                    </div>`
             });
 
             uiEditor["engine.collision.editing"] = function(data) {
                 const [type, panel] = data.split(' ');
-                $$("inspect_collision_shape_pointlist").clearAll();
+                document.getElementById("inspect_collision_shape_pointlist").replaceChildren();
                 utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_collision"].forEach(item => {
                     utility.showSection(item, true);
                 });
-                $$("collision_edit_0_actor").hide();
-                $$("collision_edit_0_obstacle").hide();
-                $$("collision_edit_0_" + panel).show();
+                showCollisionPanel(panel);
                 utility.setElementValue("inspect_collision_shape_type", type);
             }
             uiEditor["engine.collision.circleXZ"] = function(data) {
@@ -1148,22 +1096,8 @@
                 utility.setElementValue("inspect_collision_shape_height", height);
             }
             uiEditor["engine.collision.obstaclePoint"] = function(data) {
-                const list = $$("inspect_collision_shape_pointlist");
                 const [id, p1, p2, isNew] = data.split(' ');
-                const oldId = isNew == "new" ?  "" : list.getSelectedId();
-
-                list.blockEvent();
-                if (oldId != id) {
-                    if (list.exists(oldId)) {
-                        list.remove(oldId);
-                    }
-                    list.add({ id: id, value: p1 + " " + p2 });                    
-                }
-                else {
-                    list.updateItem(id, { value: p1 + " " + p2 });
-                }
-                list.select(id);
-                list.unblockEvent();
+                utility.updateListPoint("inspect_collision_shape_pointlist", id, p1 + " " + p2, isNew);
 
                 utility.setElementValue("inspect_collision_shape_p1", p1);
                 utility.setElementValue("inspect_collision_shape_p2", p2);

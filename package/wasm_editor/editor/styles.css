@@ -36,8 +36,8 @@ html, body {
     gap: 2px;
     padding: 2px;
 }
-.editor_top_group[hidden] {
-    display: none;
+[hidden] {
+    display: none !important;
 }
 .editor_top_spacer {
     flex: 1;
@@ -125,7 +125,12 @@ html, body {
     color: #475466;
     white-space: nowrap;
 }
-.editor_inspect_row input {
+.editor_inspect_group {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.editor_inspect_row input, .editor_inspect_row select:not([size]) {
     box-sizing: border-box;
     width: 54px;
     height: 24px;
@@ -138,7 +143,7 @@ html, body {
 .editor_inspect_row input[type=text] {
     width: 183px;
 }
-.editor_inspect_row select {
+.editor_inspect_row select[size] {
     flex: 1;
     min-width: 0;
     height: 500px;
