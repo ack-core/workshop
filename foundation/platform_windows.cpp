@@ -270,7 +270,7 @@ namespace {
                 POINT cursorPosition { LONG(x), LONG(y) }; // wheel coordinates are in screen space
                 ::ScreenToClient(hwnd, &cursorPosition);
 
-                const int wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1;
+                const int wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 160 : -160;
                 pointerEvent(hwnd, PointerEventType::WHEEL, float(cursorPosition.x), float(cursorPosition.y), false, false, wheel);
                 break;
             }

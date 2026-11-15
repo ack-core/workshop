@@ -358,7 +358,7 @@ namespace core {
             const int geometryType = int(desc.getInteger("geometry", 0));
 
             if (geometryType == 0) { // grass
-                fillGeometryGrass(rendering, map, margs, desc.getVector2i("size", {}));
+                fillGeometryGrass(rendering, map, margs, int(desc.getInteger("textureRowSize", 1)));
             }
             if (geometryType == 1) { // tree leafs
                 const int rowSize = int(desc.getInteger("textureRowSize", 1));
@@ -373,10 +373,15 @@ namespace core {
             }
         }
 
-        void fillGeometryGrass(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const math::vector2i &size) {
+        void fillGeometryGrass(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, int rowSize) {
             std::vector<VTXVEG> vertices;
             std::vector<std::uint32_t> indexes;
-            
+
+            const int rcount = std::max(1, int(texture->getHeight()) / rowSize);
+            const float th = 1.0f / float(rcount);
+            const float hw = 0.5f * float(texture->getWidth());
+            const float top = float(rowSize) - 0.5f;
+
             for (int y = 0; y < margs.y; y++) {
                 for (int x = 0; x < margs.x; x++) {
                     if (map[4 * (y * margs.x + x) + 1] == margs.z) {
@@ -384,9 +389,7 @@ namespace core {
                         const std::uint32_t curri = std::uint32_t(indexes.size());
                         const float px = float(x);
                         const float pz = float(y);
-                        
-                        const float hw = 0.5f * size.x;
-                        const float top = size.y - 0.5f;
+                        const float tv = float(map[4 * (y * margs.x + x) + 2] % rcount) * th;
 
                         vertices.resize(vertices.size() + 8);
                         indexes.resize(indexes.size() + 12);
@@ -398,13 +401,13 @@ namespace core {
                             const std::uint32_t istart = curri + i * 6;
 
                             vertices[vstart + 0].posdyn = math::vector4f(px - dx, -0.5f, pz - dz, 0.0f);
-                            vertices[vstart + 0].uv = math::vector2f(0.0f, 1.0f);
+                            vertices[vstart + 0].uv = math::vector2f(0.0f, tv + th);
                             vertices[vstart + 1].posdyn = math::vector4f(px + dx, -0.5f, pz + dz, 0.0f);
-                            vertices[vstart + 1].uv = math::vector2f(1.0f, 1.0f);
+                            vertices[vstart + 1].uv = math::vector2f(1.0f, tv + th);
                             vertices[vstart + 2].posdyn = math::vector4f(px + dx, top, pz + dz, 0.0f);
-                            vertices[vstart + 2].uv = math::vector2f(1.0f, 0.0f);
+                            vertices[vstart + 2].uv = math::vector2f(1.0f, tv);
                             vertices[vstart + 3].posdyn = math::vector4f(px - dx, top, pz - dz, 0.0f);
-                            vertices[vstart + 3].uv = math::vector2f(0.0f, 0.0f);
+                            vertices[vstart + 3].uv = math::vector2f(0.0f, tv);
 
                             indexes[istart + 0] = vstart + 0;
                             indexes[istart + 1] = vstart + 3;

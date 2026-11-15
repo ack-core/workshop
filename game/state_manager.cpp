@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #if __has_include("game.h")
@@ -34,11 +35,21 @@ namespace game {
 }
 #else
 #include "experimental/render_dev.h"
+#include "experimental/vegetation.h"
+#include "experimental/uielements.h"
 
 namespace game {
     inline const State STATES[] = {
         {"default", {
             &makeContext<RenderDevContext>
+        }},
+        {"vegetation", {
+            &makeContext<RenderDevContext>,
+            &makeContext<VegetationContext>
+        }},
+        {"uielements", {
+            &makeContext<RenderDevContext>,
+            &makeContext<UIElementsContext>
         }}
     };
 }
@@ -73,6 +84,8 @@ namespace game {
         void update(float dtSec) override;
         
     private:
+        void _applyState(const std::string& name);
+
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
         const resource::ResourceProviderPtr _resourceProvider;
@@ -83,14 +96,18 @@ namespace game {
         const core::SimulationInterfacePtr _simulation;
         const ui::StageInterfacePtr _ui;
         
-        std::string _currentStateName;
+        std::string _nextStateName;
         std::unordered_map<MakeContextFunc, std::shared_ptr<Context>> _currentContextList;
     };
-    
+
     void StateManagerImpl::switchToState(const char *name) {
-        auto state = std::find_if(std::begin(STATES), std::end(STATES), [name](const State &s) { return s.name == name; });
+        _nextStateName = name;
+    }
+
+    void StateManagerImpl::_applyState(const std::string &name) {
+        auto state = std::find_if(std::begin(STATES), std::end(STATES), [&name](const State &s) { return s.name == name; });
         if (state == std::end(STATES)) {
-            _platform->logError("[StateManager] '%s' state not found");
+            _platform->logError("[StateManager] '%s' state not found", name.c_str());
             return;
         }
 
@@ -116,22 +133,19 @@ namespace game {
                 newContextList.emplace(makeContextFunction, std::move(ctx));
             }
             else {
-                _platform->logError("[StateManager] Unexpected state while switching to '%s'");
+                _platform->logError("[StateManager] Unexpected state while switching to '%s'", name.c_str());
             }
         }
 
-        _currentStateName = name;
         std::swap(_currentContextList, newContextList);
     }
-    
+
     void StateManagerImpl::update(float dtSec) {
-        std::string state = _currentStateName;
+        if (_nextStateName.size()) {
+            _applyState(std::exchange(_nextStateName, {}));
+        }
         for (auto& contextEntry : _currentContextList) {
-            std::shared_ptr<Context> ctx = contextEntry.second;
-            ctx->update(dtSec);
-            if (state != _currentStateName) {
-                break;
-            }
+            contextEntry.second->update(dtSec);
         }
     }
 }

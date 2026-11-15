@@ -2,7 +2,7 @@ vegetation {
     color : integer = 0xFFFF00
     geometry : integer = 0
     source : string = "auxiliary/textures/grass"
-    size : vector2i = 9 4
+    textureRowSize : integer = 3
 }
 vegetation {
     color : integer = 0x0000FF

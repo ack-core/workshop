@@ -20,22 +20,5 @@ namespace game {
         math::vector2f _lockedCoordinates;
         math::vector3f _orbit = { 35, 125, 35 };
         core::SceneInterface::LineSetPtr _axis;
-        
-        core::WorldInterface::ObjectPtr _ptc;
-        core::SceneInterface::VoxelMeshPtr _knight;
-        core::SceneInterface::GroundMeshPtr _ground;
-        std::vector<core::SceneInterface::VegetationPtr> _vg;
-        
-        ui::InteractorPtr _joystick;
-        std::shared_ptr<ui::StageInterface::Image> _img0;
-        std::shared_ptr<ui::StageInterface::Img9Slice> _img1;
-        std::shared_ptr<ui::StageInterface::Element> _btn0;
-        std::shared_ptr<ui::StageInterface::TextLine> _txt0;
-        std::shared_ptr<ui::StageInterface::TextLine> _txt1;
-        std::shared_ptr<ui::StageInterface::TextLine> _txt2;
-        std::shared_ptr<ui::StageInterface::TextBlock> _tb0;
-        std::shared_ptr<ui::StageInterface::ImgCustom> _img2;
-        
-        ui::extensions::ImgSectorPtr _ims;
     };
 }
