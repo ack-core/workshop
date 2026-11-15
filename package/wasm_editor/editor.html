@@ -12,7 +12,22 @@
 <body>
     <canvas class="rt" id="render_target"></canvas>
     <div class="editor" id="editor">
-        <div class="top" id="top"></div>
+        <div class="top" id="top">
+            <div class="editor_top_group" id="swd" hidden>
+                <button class="editor_top_button" title="Set working directory" onclick="uiBindings.setWorkingDirectory()">&#x1F5C4;</button>
+            </div>
+            <div class="editor_top_group" id="top_buttons" hidden>
+                <button class="editor_top_button" title="Load resources" onclick="uiBindings.loadResources()">&#x1F4E4;</button>
+                <button class="editor_top_button" title="Center on selected object" onclick="uiBindings.centerOnObject()">&#x2316;</button>
+                <button class="editor_top_button" title="Hide/show axis" onclick="uiBindings.axisSwitch(this)"><img src="editor/axis.svg"></button>
+                <button class="editor_top_button" title="Update every frame" onclick="uiBindings.updateSwitch(this)">&#x25B6;</button>
+            </div>
+            <div class="editor_top_spacer"></div>
+            <div class="editor_top_group" id="edit_resource_buttons" hidden>
+                <button class="editor_top_button" title="Save resource &amp; Exit" onclick="uiBindings.resourceSaveAndExit()">&#x1F4BE;</button>
+                <button class="editor_top_button" title="Discard changes in the resource &amp; Exit" onclick="uiBindings.resourceDiscardAndExit()">&#x1F6AB;</button>
+            </div>
+        </div>
         <div class="nodes" id="nodes"></div>
         <div class="inspect" id="inspect"></div>
     </div>
@@ -248,16 +263,16 @@
         }
 
         uiBindings = {
-            setWorkingDirectory: async function(e) {
+            setWorkingDirectory: async function() {
                 editorRootDirectory = await window.showDirectoryPicker({ mode: "readwrite" });
                 const db = await utility.openDB();
-                await db.put('handles', editorRootDirectory, 'rootDirectory');                        
-                
+                await db.put('handles', editorRootDirectory, 'rootDirectory');
+
                 let success = await utility.setWorkingDirectories();
                 if (success) {
                     document.getElementById("nodes").style.visibility = "visible";
-                    $$("top_buttons").show();
-                    e.hide();
+                    document.getElementById("top_buttons").hidden = false;
+                    document.getElementById("swd").hidden = true;
                 }
             },
             initWorkingDirectory: async function() {
@@ -269,12 +284,12 @@
                         let success = await utility.setWorkingDirectories();
                         if (success) {
                             document.getElementById("nodes").style.visibility = "visible";
-                            $$("top_buttons").show();
+                            document.getElementById("top_buttons").hidden = false;
                             return;
                         }
                     }
                 }
-                $$("swd").show();
+                document.getElementById("swd").hidden = false;
             },
             loadResources: async function(e) {
                 $$("processing_popup").show();
@@ -286,10 +301,15 @@
             centerOnObject: function(e) {
                 uiEditor.sendMsg("editor.centerOnObject", "");
             },
-            axisSwitch: function(e, nv) {
+            axisSwitch: function(e) {
+                const img = e.firstElementChild;
+                const nv = img.src.endsWith("axis_off.svg");
+                img.src = nv ? "editor/axis.svg" : "editor/axis_off.svg";
                 uiEditor.sendMsg("editor.axisSwitch", nv.toString());
             },
-            updateSwitch: function(e, nv) {
+            updateSwitch: function(e) {
+                const nv = e.textContent == "▶";
+                e.textContent = nv ? "◼️" : "▶";
                 uiEditor.sendMsg("editor.updateSwitch", nv.toString());
             },
             resourceSaveAndExit: function(e) {
@@ -301,7 +321,7 @@
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
                     $$(item).hide();
                 });
-                $$("edit_resource_buttons").hide();
+                document.getElementById("edit_resource_buttons").hidden = true;
                 $$("node_1_resource_list").show();
             },
             treeNewNode: function(e) {
@@ -311,12 +331,12 @@
                 uiEditor.sendMsg("editor.deleteNode", uiNodeTree.getSelectedId());
             },
             treeNodeSelected: function(id) {
-                $$("edit_resource_buttons").hide();
+                document.getElementById("edit_resource_buttons").hidden = true;
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiEditor.sendMsg("editor.selectNode", id);
             },
             spaceClick: function(e) {
-                $$("edit_resource_buttons").hide();
+                document.getElementById("edit_resource_buttons").hidden = true;
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiNodeTree.unselectAll();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
@@ -402,41 +422,6 @@
             }
         }
         
-        webix.ui({
-            container: "top",
-            margin: 0,
-            rows: [
-                {cols: [
-                    {
-                        id: "swd",
-                        hidden: true,
-                        cols: [
-                            elements.button("\uD83D\uDDC4", "Set working directory", uiBindings.setWorkingDirectory),
-                        ]
-                    },
-                    {
-                        id: "top_buttons",
-                        hidden: true,
-                        cols: [
-                            elements.button("\uD83D\uDCE4", "Load resources", uiBindings.loadResources),
-                            elements.button("\u2316", "Center on selected object", uiBindings.centerOnObject),
-                            elements.toggle('<img src="editor/axis.svg"></img>', '<img src="editor/axis_off.svg"></img>', true, "Hide/show axis", uiBindings.axisSwitch),
-                            elements.toggle('\u25FC\uFE0F', '\u25B6', false, "Update every frame", uiBindings.updateSwitch)
-                        ]
-                    },
-                    {},
-                    {
-                        id: "edit_resource_buttons",
-                        hidden: true,
-                        cols: [
-                            elements.button("\uD83D\uDCBE", "Save resource & Exit", uiBindings.resourceSaveAndExit),
-                            elements.button("\uD83D\uDEAB", "Discard changes in the resource & Exit", uiBindings.resourceDiscardAndExit)
-                        ]
-                    },
-
-                ], autoheight: true}
-            ]
-        });
         webix.ui({
             container: "nodes",
             cols: [
@@ -669,7 +654,7 @@
             uiEditor["engine.mesh.editing"] = function(data) {
                 $$("inspect_mesh_anim_list").clearAll();
                 $$("node_1_resource_list").hide();
-                $$("edit_resource_buttons").show();
+                document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_mesh"].forEach(item => {
                     $$(item).show();
                 });
@@ -707,7 +692,7 @@
             
             uiEditor["engine.ground.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
-                $$("edit_resource_buttons").show();
+                document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_ground"].forEach(item => {
                     $$(item).show();
                 });
@@ -901,7 +886,7 @@
 
             uiEditor["engine.particles.editing"] = function(data) {
                 $$("node_1_resource_list").hide();
-                $$("edit_resource_buttons").show();
+                document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_particles"].forEach(item => {
                     $$(item).show();
                     $$(item).expand();
@@ -1066,7 +1051,7 @@
             uiEditor["engine.raycast.editing"] = function(data) {
                 $$("inspect_raycast_shape_pointlist").clearAll();
                 $$("node_1_resource_list").hide();
-                $$("edit_resource_buttons").show();
+                document.getElementById("edit_resource_buttons").hidden = false;
                 utility.setElementValue("inspect_raycast_shape_type", data);
                 uiInspectMappingEdit["inspect_raycast"].forEach(item => {
                     $$(item).show();
@@ -1183,7 +1168,7 @@
                 const [type, panel] = data.split(' ');
                 $$("inspect_collision_shape_pointlist").clearAll();
                 $$("node_1_resource_list").hide();
-                $$("edit_resource_buttons").show();
+                document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_collision"].forEach(item => {
                     $$(item).show();
                 });
@@ -1344,7 +1329,7 @@
                     $$(item).show();
                 });
 
-                $$("edit_resource_buttons").hide();
+                document.getElementById("edit_resource_buttons").hidden = true;
             }
             uiEditor["engine.resourcesReloaded"] = function(data) {
                 $$("processing_popup").hide();
