@@ -368,7 +368,7 @@ namespace ui {
                 instance.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
                 instance.args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
                 
-                rendering->applyTextures({{_texture, foundation::SamplerType::NEAREST}});
+                rendering->applyTextures({{_texture, foundation::SamplerType::LINEAR}});
                 rendering->draw(&instance, 1);
                 
                 for (auto &item : _attachedElements) {
@@ -431,7 +431,7 @@ namespace ui {
             _drawHandler(*this);
             if (_shader && _texture && _vertexData) {
                 rendering->applyShader(_shader, _topology, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
-                rendering->applyTextures({{_texture, foundation::SamplerType::NEAREST}});
+                rendering->applyTextures({{_texture, foundation::SamplerType::LINEAR}});
                 rendering->draw(_vertexData.get(), _vertexCount, _indexData.data(), std::uint32_t(_indexData.size()));
                 
                 rendering->applyShader(_facility.getDefaultShader(), foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::DISABLED);
@@ -533,7 +533,7 @@ namespace ui {
                     instances[i].args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
                 }
                 
-                rendering->applyTextures({{_texture, foundation::SamplerType::NEAREST}});
+                rendering->applyTextures({{_texture, foundation::SamplerType::LINEAR}});
                 rendering->draw(instances, index);
                 
                 for (auto &item : _attachedElements) {
@@ -605,7 +605,7 @@ namespace ui {
                         fillInstances(_chars, _fontColor, {}, _instanceCount);
                     }
                     if (_instanceCount) {
-                        rendering->applyTextures({{texture, foundation::SamplerType::NEAREST}});
+                        rendering->applyTextures({{texture, foundation::SamplerType::LINEAR}});
                         rendering->draw(_instances.data(), _instanceCount);
                     }
                 }
@@ -750,7 +750,7 @@ namespace ui {
                         fillInstances(_chars, _fontColor, {}, _instanceCount);
                     }
                     if (_instanceCount) {
-                        rendering->applyTextures({{texture, foundation::SamplerType::NEAREST}});
+                        rendering->applyTextures({{texture, foundation::SamplerType::LINEAR}});
                         rendering->draw(_instances.data(), _instanceCount);
                     }
                 }

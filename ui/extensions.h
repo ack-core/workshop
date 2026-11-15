@@ -283,22 +283,23 @@ namespace ui {
                         .anchorH = params.anchorH,
                         .anchorV = params.anchorV,
                         .anchorOffset = params.anchorOffset,
+                        .texture = params.texture,
                         .layout = layout,
-                        .shaderSource = shaderSrc,
-                        .texture = params.texture
+                        .shaderSource = shaderSrc
                     });
                     std::shared_ptr<ImgSector> result = std::make_shared<ImgSector>(img);
                     img->setSize(math::vector2f(math::scalar(info->width), math::scalar(info->height)));
-                    img->setDrawHandler([weak = std::weak_ptr<ImgSector>(result)](StageInterface::ImgCustom &img) {
+                    img->setDrawHandler([weak = std::weak_ptr<ImgSector>(result), platform = stage.getPlatform()](StageInterface::ImgCustom &img) {
                         if (auto owner = weak.lock()) {
                             if (owner->_dirty) {
                                 struct Vtx {
                                     float x, y, tx, ty;
                                 };
-                                const float posx = img.getPosition().x;
-                                const float posy = img.getPosition().y;
-                                const float width = img.getSize().x;
-                                const float height = img.getSize().y;
+                                const float screenScale = platform->getScreenScale();
+                                const float posx = img.getPosition().x * screenScale;
+                                const float posy = img.getPosition().y * screenScale;
+                                const float width = img.getSize().x * screenScale;
+                                const float height = img.getSize().y * screenScale;
                                 const Vtx corners[] = {
                                     Vtx{ posx + width, posy + 0.0f, 1, 0 },
                                     Vtx{ posx + width, posy + height, 1, 1 },

@@ -15,10 +15,14 @@ namespace resource {
         math::vector2f txLT;
         math::vector2f txRB;
         math::vector2f pxSize;
-        float advance, lsb, voffset;
+        float advance;
+        float lsb;
+        float voffset;
         std::uint32_t u16ch;
     };
 
+    // Interface provides methods to work with font
+    //
     class FontAtlasProvider {
     public:
         static std::shared_ptr<FontAtlasProvider> instance(

@@ -40,10 +40,12 @@ namespace {
                 VOXMESH,
             };
             util::Description description;
-            std::vector<std::pair<math::vector2i, ByteDataPtr>> sourceData;
             SourceType sourceType = SourceType::TEXTURE;
+            std::vector<std::pair<math::vector2i, ByteDataPtr>> sourceData;
+            std::uint8_t mapIndex = 0;
+            std::int64_t color = 0;
 
-            VGEntry(const util::Description &desc) : description(desc) {}
+            VGEntry(const util::Description &desc) : description(desc), color(desc.getInteger("color", 0)) {}
             VGEntry(VGEntry &&) = default;
             VGEntry &operator=(VGEntry &&) = default;
         };
@@ -121,7 +123,14 @@ namespace {
             const int descLen = *(int *)(data + 0);
             util::Description vg = util::Description::parse((const std::uint8_t *)(data + 4), descLen);
             for (auto &item : vg.getDescriptions("vegetation")) {
-                ctx.vg.emplace_back(*item);
+                GroundAsyncContext::VGEntry &entry = ctx.vg.emplace_back(*item);
+                entry.mapIndex = std::uint8_t(ctx.vg.size() - 1);
+                for (const GroundAsyncContext::VGEntry &prev : ctx.vg) {
+                    if (prev.color == entry.color) {
+                        entry.mapIndex = prev.mapIndex;
+                        break;
+                    }
+                }
             }
             data += 4 + descLen;
             
@@ -557,6 +566,7 @@ namespace resource {
                                         if (item.sourceData.size()) {
                                             GroundMapDescription::Vegetation &newVG = groundMesh.mapDesc.vegetation.emplace_back(GroundMapDescription::Vegetation {});
                                             newVG.description = std::move(item.description);
+                                            newVG.mapIndex = item.mapIndex;
                                             
                                             if (item.sourceType == GroundAsyncContext::VGEntry::SourceType::TEXTURE) {
                                                 const math::vector2i txsize = item.sourceData[0].first;

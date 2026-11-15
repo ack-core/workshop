@@ -3,26 +3,6 @@
 #include "ui/extensions.h"
 #include <list>
 
-namespace {
-    const char *g_meshShaderSrc = R"(
-        const {
-            modelTransform : matrix4
-        }
-        inout {
-            uv : float2
-            nrm : float3
-        }
-        vssrc {
-            output_position = _transform(_transform(const_modelTransform, float4(vertex_position.xyz, 1.0)), frame_plmVPMatrix);
-            output_uv = vertex_uv;
-            output_nrm = vertex_normal.xyz;
-        }
-        fssrc {
-            output_color[0] = float4(1.0, 0.0, 0.0, 1.0);
-        }
-    )";
-}
-
 namespace game {
     RenderDevContext::RenderDevContext(API &&api) : _api(std::move(api)) {
         _token = _api.platform->addPointerEventHandler(
@@ -54,6 +34,14 @@ namespace game {
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
                     _pointerId = foundation::INVALID_POINTER_ID;
                 }
+                if (args.type == foundation::PlatformPointerEventArgs::EventType::WHEEL) {
+                    const float percent = std::max(1000.0f + float(args.flags.wheel), 900.0f) / 1000.0f;
+                    const float orbitLength = _orbit.length();
+
+                    if ((orbitLength >= 50.0f || percent > 1.0f) && (orbitLength <= 1000.0f || percent < 1.0f)) {
+                        _orbit = _orbit * percent;
+                    }
+                }
 
                 return true;
             }
@@ -66,23 +54,7 @@ namespace game {
         _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-
-        //_joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
-        //    .anchorH = ui::HorizontalAnchor::RIGHT,
-        //    .anchorV = ui::VerticalAnchor::BOTTOM,
-        //    .anchorOffset = math::vector2f(50.0f, 50.0f),
-        //    .textureBackground = "textures/ui/joystick_bg_00",
-        //    .textureThumb = "textures/ui/joystick_thumb",
-        //    .maxThumbOffset = 100.0f,
-        //    .onChange = [this](const math::vector2f &direction) {
-        //        //printf("%f %f\n", direction.x, direction.y);
-        //    }
-        //});
-        //_api.resources->getOrLoadVoxelMesh("meshes/a-knight-blue", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
-        //    _knight = _api.scene->addVoxelMesh(frames, desc);
-        //    _knight->setPosition({10, 0, 5});
-        //});
-        
+        api.stateManager->switchToState("uielements");
     }
     
     RenderDevContext::~RenderDevContext() {
@@ -91,6 +63,5 @@ namespace game {
     
     void RenderDevContext::update(float dtSec) {
         _api.scene->setCameraLookAt(_orbit, math::vector3f{0, 0, 0});
-        //_ims->setSector(-135, -105);
     }
 }

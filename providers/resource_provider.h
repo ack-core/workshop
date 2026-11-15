@@ -3,7 +3,9 @@
 #include "foundation/platform.h"
 #include "foundation/rendering.h"
 
+// TODO: preload prefab resources
 // TODO: only texture lists needed. Remove all others
+
 namespace resource {
     inline const char *PREFAB_BIN = "prefabs.bin";
 
@@ -30,6 +32,7 @@ namespace resource {
             util::Description description;
             foundation::RenderTexturePtr texture;
             std::vector<std::pair<std::uint32_t, ByteDataPtr>> voxmesh;
+            std::uint8_t mapIndex = 0;
 
             Vegetation() = default;
             Vegetation(Vegetation &&) = default;
@@ -39,6 +42,8 @@ namespace resource {
         std::vector<Vegetation> vegetation;
     };
     
+    // Interface provides methods to load resources in engine's format
+    //
     class ResourceProvider {
     public:
         static std::shared_ptr<ResourceProvider> instance(
@@ -107,8 +112,6 @@ namespace resource {
         // @return - description or nullptr
         //
         virtual auto getPrefab(const char *prefabPath) -> const std::unique_ptr<util::Description> & = 0;
-        
-        // TODO: preload prefab resources
         
         // Force removing resources from internal storages
         //

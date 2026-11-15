@@ -41,6 +41,8 @@ namespace ui {
         RIGHT,
     };
 
+    // Interface provides 2D-ui as a tree of elements. Coordinates are in points (pixels / screen scale)
+    //
     class StageInterface {
     public:
         static std::shared_ptr<StageInterface> instance(
@@ -98,6 +100,11 @@ namespace ui {
         };
         
     public:
+        // Anchors
+        // Element is aligned to @anchorTarget (sibling) or to parent if target is nullptr (screen for top level)
+        // LEFT/CENTER/RIGHT, TOP/MIDDLE/BOTTOM - inside the target. *SIDE - outside, next to the target edge
+        // @anchorOffset moves element away from the aligned edge
+        //
         struct PivotParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
             const HorizontalAnchor anchorH = HorizontalAnchor::LEFT;
@@ -117,8 +124,8 @@ namespace ui {
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             const char *texture = "";
-            const float activeAreaOffset = 0.0f;
-            const float activeAreaRadius = 0.0f;
+            const float activeAreaOffset = 0.0f;    // padding of touchable rect inside element bounds
+            const float activeAreaRadius = 0.0f;    // extra touchable distance around touchable rect
         };
         struct ImgCustomParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
@@ -126,9 +133,9 @@ namespace ui {
             const VerticalAnchor anchorV = VerticalAnchor::TOP;
             const math::vector2f anchorOffset = math::vector2f(0, 0);
             const math::vector2f size = math::vector2f(100.0f, 100.0f);
-            const foundation::InputLayout &layout;
-            const char *shaderSource = "";
-            const char *texture = "";
+            const char* texture = "";
+            const foundation::InputLayout &layout;  // vertex layout of custom geometry
+            const char *shaderSource = "";          // see RenderingInterface::createShader
         };
         struct Img9SliceParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
@@ -140,7 +147,7 @@ namespace ui {
             const math::vector3f sliceArgs = math::vector3f(0, 0, 0);
             const float activeAreaOffset = 0.0f;
             const float activeAreaRadius = 0.0f;
-            const bool fill = true;
+            const bool fill = true;                 // draw center part or not
         };
         struct TextLineParams {
             const std::shared_ptr<StageInterface::Element> anchorTarget;
@@ -168,20 +175,56 @@ namespace ui {
         };
         
     public:
+        virtual auto getPlatform() const -> const foundation::PlatformInterfacePtr & = 0;
         virtual auto getResourceProvider() const -> const resource::ResourceProviderPtr & = 0;
+
+        // Get element added with name
+        // @return - element or nullptr if there is no such element
+        //
         virtual auto getNamedElement(const std::string &name) -> std::shared_ptr<Element> = 0;
+
+        // Invisible element to group others. Can be positioned by anchor, in screen or in world
+        // @name          - optional name to find element with getNamedElement
+        // @parent        - parent element or nullptr. Top level element exists while returned pointer is held, child exists while parent exists
+        // @params        - parameters (individual for each type)
+        //
         virtual auto addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::PivotParams &&params) -> std::shared_ptr<Pivot> = 0;
+
+        // Image with texture size
+        // @return        - element or nullptr if texture doesn't exist
+        //
         virtual auto addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImageParams &&params) -> std::shared_ptr<Image> = 0;
+
+        // Image drawn with custom shader and geometry
+        // @return        - element or nullptr if shader or texture is invalid
+        //
         virtual auto addImgCustom(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::ImgCustomParams &&params) -> std::shared_ptr<ImgCustom> = 0;
+
+        // Resizable image from 9-slice texture
+        // @return        - element or nullptr if texture doesn't exist
+        //
         virtual auto addImg9Slice(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::Img9SliceParams &&params) -> std::shared_ptr<Img9Slice> = 0;
+
+        // Single line text sized by its content
+        //
         virtual auto addTextLine(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextLineParams &&params) -> std::shared_ptr<TextLine> = 0;
+
+        // Multiline text wrapped into @size and aligned by @textAlign
+        //
         virtual auto addTextBlock(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ui::StageInterface::TextBlockParams &&params) -> std::shared_ptr<TextBlock> = 0;
-        
+
+        // Add user-defined element. T must provide static T::make(stage, name, parent, params)
+        //
         template<typename T> auto addExtensionElement(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, T &&params) {
             return T::make(*this, name, parent, std::move(params));
         }
-        
+
+        // Remove all elements
+        //
         virtual void clear() = 0;
+
+        // Remove released elements, update positions and draw
+        //
         virtual void updateAndDraw(float dtSec) = 0;
         
     public:

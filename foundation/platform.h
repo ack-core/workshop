@@ -94,30 +94,15 @@ namespace foundation {
         util::callback<void(Context &context)> _main;
     };
     
-    // If some subsystem requires only error output
-    //
-    class LoggerInterface {
-    public:
-        virtual void logMsg(const char *fmt, ...) = 0;
-        virtual void logError(const char *fmt, ...) = 0;
-        
-    public:
-        virtual ~LoggerInterface() = default;
-    };
-    
-    using LoggerInterfacePtr = std::shared_ptr<LoggerInterface>;
-    
     // Interface provides low-level core methods
     //
-    class PlatformInterface : public LoggerInterface {
+    class PlatformInterface {
     public:
         // Gets or creates an instance. There can be only one instance
         //
         static std::shared_ptr<PlatformInterface> instance();
 
-        // Texture pixels per inch
         static constexpr float REFERENCE_DENSITY = 160.0f;
-
         struct StatInfo {
             std::size_t eventHandlersCount = 0;
             std::size_t fileLoadTasksCount = 0;
@@ -222,6 +207,9 @@ namespace foundation {
         // Breaks platform update cycle and exits the app
         //
         virtual void exit(int returnCode) = 0;
+
+        virtual void logMsg(const char* fmt, ...) = 0;
+        virtual void logError(const char* fmt, ...) = 0;
 
         // Returns counters usable in statistics and testing
         //

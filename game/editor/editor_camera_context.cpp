@@ -44,17 +44,7 @@ namespace game {
             float percent = std::max(1000.0f + float(args.flags.wheel), 900.0f) / 1000.0f;
             float orbitLength = _orbit.length();
 
-            if (orbitLength < 50.0f) {
-                if (percent > 1.0f) {
-                     _orbit = _orbit * percent;
-                }
-            }
-            else if (orbitLength > 1000.0f) {
-                if (percent < 1.0f) {
-                     _orbit = _orbit * percent;
-                }
-            }
-            else {
+            if ((orbitLength >= 50.0f || percent > 1.0f) && (orbitLength <= 1000.0f || percent < 1.0f)) {
                 _orbit = _orbit * percent;
             }
         }

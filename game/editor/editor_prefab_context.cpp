@@ -73,8 +73,8 @@ namespace game {
     
     bool EditorPrefabContext::_startEditing(const std::string &data) {
         if (std::shared_ptr<EditorNodePrefab> node = std::dynamic_pointer_cast<EditorNodePrefab>(_nodeAccess.getSelectedNode().lock())) {
-            const util::Description &prefabDesc = _api.resources->getPrefab(node->resourcePath.c_str());
-            const std::map<std::string, const util::Description *> descs = prefabDesc.getDescriptions();
+            const std::unique_ptr<util::Description> &prefabDesc = _api.resources->getPrefab(node->resourcePath.c_str());
+            const std::map<std::string, const util::Description *> descs = prefabDesc->getDescriptions();
             for (auto &index : descs) {
                 math::vector3f position = index.second->getVector3f("position", {});
                 

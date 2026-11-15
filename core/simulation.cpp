@@ -2,6 +2,10 @@
 #include "simulation.h"
 #include <vector>
 
+namespace {
+    const float VELOCITY_STEP_SEC = 0.033f;
+}
+
 namespace core {
     class CollisionBodyBase : public SimulationInterface::Body {
     public:
@@ -43,22 +47,25 @@ namespace core {
         void setTransform(const math::transform3f &trfm) override {
             transform = trfm;
             _prevpos = transform.v3.xyz;
+            _lastDt = VELOCITY_STEP_SEC;
         }
         const math::vector3f getVelocity() const override {
-            return transform.v3.xyz - _prevpos;
+            return (transform.v3.xyz - _prevpos) * (VELOCITY_STEP_SEC / _lastDt);
         }
         void setVelocity(const math::vector3f &v) override {
             _prevpos = transform.v3.xyz - math::vector3f(v.x, 0.0f, v.z);
+            _lastDt = VELOCITY_STEP_SEC;
         }
         void update(float dtSec) {
-            const math::vector3f v = math::vector3f(transform.v3.x - _prevpos.x, 0.0f, transform.v3.z - _prevpos.z);
+            const math::vector3f v = getVelocity();
             _prevpos = transform.v3.xyz;
-            transform.v3.xyz = transform.v3.xyz + v * (dtSec / _prevDt);
+            _lastDt = std::max(dtSec, std::numeric_limits<float>::epsilon());
+            transform.v3.xyz = transform.v3.xyz + math::vector3f(v.x, 0.0f, v.z) * (dtSec / VELOCITY_STEP_SEC);
             _visual->setPosition(transform.v3.xyz);
         }
-        
+
     private:
-        float _prevDt = 0.033f;
+        float _lastDt = VELOCITY_STEP_SEC;
         math::vector3f _prevpos;
         core::SceneInterface::LineSetPtr _visual;
     };

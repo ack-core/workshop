@@ -7,7 +7,6 @@
 #include "core/raycast.h"
 #include "core/simulation.h"
 #include "ui/stage.h"
-#include "datahub/datahub.h"
 
 namespace game {
     class StateManager {

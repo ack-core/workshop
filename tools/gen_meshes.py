@@ -160,18 +160,14 @@ def convert_vox(src: str, cfg: str, dst: str, opt: int):
         print("------ Error: empty vox data for ", src)
 
 def main(src: str, dst: str, opt: int):
-    src = os.path.abspath(src)
-    dst = os.path.abspath(dst)
+    src = Path(src).resolve()
+    dst = Path(dst).resolve()
 
-    for path, _, files in os.walk(src):
-        for file in files:
-            if file.endswith(".vox"):
-                relpath_to = os.path.join(os.path.relpath(path, src), file)
-                fullpath_to = os.path.normpath(os.path.join(dst, relpath_to))
-                fullpath_to = fullpath_to.replace(".vox", ".vxm")
-                fullpath_from = os.path.join(path, file)
-                fullpath_cfg = fullpath_from.replace(".vox", ".txt")
-                convert_vox(fullpath_from, fullpath_cfg, fullpath_to, opt)
+    for vox in src.rglob("*.vox"):
+        fullpath_to = (dst / vox.relative_to(src)).with_suffix(".vxm").as_posix()
+        fullpath_from = vox.as_posix()
+        fullpath_cfg = fullpath_from.replace(".vox", ".txt")
+        convert_vox(fullpath_from, fullpath_cfg, fullpath_to, opt)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tool to generate optimized meshes")

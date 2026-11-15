@@ -41,9 +41,9 @@ namespace {
     RECT g_minWindowRect { 0, 0, LONG(APP_WIDTH), LONG(APP_HEIGHT) };
 
     char g_buffer[BUFFER_SIZE];
-    std::atomic<bool> g_killed {false};
     int g_returnCode = 0;
 
+    std::atomic<bool> g_killed{ false };
     std::weak_ptr<foundation::PlatformInterface> g_instance;
     util::callback<void(float)> g_updateAndDraw;
 
@@ -270,7 +270,7 @@ namespace {
                 POINT cursorPosition { LONG(x), LONG(y) }; // wheel coordinates are in screen space
                 ::ScreenToClient(hwnd, &cursorPosition);
 
-                const int wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1;
+                const int wheel = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 160 : -160;
                 pointerEvent(hwnd, PointerEventType::WHEEL, float(cursorPosition.x), float(cursorPosition.y), false, false, wheel);
                 break;
             }
@@ -550,11 +550,6 @@ namespace foundation {
         g_returnCode = returnCode;
     }
 
-    const WindowsPlatform::StatInfo &WindowsPlatform::getStatistics() const {
-        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
-        return g_statistics;
-    }
-
     void WindowsPlatform::logMsg(const char *fmt, ...) {
         std::lock_guard<std::mutex> guard(_logMutex);
 
@@ -585,6 +580,11 @@ namespace foundation {
         if (IsDebuggerPresent()) {
             DebugBreak();
         }
+    }
+
+    const WindowsPlatform::StatInfo& WindowsPlatform::getStatistics() const {
+        g_statistics.eventHandlersCount = g_editorHandlers.size() + g_pointerHandlers.size() + g_keyboardHandlers.size() + g_resizeHandlers.size();
+        return g_statistics;
     }
 }
 
@@ -637,7 +637,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         foregroundQueue.clear();
 
         auto curFrameTime = std::chrono::high_resolution_clock::now();
-        float dt = float(std::chrono::duration_cast<std::chrono::milliseconds>(curFrameTime - prevFrameTime).count()) / 1000.0f;
+        float dt = std::chrono::duration<float>(curFrameTime - prevFrameTime).count();
 
         if (g_updateAndDraw) {
             g_updateAndDraw(dt);

@@ -19,6 +19,7 @@ namespace {
     std::uint32_t g_width;
     std::uint32_t g_height;
     float g_pixelRatio = 1.0f;
+
     std::size_t g_asyncWorkCount = 0;
     foundation::PlatformInterface::StatInfo g_statistics;
 }
