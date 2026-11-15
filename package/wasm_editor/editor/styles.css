@@ -85,6 +85,71 @@ html, body {
     max-height: calc(100vh - 127px);
     min-width: 100px;
 }
+.editor_inspect_section {
+    width: 240px;
+    background: rgba(255, 255, 255, 0.7);
+}
+.editor_inspect_header {
+    height: 10px;
+    line-height: 10px;
+    padding-right: 3px;
+    font-size: 6pt;
+    text-align: right;
+    background: lightGray;
+    color: #475466;
+    cursor: pointer;
+}
+.editor_inspect_header::after {
+    content: " \25BE";
+}
+.editor_inspect_collapsed > .editor_inspect_header::after {
+    content: " \25B8";
+}
+.editor_inspect_collapsed > .editor_inspect_body {
+    display: none;
+}
+.editor_inspect_form {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 3px 3px 16px 3px;
+}
+.editor_inspect_row {
+    display: flex;
+    gap: 3px;
+}
+.editor_inspect_row label {
+    flex: 1;
+    line-height: 24px;
+    font-size: 8pt;
+    color: #475466;
+    white-space: nowrap;
+}
+.editor_inspect_row input {
+    box-sizing: border-box;
+    width: 54px;
+    height: 24px;
+    padding: 2px;
+    border: 1px solid #c8c8c8;
+    border-radius: 2px;
+    background: #eeeeee;
+    font-size: 8pt;
+}
+.editor_inspect_row input[type=text] {
+    width: 183px;
+}
+.editor_inspect_row select {
+    flex: 1;
+    min-width: 0;
+    height: 500px;
+    border: none;
+    outline: none;
+    background: rgba(255, 255, 255, 0.6);
+    font-size: 8pt;
+}
+.editor_inspect_row option {
+    padding: 4px;
+}
 .editor_nodes_menu {
     position: fixed;
     padding: 2px 0;

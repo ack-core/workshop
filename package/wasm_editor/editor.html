@@ -37,7 +37,36 @@
             <div class="editor_nodes_tree" id="node_tree" onclick="if (event.target == this) uiBindings.spaceClick(event)"></div>
             <div class="editor_nodes_menu" id="add_node_menu" hidden></div>
         </div>
-        <div class="inspect" id="inspect"></div>
+        <div class="inspect" id="inspect">
+            <div class="editor_inspect_section" id="node_0" hidden>
+                <div class="editor_inspect_header" onclick="uiBindings.inspectToggle(this)">Parameters</div>
+                <div class="editor_inspect_body editor_inspect_form">
+                    <div class="editor_inspect_row">
+                        <label>Name:</label>
+                        <input type="text" id="inspect_node_name" onchange="uiBindings.nodeName(this)">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Position:</label>
+                        <input type="number" id="inspect_node_x" step="0.1" min="-9999" max="9999" onchange="uiBindings.nodeMove()">
+                        <input type="number" id="inspect_node_y" step="0.1" min="-9999" max="9999" onchange="uiBindings.nodeMove()">
+                        <input type="number" id="inspect_node_z" step="0.1" min="-9999" max="9999" onchange="uiBindings.nodeMove()">
+                    </div>
+                </div>
+            </div>
+            <div class="editor_inspect_section" id="node_1_resource_list" hidden>
+                <div class="editor_inspect_header" onclick="uiBindings.inspectToggle(this)">Resource List</div>
+                <div class="editor_inspect_body editor_inspect_form">
+                    <div class="editor_inspect_row">
+                        <select id="node_resource_list" size="20" onchange="uiEditor.sendMsg('editor.setPath', this.value)"></select>
+                        <div class="editor_nodes_buttons">
+                            <button class="editor_top_button" title="Edit resource" onclick="uiBindings.nodeStartEdit()">&#x1F6E0;</button>
+                            <button class="editor_top_button" title="Clone resource" onclick="uiBindings.cloneResource()">&#x2FFB;</button>
+                            <button class="editor_top_button" title="Delete resource" onclick="uiBindings.deleteResource()">&#x274C;</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="text/javascript" charset="utf-8">
@@ -83,7 +112,6 @@
         var uiNodeTree = null;
         var uiNodeName = null;
         var uiNodeTree = null;
-        var uiInspectPanel = null;
         var uiInspectType = null;
         var uiResourceList = null;
         var listResources = {
@@ -206,10 +234,28 @@
                 return true;
             },
             setElementValue: function(name, value) {
+                const d = document.getElementById(name);
+                if (d) {
+                    d.value = d.defaultValue = value;
+                    return;
+                }
                 const e = $$(name);
                 e.blockEvent();
                 e.setValue(value);
                 e.unblockEvent();
+            },
+            showSection: function(id, show) {
+                document.getElementById(id).hidden = !show;
+            },
+            addInspectSection: function(config) {
+                const section = document.createElement("div");
+                section.className = "editor_inspect_section";
+                section.id = config.id;
+                section.innerHTML = '<div class="editor_inspect_header" onclick="uiBindings.inspectToggle(this)">' + config.header + '</div><div class="editor_inspect_body"></div>';
+                document.getElementById("inspect").appendChild(section);
+                webix.ui({ container: section.lastElementChild, ...config.body });
+                section.classList.toggle("editor_inspect_collapsed", !!config.collapsed);
+                section.hidden = true;
             },
             nodeTreeItem: function(id) {
                 return uiNodeTree.querySelector('[data-id="' + id + '"]');
@@ -335,10 +381,10 @@
             resourceDiscardAndExit: function(e) {
                 uiEditor.sendMsg("editor.stopEditing", "");
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
-                    $$(item).hide();
+                    utility.showSection(item, false);
                 });
                 document.getElementById("edit_resource_buttons").hidden = true;
-                $$("node_1_resource_list").show();
+                utility.showSection("node_1_resource_list", true);
             },
             treeNewNode: function(e) {
                 const rect = e.getBoundingClientRect();
@@ -368,22 +414,25 @@
                 utility.unselectNode();
                 uiEditor.sendMsg("editor.clearNodeSelection", "");
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
-                    $$(item).hide();
+                    utility.showSection(item, false);
                 });
                 uiInspectMappingBasic.forEach(item => {
-                    $$(item).hide();
+                    utility.showSection(item, false);
                 });
             },
-            nodeName: function(e, nv, old) {
-                if (/^(?!\.)[A-Za-z0-9_.]+(?<!\.)$/.test(nv)) {
-                    uiEditor.sendMsg("editor.renameNode", old + " " + nv);
+            inspectToggle: function(e) {
+                e.parentNode.classList.toggle("editor_inspect_collapsed");
+            },
+            nodeName: function(e) {
+                if (/^(?!\.)[A-Za-z0-9_.]+(?<!\.)$/.test(e.value)) {
+                    uiEditor.sendMsg("editor.renameNode", e.defaultValue + " " + e.value);
                 }
                 else {
-                    utility.setElementValue(e.data.id, old);
+                    e.value = e.defaultValue;
                 }
             },
-            nodeMove: function(e, nv, old) {
-                let args = $$("inspect_node_x").getValue() + " " + $$("inspect_node_y").getValue() + " " + $$("inspect_node_z").getValue()
+            nodeMove: function() {
+                let args = ["x", "y", "z"].map(a => document.getElementById("inspect_node_" + a).value).join(" ");
                 uiEditor.sendMsg("editor.moveNode", args);
             },
             nodeStartEdit: function(e) {
@@ -393,7 +442,7 @@
                 uiEditor.sendMsg("editor.savePrefab", "");
             },
             deleteResource: async function(e) {
-                let path = uiResourceList.getSelectedId();
+                let path = uiResourceList.value;
                 if (path.length) {
                     try {
                         let [dir, name] = await utility.getPathDirectoryAndName(dirResources, path);
@@ -406,12 +455,12 @@
                     catch (error) {}
                 }
                 listResources[uiInspectType] = listResources[uiInspectType].filter(item => item !== path);
-                uiResourceList.remove(path);
+                uiResourceList.selectedOptions[0]?.remove();
                 uiEditor.sendMsg("editor.setPath", "");
                 uiEditor["engine.refresh"]();
             },
             cloneResource: async function(e) {
-                let path = uiResourceList.getSelectedId();
+                let path = uiResourceList.value;
                 if (path.length) {
                     webix.prompt({
                         title: "Clone with a new name", ok: "Clone", cancel: "Cancel", input: { value: path }
@@ -439,8 +488,8 @@
                         catch (error) {}
                         await utility.updateResourcesList();
                         await utility.hostUpdateResources(() => {
-                            if (!uiResourceList.exists(newPath)) {
-                                uiResourceList.add({ id: newPath, value: newPath });
+                            if (![...uiResourceList.options].some(o => o.value == newPath)) {
+                                uiResourceList.add(new Option(newPath));
                             }
                             $$("processing_popup").hide();
                         });
@@ -449,54 +498,6 @@
             }
         }
         
-        webix.ui({
-            id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true, width: 240,
-            rows: [
-                {
-                    id: "node_0", view: "accordionitem", hidden: true, header: "Parameters", headerHeight: 10, headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
-                    body: {
-                        padding: 3,
-                        rows: [
-                            {cols: [
-                                elements.label("Name:"), {},
-                                elements.text("inspect_node_name", "", 183, false, uiBindings.nodeName),
-                            ]},
-                            {cols: [
-                                elements.label("Position:"),
-                                {},
-                                elements.number("inspect_node_x", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiBindings.nodeMove),
-                                elements.number("inspect_node_y", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiBindings.nodeMove),
-                                elements.number("inspect_node_z", null, 54, "11111.0", 0.0, 0.1, -9999.0, 9999.0, uiBindings.nodeMove),
-                            ]},
-                            { height: 16 }
-                        ]
-                    }
-                },
-                {
-                    id: "node_1_resource_list", view: "accordionitem", hidden: true, header: "Resource List", headerHeight: 10, headerAltHeight: 10,
-                    css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
-                    body: {
-                        padding: 3,
-                        cols: [
-                            {rows: [
-                                elements.list("node_resource_list", 500, (obj, path) => { uiEditor.sendMsg("editor.setPath", path); }),
-                                { height: 16 }
-                            ]},
-                            {
-                                width: 28,
-                                css: {"margin-left": "3px !important"},
-                                rows: [
-                                    elements.button("\uD83D\uDEE0", "Edit resource", uiBindings.nodeStartEdit),
-                                    elements.button("\u2FFB", "Clone resource", uiBindings.cloneResource),
-                                    elements.button("\u274C", "Delete resource", uiBindings.deleteResource)
-                                ]
-                            }
-                        ]
-                    }
-                }
-            ]
-        });
         webix.ui({
             view: "popup",
             id: "processing_popup",
@@ -524,8 +525,7 @@
         }, true);
 
         uiNodeTree = document.getElementById("node_tree");
-        uiInspectPanel = $$("inspect_panel");
-        uiResourceList = $$("node_resource_list");
+        uiResourceList = document.getElementById("node_resource_list");
 
         function registerMeshResource() {
             listResFunctions.push(async function() {
@@ -566,9 +566,8 @@
             };
 
             utility.addNodeMenuItem("10", "Add Voxel Mesh");
-            $$("inspect_panel").addView({
-                id: "voxel_mesh_edit_0", view: "accordionitem", hidden: true, header: "Edit Mesh", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "voxel_mesh_edit_0", header: "Edit Mesh",
                 body: {
                     padding: 3,
                     rows: [
@@ -583,9 +582,8 @@
                     ]
                 }
             });
-            $$("inspect_panel").addView({
-                id: "voxel_mesh_edit_1", view: "accordionitem", hidden: true, header: "Animation", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "voxel_mesh_edit_1", header: "Animation",
                 body: {
                     padding: 3,
                     rows: [
@@ -649,10 +647,10 @@
             }
             uiEditor["engine.mesh.editing"] = function(data) {
                 $$("inspect_mesh_anim_list").clearAll();
-                $$("node_1_resource_list").hide();
+                utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_mesh"].forEach(item => {
-                    $$(item).show();
+                    utility.showSection(item, true);
                 });
                 const [x, y, z] = data.split(' ');
                 Object.entries({inspect_mesh_cx: x, inspect_mesh_cy: y, inspect_mesh_cz: z}).forEach(([k, v]) => {
@@ -672,9 +670,8 @@
             // bindings
 
             utility.addNodeMenuItem("12", "Add Ground Mesh");
-            $$("inspect_panel").addView({
-                id: "ground_edit_0", view: "accordionitem", hidden: true, header: "Edit Ground", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "ground_edit_0", header: "Edit Ground",
                 body: {
                     padding: 3,
                     rows: [
@@ -687,10 +684,10 @@
             });
             
             uiEditor["engine.ground.editing"] = function(data) {
-                $$("node_1_resource_list").hide();
+                utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_ground"].forEach(item => {
-                    $$(item).show();
+                    utility.showSection(item, true);
                 });
             }
         }
@@ -773,9 +770,8 @@
 
 
             utility.addNodeMenuItem("20", "Add Particles");
-            $$("inspect_panel").addView({
-                id: "particles_edit_0", view: "accordionitem", hidden: true, header: "Emission", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "particles_edit_0", header: "Emission",
                 body: {
                     padding: 3,
                     rows: [
@@ -808,9 +804,8 @@
                     ]
                 }
             });
-            $$("inspect_panel").addView({
-                id: "particles_edit_1", view: "accordionitem", hidden: true, header: "Visual", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "particles_edit_1", header: "Visual",
                 body: {
                     padding: 3,
                     rows: [
@@ -860,9 +855,8 @@
                     ]
                 }
             });
-            $$("inspect_panel").addView({
-                id: "particles_edit_2", view: "accordionitem", hidden: true, header: "Dynamic", collapsed: true, headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "particles_edit_2", header: "Dynamic", collapsed: true,
                 body: {
                     padding: 3,
                     rows: [
@@ -881,11 +875,11 @@
             });
 
             uiEditor["engine.particles.editing"] = function(data) {
-                $$("node_1_resource_list").hide();
+                utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_particles"].forEach(item => {
-                    $$(item).show();
-                    $$(item).expand();
+                    utility.showSection(item, true);
+                    document.getElementById(item).classList.remove("editor_inspect_collapsed");
                 });
 
                 $$("inspect_ptc_texture").getList().clearAll();
@@ -971,9 +965,8 @@
             };
 
             utility.addNodeMenuItem("30", "Add Raycast Shape");
-            $$("inspect_panel").addView({
-                id: "raycast_edit_0", view: "accordionitem", hidden: true, header: "Edit Raycast Shape", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "raycast_edit_0", header: "Edit Raycast Shape",
                 body: {
                     padding: 3,
                     rows: [
@@ -1046,11 +1039,11 @@
             }
             uiEditor["engine.raycast.editing"] = function(data) {
                 $$("inspect_raycast_shape_pointlist").clearAll();
-                $$("node_1_resource_list").hide();
+                utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 utility.setElementValue("inspect_raycast_shape_type", data);
                 uiInspectMappingEdit["inspect_raycast"].forEach(item => {
-                    $$(item).show();
+                    utility.showSection(item, true);
                 });
             }
         }
@@ -1101,9 +1094,8 @@
             };
 
             utility.addNodeMenuItem("31", "Add Collision Shape");
-            $$("inspect_panel").addView({
-                id: "collision_edit_0", view: "accordionitem", hidden: true, header: "Edit Collision Shape", headerHeight: 10, headerAltHeight: 10,
-                css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
+            utility.addInspectSection({
+                id: "collision_edit_0", header: "Edit Collision Shape",
                 body: {
                     padding: 3,
                     rows: [
@@ -1163,10 +1155,10 @@
             uiEditor["engine.collision.editing"] = function(data) {
                 const [type, panel] = data.split(' ');
                 $$("inspect_collision_shape_pointlist").clearAll();
-                $$("node_1_resource_list").hide();
+                utility.showSection("node_1_resource_list", false);
                 document.getElementById("edit_resource_buttons").hidden = false;
                 uiInspectMappingEdit["inspect_collision"].forEach(item => {
-                    $$(item).show();
+                    utility.showSection(item, true);
                 });
                 $$("collision_edit_0_actor").hide();
                 $$("collision_edit_0_obstacle").hide();
@@ -1271,20 +1263,14 @@
                 const [name, panel, arg0] = data.split(' ');
 
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
-                    $$(item).hide();
+                    utility.showSection(item, false);
                 });
                 uiInspectMappingBasic.forEach(item => {
-                    $$(item).show();
+                    utility.showSection(item, true);
                 });
 
-                uiResourceList.clearAll();
-                uiResourceList.parse(listResources[panel]);
-                if (uiResourceList.exists(arg0)) {
-                    uiResourceList.select(arg0);
-                }
-                else {
-                    uiResourceList.unselectAll();
-                }
+                uiResourceList.replaceChildren(...listResources[panel].map(p => new Option(p)));
+                uiResourceList.value = arg0;
 
                 uiInspectType = panel;
                 utility.setElementValue("inspect_node_name", name);
@@ -1299,7 +1285,7 @@
                     utility.addItemToNodeTree(nv, isPrefab);
                 }
                 else {
-                    utility.setElementValue($$("inspect_node_name"), old);
+                    utility.setElementValue("inspect_node_name", old);
                 }
             }
             uiEditor["engine.nodeCoordinates"] = function(data) {
@@ -1318,10 +1304,10 @@
                     uiEditor.sendMsg("editor.reloadResources", data);
                 });
                 uiInspectMappingEdit[uiInspectType].forEach(item => {
-                    $$(item).hide();
+                    utility.showSection(item, false);
                 });
                 uiInspectMappingBasic.forEach(item => {
-                    $$(item).show();
+                    utility.showSection(item, true);
                 });
 
                 document.getElementById("edit_resource_buttons").hidden = true;
