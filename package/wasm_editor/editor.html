@@ -34,7 +34,8 @@
                 <button class="editor_top_button" title="Delete node" onclick="uiBindings.treeDeleteNode()">&#x274C;</button>
                 <button class="editor_top_button" title="Save prefab" onclick="uiBindings.prefabSave()">&#x1F4BE;</button>
             </div>
-            <div class="editor_nodes_tree" id="node_tree"></div>
+            <div class="editor_nodes_tree" id="node_tree" onclick="if (event.target == this) uiBindings.spaceClick(event)"></div>
+            <div class="editor_nodes_menu" id="add_node_menu" hidden></div>
         </div>
         <div class="inspect" id="inspect"></div>
     </div>
@@ -224,6 +225,15 @@
                 utility.nodeTreeItem(id).firstElementChild.classList.add("editor_nodes_selected");
                 uiBindings.treeNodeSelected(id);
             },
+            showNodeMenu: function(x, y) {
+                const menu = document.getElementById("add_node_menu");
+                menu.style.left = x + "px";
+                menu.style.top = y + "px";
+                menu.hidden = false;
+            },
+            addNodeMenuItem: function(id, value) {
+                document.getElementById("add_node_menu").insertAdjacentHTML("beforeend", '<div class="editor_nodes_menu_item" onclick="uiBindings.createNode(\'' + id + '\')">' + value + '</div>');
+            },
             insertItemToNodeTree: function(name) {
                 var parent = uiNodeTree;
                 var current = null;
@@ -234,7 +244,7 @@
                         item = document.createElement("div");
                         item.className = "editor_nodes_item";
                         item.dataset.id = current;
-                        item.innerHTML = '<div class="editor_nodes_row"><span class="editor_nodes_toggle"></span><input type="checkbox">' + node + '</div><div class="editor_nodes_children"></div>';
+                        item.innerHTML = '<div class="editor_nodes_row"><span class="editor_nodes_toggle" onclick="uiBindings.treeNodeToggle(this)"></span><input type="checkbox"><span onclick="uiBindings.treeNodeClick(this)">' + node + '</span></div><div class="editor_nodes_children"></div>';
                         parent.appendChild(item);
                     }
                     item.classList.remove("editor_nodes_closed");
@@ -331,7 +341,18 @@
                 $$("node_1_resource_list").show();
             },
             treeNewNode: function(e) {
-                $$("add_node_menu").show(e, {pos: "right"});
+                const rect = e.getBoundingClientRect();
+                utility.showNodeMenu(rect.right, rect.top);
+            },
+            treeNodeToggle: function(e) {
+                e.closest(".editor_nodes_item").classList.toggle("editor_nodes_closed");
+            },
+            treeNodeClick: function(e) {
+                utility.selectNode(e.closest(".editor_nodes_item").dataset.id);
+            },
+            createNode: function(id) {
+                document.getElementById("add_node_menu").hidden = true;
+                uiEditor.sendMsg("editor.createNode", id);
             },
             treeDeleteNode: function(e) {
                 uiEditor.sendMsg("editor.deleteNode", utility.selectedNodeId());
@@ -429,20 +450,6 @@
         }
         
         webix.ui({
-            id: "add_node_menu", container: "editor", view: "contextmenu", master: "nodes",
-            data: [],
-            submenuConfig: {
-                type: {
-                    height: 22
-                },
-            },
-            on: {
-                onMenuItemClick: function(id, e, node) {
-                    uiEditor.sendMsg("editor.createNode", id);
-                }
-            }
-        });
-        webix.ui({
             id: "inspect_panel", container: "inspect", view: "accordion", type: "clean", multi: true, borderless: true, width: 240,
             rows: [
                 {
@@ -507,19 +514,16 @@
         });
         webix.message.position = "bottom";
 
-        uiNodeTree = document.getElementById("node_tree");
-        uiNodeTree.addEventListener("click", (e) => {
-            const row = e.target.closest(".editor_nodes_row");
-            if (row == null) {
-                if (e.target == uiNodeTree) uiBindings.spaceClick(e);
-            }
-            else if (e.target.classList.contains("editor_nodes_toggle")) {
-                row.parentNode.classList.toggle("editor_nodes_closed");
-            }
-            else if (e.target.type != "checkbox") {
-                utility.selectNode(row.parentNode.dataset.id);
-            }
+        const uiNodeMenu = document.getElementById("add_node_menu");
+        document.getElementById("nodes").addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            utility.showNodeMenu(e.clientX, e.clientY);
         });
+        document.addEventListener("pointerdown", (e) => {
+            if (!uiNodeMenu.contains(e.target)) uiNodeMenu.hidden = true;
+        }, true);
+
+        uiNodeTree = document.getElementById("node_tree");
         uiInspectPanel = $$("inspect_panel");
         uiResourceList = $$("node_resource_list");
 
@@ -561,7 +565,7 @@
                 uiEditor.sendMsg("editor.mesh.animationPlay", "1");
             };
 
-            $$("add_node_menu").add({ id: "10", value: "Add Voxel Mesh" });
+            utility.addNodeMenuItem("10", "Add Voxel Mesh");
             $$("inspect_panel").addView({
                 id: "voxel_mesh_edit_0", view: "accordionitem", hidden: true, header: "Edit Mesh", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -667,7 +671,7 @@
 
             // bindings
 
-            $$("add_node_menu").add({ id: "12", value: "Add Ground Mesh" });
+            utility.addNodeMenuItem("12", "Add Ground Mesh");
             $$("inspect_panel").addView({
                 id: "ground_edit_0", view: "accordionitem", hidden: true, header: "Edit Ground", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -768,7 +772,7 @@
             };
 
 
-            $$("add_node_menu").add({ id: "20", value: "Add Particles" });
+            utility.addNodeMenuItem("20", "Add Particles");
             $$("inspect_panel").addView({
                 id: "particles_edit_0", view: "accordionitem", hidden: true, header: "Emission", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -966,7 +970,7 @@
                 uiEditor.sendMsg("editor.raycast.pointArgs", args);
             };
 
-            $$("add_node_menu").add({ id: "30", value: "Add Raycast Shape" });
+            utility.addNodeMenuItem("30", "Add Raycast Shape");
             $$("inspect_panel").addView({
                 id: "raycast_edit_0", view: "accordionitem", hidden: true, header: "Edit Raycast Shape", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -1096,7 +1100,7 @@
                 uiEditor.sendMsg("editor.collision.pointArgs", args);
             };
 
-            $$("add_node_menu").add({ id: "31", value: "Add Collision Shape" });
+            utility.addNodeMenuItem("31", "Add Collision Shape");
             $$("inspect_panel").addView({
                 id: "collision_edit_0", view: "accordionitem", hidden: true, header: "Edit Collision Shape", headerHeight: 10, headerAltHeight: 10,
                 css: { "background" : "rgba(255, 255, 255, 0.7)", "color" : "lightGray" },
@@ -1206,7 +1210,7 @@
             uiInspectMappingEdit["inspect_prefab"] = [];
             resourcesExtMapping["inspect_prefab"] = [".txt"];
 
-            $$("add_node_menu").add({ id: "0", value: "Add Prefab" });
+            utility.addNodeMenuItem("0", "Add Prefab");
             
             uiEditor["engine.prefab.editFail"] = function(data) {
                 webix.alert("Attempt to edit a prefab with the root node '" + data + "'. But the tree already has a node with that name");
