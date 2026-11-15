@@ -650,20 +650,13 @@
             uiInspectMappingEdit["inspect_ground"] = ["ground_edit_0"];
             resourcesExtMapping["inspect_ground"] = [".png"];
 
-            // bindings
-
             utility.addNodeMenuItem("12", "Add Ground Mesh");
             utility.addInspectSection({
                 id: "ground_edit_0", header: "Edit Ground",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("TODO"),
-                        ]},
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>TODO</label>
+                    </div>`
             });
             
             uiEditor["engine.ground.editing"] = function(data) {
@@ -1188,7 +1181,7 @@
             utility.addNodeMenuItem("0", "Add Prefab");
             
             uiEditor["engine.prefab.editFail"] = function(data) {
-                webix.alert("Attempt to edit a prefab with the root node '" + data + "'. But the tree already has a node with that name");
+                alert("Attempt to edit a prefab with the root node '" + data + "'. But the tree already has a node with that name");
             }
             uiEditor["engine.prefab.editing"] = function(data) {
                 uiEditor.sendMsg("editor.stopEditing", "");
