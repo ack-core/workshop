@@ -234,15 +234,17 @@
                 return true;
             },
             setElementValue: function(name, value) {
-                const d = document.getElementById(name);
-                if (d) {
-                    d.value = d.defaultValue = value;
-                    return;
+                const e = document.getElementById(name);
+                if (e.type == "checkbox") {
+                    e.checked = value;
                 }
-                const e = $$(name);
-                e.blockEvent();
-                e.setValue(value);
-                e.unblockEvent();
+                else {
+                    e.value = e.defaultValue = value;
+                }
+            },
+            elementValue: function(name) {
+                const e = document.getElementById(name);
+                return e.type == "checkbox" ? +e.checked : e.value;
             },
             showSection: function(id, show) {
                 document.getElementById(id).hidden = !show;
@@ -251,15 +253,8 @@
                 const section = document.createElement("div");
                 section.className = "editor_inspect_section";
                 section.id = config.id;
-                section.innerHTML = '<div class="editor_inspect_header" onclick="uiBindings.inspectToggle(this)">' + config.header + '</div><div class="editor_inspect_body"></div>';
+                section.innerHTML = '<div class="editor_inspect_header" onclick="uiBindings.inspectToggle(this)">' + config.header + '</div><div class="editor_inspect_body editor_inspect_form">' + config.html + '</div>';
                 document.getElementById("inspect").appendChild(section);
-                if (config.html) {
-                    section.lastElementChild.classList.add("editor_inspect_form");
-                    section.lastElementChild.innerHTML = config.html;
-                }
-                else {
-                    webix.ui({ container: section.lastElementChild, ...config.body });
-                }
                 section.classList.toggle("editor_inspect_collapsed", !!config.collapsed);
                 section.hidden = true;
             },
@@ -331,7 +326,9 @@
             },
             addItemToNodeTree: function(name, isPrefab) {
                 utility.insertItemToNodeTree(name);
-                utility.nodeTreeItem(name).classList.toggle("editor_nodes_prefab", !!isPrefab);
+                if (isPrefab) {
+                    utility.nodeTreeItem(name).classList.add("editor_nodes_prefab");
+                }
                 utility.selectNode(name);
             },
             hostUpdateResources: async function(handler) {
@@ -464,7 +461,7 @@
                 }
             },
             nodeMove: function() {
-                let args = ["x", "y", "z"].map(a => document.getElementById("inspect_node_" + a).value).join(" ");
+                let args = utility.elementValue("inspect_node_x") + " " + utility.elementValue("inspect_node_y") + " " + utility.elementValue("inspect_node_z");
                 uiEditor.sendMsg("editor.moveNode", args);
             },
             nodeStartEdit: function(e) {
@@ -541,7 +538,7 @@
                     left: 20, right: 20
                 },
                 rows: [
-                    elements.label("Processing...")
+                    { view: "label", label: "Processing..." }
                 ]
             }
         });
@@ -569,7 +566,7 @@
             resourcesExtMapping["inspect_mesh"] = [".vox", ".txt"];
 
             uiBindings.meshOffset = function() {
-                let args = ["cx", "cy", "cz"].map(a => document.getElementById("inspect_mesh_" + a).value).join(" ");
+                let args = utility.elementValue("inspect_mesh_cx") + " " + utility.elementValue("inspect_mesh_cy") + " " + utility.elementValue("inspect_mesh_cz");
                 uiEditor.sendMsg("editor.mesh.offset", args);
             };
             uiBindings.meshAddAnimation = function() {
@@ -589,7 +586,8 @@
                 }
             };
             uiBindings.meshAnimationParameters = function() {
-                let args = ["name", "first", "last", "time"].map(a => document.getElementById("inspect_mesh_anim_" + a).value).join(" ");
+                let args = utility.elementValue("inspect_mesh_anim_name") + " " + utility.elementValue("inspect_mesh_anim_first") + " ";
+                args += utility.elementValue("inspect_mesh_anim_last") + " " + utility.elementValue("inspect_mesh_anim_time");
                 uiEditor.sendMsg("editor.mesh.animationParameters", args);
             };
             uiBindings.meshAnimationPlay = function() {
@@ -694,26 +692,8 @@
             }
         }
         function registerParticlesResource() {
-            const uiPtcFrameType = [
-                { id: 1, value: "10"}, 
-                { id: 2, value: "20"},
-                { id: 3, value: "50"},
-                { id: 4, value: "100"},
-            ];
-            const uiPtcShapeTypes = [
-                { id: 1, value: "Disk"}, 
-                { id: 2, value: "Box"}
-            ];
-            const uiPtcShapeDistribution = [
-                { id: 1, value: "Random"}, 
-                { id: 2, value: "Shuffled"},
-                { id: 3, value: "Linear"}
-            ];
-            const uiPtcOrientation = [
-                { id: 1, value: "Camera"}, 
-                { id: 2, value: "Axis"},
-                { id: 3, value: "World"}
-            ];
+            const shapeTypeOptions = '<option value="1">Disk</option><option value="2">Box</option>';
+            const graphs = {};
             var listParticleTextures = [];
 
             listResFunctions.push(async function() {
@@ -726,154 +706,151 @@
             uiInspectMappingEdit["inspect_particles"] = ["particles_edit_0", "particles_edit_1", "particles_edit_2"];
             resourcesExtMapping["inspect_particles"] = [".txt", ".tga"];
 
-            uiBindings.particlesEmission = function(e, nv, old) {
-                if (e.data.id == "inspect_ptc_lifetime") {
-                    let isLooped = parseInt($$("inspect_ptc_looped").getValue());
-                    if (isLooped && parseInt(nv) > parseInt($$("inspect_ptc_emission_time").getValue())) {
-                        utility.setElementValue(e.data.id, old);
+            uiBindings.particlesEmission = function(e) {
+                if (e.id == "inspect_ptc_lifetime") {
+                    let isLooped = document.getElementById("inspect_ptc_looped").checked;
+                    if (isLooped && parseInt(e.value) > parseInt(utility.elementValue("inspect_ptc_emission_time"))) {
+                        e.value = e.defaultValue;
                     }
+                    e.defaultValue = e.value;
                 }
-                if (e.data.id == "inspect_ptc_looped") {
-                    let lifeTime = parseInt($$("inspect_ptc_lifetime").getValue());
-                    let emissionTime = parseInt($$("inspect_ptc_emission_time").getValue())
-                    if (nv && lifeTime > emissionTime) {
+                if (e.id == "inspect_ptc_looped") {
+                    let lifeTime = parseInt(utility.elementValue("inspect_ptc_lifetime"));
+                    let emissionTime = parseInt(utility.elementValue("inspect_ptc_emission_time"));
+                    if (e.checked && lifeTime > emissionTime) {
                         utility.setElementValue("inspect_ptc_lifetime", emissionTime);
                     }
                 }
-                let args = $$("inspect_ptc_emission_time").getValue() + " " + $$("inspect_ptc_lifetime").getValue() + " ";
-                args += $$("inspect_ptc_baking_time").getValue() + " " + $$("inspect_ptc_count").getValue() + " " + $$("inspect_ptc_looped").getValue() + " ";
-                args += $$("inspect_ptc_rnd_seed").getValue();
+                let args = utility.elementValue("inspect_ptc_emission_time") + " " + utility.elementValue("inspect_ptc_lifetime") + " ";
+                args += utility.elementValue("inspect_ptc_baking_time") + " " + utility.elementValue("inspect_ptc_count") + " " + utility.elementValue("inspect_ptc_looped") + " ";
+                args += utility.elementValue("inspect_ptc_rnd_seed");
                 uiEditor.sendMsg("editor.particles.emission", args);
             };
-            uiBindings.particlesVisual = function(e, nv, old) {
-                let args = $$("inspect_ptc_sshape_type").getValue() + " " + $$("inspect_ptc_sshape_fill").getValue() + " ";
-                args += $$("inspect_ptc_sshape_arg0").getValue() + " " + $$("inspect_ptc_sshape_arg1").getValue() + " " + $$("inspect_ptc_sshape_arg2").getValue() + " ";
-                args += $$("inspect_ptc_eshape_type").getValue() + " " + $$("inspect_ptc_eshape_fill").getValue() + " ";
-                args += $$("inspect_ptc_eshape_arg0").getValue() + " " + $$("inspect_ptc_eshape_arg1").getValue() + " " + $$("inspect_ptc_eshape_arg2").getValue() + " ";
-                args += $$("inspect_ptc_end_offset_x").getValue() + " " + $$("inspect_ptc_end_offset_y").getValue() + " " + $$("inspect_ptc_end_offset_z").getValue() + " ";
-                args += $$("inspect_ptc_shape_distr").getValue() + " " + $$("inspect_ptc_orientation").getValue() + " " + $$("inspect_ptc_texture").getValue();
+            uiBindings.particlesVisual = function() {
+                let args = utility.elementValue("inspect_ptc_sshape_type") + " " + utility.elementValue("inspect_ptc_sshape_fill") + " ";
+                args += utility.elementValue("inspect_ptc_sshape_arg0") + " " + utility.elementValue("inspect_ptc_sshape_arg1") + " " + utility.elementValue("inspect_ptc_sshape_arg2") + " ";
+                args += utility.elementValue("inspect_ptc_eshape_type") + " " + utility.elementValue("inspect_ptc_eshape_fill") + " ";
+                args += utility.elementValue("inspect_ptc_eshape_arg0") + " " + utility.elementValue("inspect_ptc_eshape_arg1") + " " + utility.elementValue("inspect_ptc_eshape_arg2") + " ";
+                args += utility.elementValue("inspect_ptc_end_offset_x") + " " + utility.elementValue("inspect_ptc_end_offset_y") + " " + utility.elementValue("inspect_ptc_end_offset_z") + " ";
+                args += utility.elementValue("inspect_ptc_shape_distr") + " " + utility.elementValue("inspect_ptc_orientation") + " " + utility.elementValue("inspect_ptc_texture");
                 uiEditor.sendMsg("editor.particles.visual", args);
             };
-            uiBindings.particleEmissionGraph = function(e, points) {
-                uiEditor.sendMsg("editor.particles.emissionGraph", utility.pointsToString(points));
-            };
-            uiBindings.particleWidthGraph = function(e, points) {
-                uiEditor.sendMsg("editor.particles.widthGraph", utility.pointsToString(points));
-            };
-            uiBindings.particleHeightGraph = function(e, points) {
-                uiEditor.sendMsg("editor.particles.heightGraph", utility.pointsToString(points));
-            };
-            uiBindings.particleSpeedGraph = function(e, points) {
-                uiEditor.sendMsg("editor.particles.speedGraph", utility.pointsToString(points));
-            };
-            uiBindings.particleAlphaGraph = function(e, points) {
-                uiEditor.sendMsg("editor.particles.alphaGraph", utility.pointsToString(points));
-            };
-
 
             utility.addNodeMenuItem("20", "Add Particles");
             utility.addInspectSection({
                 id: "particles_edit_0", header: "Emission",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Particles emission time (ms):"), {},
-                            elements.number("inspect_ptc_emission_time", "", 60, "11111", 1000, 100, 100, 10000, uiBindings.particlesEmission),
-                        ]},
-                        elements.graphedit("inspect_ptc_emission_graph", "Emission", 1.0, 0.0, 1.0, 0.0, uiBindings.particleEmissionGraph),
-                        {cols: [
-                            elements.label("Particles life time (ms):"), {},
-                            elements.number("inspect_ptc_lifetime", "", 60, "11111", 1000, 100, 100, 10000, uiBindings.particlesEmission),
-                        ]},
-                        {cols: [
-                            elements.label("Baking frame time (ms):"), {},
-                            elements.combo("inspect_ptc_baking_time", 1, uiPtcFrameType, 60, uiBindings.particlesEmission),
-                        ]},
-                        {cols: [
-                            elements.label("Amount of particles to emit:"), {},
-                            elements.number("inspect_ptc_count", "", 60, "11111", 10, 1, 1, 1000, uiBindings.particlesEmission),
-                        ]},
-                        {cols: [
-                            elements.button("\u25b6", "Restart"), 
-                            elements.label("Looped:"),
-                            elements.checkbox("inspect_ptc_looped", false, uiBindings.particlesEmission), 
-                            elements.label("Seed:"),
-                            elements.number("inspect_ptc_rnd_seed", "", 70, "11111111", 100, 1, 0, 99999999, uiBindings.particlesEmission),
-                            elements.button("\uD83C\uDFB2", "Reroll")
-                        ]},
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Particles emission time (ms):</label>
+                        <input type="number" id="inspect_ptc_emission_time" style="width: 60px" step="100" min="100" max="10000" value="1000" onchange="uiBindings.particlesEmission(this)">
+                    </div>
+                    <div id="inspect_ptc_emission_graph"></div>
+                    <div class="editor_inspect_row">
+                        <label>Particles life time (ms):</label>
+                        <input type="number" id="inspect_ptc_lifetime" style="width: 60px" step="100" min="100" max="10000" value="1000" onchange="uiBindings.particlesEmission(this)">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Baking frame time (ms):</label>
+                        <select id="inspect_ptc_baking_time" style="width: 60px" onchange="uiBindings.particlesEmission(this)">
+                            <option value="1">10</option>
+                            <option value="2">20</option>
+                            <option value="3">50</option>
+                            <option value="4">100</option>
+                        </select>
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Amount of particles to emit:</label>
+                        <input type="number" id="inspect_ptc_count" style="width: 60px" step="1" min="1" max="1000" value="10" onchange="uiBindings.particlesEmission(this)">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <button class="editor_top_button" title="Restart">&#x25B6;</button>
+                        <label>Looped:</label>
+                        <input type="checkbox" id="inspect_ptc_looped" onchange="uiBindings.particlesEmission(this)">
+                        <label>Seed:</label>
+                        <input type="number" id="inspect_ptc_rnd_seed" style="width: 70px" step="1" min="0" max="99999999" value="100" onchange="uiBindings.particlesEmission(this)">
+                        <button class="editor_top_button" title="Reroll">&#x1F3B2;</button>
+                    </div>`
             });
             utility.addInspectSection({
                 id: "particles_edit_1", header: "Visual",
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Start shape type:"), { width: 17 },
-                            elements.combo("inspect_ptc_sshape_type", 1, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
-                            elements.label("Fill:"),
-                            elements.checkbox("inspect_ptc_sshape_fill", false, uiBindings.particlesVisual)
-                        ]},
-                        {cols: [
-                            elements.label("Start shape args:"), {},
-                            elements.number("inspect_ptc_sshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                            elements.number("inspect_ptc_sshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                            elements.number("inspect_ptc_sshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                        ]},
-                        {cols: [
-                            elements.label("End shape type:"), {  },
-                            elements.combo("inspect_ptc_eshape_type", 1, uiPtcShapeTypes, 88, uiBindings.particlesVisual),
-                            elements.label("Fill:"),
-                            elements.checkbox("inspect_ptc_eshape_fill", false, uiBindings.particlesVisual)
-                        ]},
-                        {cols: [
-                            elements.label("End shape args:"), {},
-                            elements.number("inspect_ptc_eshape_arg0", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                            elements.number("inspect_ptc_eshape_arg1", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual),
-                            elements.number("inspect_ptc_eshape_arg2", "", 44, "11111.0", 0.0, 0.1, 0.0, 99.0, uiBindings.particlesVisual)
-                        ]},
-                        {cols: [
-                            elements.label("End shape offset:"), {},
-                            elements.number("inspect_ptc_end_offset_x", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
-                            elements.number("inspect_ptc_end_offset_y", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual),
-                            elements.number("inspect_ptc_end_offset_z", "", 44, "11111.0", 0.0, 0.1, -99.0, 99.0, uiBindings.particlesVisual)
-                        ]},
-                        {cols: [
-                            elements.label("Start-to-End Mapping:"), {},
-                            elements.combo("inspect_ptc_shape_distr", 1, uiPtcShapeDistribution, 106, uiBindings.particlesVisual),
-                        ]},
-                        {cols: [
-                            elements.label("Particle orientation:"), {},
-                            elements.combo("inspect_ptc_orientation", 1, uiPtcOrientation, 106, uiBindings.particlesVisual),
-                        ]},
-                        {cols: [
-                            elements.label("Texture:"), {},
-                            elements.combo("inspect_ptc_texture", "", listParticleTextures, 175, uiBindings.particlesVisual),
-                        ]},
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Start shape type:</label>
+                        <select id="inspect_ptc_sshape_type" style="width: 88px" onchange="uiBindings.particlesVisual()">${shapeTypeOptions}</select>
+                        <label>Fill:</label>
+                        <input type="checkbox" id="inspect_ptc_sshape_fill" onchange="uiBindings.particlesVisual()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Start shape args:</label>
+                        <input type="number" id="inspect_ptc_sshape_arg0" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.particlesVisual()">
+                        <input type="number" id="inspect_ptc_sshape_arg1" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.particlesVisual()">
+                        <input type="number" id="inspect_ptc_sshape_arg2" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.particlesVisual()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>End shape type:</label>
+                        <select id="inspect_ptc_eshape_type" style="width: 88px" onchange="uiBindings.particlesVisual()">${shapeTypeOptions}</select>
+                        <label>Fill:</label>
+                        <input type="checkbox" id="inspect_ptc_eshape_fill" onchange="uiBindings.particlesVisual()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>End shape args:</label>
+                        <input type="number" id="inspect_ptc_eshape_arg0" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.particlesVisual()">
+                        <input type="number" id="inspect_ptc_eshape_arg1" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.particlesVisual()">
+                        <input type="number" id="inspect_ptc_eshape_arg2" style="width: 44px" step="0.1" min="0" max="99" onchange="uiBindings.particlesVisual()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>End shape offset:</label>
+                        <input type="number" id="inspect_ptc_end_offset_x" style="width: 44px" step="0.1" min="-99" max="99" onchange="uiBindings.particlesVisual()">
+                        <input type="number" id="inspect_ptc_end_offset_y" style="width: 44px" step="0.1" min="-99" max="99" onchange="uiBindings.particlesVisual()">
+                        <input type="number" id="inspect_ptc_end_offset_z" style="width: 44px" step="0.1" min="-99" max="99" onchange="uiBindings.particlesVisual()">
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Start-to-End Mapping:</label>
+                        <select id="inspect_ptc_shape_distr" style="width: 106px" onchange="uiBindings.particlesVisual()">
+                            <option value="1">Random</option>
+                            <option value="2">Shuffled</option>
+                            <option value="3">Linear</option>
+                        </select>
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Particle orientation:</label>
+                        <select id="inspect_ptc_orientation" style="width: 106px" onchange="uiBindings.particlesVisual()">
+                            <option value="1">Camera</option>
+                            <option value="2">Axis</option>
+                            <option value="3">World</option>
+                        </select>
+                    </div>
+                    <div class="editor_inspect_row">
+                        <label>Texture:</label>
+                        <select id="inspect_ptc_texture" style="width: 175px" onchange="uiBindings.particlesVisual()"></select>
+                    </div>`
             });
             utility.addInspectSection({
                 id: "particles_edit_2", header: "Dynamic", collapsed: true,
-                body: {
-                    padding: 3,
-                    rows: [
-                        {cols: [
-                            elements.label("Change width and height together:"),
-                            { width: 39 },
-                            elements.checkbox("inspect_ptc_with_height_bind", false)
-                        ]},
-                        elements.graphedit("inspect_ptc_width_graph", "Width", 1.0, 0.0, 99.0, 99.0, uiBindings.particleWidthGraph),
-                        elements.graphedit("inspect_ptc_height_graph", "Height", 1.0, 0.0, 99.0, 99.0, uiBindings.particleHeightGraph),
-                        elements.graphedit("inspect_ptc_speed_graph", "Speed", 10.0, -999.0, 999.0, 999.0, uiBindings.particleSpeedGraph),
-                        elements.graphedit("inspect_ptc_alpha_graph", "Alpha", 1.0, 0.0, 1.0, 1.0, uiBindings.particleAlphaGraph),
-                        { height: 16 }
-                    ]
-                }
+                html: `
+                    <div class="editor_inspect_row">
+                        <label>Change width and height together:</label>
+                        <input type="checkbox" id="inspect_ptc_with_height_bind">
+                    </div>
+                    <div id="inspect_ptc_width_graph"></div>
+                    <div id="inspect_ptc_height_graph"></div>
+                    <div id="inspect_ptc_speed_graph"></div>
+                    <div id="inspect_ptc_alpha_graph"></div>`
+            });
+            graphs.emission = new GraphEdit(document.getElementById("inspect_ptc_emission_graph"), "Emission", 1.0, 0.0, 1.0, 0.0, (points) => {
+                uiEditor.sendMsg("editor.particles.emissionGraph", utility.pointsToString(points));
+            });
+            graphs.width = new GraphEdit(document.getElementById("inspect_ptc_width_graph"), "Width", 1.0, 0.0, 99.0, 99.0, (points) => {
+                uiEditor.sendMsg("editor.particles.widthGraph", utility.pointsToString(points));
+            });
+            graphs.height = new GraphEdit(document.getElementById("inspect_ptc_height_graph"), "Height", 1.0, 0.0, 99.0, 99.0, (points) => {
+                uiEditor.sendMsg("editor.particles.heightGraph", utility.pointsToString(points));
+            });
+            graphs.speed = new GraphEdit(document.getElementById("inspect_ptc_speed_graph"), "Speed", 10.0, -999.0, 999.0, 999.0, (points) => {
+                uiEditor.sendMsg("editor.particles.speedGraph", utility.pointsToString(points));
+            });
+            graphs.alpha = new GraphEdit(document.getElementById("inspect_ptc_alpha_graph"), "Alpha", 1.0, 0.0, 1.0, 1.0, (points) => {
+                uiEditor.sendMsg("editor.particles.alphaGraph", utility.pointsToString(points));
             });
 
             uiEditor["engine.particles.editing"] = function(data) {
@@ -884,8 +861,7 @@
                     document.getElementById(item).classList.remove("editor_inspect_collapsed");
                 });
 
-                $$("inspect_ptc_texture").getList().clearAll();
-                $$("inspect_ptc_texture").getList().parse(listParticleTextures);
+                document.getElementById("inspect_ptc_texture").replaceChildren(...listParticleTextures.map(p => new Option(p)));
 
                 let desc = utility.parseConfig(data);
                 utility.setElementValue("inspect_ptc_emission_time", desc.emissionTimeMs);
@@ -911,15 +887,19 @@
                 utility.setElementValue("inspect_ptc_orientation", desc.particleOrientation);
                 utility.setElementValue("inspect_ptc_texture", desc.texture);
 
-                let setGraphValue = (src, name) => {
-                    let graph = src.map((_, i, a) => i % 3 === 0 ? { x: a[i], value: a[i + 1], spread: a[i + 2] } : null).filter(Boolean);
-                    utility.setElementValue(name, graph);
+                let setGraphValue = (graph, data) => {
+                    const numbers = data.trim().split(" ").map(Number);
+                    const points = [];
+                    for (let i = 0; i < numbers.length; i += 3) {
+                        points.push({ x: numbers[i], value: numbers[i + 1], spread: numbers[i + 2] });
+                    }
+                    graph.setValue(points);
                 };
-                setGraphValue(desc.emissionGraphData.trim().split(" ").map(Number), "inspect_ptc_emission_graph");
-                setGraphValue(desc.widthGraphData.trim().split(" ").map(Number), "inspect_ptc_width_graph");
-                setGraphValue(desc.heightGraphData.trim().split(" ").map(Number), "inspect_ptc_height_graph");
-                setGraphValue(desc.speedGraphData.trim().split(" ").map(Number), "inspect_ptc_speed_graph");
-                setGraphValue(desc.alphaGraphData.trim().split(" ").map(Number), "inspect_ptc_alpha_graph");
+                setGraphValue(graphs.emission, desc.emissionGraphData);
+                setGraphValue(graphs.width, desc.widthGraphData);
+                setGraphValue(graphs.height, desc.heightGraphData);
+                setGraphValue(graphs.speed, desc.speedGraphData);
+                setGraphValue(graphs.alpha, desc.alphaGraphData);
             }
             uiEditor["engine.ptcEndOffset"] = function(data) {
                 const [x, y, z] = data.split(' ');
@@ -948,7 +928,9 @@
                 utility.removeListPoint("inspect_raycast_shape_pointlist", "editor.raycast.pointRemove", "editor.raycast.pointSelected");
             };
             uiBindings.raycastPointArgs = function() {
-                let args = ["point_x", "point_y", "point_z", "arg_x", "arg_y", "arg_z"].map(a => document.getElementById("inspect_raycast_shape_" + a).value).join(" ");
+                let args = utility.elementValue("inspect_raycast_shape_point_x") + " " + utility.elementValue("inspect_raycast_shape_point_y") + " ";
+                args += utility.elementValue("inspect_raycast_shape_point_z") + " " + utility.elementValue("inspect_raycast_shape_arg_x") + " ";
+                args += utility.elementValue("inspect_raycast_shape_arg_y") + " " + utility.elementValue("inspect_raycast_shape_arg_z");
                 uiEditor.sendMsg("editor.raycast.pointArgs", args);
             };
 
@@ -1012,7 +994,8 @@
                 "2": "obstacle",
             };
             const showCollisionPanel = function(panel) {
-                Object.values(uiCollisionPanelMap).forEach(p => utility.showSection("collision_edit_0_" + p, p == panel));
+                utility.showSection("collision_edit_0_actor", panel == "actor");
+                utility.showSection("collision_edit_0_obstacle", panel == "obstacle");
             };
 
             listResFunctions.push(async function() {
@@ -1029,7 +1012,8 @@
                 showCollisionPanel(uiCollisionPanelMap[e.value]);
             };
             uiBindings.collisionActorArgs = function() {
-                let args = ["mass", "radius", "height"].map(a => document.getElementById("inspect_collision_shape_" + a).value).join(" ");
+                let args = utility.elementValue("inspect_collision_shape_mass") + " ";
+                args += utility.elementValue("inspect_collision_shape_radius") + " " + utility.elementValue("inspect_collision_shape_height");
                 uiEditor.sendMsg("editor.collision.actorArgs", args);
             };
             uiBindings.collisionAddPoint = function() {
@@ -1039,7 +1023,7 @@
                 utility.removeListPoint("inspect_collision_shape_pointlist", "editor.collision.pointRemove", "editor.collision.pointSelected");
             };
             uiBindings.collisionPointArgs = function() {
-                let args = ["p1", "p2"].map(a => document.getElementById("inspect_collision_shape_" + a).value).join(" ");
+                let args = utility.elementValue("inspect_collision_shape_p1") + " " + utility.elementValue("inspect_collision_shape_p2");
                 uiEditor.sendMsg("editor.collision.pointArgs", args);
             };
 

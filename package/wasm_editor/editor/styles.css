@@ -130,7 +130,17 @@ html, body {
     flex-direction: column;
     gap: 3px;
 }
-.editor_inspect_row input, .editor_inspect_row select:not([size]) {
+.editor_inspect_row input[type=checkbox] {
+    align-self: center;
+}
+.editor_inspect_graph {
+    display: block;
+    width: 100%;
+    height: 70px;
+    margin-top: 3px;
+    background-color: #d0d0d0;
+}
+.editor_inspect_row input:not([type=checkbox]), .editor_inspect_row select:not([size]) {
     box-sizing: border-box;
     width: 54px;
     height: 24px;
