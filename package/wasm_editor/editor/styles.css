@@ -241,73 +241,32 @@ html, body {
 .editor_nodes_row input:checked {
     background: #DADEE0;
 }
-.webix_el_text input {
-    padding: 2px;
+.editor_processing {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.2);
 }
-.webix_inp_label, .webix_el_box {
-    font-size: 8pt !important;
+.editor_processing div {
+    padding: 16px 20px;
+    border-radius: 2px;
+    background: #f4f4f4;
+    color: #475466;
+    font-size: 8pt;
 }
-.webix_list_item, .webix_list .webix_list_item.webix_selected {
-    line-height: 20px;
-    padding-top: 0;
-}
-.webix_button {
-    padding: 0.5px 2px 0px 2px;
-    color: #000000 !important;
-    font-size: 12px;
-}
-.webix_popup_button.confirm {
-    background: #c8c8c8;
-}
-.webix_popup_button:hover {
-    background: #d8d8d8 !important;
-}
-.webix_secondary .webix_button {
-    background: #d8d8d8;
-}
-.webix_view {
-    white-space: nowrap;
-}
-.webix_view .webix_list {
-    background-color: rgba(255, 255, 255, 0.6);
-}
-.webix_el_text input {
-    background-color: #eeeeee;
-}
-.webix_el_combo input {
-    padding: 0px 2px 0px 2px !important;
-}
-.webix_el_combo .webix_input_icon {
-    width: 19px;
-}
-.webix_custom_checkbox {
-    margin-top: -2px;
-    color: #8888a3 !important;
-}
-.webix_accordionitem_button {
-    font-size: 10px !important;
-    width: 10px !important;
-    height: 10px !important;
-    color: #475466 !important;
-}
-.webix_accordionitem .webix_accordionitem_header {
-    line-height: 10px;
-    font-size: 6pt;
-    text-align: right;
-    background-color: lightGray;
-}
-.webix_accordionitem.collapsed .webix_accordionitem_header {
-    background-color: lightGray;
-}
-.webix_template {
-    padding: 0px;
-}
-.webix_message {
-    margin: 0px;
-}
-.webix_message_area {
+.editor_message {
+    position: fixed;
+    right: 0;
+    bottom: 0;
     width: 240px;
-    right: 0px;
+    box-sizing: border-box;
+    padding: 8px;
+    background: #f4f4f4;
+    border: 1px solid #c8c8c8;
+    color: #475466;
+    font-size: 8pt;
 }
 
 input[type=number]::-webkit-inner-spin-button {
