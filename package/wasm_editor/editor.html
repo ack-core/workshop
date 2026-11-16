@@ -12,25 +12,25 @@
     <div class="editor" id="editor">
         <div class="top" id="top">
             <div class="editor_top_group" id="swd" hidden>
-                <button class="editor_top_button" title="Set working directory" onclick="uiBindings.setWorkingDirectory()">&#x1F5C4;</button>
+                <button id="button_set_working_directory" class="editor_top_button" title="Set working directory" onclick="uiBindings.setWorkingDirectory()"><img src="editor/folder.svg" width="16"></button>
             </div>
             <div class="editor_top_group" id="top_buttons" hidden>
-                <button class="editor_top_button" title="Load resources" onclick="uiBindings.loadResources()">&#x1F4E4;</button>
-                <button class="editor_top_button" title="Center on selected object" onclick="uiBindings.centerOnObject()">&#x2316;</button>
-                <button class="editor_top_button" title="Hide/show axis" onclick="uiBindings.axisSwitch(this)"><img src="editor/axis.svg"></button>
-                <button class="editor_top_button" title="Update every frame" onclick="uiBindings.updateSwitch(this)">&#x25B6;</button>
+                <button id="button_load_resources" class="editor_top_button" title="Reload resources" onclick="uiBindings.loadResources()"><img src="editor/circle-up.svg" width="16"></button>
+                <button id="button_center_on_object" class="editor_top_button" title="Center on selected object" onclick="uiBindings.centerOnObject()"><img src="editor/circle-dot.svg" width="16"></button>
+                <button id="button_axis_switch" class="editor_top_button" title="Hide/show axis" onclick="uiBindings.axisSwitch(this)"><img src="editor/axis.svg"></button>
+                <button id="button_update_switch" class="editor_top_button" title="Update every frame" onclick="uiBindings.updateSwitch(this)">&#x25B6;</button>
             </div>
             <div class="editor_top_spacer"></div>
             <div class="editor_top_group" id="edit_resource_buttons" hidden>
-                <button class="editor_top_button" title="Save resource &amp; Exit" onclick="uiBindings.resourceSaveAndExit()">&#x1F4BE;</button>
-                <button class="editor_top_button" title="Discard changes in the resource &amp; Exit" onclick="uiBindings.resourceDiscardAndExit()">&#x1F6AB;</button>
+                <button id="button_resource_save" class="editor_top_button" title="Save resource &amp; Exit" onclick="uiBindings.resourceSaveAndExit()"><img src="editor/save.svg" width="16"></button>
+                <button id="button_resource_discard" class="editor_top_button" title="Discard changes in the resource &amp; Exit" onclick="uiBindings.resourceDiscardAndExit()"><img src="editor/circle-xmark.svg" width="16"></button>
             </div>
         </div>
         <div class="nodes" id="nodes">
             <div class="editor_nodes_buttons">
-                <button class="editor_top_button" title="New node" onclick="uiBindings.treeNewNode(this)">&#x2795;</button>
-                <button class="editor_top_button" title="Delete node" onclick="uiBindings.treeDeleteNode()">&#x274C;</button>
-                <button class="editor_top_button" title="Save prefab" onclick="uiBindings.prefabSave()">&#x1F4BE;</button>
+                <button id="button_node_new" class="editor_top_button" title="New node" onclick="uiBindings.treeNewNode(this)"><img src="editor/plus-square.svg" width="16"></button>
+                <button id="button_node_delete" class="editor_top_button" title="Delete node" onclick="uiBindings.treeDeleteNode()"><img src="editor/trash-can.svg" width="16"></button>
+                <button id="button_prefab_save" class="editor_top_button" title="Save prefab" onclick="uiBindings.prefabSave()"><img src="editor/save.svg" width="16"></button>
             </div>
             <div class="editor_nodes_tree" id="node_tree" onclick="if (event.target == this) uiBindings.spaceClick(event)"></div>
             <div class="editor_nodes_menu" id="add_node_menu" hidden></div>
@@ -57,9 +57,9 @@
                     <div class="editor_inspect_row">
                         <select id="node_resource_list" size="20" onchange="uiEditor.sendMsg('editor.setPath', this.value)"></select>
                         <div class="editor_nodes_buttons">
-                            <button class="editor_top_button" title="Edit resource" onclick="uiBindings.nodeStartEdit()">&#x1F6E0;</button>
-                            <button class="editor_top_button" title="Clone resource" onclick="uiBindings.cloneResource()">&#x2FFB;</button>
-                            <button class="editor_top_button" title="Delete resource" onclick="uiBindings.deleteResource()">&#x274C;</button>
+                            <button id="button_resource_edit" class="editor_top_button" title="Edit resource" onclick="uiBindings.nodeStartEdit()"><img src="editor/edit.svg" width="16"></button>
+                            <button id="button_resource_clone" class="editor_top_button" title="Clone resource" onclick="uiBindings.cloneResource()"><img src="editor/clone.svg" width="16"></button>
+                            <button id="button_resource_delete" class="editor_top_button" title="Delete resource" onclick="uiBindings.deleteResource()">&#x274C;</button>
                         </div>
                     </div>
                 </div>
@@ -611,10 +611,10 @@
                     <div class="editor_inspect_row">
                         <select id="inspect_mesh_anim_list" size="10" style="height: 200px" onchange="uiEditor.sendMsg('editor.mesh.animationSelected', this.value)"></select>
                         <div class="editor_nodes_buttons">
-                            <button class="editor_top_button" title="Play animation" onclick="uiBindings.meshAnimationPlay()">&#x25B6;</button>
-                            <button class="editor_top_button" title="Loop animation" onclick="uiBindings.meshAnimationLoop()">&#x27F3;</button>
-                            <button class="editor_top_button" title="Add animation" onclick="uiBindings.meshAddAnimation()">&#x2795;</button>
-                            <button class="editor_top_button" title="Delete animation" onclick="uiBindings.meshRemoveAnimation()">&#x274C;</button>
+                            <button id="button_mesh_anim_play" class="editor_top_button" title="Play animation" onclick="uiBindings.meshAnimationPlay()">&#x25B6;</button>
+                            <button id="button_mesh_anim_loop" class="editor_top_button" title="Loop animation" onclick="uiBindings.meshAnimationLoop()">&#x27F3;</button>
+                            <button id="button_mesh_anim_add" class="editor_top_button" title="Add animation" onclick="uiBindings.meshAddAnimation()">&#x2795;</button>
+                            <button id="button_mesh_anim_delete" class="editor_top_button" title="Delete animation" onclick="uiBindings.meshRemoveAnimation()">&#x274C;</button>
                         </div>
                     </div>`
             });
@@ -748,12 +748,12 @@
                         <input type="number" id="inspect_ptc_count" style="width: 60px" step="1" min="1" max="1000" value="10" onchange="uiBindings.particlesEmission(this)">
                     </div>
                     <div class="editor_inspect_row">
-                        <button class="editor_top_button" title="Restart">&#x25B6;</button>
+                        <button id="button_ptc_restart" class="editor_top_button" title="Restart">&#x25B6;</button>
                         <label>Looped:</label>
                         <input type="checkbox" id="inspect_ptc_looped" onchange="uiBindings.particlesEmission(this)">
                         <label>Seed:</label>
                         <input type="number" id="inspect_ptc_rnd_seed" style="width: 70px" step="1" min="0" max="99999999" value="100" onchange="uiBindings.particlesEmission(this)">
-                        <button class="editor_top_button" title="Reroll">&#x1F3B2;</button>
+                        <button id="button_ptc_reroll" class="editor_top_button" title="Reroll">&#x1F3B2;</button>
                     </div>`
             });
             utility.addInspectSection({
@@ -946,8 +946,8 @@
                     <div class="editor_inspect_row">
                         <select id="inspect_raycast_shape_pointlist" size="10" style="height: 200px" onchange="uiEditor.sendMsg('editor.raycast.pointSelected', this.value)"></select>
                         <div class="editor_nodes_buttons">
-                            <button class="editor_top_button" title="Add point" onclick="uiBindings.raycastAddPoint()">&#x2795;</button>
-                            <button class="editor_top_button" title="Delete point" onclick="uiBindings.raycastRemovePoint()">&#x274C;</button>
+                            <button id="button_raycast_point_add" class="editor_top_button" title="Add point" onclick="uiBindings.raycastAddPoint()">&#x2795;</button>
+                            <button id="button_raycast_point_delete" class="editor_top_button" title="Delete point" onclick="uiBindings.raycastRemovePoint()">&#x274C;</button>
                         </div>
                     </div>`
             });
@@ -1040,8 +1040,8 @@
                         <div class="editor_inspect_row">
                             <select id="inspect_collision_shape_pointlist" size="10" style="height: 200px" onchange="uiEditor.sendMsg('editor.collision.pointSelected', this.value)"></select>
                             <div class="editor_nodes_buttons">
-                                <button class="editor_top_button" title="Add point" onclick="uiBindings.collisionAddPoint()">&#x2795;</button>
-                                <button class="editor_top_button" title="Delete point" onclick="uiBindings.collisionRemovePoint()">&#x274C;</button>
+                                <button id="button_collision_point_add" class="editor_top_button" title="Add point" onclick="uiBindings.collisionAddPoint()">&#x2795;</button>
+                                <button id="button_collision_point_delete" class="editor_top_button" title="Delete point" onclick="uiBindings.collisionRemovePoint()">&#x274C;</button>
                             </div>
                         </div>
                     </div>`
