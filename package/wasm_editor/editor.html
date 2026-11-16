@@ -15,6 +15,7 @@
                 <button id="button_set_working_directory" class="editor_top_button" title="Set working directory" onclick="uiBindings.setWorkingDirectory()"><img src="editor/folder.svg" width="16"></button>
             </div>
             <div class="editor_top_group" id="top_buttons" hidden>
+                <button id="button_reset_working_directory" class="editor_top_button" title="Reset working directory" onclick="uiBindings.resetWorkingDirectory()"><img src="editor/compass.svg" width="16"></button>
                 <button id="button_load_resources" class="editor_top_button" title="Reload resources" onclick="uiBindings.loadResources()"><img src="editor/circle-up.svg" width="16"></button>
                 <button id="button_center_on_object" class="editor_top_button" title="Center on selected object" onclick="uiBindings.centerOnObject()"><img src="editor/circle-dot.svg" width="16"></button>
                 <button id="button_axis_switch" class="editor_top_button" title="Hide/show axis" onclick="uiBindings.axisSwitch(this)"><img src="editor/axis.svg"></button>
@@ -383,6 +384,10 @@
                     }
                 }
                 document.getElementById("swd").hidden = false;
+            },
+            resetWorkingDirectory: function() {
+                const request = indexedDB.deleteDatabase('fs-db');
+                request.onsuccess = request.onerror = request.onblocked = () => location.reload();
             },
             loadResources: async function(e) {
                 utility.showSection("processing_popup", true);

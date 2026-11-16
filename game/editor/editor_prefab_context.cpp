@@ -42,7 +42,11 @@ namespace game {
         _editorEventsToken = _api.platform->addEditorEventHandler([this](const std::string &msg, const std::string &data) {
             auto handler = _handlers[msg];
             if (handler) {
-                return (this->*handler)(data);
+                _api.platform->logMsg("[PREFAB] msg = '%s' arg = '%s'", msg.data(), data.c_str());
+                if ((this->*handler)(data)) {
+                    return true;
+                }
+                _api.platform->logMsg("[PREFAB] msg skipped");
             }
             return false;
         });
