@@ -587,6 +587,11 @@ namespace core {
         void setTransform(const math::transform3f &trfm) override {
             _constants.transform = trfm;
         }
+        void setPosition(const math::vector3f &pos) override {
+            _constants.transform.m41 = pos.x;
+            _constants.transform.m42 = pos.y;
+            _constants.transform.m43 = pos.z;
+        }
         void setTime(float totalTimeSec, float fadingTimeSec) override {
             float koeff = std::max(totalTimeSec, 0.0f) / _secondsPerTextureWidth;
             if (koeff >= 1.0f) {

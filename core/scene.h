@@ -83,6 +83,7 @@ namespace core {
         struct Particles {
             virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
+            virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setTime(float totalTimeSec, float fadingTimeSec) = 0;
             virtual ~Particles() = default;
         };
