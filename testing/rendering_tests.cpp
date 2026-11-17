@@ -405,6 +405,70 @@ namespace test {
     };
 }
 
+namespace test {
+    class rendering_textured_quad_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<rendering_textured_quad_test>();
+        }
+        void init(const API &api) override {
+            // Fullscreen quad sampling 2x2 texture: red, green in the top row, blue, white in the bottom row
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [-1.0, 1.0][1.0, 1.0][-1.0, -1.0][1.0, -1.0]
+                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0);
+                    output_uv = fixed_uv[repeat_ID];
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 4
+            };
+            const std::uint32_t pixels[] = { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+            _texture = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 2, 2, { pixels });
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyTextures({ { _texture, foundation::SamplerType::NEAREST } });
+                rendering.draw(1);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_texture, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            const std::size_t w = foundation::TESTING_RENDER_WIDTH;
+            const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
+
+            EXPECT_TRUE(pixelIs(w / 4, h / 4, 255, 0, 0));              // top-left texel: red
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h / 4, 0, 255, 0));          // top-right texel: green
+            EXPECT_TRUE(pixelIs(w / 4, h * 3 / 4, 0, 0, 255));          // bottom-left texel: blue
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h * 3 / 4, 255, 255, 255));  // bottom-right texel: white
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderTexturePtr _texture;
+    };
+}
+
 
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
@@ -416,5 +480,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST(rendering_static_data_triangle_test);
         REGISTER_SCREENSHOT_TEST(rendering_strip_quads_test);
         REGISTER_SCREENSHOT_TEST(rendering_shader_constants_test);
+        REGISTER_SCREENSHOT_TEST(rendering_textured_quad_test);
     }
 }
