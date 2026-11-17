@@ -139,12 +139,10 @@ def step():
         log("Claude usage is over limit")
         return
 
-    if is_repo_dirty():
-        log("Repo is dirty")
-        return
-    
     log("Preparing...")
-    run("git", "switch", "master")
+    run("git", "switch", "--discard-changes", "master")
+    run("git", "reset", "--hard")
+    run("git", "clean", "-fd")
     run("git", "pull", "--ff-only")
     remove_gone_branches()
     prs = open_prs()
@@ -196,6 +194,9 @@ def step():
 
 def main():
     sys.stdout.reconfigure(errors="replace")
+    if is_repo_dirty():
+        log("Repo is dirty")
+        return
     while True:
         try:
             step()
