@@ -628,6 +628,50 @@ namespace test {
 
         return true;
     }
+
+    bool util_easing_test(const API &api) {
+        util::Easing easing (util::Easing::Formula::INCUBIC, 2.0f);
+
+        // starts at 0 heading to 0
+        EXPECT_FALSE(easing.inProgress());
+        EXPECT_FALSE(easing.update(1.0f));
+        EXPECT_FALSE(easing.hasReached_0());
+        EXPECT_EQ_F(easing.getKoeff(), 0.0f);
+
+        // halfway to 1 with formula applied
+        easing.goTo_1();
+        EXPECT_TRUE(easing.inProgress());
+        EXPECT_TRUE(easing.update(1.0f));
+        EXPECT_EQ_F(easing.getKoeff(), 0.125f);
+        EXPECT_FALSE(easing.hasReached_1());
+
+        // overshoot is clamped, reached is reported once
+        EXPECT_TRUE(easing.update(1.5f));
+        EXPECT_EQ_F(easing.getKoeff(), 1.0f);
+        EXPECT_FALSE(easing.inProgress());
+        EXPECT_FALSE(easing.hasReached_0());
+        EXPECT_TRUE(easing.hasReached_1());
+        EXPECT_FALSE(easing.hasReached_1());
+        EXPECT_FALSE(easing.update(1.0f));
+
+        // back to 0
+        easing.goTo_0();
+        EXPECT_TRUE(easing.inProgress());
+        EXPECT_TRUE(easing.update(1.0f));
+        EXPECT_EQ_F(easing.getKoeff(), 0.125f);
+        EXPECT_TRUE(easing.update(3.0f));
+        EXPECT_EQ_F(easing.getKoeff(), 0.0f);
+        EXPECT_FALSE(easing.hasReached_1());
+        EXPECT_TRUE(easing.hasReached_0());
+
+        // next update resets unchecked reached state
+        easing.goTo_1();
+        EXPECT_TRUE(easing.update(4.0f));
+        EXPECT_FALSE(easing.update(1.0f));
+        EXPECT_FALSE(easing.hasReached_1());
+
+        return true;
+    }
 }
 
 
@@ -645,5 +689,6 @@ namespace test {
         REGISTER_UNIT_TEST(util_description_default_values_test);
         REGISTER_UNIT_TEST(util_description_parse_test);
         REGISTER_UNIT_TEST(util_description_serialize_test);
+        REGISTER_UNIT_TEST(util_easing_test);
     }
 }
