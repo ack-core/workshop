@@ -539,13 +539,13 @@ namespace test {
         EXPECT_EQ_F(math::vector2f(2.0f, 1.0f).rotated(0.5f).angleTo({2.0f, 1.0f}), 0.5f);
 
         // vector3f
-        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 0.0f, 1.0f}, hpi), 0.0f, 1.0f, 0.0f));
-        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).rotated({1.0f, 0.0f, 0.0f}, hpi), 0.0f, 0.0f, 1.0f));
-        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 1.0f).rotated({0.0f, 1.0f, 0.0f}, hpi), 1.0f, 0.0f, 0.0f));
-        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 0.0f, 1.0f}, -hpi), 0.0f, -1.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 0.0f, 1.0f}, hpi), 0.0f, -1.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).rotated({1.0f, 0.0f, 0.0f}, hpi), 0.0f, 0.0f, -1.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 1.0f).rotated({0.0f, 1.0f, 0.0f}, hpi), -1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 0.0f, 1.0f}, -hpi), 0.0f, 1.0f, 0.0f));
         EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).rotated({0.0f, 0.0f, 1.0f}, MATH_PI), -1.0f, -2.0f, 3.0f));
         EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 5.0f).rotated({0.0f, 0.0f, 1.0f}, 1.0f), 0.0f, 0.0f, 5.0f));
-        EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).zyx.rotated({0.0f, 0.0f, 1.0f}, hpi), -2.0f, 3.0f, 1.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).zyx.rotated({0.0f, 0.0f, 1.0f}, hpi), 2.0f, -3.0f, 1.0f));
 
         EXPECT_EQ_F(math::vector3f(1.0f, 0.0f, 0.0f).angleTo({0.0f, 0.0f, 1.0f}), hpi);
         EXPECT_EQ_F(math::vector3f(1.0f, 1.0f, 0.0f).angleTo({1.0f, 0.0f, 0.0f}), MATH_PI * 0.25f);
