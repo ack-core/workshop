@@ -115,21 +115,14 @@ namespace test {
                         //_api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
                     }
                     else {
-                        _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s'", name.data());
+                        _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s', frame saved", name.data());
                         _testsFailed++;
+                        saveScreenshot(name, frame.get(), "_fail");
                     }
                 }
                 else {
                     _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
-
-                    auto tga = util::writeTGA(frame.get(), foundation::TESTING_RENDER_WIDTH, foundation::TESTING_RENDER_HEIGHT);
-                    _screenshotFrameTGA = std::move(tga.first);
-                    _api.platform->saveFile(("rendering_tests/" + name + "_ref.tga").data(), _screenshotFrameTGA.get(), tga.second, [this, name](bool saved) {
-                        if (saved == false) {
-                            _api.platform->logMsg("[SCREENSHOT TEST] '%s' ref saving failed", name.data());
-                        }
-                        _screenshotFrameTGA = nullptr;
-                    }, true);
+                    saveScreenshot(name, frame.get(), "_ref");
                 }
 
                 _currentScreenshotTest.reset();
@@ -152,5 +145,16 @@ namespace test {
         if (_api.platform->isAsyncWorkInProgress() == false) {
             _api.platform->exit(_testsFailed);
         }
+    }
+
+    void TestRunner::saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix) {
+        auto tga = util::writeTGA(frame, foundation::TESTING_RENDER_WIDTH, foundation::TESTING_RENDER_HEIGHT);
+        _screenshotFrameTGA = std::move(tga.first);
+        _api.platform->saveFile(("rendering_tests/" + name + suffix + ".tga").data(), _screenshotFrameTGA.get(), tga.second, [this, name, suffix](bool saved) {
+            if (saved == false) {
+                _api.platform->logMsg("[SCREENSHOT TEST] '%s' %s saving failed", name.data(), suffix);
+            }
+            _screenshotFrameTGA = nullptr;
+        }, true);
     }
 }

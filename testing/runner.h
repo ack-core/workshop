@@ -123,6 +123,9 @@ namespace test {
         void nextFrame(float dtSec);
 
     private:
+        void saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix);
+
+    private:
         API _api;
 
         std::vector<std::pair<std::string, bool (*)(const API &api)>> _unitTests;
