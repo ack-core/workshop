@@ -14,6 +14,19 @@ namespace {
     private:
         int _sum = 0;
     };
+
+    class SignalTarget {
+    public:
+        void add(int a, int b) {
+            sum += a + b;
+            calls++;
+        }
+
+        int sum = 0;
+        int calls = 0;
+    };
+
+    class DerivedSignalTarget : public SignalTarget {};
 }
 
 namespace test {
@@ -90,6 +103,49 @@ namespace test {
         target = nullptr;
         EXPECT_TRUE(cb7);
         EXPECT_EQ(cb7(3), 0);
+
+        return true;
+    }
+
+    bool util_signal_test(const API &api) {
+        // notify without subscribers
+        util::signal<void(int, int)> empty;
+        empty.notify(1, 2);
+
+        auto t0 = std::make_shared<SignalTarget>();
+        auto t1 = std::make_shared<DerivedSignalTarget>();
+        auto t2 = std::make_shared<SignalTarget>();
+        {
+            util::signal<void(int, int)> sig;
+            sig.subscribe(std::weak_ptr<SignalTarget>(t0), &SignalTarget::add);
+            sig.subscribe(std::weak_ptr<DerivedSignalTarget>(t1), &SignalTarget::add);
+            sig.subscribe(std::weak_ptr<SignalTarget>(t2), &SignalTarget::add);
+            sig.subscribe(std::weak_ptr<SignalTarget>(t0), &SignalTarget::add);
+
+            // signal doesn't own targets
+            EXPECT_EQ(t0.use_count(), 1);
+            EXPECT_EQ(t1.use_count(), 1);
+
+            // every subscription is called, the same target twice
+            sig.notify(1, 2);
+            EXPECT_EQ(t0->calls, 2);
+            EXPECT_EQ(t0->sum, 6);
+            EXPECT_EQ(t1->calls, 1);
+            EXPECT_EQ(t1->sum, 3);
+            EXPECT_EQ(t2->calls, 1);
+
+            // expired target is skipped, others are still called
+            t2 = nullptr;
+            sig.notify(10, 20);
+            EXPECT_EQ(t0->calls, 4);
+            EXPECT_EQ(t0->sum, 66);
+            EXPECT_EQ(t1->calls, 2);
+            EXPECT_EQ(t1->sum, 33);
+
+            t0 = nullptr;
+            t1 = nullptr;
+            sig.notify(1, 1);
+        }
 
         return true;
     }
@@ -578,6 +634,7 @@ namespace test {
 namespace test {
     void registerUtilTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(util_callback_test);
+        REGISTER_UNIT_TEST(util_signal_test);
         REGISTER_UNIT_TEST(util_strstream_atoi_atof_test);
         REGISTER_UNIT_TEST(util_strstream_char_reading_test);
         REGISTER_UNIT_TEST(util_strstream_extraction_test);
