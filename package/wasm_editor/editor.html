@@ -308,7 +308,7 @@
                 menu.hidden = false;
             },
             addNodeMenuItem: function(id, value) {
-                document.getElementById("add_node_menu").insertAdjacentHTML("beforeend", '<div class="editor_nodes_menu_item" onclick="uiBindings.createNode(\'' + id + '\')">' + value + '</div>');
+                document.getElementById("add_node_menu").insertAdjacentHTML("beforeend", '<div class="editor_nodes_menu_item" id="new_node_' + id + '" onclick="uiBindings.createNode(\'' + id + '\')">' + value + '</div>');
             },
             insertItemToNodeTree: function(name) {
                 var parent = uiNodeTree;
@@ -1216,6 +1216,40 @@
             registerParticlesResource();
             registerRaycastShapeResource();
             registerCollisionShapeResource();
+        }
+
+        function testing_visible(id) {
+            return document.getElementById(id)?.checkVisibility({ visibilityProperty: true }) ?? false;
+        }
+        function testing_value(id) {
+            const element = document.getElementById(id);
+            if (element == null) {
+                return false;
+            }
+            if (element.type == "checkbox") {
+                return element.checked ? "1" : "0";
+            }
+            if (element.tagName == "SELECT" && element.size > 1) {
+                return [...element.options].map(o => `'${o.value}'`).join(" ");
+            }
+            if (element == uiNodeTree) {
+                return [...element.querySelectorAll(".editor_nodes_item")].map(e => `'${e.dataset.id}'`).join(" ");
+            }
+            return element.value;
+        }
+        function testing_action(id, value) {
+            const element = document.getElementById(id);
+            if (element == null) {
+                return false;
+            }
+            if (element.onclick) {
+                element.click();
+            }
+            else {
+                element.type == "checkbox" ? element.checked = value == "1" : element.value = value;
+                element.dispatchEvent(new Event("change"));
+            }
+            return true;
         }
 
         uiBindings.initWorkingDirectory();

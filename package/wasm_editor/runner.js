@@ -1,4 +1,4 @@
-// Runs editor in browser: node testing.js
+// Runs editor in browser: node runner.js
 
 const https = require('https');
 const fs = require('fs');
@@ -131,4 +131,11 @@ https.createServer({
 
     await page.addInitScript(standInFileSystem, ROOT_URL);
     await page.goto('https://127.0.0.1:9002/editor.html');
+    await page.waitForFunction(() => testing_visible('top_buttons') && uiEditor['engine.refresh'] != null);
+
+    for (const [name, test] of Object.entries(require('./tests.js'))) {
+        console.log(name);
+        await test(page);
+    }
+
 });
