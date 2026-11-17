@@ -17,6 +17,12 @@ namespace {
     bool near3(const float *r, float x, float y, float z) {
         return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f;
     }
+    bool near2(const math::vector2f &v, float x, float y) {
+        return std::fabs(v.x - x) < 1.0e-5f && std::fabs(v.y - y) < 1.0e-5f;
+    }
+    bool near3(const math::vector3f &v, float x, float y, float z) {
+        return std::fabs(v.x - x) < 1.0e-5f && std::fabs(v.y - y) < 1.0e-5f && std::fabs(v.z - z) < 1.0e-5f;
+    }
 }
 
 namespace test {
@@ -513,6 +519,42 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_rotated_angle_test(const API &api) {
+        const float hpi = MATH_PI * 0.5f;
+
+        // vector2f
+        EXPECT_TRUE(near2(math::vector2f(1.0f, 0.0f).rotated(hpi), 0.0f, 1.0f));
+        EXPECT_TRUE(near2(math::vector2f(1.0f, 0.0f).rotated(-hpi), 0.0f, -1.0f));
+        EXPECT_TRUE(near2(math::vector2f(3.0f, 4.0f).rotated(MATH_PI), -3.0f, -4.0f));
+        EXPECT_TRUE(near2(math::vector2f(1.0f, 2.0f).yx.rotated(hpi), -1.0f, 2.0f));
+        EXPECT_EQ_F(math::vector2f(3.0f, 4.0f).rotated(0.7f).length(), 5.0f);
+
+        EXPECT_EQ_F(math::vector2f(1.0f, 0.0f).angleTo({0.0f, 1.0f}), hpi);
+        EXPECT_EQ_F(math::vector2f(0.0f, 1.0f).angleTo({1.0f, 0.0f}), hpi);
+        EXPECT_EQ_F(math::vector2f(1.0f, 0.0f).angleTo({1.0f, 1.0f}), MATH_PI * 0.25f);
+        EXPECT_EQ_F(math::vector2f(2.0f, 0.0f).angleTo({3.0f, 0.0f}), 0.0f);
+        EXPECT_EQ_F(math::vector2f(1.0f, 0.0f).angleTo({-1.0f, 0.0f}), MATH_PI);
+        EXPECT_EQ_F(math::vector2f(0.0f, 3.0f).yx.angleTo({1.0f, 0.0f}), 0.0f);
+        EXPECT_EQ_F(math::vector2f(2.0f, 1.0f).rotated(0.5f).angleTo({2.0f, 1.0f}), 0.5f);
+
+        // vector3f
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 0.0f, 1.0f}, hpi), 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).rotated({1.0f, 0.0f, 0.0f}, hpi), 0.0f, 0.0f, 1.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 1.0f).rotated({0.0f, 1.0f, 0.0f}, hpi), 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 0.0f, 1.0f}, -hpi), 0.0f, -1.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).rotated({0.0f, 0.0f, 1.0f}, MATH_PI), -1.0f, -2.0f, 3.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 5.0f).rotated({0.0f, 0.0f, 1.0f}, 1.0f), 0.0f, 0.0f, 5.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).zyx.rotated({0.0f, 0.0f, 1.0f}, hpi), -2.0f, 3.0f, 1.0f));
+
+        EXPECT_EQ_F(math::vector3f(1.0f, 0.0f, 0.0f).angleTo({0.0f, 0.0f, 1.0f}), hpi);
+        EXPECT_EQ_F(math::vector3f(1.0f, 1.0f, 0.0f).angleTo({1.0f, 0.0f, 0.0f}), MATH_PI * 0.25f);
+        EXPECT_EQ_F(math::vector3f(0.0f, 0.0f, 2.0f).angleTo({0.0f, 0.0f, -3.0f}), MATH_PI);
+        EXPECT_EQ_F(math::vector3f(1.0f, 0.0f, 0.0f).zyx.angleTo({0.0f, 0.0f, 1.0f}), 0.0f);
+        EXPECT_EQ_F(math::vector3f(1.0f, 0.0f, 0.0f).rotated({0.0f, 1.0f, 0.0f}, 0.8f).angleTo({1.0f, 0.0f, 0.0f}), 0.8f);
+
+        return true;
+    }
 }
 
 
@@ -529,5 +571,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector_transformed_test);
         REGISTER_UNIT_TEST(math_transform3f_translated_inverted_test);
         REGISTER_UNIT_TEST(math_transform2f_methods_test);
+        REGISTER_UNIT_TEST(math_vector_rotated_angle_test);
     }
 }
