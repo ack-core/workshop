@@ -917,6 +917,53 @@ namespace math {
         
         return transform3f(r0, r1, r2, r3);
     }
+
+    //---
+
+    inline transform2f operator *(const transform2f &t0, const transform2f &t1) {
+        transform2f r;
+        for (int i = 0; i < 3; i++) {
+            for (int c = 0; c < 3; c++) {
+                r.flat[i * 3 + c] = t0.flat[i * 3] * t1.flat[c] + t0.flat[i * 3 + 1] * t1.flat[3 + c] + t0.flat[i * 3 + 2] * t1.flat[6 + c];
+            }
+        }
+        return r;
+    }
+    inline transform2f::transform2f(const vector3f &r0, const vector3f &r1, const vector3f &r2) {
+        std::copy(r0.flat, r0.flat + 3, row0);
+        std::copy(r1.flat, r1.flat + 3, row1);
+        std::copy(r2.flat, r2.flat + 3, row2);
+    }
+    inline transform2f::transform2f(scalar radians) {
+        const scalar rsin = std::sinf(radians);
+        const scalar rcos = std::cosf(radians);
+        *this = transform2f({rcos, rsin, 0}, {-rsin, rcos, 0}, {0, 0, 1});
+    }
+    inline transform2f& transform2f::operator =(const transform2f& other) {
+        this->block = other.block;
+        return *this;
+    }
+    inline transform2f transform2f::translated(const vector2f &v) const {
+        return {vector3f(row0), vector3f(row1), vector3f(m31 + v.x, m32 + v.y, m33)};
+    }
+    inline transform2f transform2f::rotated(scalar radians) const {
+        return *this * transform2f(radians);
+    }
+    inline transform2f transform2f::scaled(const vector2f &v) const {
+        return {vector3f(m11 * v.x, m12 * v.y, m13), vector3f(m21 * v.x, m22 * v.y, m23), vector3f(m31 * v.x, m32 * v.y, m33)};
+    }
+    inline transform2f transform2f::inverted() const {
+        const scalar c11 = m22 * m33 - m23 * m32;
+        const scalar c12 = m23 * m31 - m21 * m33;
+        const scalar c13 = m21 * m32 - m22 * m31;
+        const scalar det = scalar(1.0) / (m11 * c11 + m12 * c12 + m13 * c13);
+
+        return {
+            vector3f(c11, m13 * m32 - m12 * m33, m12 * m23 - m13 * m22) * det,
+            vector3f(c12, m11 * m33 - m13 * m31, m13 * m21 - m11 * m23) * det,
+            vector3f(c13, m12 * m31 - m11 * m32, m11 * m22 - m12 * m21) * det
+        };
+    }
 }
 
 namespace math {
