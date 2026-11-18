@@ -3,7 +3,7 @@
 
 namespace test {
     bool scene_statistics_test(const API &api) {
-        core::SceneInterfacePtr scene = core::SceneInterface::instance(api.platform, api.rendering);
+        const core::SceneInterfacePtr &scene = api.scene;
         {
             core::SceneInterface::ArrowsPtr arrows = scene->addArrows();
             core::SceneInterface::LineSetPtr lineSet0 = scene->addLineSet();
