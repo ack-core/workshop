@@ -470,10 +470,10 @@ namespace test {
 }
 
 namespace test {
-    class rendering_linear_textured_quad_screenshot_test : public ScreenshotTestInterface {
+    class rendering_4x4_linear_texture_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
-            return std::make_unique<rendering_linear_textured_quad_screenshot_test>();
+            return std::make_unique<rendering_4x4_linear_texture_test>();
         }
         void init(const API &api) override {
             // Fullscreen quad sampling 4x4 multicolor texture with linear filtering
@@ -534,6 +534,6 @@ namespace test {
         REGISTER_PIXEL_TEST(rendering_strip_quads_test);
         REGISTER_PIXEL_TEST(rendering_shader_constants_test);
         REGISTER_PIXEL_TEST(rendering_textured_quad_test);
-        REGISTER_SCREENSHOT_TEST(rendering_linear_textured_quad_screenshot_test);
+        REGISTER_SCREENSHOT_TEST(rendering_4x4_linear_texture_test);
     }
 }
