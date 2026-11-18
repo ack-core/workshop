@@ -90,8 +90,11 @@ extern "C" void initialize() {
     platform = foundation::PlatformInterface::instance();
     rendering = foundation::RenderingInterface::instance(platform);
     resourceProvider = resource::ResourceProvider::instance(platform, rendering);
+    scene = core::SceneInterface::instance(platform, rendering);
+    raycast = core::RaycastInterface::instance(platform, scene);
+    simulation = core::SimulationInterface::instance(platform, scene);
 
-    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider);
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, scene, raycast, simulation);
     test::registerMathTests(*testRunner);
     test::registerUtilTests(*testRunner);
     test::registerShaderTests(*testRunner);

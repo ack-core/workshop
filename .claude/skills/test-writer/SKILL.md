@@ -10,8 +10,9 @@ Do these steps in exact order:
 1. In the file `tmp/tests-coverage-report.txt` get the first line in the 'Candidates' block. It has the format `<test name> - <description of what is tested>`, one line per test.
    - Test name has format `<area>_<subject>_test`, each area has its `testing/<area>_tests.cpp` file where tests are implemented.
 2. Switch the repo to the fresh master. Make a branch named `test/<area>_<subject>` or similar and switch to it.
-3. Study some existing tests and how they work. Implement the described test and register it with suitable `REGISTER_*(...)` macro
+3. Study some existing tests and how they work. Implement the described test and register it with a suitable `REGISTER_*(...)` macro
    - If the test is more than 60 (for unit tests) and 160 (for step/rendering tests) lines of code split it into a few logically different tests with their own class/function names.
+   - If the test needs resources (files) - generate them and place in `testing/resources` as other tests do.
    - Assertion line is the only information available if a test fails. Make sure that different checks don't end up on the same line.
    - Questions for self-check during implementation:
      - is there a simpler implementation? Simplify

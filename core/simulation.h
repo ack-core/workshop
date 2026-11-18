@@ -5,6 +5,8 @@
 #include "foundation/platform.h"
 #include "scene.h"
 
+// TODO: multi-frame tests
+
 namespace core {
     class SimulationInterface {
     public:

@@ -114,7 +114,10 @@ namespace test {
         TestRunner(
             const foundation::PlatformInterfacePtr& platform,
             const foundation::RenderingInterfacePtr& rendering,
-            const resource::ResourceProviderPtr& resourceProvider
+            const resource::ResourceProviderPtr& resourceProvider,
+            const core::SceneInterfacePtr& scene,
+            const core::RaycastInterfacePtr& raycast,
+            const core::SimulationInterfacePtr& simulation
         );
         ~TestRunner();
 
@@ -130,9 +133,6 @@ namespace test {
         void saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix);
 
     private:
-        core::SceneInterfacePtr _scene;
-        core::RaycastInterfacePtr _raycast;
-        core::SimulationInterfacePtr _simulation;
         API _api;
 
         std::vector<std::pair<std::string, bool (*)(const API &api)>> _unitTests;

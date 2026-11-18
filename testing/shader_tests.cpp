@@ -107,7 +107,7 @@ namespace test {
                 uint2 u2 = uint2(u1, u1 << uint1(1));
                 uint3 u3 = uint3(u2, u1 | uint1(0x2));
                 uint4 u4 = uint4(u3, u3.x ^ u3.y);
-                output_position = f4 + float4(float(i4.x), float(i4.y), float(u4.x), float(u4.w)) * 0.1;
+                output_position = f4 + float4(float1(i4.x), float1(i4.y), float1(u4.x), float1(u4.w)) * 0.1;
             }
             fssrc {
                 float1 f1 = 0.5;
@@ -122,7 +122,7 @@ namespace test {
                 uint2 u2 = uint2(u1, u1 >> uint1(1));
                 uint3 u3 = uint3(u2 & uint2(0x3, 0x3), u1 + uint1(1));
                 uint4 u4 = uint4(u3, u3.z - u3.x);
-                output_color[0] = f4 * float4(float(i4.x), float(i4.w), float(u4.y), float(u4.w)) * 0.1;
+                output_color[0] = f4 * float4(float1(i4.x), float1(i4.w), float1(u4.y), float1(u4.w)) * 0.1;
             }
         )";
         const foundation::InputLayout layout = foundation::InputLayout {
@@ -170,7 +170,7 @@ namespace test {
             }
             vssrc {
                 float3 position = fixed_lines[repeat_ID] * fixed_scale;
-                position.xy += fixed_offset[fixed_index[repeat_ID]] * float(fixed_mask.x);
+                position.xy += fixed_offset[fixed_index[repeat_ID]] * float1(fixed_mask.x);
                 output_position = float4(position, 1.0);
             }
             fssrc {
@@ -212,7 +212,7 @@ namespace test {
                 mask : uint4
             }
             vssrc {
-                float4 position = const_positions[(repeat_ID + const_index.x) & 0x3] * float(const_mask.x);
+                float4 position = const_positions[(repeat_ID + const_index.x) & 0x3] * float1(const_mask.x);
                 output_position = _transform(position, const_transform);
             }
             fssrc {
@@ -289,7 +289,7 @@ namespace test {
                 output_mask = uint4(1, 0, 1, 0);
             }
             fssrc {
-                output_color[0] = input_color * float4(float(input_index), float(input_mask.x), 1.0, 1.0);
+                output_color[0] = input_color * float4(float1(input_index), float1(input_mask.x), 1.0, 1.0);
             }
         )";
         const char* badShaderSrc0 = R"(
@@ -328,7 +328,7 @@ namespace test {
             const {
                 color : float4
             }
-            fndef getPosition(int index, float depth) -> float4 {
+            fndef getPosition(int index, float1 depth) -> float4 {
                 return float4(fixed_quad[index], depth, 1.0);
             }
             fndef getColor(float3 rgb) -> float4 {

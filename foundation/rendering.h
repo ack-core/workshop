@@ -150,50 +150,61 @@ namespace foundation {
         virtual void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
         
         // Create shader from source text
-        // @layout    - input layout for vertex shader. Vertex attributes have 'vertex_' prefix
-        // @src       - generic shader source text. Example:
+        // @src            - generic shader source text (see example below)
+        // @layout         - input layout for vertex shader. Must have attributes or repeat > 0
+        //                   Vertex attributes have 'vertex_' prefix in vssrc
+        // @suppressErrors - don't log compilation errors
+        // Returns nullptr on failure. Shaders are cached by @src
         //
-        // Assume that @layout = {1, {"position", foundation::InputAttributeFormat::FLOAT3}}
+        // Assume that @layout = {1, {{"position", foundation::InputAttributeFormat::FLOAT3}, {"color", foundation::InputAttributeFormat::FLOAT4}}}
         // So vertex shader has vertex_position and vertex_color input values.
+        // Blocks order: fixed, const, inout, fndef..., vssrc, fssrc. Only vssrc and fssrc are required.
         // s--------------------------------------
-        //     fixed {                                           - block of permanent constants. Can be omitted if unused.
-        //         constName0 : float4 = [1.0, -3.0, 0.0, 1.0]   - in the code these constants have 'fixed_' prefix
-        //         constName1 : int2 = [1, -2]
-        //         constNameArray0[2] : float4 = [1.0, 0.3, 0.6, 0.9][0.0, 0.1, 0.2, 0.3]
+        //     fixed {                                           - block of permanent constants. These constants have 'fixed_' prefix in code
+        //         fixedName0 : float4 = [1.0, -3.0, 0.0, 1.0]
+        //         fixedName1 : int2 = [1, -2]
+        //         fixedArray0[2] : float4 = [1.0, 0.3, 0.6, 0.9][0.0, 0.1, 0.2, 0.3]
         //     }
-        //     const {                                           - block of per-pass constants. Can be omitted if unused.
-        //         constName1 : float4                           - these constants have 'const_' prefix in code
-        //         constNamesArray1[16] : float4                 - spaces in/before array braces are not permitted
+        //     const {                                           - block of per-pass constants. These constants have 'const_' prefix in code
+        //         constName0 : float4                           - only float4, int4, uint4, matrix4 types are allowed
+        //         constArray0[16] : float4                      - spaces in/before array braces are not permitted
         //     }
-        //     inout {                                           - vertex output and fragment input. Can be omitted if unused.
-        //         varName4 : float4                             - these variables have 'output_' prefix in vssrc and 'input_' in fssrc
+        //     inout {                                           - vertex output and fragment input
+        //         varName0 : float4                             - these variables have 'output_' prefix in vssrc and 'input_' in fssrc
         //     }
-        //     fndef getcolor(float3 rgb) -> float4 {            - example of function defined in shader
+        //     fndef getcolor(float3 rgb) -> float4 {            - function available in vssrc, fssrc and next fndef blocks
         //         return float4(rgb, 1.0);
         //     }
-        //     vssrc {
-        //         output_varName4 = _lerp(vertex_color, const_constName1, fixed_constName1);
+        //     vssrc {                                           - vertex shader has float4 'output_position' variable
+        //         output_varName0 = _lerp(vertex_color, const_constName0, fixed_fixedName0.x);
         //         output_position = _transform(float4(vertex_position, 1.0), frame_stdVPMatrix);
-        //
-        //     }                                                 - vertex shader has float4 'output_position' variable
+        //     }
         //     fssrc {                                           - fragment shader has float4 'output_color[4]' variable. Max four render targets
-        //         output_color[0] = input_varName4;             - fragment shader has float2 'fragment_coord' variable with range 0.0 <= x, y <= 1.0
+        //         output_color[0] = input_varName0;             - fragment shader has float2 'fragment_coord' variable with range 0.0 <= x, y <= 1.0
         //     }
         // s--------------------------------------
         // Types:
         //     matrix4, matrix3, float1, float2, float3, float4, int1, int2, int3, int4, uint1, uint2, uint3, uint4
         //
+        // Vertex shader indices (int):
+        //     vertex_ID    - vertex index
+        //     instance_ID  - instance index
+        //     repeat_ID    - index in [0, layout.repeat) when layout.repeat > 1, otherwise 0
+        //
         // Per frame global constants:
-        //     frame_stdVPMatrix        : matrix4 - view * projection matrix
-        //     frame_invVPMatrix        : matrix4 - view * projection matrix
+        //     frame_plmVPMatrix        : matrix4 - view * projection matrix with platform-dependent z-range
+        //     frame_stdVPMatrix        : matrix4 - view * projection matrix with [0..1] z-range
+        //     frame_invVPMatrix        : matrix4 - inverted frame_stdVPMatrix
         //     frame_cameraPosition     : float4  - camera position (w = 1)
         //     frame_cameraDirection    : float4  - normalized camera direction (w = 0)
-        //     frame_rtBounds           : float4  - render target size in pixels (.rg)
+        //     frame_rtBounds           : float4  - render target size in pixels (.xy)
         //
-        // Textures. There 4 texture slots. Example of getting color from the last slot: float4 color = _tex2linear(3, float2(0, 0));
+        // Textures. There are 4 texture slots. Example of getting color from the last slot: float4 color = _tex2d(3, float2(0, 0));
         //
         // Global functions:
-        //     _transform(v, m), _sign(s), _dot(v, v), _sin(v), _cos(v), _norm(v), _lerp(v, v, k), _tex2d(index, v)
+        //     _transform(v, m), _dot(a, b), _cross(a, b), _len(v), _norm(v), _sign(a), _abs(a), _sin(a), _cos(a), _pow(a, b),
+        //     _floor(a), _frac(a), _sat(a), _clamp(a), _min(a, b), _max(a, b), _lerp(a, b, k), _step(k, a), _smooth(a, b, k),
+        //     _select(a, b, k), _tex2d(index, uv), _discard()
         //
         virtual auto createShader(const char *src, const InputLayout &layout, bool suppressErrors = false) -> RenderShaderPtr = 0;
         

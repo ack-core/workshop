@@ -34,12 +34,12 @@ namespace test {
     TestRunner::TestRunner(
         const foundation::PlatformInterfacePtr& platform,
         const foundation::RenderingInterfacePtr& rendering,
-        const resource::ResourceProviderPtr& resourceProvider
+        const resource::ResourceProviderPtr& resourceProvider,
+        const core::SceneInterfacePtr& scene,
+        const core::RaycastInterfacePtr& raycast,
+        const core::SimulationInterfacePtr& simulation
     )
-    : _scene(core::SceneInterface::instance(platform, rendering))
-    , _raycast(core::RaycastInterface::instance(platform, _scene))
-    , _simulation(core::SimulationInterface::instance(platform, _scene))
-    , _api{platform, rendering, resourceProvider, _scene, _raycast, _simulation}
+    : _api{platform, rendering, resourceProvider, scene, raycast, simulation}
     {
 
     }

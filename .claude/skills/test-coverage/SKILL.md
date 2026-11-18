@@ -10,6 +10,7 @@ Single interface/class/function capability - is ability of doing something that 
 - Ability to save different arguments in the passed lambda (callback test) - single capability.
 - Each shader language construct handled in shader.cpp (inout blocks, uniforms, ...) is one capability.
 - Each possible way of rendering in RenderingInterface is single capability
+- Each possible resource/description loaded by the interfaces is single capability
 
 Areas:
 - 'math' is testing everything declared/defined in math.h
@@ -17,6 +18,8 @@ Areas:
 - 'shader' is testing compilation of different shaders using makePlatformShaderSource from shader.h/shader.cpp, read the implementation here to understand how shaders are written.
 - 'platform' is testing everything declared/defined by platform.h
 - 'rendering' is testing everything declared/defined by rendering.h and primitives rendering at different state of RenderingInterface
+- 'resources' is testing everything declared/defined by resource_provider.h and that different resource types could be loaded 
+- 'raycast' is testing everything declared/defined by raycast.h and that differently oriented shapes are raycasted correctly
 
 We are adding untested capabilities (candidates) to the file `tmp/tests-coverage-report.txt`.
 The file contains exactly one `Candidates:` block with the list of untested capabilities (candidates).
@@ -36,7 +39,7 @@ rendering_red_triangle_on_black_test - Testing ability to draw a single triangle
 - Test name: lowercase snake_case `<area>_<subject>_test`.
 - Test name must not match any name already passed to a `REGISTER_*_TEST` macro or any other test in the list.
 
-In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_SCREENSHOT_TEST macro. Study areas and capabilities being tested. 
+In testing folder find tests registered by calling REGISTER_UNIT_TEST/REGISTER_STEP_TEST/REGISTER_PIXEL_TEST macro. Study areas and capabilities being tested. 
 Find up to 3 untested capabilities (candidates) from different areas which could be tested through existing code.
 Ensure that candidates aren't in the list and there are no open pull requests which already implement them (Use `gh pr list --repo ack-core/workshop --state open --json title,body`)
 
