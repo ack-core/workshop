@@ -79,6 +79,7 @@ namespace test {
         const foundation::RenderingInterfacePtr& rendering;
         const resource::ResourceProviderPtr& resourceProvider;
         const core::SceneInterfacePtr& scene;
+        const core::RaycastInterfacePtr& raycast;
         const core::SimulationInterfacePtr& simulation;
     };
 
@@ -130,6 +131,7 @@ namespace test {
 
     private:
         core::SceneInterfacePtr _scene;
+        core::RaycastInterfacePtr _raycast;
         core::SimulationInterfacePtr _simulation;
         API _api;
 

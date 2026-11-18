@@ -20,6 +20,7 @@
 #include "testing/rendering_tests.h"
 #include "testing/resource_provider_tests.h"
 #include "testing/scene_tests.h"
+#include "testing/raycast_tests.h"
 #include "testing/simulation_tests.h"
 #endif
 
@@ -98,6 +99,7 @@ extern "C" void initialize() {
     test::registerRenderingTests(*testRunner);
     test::registerResourceProviderTests(*testRunner);
     test::registerSceneTests(*testRunner);
+    test::registerRaycastTests(*testRunner);
     test::registerSimulationTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
