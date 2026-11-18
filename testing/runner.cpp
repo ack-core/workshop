@@ -37,8 +37,9 @@ namespace test {
         const resource::ResourceProviderPtr& resourceProvider
     )
     : _scene(core::SceneInterface::instance(platform, rendering))
+    , _raycast(core::RaycastInterface::instance(platform, _scene))
     , _simulation(core::SimulationInterface::instance(platform, _scene))
-    , _api{platform, rendering, resourceProvider, _scene, _simulation}
+    , _api{platform, rendering, resourceProvider, _scene, _raycast, _simulation}
     {
 
     }

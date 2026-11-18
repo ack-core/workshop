@@ -3,8 +3,7 @@
 
 namespace test {
     bool raycast_sphere_hit_test(const API &api) {
-        const core::SceneInterfacePtr scene = core::SceneInterface::instance(api.platform, api.rendering);
-        const core::RaycastInterfacePtr raycast = core::RaycastInterface::instance(api.platform, scene);
+        const core::RaycastInterfacePtr &raycast = api.raycast;
         util::Description desc;
         desc.setInteger("type", std::int64_t(core::RaycastInterface::ShapeType::SPHERES));
         desc.setVector3f("points", math::vector3f(0.0f, 0.0f, 5.0f));
