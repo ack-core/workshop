@@ -20,6 +20,7 @@
 #include "testing/rendering_tests.h"
 #include "testing/resource_provider_tests.h"
 #include "testing/scene_tests.h"
+#include "testing/simulation_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;
@@ -97,6 +98,7 @@ extern "C" void initialize() {
     test::registerRenderingTests(*testRunner);
     test::registerResourceProviderTests(*testRunner);
     test::registerSceneTests(*testRunner);
+    test::registerSimulationTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
         testRunner->nextFrame(dtSec);
