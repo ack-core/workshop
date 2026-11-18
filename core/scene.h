@@ -102,7 +102,18 @@ namespace core {
         using LightSourcePtr = std::shared_ptr<LightSource>;
         using VegetationPtr = std::shared_ptr<Vegetation>;
         using ParticlesPtr = std::shared_ptr<Particles>;
-        
+
+        struct StatInfo {
+            std::size_t arrowsCount = 0;
+            std::size_t lineSetsCount = 0;
+            std::size_t boundingSpheresCount = 0;
+            std::size_t boundingBoxesCount = 0;
+            std::size_t voxelMeshesCount = 0;
+            std::size_t groundMeshesCount = 0;
+            std::size_t vegetationsCount = 0;
+            std::size_t particleEmittersCount = 0;
+        };
+
     public:
         // Set camera
         // @position    - camera position
@@ -192,7 +203,11 @@ namespace core {
         // Enable drawing of debug objects: arrows, lines, bounding volumes
         //
         virtual void setLinesDrawingEnabled(bool enabled) = 0;
-        
+
+        // Returns counters usable in statistics and testing. Released objects are counted until next updateAndDraw
+        //
+        virtual auto getStatistics() const -> StatInfo = 0;
+
     public:
         virtual ~SceneInterface() = default;
     };

@@ -658,7 +658,8 @@ namespace core {
         void updateAndDraw(float dtSec) override;
         
         void setLinesDrawingEnabled(bool enabled) override;
-        
+        auto getStatistics() const -> StatInfo override;
+
     private:
         struct Camera {
             math::transform3f plmVPMatrix; // plm matrix transforms to clip space with platform-specific z-range
@@ -702,7 +703,7 @@ namespace core {
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
         
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
-        
+
         bool _initialized = false;
         bool _lineDrawingEnabled = true;
     };
@@ -1282,6 +1283,19 @@ namespace core {
 
     void SceneInterfaceImpl::setLinesDrawingEnabled(bool enabled) {
         _lineDrawingEnabled = enabled;
+    }
+
+    auto SceneInterfaceImpl::getStatistics() const -> StatInfo {
+        return StatInfo {
+            _arrows.size(),
+            _lineSets.size(),
+            _boundingSpheres.size(),
+            _boundingBoxes.size(),
+            _voxelMeshes.size(),
+            _groundMeshes.size(),
+            _vegetations.size(),
+            _particleEmitters.size()
+        };
     }
 }
 
