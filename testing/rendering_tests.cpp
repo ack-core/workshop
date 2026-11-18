@@ -469,6 +469,23 @@ namespace test {
     };
 }
 
+namespace test {
+    class rendering_fill_green_screenshot_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<rendering_fill_green_screenshot_test>();
+        }
+        void init(const API &api) override {}
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 1.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+
+            });
+        }
+        std::uint8_t getThreshold() const override {
+            return 0;
+        }
+    };
+}
 
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
@@ -481,5 +498,6 @@ namespace test {
         REGISTER_PIXEL_TEST(rendering_strip_quads_test);
         REGISTER_PIXEL_TEST(rendering_shader_constants_test);
         REGISTER_PIXEL_TEST(rendering_textured_quad_test);
+        REGISTER_SCREENSHOT_TEST(rendering_fill_green_screenshot_test);
     }
 }
