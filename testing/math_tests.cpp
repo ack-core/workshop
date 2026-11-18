@@ -14,6 +14,9 @@ namespace {
     bool near4(const float *r, float x, float y, float z, float w) {
         return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f && std::fabs(r[3] - w) < 1.0e-5f;
     }
+    bool near3(const float *r, float x, float y, float z) {
+        return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f;
+    }
 }
 
 namespace test {
@@ -469,6 +472,47 @@ namespace test {
 
         return true;
     }
+
+    bool math_transform2f_methods_test(const API &api) {
+        const math::transform2f id(0.0f);
+        EXPECT_TRUE(near3(id.row0, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(id.row1, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near3(id.row2, 0.0f, 0.0f, 1.0f));
+
+        const math::transform2f r(MATH_PI * 0.5f);
+        EXPECT_TRUE(near3(r.row0, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near3(r.row1, -1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(r.row2, 0.0f, 0.0f, 1.0f));
+
+        const math::transform2f m({2, 0, 0}, {0, 3, 0}, {1, 2, 1});
+        const math::transform2f t = m.translated({4.0f, 5.0f});
+        EXPECT_TRUE(near3(t.row0, 2.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(t.row1, 0.0f, 3.0f, 0.0f));
+        EXPECT_TRUE(near3(t.row2, 5.0f, 7.0f, 1.0f));
+
+        const math::transform2f s = m.scaled({2.0f, 0.5f});
+        EXPECT_TRUE(near3(s.row0, 4.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(s.row1, 0.0f, 1.5f, 0.0f));
+        EXPECT_TRUE(near3(s.row2, 2.0f, 1.0f, 1.0f));
+
+        const math::transform2f mr = m.rotated(MATH_PI * 0.5f);
+        EXPECT_TRUE(near3(mr.row0, 0.0f, 2.0f, 0.0f));
+        EXPECT_TRUE(near3(mr.row1, -3.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(mr.row2, -2.0f, 1.0f, 1.0f));
+
+        const math::transform2f mi = m.inverted();
+        EXPECT_TRUE(near3(mi.row0, 0.5f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(mi.row1, 0.0f, 1.0f / 3.0f, 0.0f));
+        EXPECT_TRUE(near3(mi.row2, -0.5f, -2.0f / 3.0f, 1.0f));
+
+        const math::transform2f n = math::transform2f(0.3f).scaled({2.0f, 3.0f}).translated({4.0f, -1.0f});
+        const math::transform2f nni = n * n.inverted();
+        EXPECT_TRUE(near3(nni.row0, 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(nni.row1, 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near3(nni.row2, 0.0f, 0.0f, 1.0f));
+
+        return true;
+    }
 }
 
 
@@ -484,5 +528,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
         REGISTER_UNIT_TEST(math_vector_transformed_test);
         REGISTER_UNIT_TEST(math_transform3f_translated_inverted_test);
+        REGISTER_UNIT_TEST(math_transform2f_methods_test);
     }
 }
