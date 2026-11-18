@@ -244,6 +244,8 @@ namespace foundation {
             _frameBufferingSemaphore = dispatch_semaphore_create(BUFFERED_FRAMES_MAX);
             
             MTLSamplerDescriptor *samplerDesc = [MTLSamplerDescriptor new];
+            samplerDesc.sAddressMode = MTLSamplerAddressModeRepeat;
+            samplerDesc.tAddressMode = MTLSamplerAddressModeRepeat;
             samplerDesc.minFilter = MTLSamplerMinMagFilterNearest;
             samplerDesc.magFilter = MTLSamplerMinMagFilterNearest;
             _samplerStates[int(foundation::SamplerType::NEAREST)] = [_device newSamplerStateWithDescriptor:samplerDesc];
