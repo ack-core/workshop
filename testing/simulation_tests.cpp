@@ -15,7 +15,7 @@ namespace test {
         api.simulation->update(0.033f);
 
         const math::vector3f position = body->getTransform().v3.xyz;
-        EXPECT_EQ_F(position.x, 1.0f);
+        EXPECT_EQ_F(position.x, 0.033f);
         EXPECT_EQ_F(position.y, 0.0f);
         EXPECT_EQ_F(position.z, 0.0f);
         return true;
