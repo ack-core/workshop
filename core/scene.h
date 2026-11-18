@@ -204,9 +204,9 @@ namespace core {
         //
         virtual void setLinesDrawingEnabled(bool enabled) = 0;
 
-        // Returns counters usable in statistics and testing. Updated by updateAndDraw
+        // Returns counters usable in statistics and testing. Released objects are counted until next updateAndDraw
         //
-        virtual auto getStatistics() const -> const StatInfo & = 0;
+        virtual auto getStatistics() const -> StatInfo = 0;
 
     public:
         virtual ~SceneInterface() = default;

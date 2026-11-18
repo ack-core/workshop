@@ -658,7 +658,7 @@ namespace core {
         void updateAndDraw(float dtSec) override;
         
         void setLinesDrawingEnabled(bool enabled) override;
-        auto getStatistics() const -> const StatInfo & override;
+        auto getStatistics() const -> StatInfo override;
 
     private:
         struct Camera {
@@ -703,7 +703,6 @@ namespace core {
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
         
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
-        StatInfo _statistics;
 
         bool _initialized = false;
         bool _lineDrawingEnabled = true;
@@ -1152,15 +1151,6 @@ namespace core {
         util::cleanupUnused(_vegetations);
         util::cleanupUnused(_particleEmitters);
 
-        _statistics.arrowsCount = _arrows.size();
-        _statistics.lineSetsCount = _lineSets.size();
-        _statistics.boundingSpheresCount = _boundingSpheres.size();
-        _statistics.boundingBoxesCount = _boundingBoxes.size();
-        _statistics.voxelMeshesCount = _voxelMeshes.size();
-        _statistics.groundMeshesCount = _groundMeshes.size();
-        _statistics.vegetationsCount = _vegetations.size();
-        _statistics.particleEmittersCount = _particleEmitters.size();
-
         if (_initialized == false) {
             _initialized = true;
 
@@ -1295,8 +1285,17 @@ namespace core {
         _lineDrawingEnabled = enabled;
     }
 
-    auto SceneInterfaceImpl::getStatistics() const -> const StatInfo & {
-        return _statistics;
+    auto SceneInterfaceImpl::getStatistics() const -> StatInfo {
+        return StatInfo {
+            _arrows.size(),
+            _lineSets.size(),
+            _boundingSpheres.size(),
+            _boundingBoxes.size(),
+            _voxelMeshes.size(),
+            _groundMeshes.size(),
+            _vegetations.size(),
+            _particleEmitters.size()
+        };
     }
 }
 
