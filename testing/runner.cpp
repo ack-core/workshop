@@ -56,8 +56,8 @@ namespace test {
         _stepTests.emplace_back(name, makeTestInstance);
     }
 
-    void TestRunner::registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)()) {
-        _screenshotTests.emplace_back(name, makeTestInstance);
+    void TestRunner::registerPixelTest(const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)()) {
+        _pixelTests.emplace_back(name, makeTestInstance);
     }
 
     void TestRunner::nextFrame(float dtSec) {
@@ -101,43 +101,43 @@ namespace test {
             return;
         }
 
-        // Screenshot tests
-        if (_currentScreenshotTest) {
-            _currentScreenshotTest->updateAndDraw(_api);
+        // Pixel tests
+        if (_currentPixelTest) {
+            _currentPixelTest->updateAndDraw(_api);
             ByteDataPtr frame = _api.rendering->presentFrame();
 
             if (_api.platform->isAsyncWorkInProgress() == false) {
-                const std::string &name = _screenshotTests[_screenshotTestIndex].first;
+                const std::string &name = _pixelTests[_pixelTestIndex].first;
 
                 if (frame == nullptr) {
-                    _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s' : frame capture isn't supported", name.data());
+                    _api.platform->logMsg("[FAILED PIXEL TEST] '%s' : frame capture isn't supported", name.data());
                     _testsFailed++;
                 }
                 else if (_screenshotRef) {
-                    if (_currentScreenshotTest->testResult(_api, _screenshotRef.get(), frame.get())) {
-                        //_api.platform->logMsg("[PASSED SCREENSHOT TEST] '%s'", name.data());
+                    if (_currentPixelTest->testResult(_api, _screenshotRef.get(), frame.get())) {
+                        //_api.platform->logMsg("[PASSED PIXEL TEST] '%s'", name.data());
                     }
                     else {
-                        _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s', frame saved", name.data());
+                        _api.platform->logMsg("[FAILED PIXEL TEST] '%s', frame saved", name.data());
                         _testsFailed++;
                         saveScreenshot(name, frame.get(), "_fail");
                     }
                 }
                 else {
-                    _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
+                    _api.platform->logMsg("[PIXEL TEST] '%s' has no reference, ref saved", name.data());
                     saveScreenshot(name, frame.get(), "_ref");
                 }
 
-                _currentScreenshotTest.reset();
+                _currentPixelTest.reset();
                 _screenshotRef = nullptr;
-                _screenshotTestIndex++;
+                _pixelTestIndex++;
             }
             return;
         }
-        if (_screenshotTestIndex < _screenshotTests.size()) {
-            const auto &test = _screenshotTests[_screenshotTestIndex];
-            _currentScreenshotTest = test.second();
-            _currentScreenshotTest->init(_api);
+        if (_pixelTestIndex < _pixelTests.size()) {
+            const auto &test = _pixelTests[_pixelTestIndex];
+            _currentPixelTest = test.second();
+            _currentPixelTest->init(_api);
             _api.platform->loadFile(("rendering_tests/" + test.first + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
                 _screenshotRef = decodeScreenshotPNG(data.get(), size);
             }, true);
@@ -155,7 +155,7 @@ namespace test {
         _screenshotFrameTGA = std::move(tga.first);
         _api.platform->saveFile(("rendering_tests/" + name + suffix + ".tga").data(), _screenshotFrameTGA.get(), tga.second, [this, name, suffix](bool saved) {
             if (saved == false) {
-                _api.platform->logMsg("[SCREENSHOT TEST] '%s' %s saving failed", name.data(), suffix);
+                _api.platform->logMsg("[PIXEL TEST] '%s' %s saving failed", name.data(), suffix);
             }
             _screenshotFrameTGA = nullptr;
         }, true);
