@@ -120,7 +120,7 @@ namespace game {
             .textureThumb = "textures/ui/joystick_thumb",
             .maxThumbOffset = 100.0f,
             .onChange = [this](const math::vector2f &direction) {
-                _knightVelocity = {0.4f * direction.y, 0.0f, 0.4f * direction.x};
+                _knightVelocity = {12.0f * direction.y, 0.0f, 12.0f * direction.x};
                 //printf("%f %f\n", direction.x, direction.y);
             }
         });

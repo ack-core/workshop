@@ -36,7 +36,9 @@ namespace test {
         const foundation::RenderingInterfacePtr& rendering,
         const resource::ResourceProviderPtr& resourceProvider
     )
-    : _api{platform, rendering, resourceProvider}
+    : _scene(core::SceneInterface::instance(platform, rendering))
+    , _simulation(core::SimulationInterface::instance(platform, _scene))
+    , _api{platform, rendering, resourceProvider, _scene, _simulation}
     {
 
     }
