@@ -19,10 +19,10 @@ set(
 	"${m_source_root}/resource_provider_tests.cpp"
 	"${m_source_root}/scene_tests.h"
 	"${m_source_root}/scene_tests.cpp"
-	"${m_source_root}/simulation_tests.h"
-	"${m_source_root}/simulation_tests.cpp"
 	"${m_source_root}/raycast_tests.h"
 	"${m_source_root}/raycast_tests.cpp"
+	"${m_source_root}/simulation_tests.h"
+	"${m_source_root}/simulation_tests.cpp"
 )
 source_group("" FILES ${m_sources_list})
 
