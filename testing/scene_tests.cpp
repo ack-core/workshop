@@ -30,10 +30,30 @@ namespace test {
         EXPECT_EQ(after.boundingBoxesCount, 0);
         return true;
     }
+
+    bool scene_camera_look_at_test(const API &api) {
+        const core::SceneInterfacePtr &scene = api.scene;
+        const math::vector3f position = {10, 10, 10};
+        const math::vector3f direction = (math::vector3f(0, 0, 0) - position).normalized();
+        scene->setCameraLookAt(position, {0, 0, 0});
+
+        const math::vector3f cameraPosition = scene->getCameraPosition();
+        const math::vector3f cameraDirection = scene->getCameraDirection();
+        scene->setCameraLookAt({45, 45, 45}, {0, 0, 0});
+
+        EXPECT_EQ_F(cameraPosition.x, position.x);
+        EXPECT_EQ_F(cameraPosition.y, position.y);
+        EXPECT_EQ_F(cameraPosition.z, position.z);
+        EXPECT_EQ_F(cameraDirection.x, direction.x);
+        EXPECT_EQ_F(cameraDirection.y, direction.y);
+        EXPECT_EQ_F(cameraDirection.z, direction.z);
+        return true;
+    }
 }
 
 namespace test {
     void registerSceneTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(scene_statistics_test);
+        REGISTER_UNIT_TEST(scene_camera_look_at_test);
     }
 }
