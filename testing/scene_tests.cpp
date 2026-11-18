@@ -3,15 +3,14 @@
 
 namespace test {
     bool scene_statistics_test(const API &api) {
-        const core::SceneInterfacePtr &scene = api.scene;
         {
-            core::SceneInterface::ArrowsPtr arrows = scene->addArrows();
-            core::SceneInterface::LineSetPtr lineSet0 = scene->addLineSet();
-            core::SceneInterface::LineSetPtr lineSet1 = scene->addLineSet();
-            core::SceneInterface::BoundingSpherePtr sphere = scene->addBoundingSphere({0, 0, 0}, 1.0f, {1, 1, 1, 1});
-            core::SceneInterface::BoundingBoxPtr box = scene->addBoundingBox({0, 0, 0}, {-1, -1, -1, 1, 1, 1}, {1, 1, 1, 1});
+            core::SceneInterface::ArrowsPtr arrows = api.scene->addArrows();
+            core::SceneInterface::LineSetPtr lineSet0 = api.scene->addLineSet();
+            core::SceneInterface::LineSetPtr lineSet1 = api.scene->addLineSet();
+            core::SceneInterface::BoundingSpherePtr sphere = api.scene->addBoundingSphere({0, 0, 0}, 1.0f, {1, 1, 1, 1});
+            core::SceneInterface::BoundingBoxPtr box = api.scene->addBoundingBox({0, 0, 0}, {-1, -1, -1, 1, 1, 1}, {1, 1, 1, 1});
 
-            const core::SceneInterface::StatInfo stats = scene->getStatistics();
+            const core::SceneInterface::StatInfo stats = api.scene->getStatistics();
             EXPECT_EQ(stats.arrowsCount, 1);
             EXPECT_EQ(stats.lineSetsCount, 2);
             EXPECT_EQ(stats.boundingSpheresCount, 1);
@@ -21,9 +20,9 @@ namespace test {
             EXPECT_EQ(stats.vegetationsCount, 0);
             EXPECT_EQ(stats.particleEmittersCount, 0);
         }
-        scene->updateAndDraw(0.0f);
+        api.scene->updateAndDraw(0.0f);
 
-        const core::SceneInterface::StatInfo after = scene->getStatistics();
+        const core::SceneInterface::StatInfo after = api.scene->getStatistics();
         EXPECT_EQ(after.arrowsCount, 0);
         EXPECT_EQ(after.lineSetsCount, 0);
         EXPECT_EQ(after.boundingSpheresCount, 0);
@@ -32,14 +31,13 @@ namespace test {
     }
 
     bool scene_camera_look_at_test(const API &api) {
-        const core::SceneInterfacePtr &scene = api.scene;
         const math::vector3f position = {10, 10, 10};
         const math::vector3f direction = (math::vector3f(0, 0, 0) - position).normalized();
-        scene->setCameraLookAt(position, {0, 0, 0});
+        api.scene->setCameraLookAt(position, {0, 0, 0});
 
-        const math::vector3f cameraPosition = scene->getCameraPosition();
-        const math::vector3f cameraDirection = scene->getCameraDirection();
-        scene->setCameraLookAt({45, 45, 45}, {0, 0, 0});
+        const math::vector3f cameraPosition = api.scene->getCameraPosition();
+        const math::vector3f cameraDirection = api.scene->getCameraDirection();
+        api.scene->setCameraLookAt({45, 45, 45}, {0, 0, 0});
 
         EXPECT_EQ_F(cameraPosition.x, position.x);
         EXPECT_EQ_F(cameraPosition.y, position.y);
