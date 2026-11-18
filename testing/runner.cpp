@@ -1,6 +1,7 @@
 
 #include "runner.h"
 #include "thirdparty/upng/upng.h"
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -58,6 +59,10 @@ namespace test {
 
     void TestRunner::registerPixelTest(const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)()) {
         _pixelTests.emplace_back(name, makeTestInstance);
+    }
+
+    void TestRunner::registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)()) {
+        _screenshotTests.emplace_back(name, makeTestInstance);
     }
 
     void TestRunner::nextFrame(float dtSec) {
@@ -138,9 +143,56 @@ namespace test {
             const auto &test = _pixelTests[_pixelTestIndex];
             _currentPixelTest = test.second();
             _currentPixelTest->init(_api);
-            _api.platform->loadFile(("rendering_tests/" + test.first + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
-                _screenshotRef = decodeScreenshotPNG(data.get(), size);
-            }, true);
+            loadScreenshotRef(test.first);
+            return;
+        }
+
+        // Screenshot tests
+        if (_currentScreenshotTest) {
+            _currentScreenshotTest->updateAndDraw(_api);
+            ByteDataPtr frame = _api.rendering->presentFrame();
+
+            if (_api.platform->isAsyncWorkInProgress() == false) {
+                const std::string &name = _screenshotTests[_screenshotTestIndex].first;
+
+                if (frame == nullptr) {
+                    _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s' : frame capture isn't supported", name.data());
+                    _testsFailed++;
+                }
+                else if (_screenshotRef) {
+                    const std::size_t size = foundation::TESTING_RENDER_WIDTH * foundation::TESTING_RENDER_HEIGHT * 4;
+                    const int threshold = _currentScreenshotTest->getThreshold();
+                    ByteDataPtr diff = std::make_unique<std::uint8_t[]>(size);
+                    bool passed = true;
+
+                    for (std::size_t i = 0; i < size; i++) {
+                        diff[i] = std::uint8_t(std::abs(int(frame[i]) - int(_screenshotRef[i])));
+                        passed = passed && diff[i] <= threshold;
+                    }
+
+                    if (passed == false) {
+                        _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s', frame and diff saved", name.data());
+                        _testsFailed++;
+                        saveScreenshot(name, frame.get(), "_fail");
+                        saveScreenshot(name, diff.get(), "_diff");
+                    }
+                }
+                else {
+                    _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
+                    saveScreenshot(name, frame.get(), "_ref");
+                }
+
+                _currentScreenshotTest.reset();
+                _screenshotRef = nullptr;
+                _screenshotTestIndex++;
+            }
+            return;
+        }
+        if (_screenshotTestIndex < _screenshotTests.size()) {
+            const auto &test = _screenshotTests[_screenshotTestIndex];
+            _currentScreenshotTest = test.second();
+            _currentScreenshotTest->init(_api);
+            loadScreenshotRef(test.first);
             return;
         }
 
@@ -150,14 +202,19 @@ namespace test {
         }
     }
 
+    void TestRunner::loadScreenshotRef(const std::string &name) {
+        _api.platform->loadFile(("rendering_tests/" + name + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
+            _screenshotRef = decodeScreenshotPNG(data.get(), size);
+        }, true);
+    }
+
     void TestRunner::saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix) {
         auto tga = util::writeTGA(frame, foundation::TESTING_RENDER_WIDTH, foundation::TESTING_RENDER_HEIGHT);
-        _screenshotFrameTGA = std::move(tga.first);
-        _api.platform->saveFile(("rendering_tests/" + name + suffix + ".tga").data(), _screenshotFrameTGA.get(), tga.second, [this, name, suffix](bool saved) {
+        const std::uint8_t *data = tga.first.get();
+        _api.platform->saveFile(("rendering_tests/" + name + suffix + ".tga").data(), data, tga.second, [this, name, suffix, tga = std::move(tga.first)](bool saved) {
             if (saved == false) {
-                _api.platform->logMsg("[PIXEL TEST] '%s' %s saving failed", name.data(), suffix);
+                _api.platform->logMsg("[TEST] '%s' %s saving failed", name.data(), suffix);
             }
-            _screenshotFrameTGA = nullptr;
         }, true);
     }
 }
