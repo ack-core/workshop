@@ -51,9 +51,9 @@ namespace test {
 }
 
 namespace test {
-    class rendering_fill_green_test : public ScreenshotTestInterface {
+    class rendering_fill_green_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_fill_green_test>();
         }
         void init(const API &api) override {}
@@ -79,9 +79,9 @@ namespace test {
 
 
 namespace test {
-    class rendering_white_line_on_black_test : public ScreenshotTestInterface {
+    class rendering_white_line_on_black_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_white_line_on_black_test>();
         }
         void init(const API &api) override {
@@ -137,9 +137,9 @@ namespace test {
 }
 
 namespace test {
-    class rendering_red_triangle_on_black_test : public ScreenshotTestInterface {
+    class rendering_red_triangle_on_black_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_red_triangle_on_black_test>();
         }
         void init(const API &api) override {
@@ -195,9 +195,9 @@ namespace test {
 }
 
 namespace test {
-    class rendering_static_data_triangle_test : public ScreenshotTestInterface {
+    class rendering_static_data_triangle_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_static_data_triangle_test>();
         }
         void init(const API &api) override {
@@ -266,9 +266,9 @@ namespace test {
 }
 
 namespace test {
-    class rendering_strip_quads_test : public ScreenshotTestInterface {
+    class rendering_strip_quads_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_strip_quads_test>();
         }
         void init(const API &api) override {
@@ -336,9 +336,9 @@ namespace test {
 }
 
 namespace test {
-    class rendering_shader_constants_test : public ScreenshotTestInterface {
+    class rendering_shader_constants_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_shader_constants_test>();
         }
         void init(const API &api) override {
@@ -406,9 +406,9 @@ namespace test {
 }
 
 namespace test {
-    class rendering_textured_quad_test : public ScreenshotTestInterface {
+    class rendering_textured_quad_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<rendering_textured_quad_test>();
         }
         void init(const API &api) override {
@@ -474,12 +474,12 @@ namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_statistics_test);
-        REGISTER_SCREENSHOT_TEST(rendering_fill_green_test);
-        REGISTER_SCREENSHOT_TEST(rendering_white_line_on_black_test);
-        REGISTER_SCREENSHOT_TEST(rendering_red_triangle_on_black_test);
-        REGISTER_SCREENSHOT_TEST(rendering_static_data_triangle_test);
-        REGISTER_SCREENSHOT_TEST(rendering_strip_quads_test);
-        REGISTER_SCREENSHOT_TEST(rendering_shader_constants_test);
-        REGISTER_SCREENSHOT_TEST(rendering_textured_quad_test);
+        REGISTER_PIXEL_TEST(rendering_fill_green_test);
+        REGISTER_PIXEL_TEST(rendering_white_line_on_black_test);
+        REGISTER_PIXEL_TEST(rendering_red_triangle_on_black_test);
+        REGISTER_PIXEL_TEST(rendering_static_data_triangle_test);
+        REGISTER_PIXEL_TEST(rendering_strip_quads_test);
+        REGISTER_PIXEL_TEST(rendering_shader_constants_test);
+        REGISTER_PIXEL_TEST(rendering_textured_quad_test);
     }
 }
