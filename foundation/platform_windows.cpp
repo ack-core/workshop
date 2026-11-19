@@ -375,7 +375,12 @@ namespace foundation {
         ::RegisterClassW(&wc);
         _window = ::CreateWindowW(APP_CLASS_NAME, APP_CLASS_NAME, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, g_minWindowRect.right - g_minWindowRect.left, g_minWindowRect.bottom - g_minWindowRect.top, HWND_DESKTOP, NULL, _hinst, NULL);
 
+#if defined(IS_TESTS)
+        ::ShowWindow(_window, SW_SHOWNOACTIVATE);
+        ::SetWindowPos(_window, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+#else
         ::ShowWindow(_window, SW_NORMAL);
+#endif
         ::UpdateWindow(_window);
         _screenScale = float(::GetDpiForWindow(_window)) / REFERENCE_DENSITY;
 
