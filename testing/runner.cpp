@@ -67,6 +67,8 @@ namespace test {
 
     void TestRunner::nextFrame(float dtSec) {
         _api.resourceProvider->update(dtSec);
+        _api.raycast->update(dtSec);
+        _api.simulation->update(dtSec);
         _api.scene->updateAndDraw(dtSec);
 
         // Unit tests
