@@ -26,6 +26,15 @@ jobs:
       - name: Install D3D debug layer
         run: dism /Online /Add-Capability /CapabilityName:Tools.Graphics.DirectX~~~~0.0.1.0
       - run: build_and_run_windows_tests.bat
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-pixel-tests-${{ github.job }}
+          path: |
+            testing/resources/**/*_diff.png
+            testing/resources/**/*_fail.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   wasm:
     runs-on: windows-2022
@@ -51,6 +60,15 @@ jobs:
           call npm install -g playwright || exit /b 1
           call playwright install chromium
       - run: build_and_run_wasm_tests.bat
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-pixel-tests-${{ github.job }}
+          path: |
+            testing/resources/**/*_diff.png
+            testing/resources/**/*_fail.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   ios:
     runs-on: macos-26
@@ -67,6 +85,15 @@ jobs:
           python-version: '3.13'
       - run: pip install pypng
       - run: bash build_and_run_ios_tests.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-pixel-tests-${{ github.job }}
+          path: |
+            testing/resources/**/*_diff.png
+            testing/resources/**/*_fail.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   mac:
     runs-on: macos-26
@@ -83,3 +110,12 @@ jobs:
           python-version: '3.13'
       - run: pip install pypng
       - run: bash build_and_run_mac_tests.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-pixel-tests-${{ github.job }}
+          path: |
+            testing/resources/**/*_diff.png
+            testing/resources/**/*_fail.png
+          if-no-files-found: ignore
+          retention-days: 7
