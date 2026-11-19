@@ -639,6 +639,7 @@ namespace core {
         foundation::RenderDataPtr mesh;
         foundation::RenderTexturePtr texture;
         math::transform3f transform = math::transform3f::identity();
+        const void *constants = nullptr;
 
     public:
         CustomMeshImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderShaderPtr &shader, bool renderToGBuffer)
@@ -668,17 +669,8 @@ namespace core {
                 mesh = rendering->createData(shader->getInputLayout(), data, vcnt, indexes, icnt);
             }
         }
-        void draw(foundation::RenderingInterface &rendering, foundation::BlendType blendType) {
-            if (enabled && mesh) {
-                rendering.applyShader(shader, topology, blendType, foundation::DepthBehavior::TEST_AND_WRITE);
-                rendering.applyShaderConstants(&transform);
-                if (texture) {
-                    rendering.applyTextures({
-                        {texture, foundation::SamplerType::NEAREST}
-                    });
-                }
-                rendering.draw(mesh);
-            }
+        void setShaderConstants(const void *value) override {
+            constants = value;
         }
     };
 
@@ -1245,6 +1237,20 @@ namespace core {
         _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         if (_gbuffer) {
+            const auto drawCustomMeshes = [this](foundation::RenderingInterface &rendering, bool renderToGBuffer, foundation::BlendType blendType) {
+                for (const auto &customMesh : _customMeshes) {
+                    if (customMesh->enabled && customMesh->mesh && customMesh->renderToGBuffer == renderToGBuffer) {
+                        rendering.applyShader(customMesh->shader, customMesh->topology, blendType, foundation::DepthBehavior::TEST_AND_WRITE);
+                        rendering.applyShaderConstants(customMesh->constants ? customMesh->constants : &customMesh->transform);
+                        if (customMesh->texture) {
+                            rendering.applyTextures({
+                                {customMesh->texture, foundation::SamplerType::NEAREST}
+                            });
+                        }
+                        rendering.draw(customMesh->mesh);
+                    }
+                }
+            };
             _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_groundMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
                 for (const auto &groundMesh : _groundMeshes) {
@@ -1281,11 +1287,7 @@ namespace core {
                         rendering.draw(vegetation->mesh);
                     }
                 }
-                for (const auto &customMesh : _customMeshes) {
-                    if (customMesh->renderToGBuffer) {
-                        customMesh->draw(rendering, foundation::BlendType::DISABLED);
-                    }
-                }
+                drawCustomMeshes(rendering, true, foundation::BlendType::DISABLED);
             });
             _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
@@ -1297,11 +1299,7 @@ namespace core {
                 rendering.draw();
             });
             _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
-                for (const auto &customMesh : _customMeshes) {
-                    if (customMesh->renderToGBuffer == false) {
-                        customMesh->draw(rendering, foundation::BlendType::MIXING);
-                    }
-                }
+                drawCustomMeshes(rendering, false, foundation::BlendType::MIXING);
                 rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
                 for (const auto &emitter : _particleEmitters) {
                     if (emitter->enabled) {

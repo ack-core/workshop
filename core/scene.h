@@ -93,6 +93,7 @@ namespace core {
             virtual void setPosition(const math::vector3f &pos) = 0;
             virtual void setTexture(const foundation::RenderTexturePtr &texture) = 0;
             virtual void setGeometry(foundation::RenderTopology topology, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
+            virtual void setShaderConstants(const void *constants) = 0;
             virtual ~CustomMesh() = default;
         };
         struct LightSource {
@@ -186,6 +187,7 @@ namespace core {
         // Mesh with user geometry, shader and optional texture (texture slot 0)
         // @layout          - vertex layout of geometry
         // @shaderSource    - shader with 'const { modelTransform : matrix4 }' block
+        //                    or any 'const' block if data is provided by setShaderConstants (pointer must stay valid while mesh is drawn)
         // @renderToGBuffer - true: drawn into gbuffer and lit like voxel meshes. Shader must write float4(normal * 0.5 + 0.5, paletteIndex / 255.0) to output_color[0]
         //                    false: drawn straight to the screen with alpha blending and gbuffer depth
         //
