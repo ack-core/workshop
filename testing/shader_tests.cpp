@@ -371,6 +371,44 @@ namespace test {
         EXPECT_EQ(badShader1, nullptr);
         return true;
     }
+
+    bool shader_builtin_functions_test(const API& api) {
+        // Global '_' functions are available in vertex and fragment code
+        //
+        const char* shaderSrc = R"(
+            inout {
+                uv : float2
+                normal : float3
+            }
+            vssrc {
+                float3 a = float3(_sin(0.5), _cos(0.5), _abs(-0.5));
+                float3 b = _cross(_norm(a), float3(0.0, 0.0, 1.0));
+                float1 k = _sat(_dot(a, b) + _len(b));
+                float3 c = _lerp(a, b, k) + _sign(a) * _pow(_abs(a), float3(2.0, 2.0, 2.0));
+                float3 d = _min(_floor(c), _frac(c)) + _max(_clamp(c), _step(0.5, c));
+                float3 e = _select(d, _smooth(0.0, 1.0, d), repeat_ID > 1);
+                float4 tex = _tex2d(0, float2(0.5, 0.5));
+                output_position = _transform(float4(e, 1.0), frame_stdVPMatrix) + tex;
+                output_uv = output_position.xy;
+                output_normal = b;
+            }
+            fssrc {
+                float4 color = _tex2d(1, input_uv) * _tex2d(3, fragment_coord);
+                float3 n = _norm(_cross(input_normal, float3(1.0, 0.0, 0.0)));
+                if (_dot(n, float3(0.0, 1.0, 0.0)) < 0.0) {
+                    _discard();
+                }
+                output_color[0] = _select(color, float4(n, 1.0), color.a < 0.5);
+                output_color[0].rgb = _smooth(float3(0.0, 0.0, 0.0), float3(1.0, 1.0, 1.0), _sat(output_color[0].rgb));
+            }
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .repeat = 4
+        };
+        foundation::RenderShaderPtr shader = api.rendering->createShader(shaderSrc, layout);
+        EXPECT_NOT_EQ(shader, nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -384,5 +422,6 @@ namespace test {
         REGISTER_UNIT_TEST(shader_const_block_test);
         REGISTER_UNIT_TEST(shader_inout_block_test);
         REGISTER_UNIT_TEST(shader_fndef_block_test);
+        REGISTER_UNIT_TEST(shader_builtin_functions_test);
     }
 }
