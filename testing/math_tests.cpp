@@ -11,17 +11,17 @@ namespace {
     bool eq4(const math::vector4f &v, float x, float y, float z, float w) {
         return v.x == x && v.y == y && v.z == z && v.w == w;
     }
-    bool near4(const float *r, float x, float y, float z, float w) {
-        return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f && std::fabs(r[3] - w) < 1.0e-5f;
-    }
-    bool near3(const float *r, float x, float y, float z) {
-        return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f;
-    }
     bool near2(const math::vector2f &v, float x, float y) {
         return std::fabs(v.x - x) < 1.0e-5f && std::fabs(v.y - y) < 1.0e-5f;
     }
     bool near3(const math::vector3f &v, float x, float y, float z) {
         return std::fabs(v.x - x) < 1.0e-5f && std::fabs(v.y - y) < 1.0e-5f && std::fabs(v.z - z) < 1.0e-5f;
+    }
+    bool near3(const float *r, float x, float y, float z) {
+        return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f;
+    }
+    bool near4(const float *r, float x, float y, float z, float w) {
+        return std::fabs(r[0] - x) < 1.0e-5f && std::fabs(r[1] - y) < 1.0e-5f && std::fabs(r[2] - z) < 1.0e-5f && std::fabs(r[3] - w) < 1.0e-5f;
     }
 }
 
