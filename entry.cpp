@@ -22,6 +22,7 @@
 #include "testing/scene_tests.h"
 #include "testing/raycast_tests.h"
 #include "testing/simulation_tests.h"
+#include "testing/stage_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;
@@ -104,6 +105,7 @@ extern "C" void initialize() {
     test::registerSceneTests(*testRunner);
     test::registerRaycastTests(*testRunner);
     test::registerSimulationTests(*testRunner);
+    test::registerStageTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
         testRunner->nextFrame(dtSec);
