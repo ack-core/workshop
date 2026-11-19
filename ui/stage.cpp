@@ -20,6 +20,7 @@ namespace ui {
         virtual const resource::ResourceProviderPtr &getResourceProvider() const = 0;
         virtual const resource::FontAtlasProviderPtr &getFontAtlasProvider() const = 0;
         virtual const foundation::RenderShaderPtr &getDefaultShader() const = 0;
+        virtual StageInterface::StatInfo &getMutableStatistics() const = 0;
         virtual ~StageFacility() = default;
     };
 }
@@ -29,8 +30,12 @@ namespace ui {
 namespace ui {
     class ElementImpl : public virtual StageInterface::Element {
     public:
-        ElementImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : _facility(facility), _parent(std::dynamic_pointer_cast<ElementImpl>(parent)) {}
-        ~ElementImpl() override {}
+        ElementImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : _facility(facility), _parent(std::dynamic_pointer_cast<ElementImpl>(parent)) {
+            _facility.getMutableStatistics().totalElementsCount++;
+        }
+        ~ElementImpl() override {
+            _facility.getMutableStatistics().totalElementsCount--;
+        }
         
         void setAnchor(const std::shared_ptr<Element> &target, HorizontalAnchor h, VerticalAnchor v, float hOffset, float vOffset) {
             if (target) {
@@ -272,8 +277,12 @@ namespace ui {
 namespace ui {
     class PivotImpl : public ElementImpl, public StageInterface::Pivot {
     public:
-        PivotImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : ElementImpl(facility, parent) {}
-        ~PivotImpl() override {}
+        PivotImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : ElementImpl(facility, parent) {
+            _facility.getMutableStatistics().pivotsCount++;
+        }
+        ~PivotImpl() override {
+            _facility.getMutableStatistics().pivotsCount--;
+        }
         
     public:
         void updateCoordinates() override {
@@ -335,9 +344,12 @@ namespace ui {
     class ImageImpl : public InteractorImpl, public std::enable_shared_from_this<ImageImpl>, public StageInterface::Image {
     public:
         ImageImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size) : InteractorImpl(facility, parent) {
+            _facility.getMutableStatistics().imagesCount++;
             _size = size;
         }
-        ~ImageImpl() override {}
+        ~ImageImpl() override {
+            _facility.getMutableStatistics().imagesCount--;
+        }
         
     public:
         void setTexture(const char *texturePath) override {
@@ -388,9 +400,12 @@ namespace ui {
     class ImgCustomImpl : public ElementImpl, public std::enable_shared_from_this<ImgCustomImpl>, public StageInterface::ImgCustom {
     public:
         ImgCustomImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size, const foundation::RenderShaderPtr &shader) : ElementImpl(facility, parent), _shader(shader) {
+            _facility.getMutableStatistics().imgCustomsCount++;
             _size = size;
         }
-        ~ImgCustomImpl() override {}
+        ~ImgCustomImpl() override {
+            _facility.getMutableStatistics().imgCustomsCount--;
+        }
         
     public:
         void setTexture(const char *texturePath) override {
@@ -458,9 +473,12 @@ namespace ui {
     class Img9SliceImpl : public InteractorImpl, public std::enable_shared_from_this<Img9SliceImpl>, public StageInterface::Img9Slice {
     public:
         Img9SliceImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent, const math::vector2f &size, bool fill) : InteractorImpl(facility, parent), _fill(fill) {
+            _facility.getMutableStatistics().img9SlicesCount++;
             _size = size;
         }
-        ~Img9SliceImpl() override {}
+        ~Img9SliceImpl() override {
+            _facility.getMutableStatistics().img9SlicesCount--;
+        }
         
     public:
         void setTexture(const char *texturePath, const math::vector3f &sliceArgs) override {
@@ -554,8 +572,12 @@ namespace ui {
 namespace ui {
     class TextLineImpl : public InteractorImpl, public std::enable_shared_from_this<TextLineImpl>, public StageInterface::TextLine {
     public:
-        TextLineImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : InteractorImpl(facility, parent) {}
-        ~TextLineImpl() override {}
+        TextLineImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : InteractorImpl(facility, parent) {
+            _facility.getMutableStatistics().textLinesCount++;
+        }
+        ~TextLineImpl() override {
+            _facility.getMutableStatistics().textLinesCount--;
+        }
         
     public:
         void setText(const char *utf8text) override {
@@ -657,8 +679,14 @@ namespace ui {
 namespace ui {
     class TextBlockImpl : public TextLineImpl, public StageInterface::TextBlock {
     public:
-        TextBlockImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : TextLineImpl(facility, parent) {}
-        ~TextBlockImpl() override {}
+        TextBlockImpl(const StageFacility &facility, const std::shared_ptr<Element> &parent) : TextLineImpl(facility, parent) {
+            _facility.getMutableStatistics().textLinesCount--;
+            _facility.getMutableStatistics().textBlocksCount++;
+        }
+        ~TextBlockImpl() override {
+            _facility.getMutableStatistics().textLinesCount++;
+            _facility.getMutableStatistics().textBlocksCount--;
+        }
         
     public:
         void setText(const char *utf8text) override {
@@ -789,8 +817,10 @@ namespace ui {
         const resource::ResourceProviderPtr &getResourceProvider() const override { return _resourceProvider; }
         const resource::FontAtlasProviderPtr &getFontAtlasProvider() const override { return _fontAtlasProvider; }
         const foundation::RenderShaderPtr &getDefaultShader() const override { return _uiShader; }
-        
+        StatInfo &getMutableStatistics() const override { return _statistics; }
+
     public:
+        auto getStatistics() const -> const StatInfo & override { return _statistics; }
         auto getNamedElement(const std::string &name) -> std::shared_ptr<Element> override;
         auto addPivot(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, PivotParams &&params) -> std::shared_ptr<Pivot> override;
         auto addImage(const std::optional<std::string> &name, const std::shared_ptr<Element> &parent, ImageParams &&params) -> std::shared_ptr<Image> override;
@@ -810,6 +840,7 @@ namespace ui {
         
         foundation::EventHandlerToken _touchEventsToken;
         foundation::RenderShaderPtr _uiShader;
+        mutable StatInfo _statistics;
         std::vector<std::shared_ptr<ElementImpl>> _topLevelElements;
         std::unordered_map<std::string, std::weak_ptr<ElementImpl>> _namedElements;
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
@@ -1037,6 +1068,7 @@ namespace ui {
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
         util::cleanupUnused(_topLevelElements);
+        _statistics.topLevelElementsCount = _topLevelElements.size();
 
         if (_uiShader == nullptr) {
             _uiShader = _rendering->createShader(g_uiShaderSrc, layouts::VTXUIUV);

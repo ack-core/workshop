@@ -51,7 +51,18 @@ namespace ui {
             const resource::ResourceProviderPtr &resourceProvider,
             const resource::FontAtlasProviderPtr &fontAtlasProvider
         );
-        
+
+        struct StatInfo {
+            std::size_t totalElementsCount = 0;
+            std::size_t topLevelElementsCount = 0;
+            std::size_t pivotsCount = 0;
+            std::size_t imagesCount = 0;
+            std::size_t imgCustomsCount = 0;
+            std::size_t img9SlicesCount = 0;
+            std::size_t textLinesCount = 0;
+            std::size_t textBlocksCount = 0;
+        };
+
     public:
         struct Element {
             virtual auto getPosition() const -> const math::vector2f & = 0;
@@ -177,6 +188,7 @@ namespace ui {
     public:
         virtual auto getPlatform() const -> const foundation::PlatformInterfacePtr & = 0;
         virtual auto getResourceProvider() const -> const resource::ResourceProviderPtr & = 0;
+        virtual auto getStatistics() const -> const StatInfo & = 0;
 
         // Get element added with name
         // @return - element or nullptr if there is no such element
