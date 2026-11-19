@@ -440,6 +440,7 @@ namespace {
             "#define _min(a, b) min((a), (b))\n"
             "#define _max(a, b) max((a), (b))\n"
             "#define _tex2d(i, a) _texture##i.sample(_sampler, a)\n"
+            "#define _texcube(i, a) _texture##i.sample(_sampler, a)\n"
             "#define _discard() discard_fragment()\n"
             "\n"
             "struct _FrameData {\n"
@@ -456,13 +457,13 @@ namespace {
         vsout += inoutVS;
 
         vsout +=
-            "struct _FN {\n    "
+            "template<typename _T0, typename _T1, typename _T2, typename _T3> struct _FN {\n    "
             "constant const _FrameData &framedata;\n    "
             "constant const _Constants &constants;\n    "
-            "thread const texture2d<float> &_texture0;\n    "
-            "thread const texture2d<float> &_texture1;\n    "
-            "thread const texture2d<float> &_texture2;\n    "
-            "thread const texture2d<float> &_texture3;\n    "
+            "thread const _T0 &_texture0;\n    "
+            "thread const _T1 &_texture1;\n    "
+            "thread const _T2 &_texture2;\n    "
+            "thread const _T3 &_texture3;\n    "
             "thread const sampler &_sampler;\n\n";        
         
         vsout += transformCode(funcs);
@@ -506,12 +507,14 @@ namespace {
         }
         
         vsout += variables;
-        vsout += "    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n    _InOut output;\n\n";
+        vsout += "    _FN<texture2d<float>, texture2d<float>, texture2d<float>, texture2d<float>> _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n    _InOut output;\n\n";
         vsout += transformCode(cb);
         vsout += "\n    (void)repeat_ID; (void)vertex_ID; (void)instance_ID;(void)_fn;\n";
         vsout += "    return output;\n}\n\n";
     }
-    void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &fsout) {
+    void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, const bool *textureCube, std::string &fsout) {
+        std::string textureTypes[4];
+
         fsout +=
             "struct _Output {\n"
             "    float4 c0[[color(0)]];\n"
@@ -521,17 +524,17 @@ namespace {
             "};\n\n"
             "fragment _Output main_fragment(\n    "
             "_InOut input [[stage_in]],\n    "
-            "sampler _sampler [[sampler(0)]],\n    "
-            "texture2d<float> _texture0 [[texture(0)]],\n    "
-            "texture2d<float> _texture1 [[texture(1)]],\n    "
-            "texture2d<float> _texture2 [[texture(2)]],\n    "
-            "texture2d<float> _texture3 [[texture(3)]],\n"
-            "";
+            "sampler _sampler [[sampler(0)]],\n";
+
+        for (int i = 0; i < 4; i++) {
+            textureTypes[i] = textureCube[i] ? "texturecube<float>" : "texture2d<float>";
+            fsout += "    " + textureTypes[i] + " _texture" + std::to_string(i) + " [[texture(" + std::to_string(i) + ")]],\n";
+        }
 
         fsout += "    constant _FrameData &framedata [[buffer(0)]],\n";
         fsout += "    constant _Constants &constants [[buffer(1)]])\n{\n";
         fsout += "    float2 fragment_coord = input.position.xy / framedata.rtBounds.xy;\n";
-        fsout += "    float4 output_color[4] = {};\n    _FN _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n\n";
+        fsout += "    float4 output_color[4] = {};\n    _FN<" + textureTypes[0] + ", " + textureTypes[1] + ", " + textureTypes[2] + ", " + textureTypes[3] + "> _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n\n";
         
         std::string codeBlock = cb;
         transformTypes(codeBlock);
@@ -569,7 +572,6 @@ static const std::string SHADER_DEFINES =
     "#define _smooth(a, b, k) smoothstep((a), (b), (k))\n"
     "#define _min(a, b) min((a), (b))\n"
     "#define _max(a, b) max((a), (b))\n"
-    "#define _tex2d(i, a) texture(_samplers[i], a)\n"
     "#define _discard() discard"
     "\n"
     "precision mediump float;\n"
@@ -582,8 +584,7 @@ static const std::string SHADER_DEFINES =
     "    mediump vec4 cameraDirection;\n"
     "    mediump vec4 rtBounds;\n"
     "}\n"
-    "framedata;\n\n"
-    "uniform sampler2D _samplers[4];\n\n";
+    "framedata;\n\n";
 
 std::string transformCode(const std::string &src) {
     std::string result = src;
@@ -707,7 +708,9 @@ void addFNDefBlock(const std::string &r, const std::string &name, const std::str
 }
 void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed, const std::string &consts, const std::string &inoutVS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &vsout) {
     vsout = SHADER_DEFINES;
+    vsout += "#define _tex2d(i, a) texture(_samplers[i], a)\n";
     vsout += "#define output_position gl_Position\n\n";
+    vsout += "uniform sampler2D _samplers[4];\n\n";
     vsout += fixed;
     vsout += consts;
     vsout += transformCode(funcs);
@@ -739,8 +742,16 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
     vsout += "    gl_Position.y *= -1.0;\n";
     vsout += "}\n\n";    
 }
-void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &fsout) {
-    fsout = SHADER_DEFINES + fixed + consts;
+void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, const bool *textureCube, std::string &fsout) {
+    fsout = SHADER_DEFINES;
+    fsout += "#define _tex2d(i, a) texture(_sampler##i, a)\n";
+    fsout += "#define _texcube(i, a) texture(_sampler##i, a)\n\n";
+
+    for (int i = 0; i < 4; i++) {
+        fsout += std::string("uniform ") + (textureCube[i] ? "samplerCube" : "sampler2D") + " _sampler" + std::to_string(i) + ";\n";
+    }
+
+    fsout += "\n" + fixed + consts;
     fsout += transformCode(funcs);
     fsout += inoutFS;
     std::string codeBlock = transformCode(cb);
@@ -785,10 +796,6 @@ static const std::string SHADER_DEFINES =
     "    float4 frame_cameraDirection;\n"
     "    float4 frame_rtBounds;\n"
     "};\n\n"
-    "Texture2D _texture0 : register(t0);\n"
-    "Texture2D _texture1 : register(t1);\n"
-    "Texture2D _texture2 : register(t2);\n"
-    "Texture2D _texture3 : register(t3);\n"
     "SamplerState _sampler0 : register(s0);\n"
     "SamplerState _sampler1 : register(s1);\n"
     "SamplerState _sampler2 : register(s2);\n"
@@ -913,6 +920,11 @@ void addFNDefBlock(const std::string &r, const std::string &name, const std::str
 void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed, const std::string &consts, const std::string &inoutVS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &vsout) {
     vsout = SHADER_DEFINES;
     vsout += "#define _tex2d(i, a) _texture##i.SampleLevel(_sampler##i, a, 0)\n\n";
+    vsout +=
+        "Texture2D _texture0 : register(t0);\n"
+        "Texture2D _texture1 : register(t1);\n"
+        "Texture2D _texture2 : register(t2);\n"
+        "Texture2D _texture3 : register(t3);\n\n";
     vsout += fixed;
     vsout += consts;
     vsout += inoutVS;
@@ -961,9 +973,16 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
     vsout += transformCode(cb);
     vsout += "\n    return output;\n}\n\n";
 }
-void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, std::string &fsout) {
+void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, const bool *textureCube, std::string &fsout) {
     fsout = SHADER_DEFINES;
-    fsout += "#define _tex2d(i, a) _texture##i.Sample(_sampler##i, a)\n\n";
+    fsout += "#define _tex2d(i, a) _texture##i.Sample(_sampler##i, a)\n";
+    fsout += "#define _texcube(i, a) _texture##i.Sample(_sampler##i, a)\n\n";
+
+    for (int i = 0; i < 4; i++) {
+        fsout += std::string(textureCube[i] ? "TextureCube" : "Texture2D") + " _texture" + std::to_string(i) + " : register(t" + std::to_string(i) + ");\n";
+    }
+
+    fsout += "\n";
     fsout += fixed;
     fsout += consts;
     fsout += inoutFS;
@@ -1094,9 +1113,37 @@ namespace foundation {
                     vssrcBlockDone = true;
                     continue;
                 }
-                if (fssrcBlockDone == false && blockName == "fssrc" && (input >> util::sequence("{"))) {
+                if (fssrcBlockDone == false && blockName == "fssrc") {
+                    std::string typesList;
+                    input.skipws();
+
+                    if (input.peekChar() == '[') {
+                        input >> util::braced(typesList, '[', ']');
+                    }
+                    if ((input >> util::sequence("{")) == false) {
+                        error = "shader has unexpected block\n";
+                        break;
+                    }
                     if (vssrcBlockDone == false) {
                         error = "'vssrc' block must be defined before 'fssrc'\n";
+                        completed = false;
+                        break;
+                    }
+
+                    util::strstream typesInput(typesList.data(), typesList.length());
+                    std::string typeName;
+                    bool textureCube[4] = {};
+                    int typeCount = 0;
+
+                    while (error.empty() && typesInput >> typeName) {
+                        if (typeCount < 4 && (typeName == "tex2d" || typeName == "cube")) {
+                            textureCube[typeCount++] = typeName == "cube";
+                        }
+                        else {
+                            error = "shader has invalid texture types in 'fssrc' block";
+                        }
+                    }
+                    if (error.empty() == false) {
                         completed = false;
                         break;
                     }
@@ -1108,7 +1155,7 @@ namespace foundation {
                         break;
                     }
 
-                    formFSBlock(shaderBlockFixed, shaderBlockConsts, shaderBlockInoutFS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, resultfs);
+                    formFSBlock(shaderBlockFixed, shaderBlockConsts, shaderBlockInoutFS, shaderBlockFunctions, codeBlock, shaderBlockFuncdefs, textureCube, resultfs);
                     fssrcBlockDone = true;
                     continue;
                 }
