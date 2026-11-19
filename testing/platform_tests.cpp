@@ -10,6 +10,43 @@ namespace test {
         EXPECT_LT(0.0f, api.platform->getScreenScale());
         return true;
     }
+    bool platform_keyboard_event_handlers_test(const API &api) {
+        using Args = foundation::PlatformKeyboardEventArgs;
+        std::string calls;
+        bool consume = false;
+
+        const foundation::EventHandlerToken first = api.platform->addKeyboardEventHandler([&](const Args &args) {
+            calls += args.type == Args::EventType::PRESS ? "1P" : "1R";
+            calls += args.key == foundation::Key::K ? "K" : "?";
+            return false;
+        }, true);
+        const foundation::EventHandlerToken second = api.platform->addKeyboardEventHandler([&](const Args &args) {
+            calls += "2";
+            return consume;
+        }, true);
+
+        EXPECT_NOT_EQ(first, foundation::INVALID_EVENT_TOKEN);
+        EXPECT_NOT_EQ(second, foundation::INVALID_EVENT_TOKEN);
+
+        api.platform->sendKeyboardEvent(Args { Args::EventType::PRESS, foundation::Key::K });
+        EXPECT_EQ(calls, "21PK");
+
+        calls.clear();
+        consume = true;
+        api.platform->sendKeyboardEvent(Args { Args::EventType::RELEASE, foundation::Key::K });
+        EXPECT_EQ(calls, "2");
+
+        calls.clear();
+        api.platform->removeEventHandler(second);
+        api.platform->sendKeyboardEvent(Args { Args::EventType::RELEASE, foundation::Key::K });
+        EXPECT_EQ(calls, "1RK");
+
+        calls.clear();
+        api.platform->removeEventHandler(first);
+        api.platform->sendKeyboardEvent(Args { Args::EventType::PRESS, foundation::Key::K });
+        EXPECT_TRUE(calls.empty());
+        return true;
+    }
 }
 
 namespace test {
@@ -138,6 +175,7 @@ namespace test {
     void registerPlatformTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(platform_uniquty_test);
         REGISTER_UNIT_TEST(platform_screen_scale_test);
+        REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);
