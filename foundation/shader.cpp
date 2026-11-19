@@ -553,7 +553,7 @@ static const std::string SHADER_DEFINES =
     "#define _sin(a) sin(a)\n"
     "#define _cos(a) cos(a)\n"
     "#define _abs(a) abs(a)\n"
-    "#define _sat(a) saturate(a)\n"
+    "#define _sat(a) clamp(a, 0.0, 1.0)\n"
     "#define _frac(a) fract(a)\n"
     "#define _transform(a, b) ((b) * (a))\n"
     "#define _dot(a, b) dot((a), (b))\n"
@@ -748,6 +748,7 @@ void formFSBlock(const std::string &fixed, const std::string &consts, const std:
     
     fsout += "out vec4 output_color[4];\n\n";
     fsout += "void main() {\n";
+    fsout += "    vec2 fragment_coord = gl_FragCoord.xy / framedata.rtBounds.xy;\n";
     fsout += codeBlock;
     fsout += "}\n\n";
 }
