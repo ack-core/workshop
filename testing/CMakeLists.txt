@@ -23,8 +23,6 @@ set(
 	"${m_source_root}/raycast_tests.cpp"
 	"${m_source_root}/simulation_tests.h"
 	"${m_source_root}/simulation_tests.cpp"
-	"${m_source_root}/stage_tests.h"
-	"${m_source_root}/stage_tests.cpp"
 )
 source_group("" FILES ${m_sources_list})
 
