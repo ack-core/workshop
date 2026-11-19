@@ -748,6 +748,7 @@ void formFSBlock(const std::string &fixed, const std::string &consts, const std:
     
     fsout += "out vec4 output_color[4];\n\n";
     fsout += "void main() {\n";
+    fsout += "    vec2 fragment_coord = gl_FragCoord.xy / framedata.rtBounds.xy;\n";
     fsout += codeBlock;
     fsout += "}\n\n";
 }
