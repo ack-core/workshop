@@ -743,15 +743,18 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
     vsout += "}\n\n";    
 }
 void formFSBlock(const std::string &fixed, const std::string &consts, const std::string &inoutFS, const std::string &funcs, const std::string &cb, const std::string &fdefs, const bool *textureCube, std::string &fsout) {
+    std::string tex2d = "vec4 _tex2d(int i, vec2 a) {\n";
+    std::string texcube = "vec4 _texcube(int i, vec3 a) {\n";
     fsout = SHADER_DEFINES;
-    fsout += "#define _tex2d(i, a) texture(_sampler##i, a)\n";
-    fsout += "#define _texcube(i, a) texture(_sampler##i, a)\n\n";
 
     for (int i = 0; i < 4; i++) {
-        fsout += std::string("uniform ") + (textureCube[i] ? "samplerCube" : "sampler2D") + " _sampler" + std::to_string(i) + ";\n";
+        const std::string index = std::to_string(i);
+        fsout += std::string("uniform ") + (textureCube[i] ? "samplerCube" : "sampler2D") + " _sampler" + index + ";\n";
+        (textureCube[i] ? texcube : tex2d) += indent + "if (i == " + index + ") return texture(_sampler" + index + ", a);\n";
     }
 
-    fsout += "\n" + fixed + consts;
+    fsout += "\n" + tex2d + indent + "return vec4(0.0);\n}\n\n" + texcube + indent + "return vec4(0.0);\n}\n\n";
+    fsout += fixed + consts;
     fsout += transformCode(funcs);
     fsout += inoutFS;
     std::string codeBlock = transformCode(cb);
