@@ -396,8 +396,12 @@ namespace foundation {
 
             [g_window center];
             [g_window makeFirstResponder:g_view];
+#if defined(IS_TESTS)
+            [g_window orderBack:nil];
+#else
             [g_window makeKeyAndOrderFront:nil];
             [NSApp activateIgnoringOtherApps:YES];
+#endif
 
             NSScreen *screen = g_window.screen ? g_window.screen : NSScreen.mainScreen;
             const CGDirectDisplayID displayID = [screen.deviceDescription[@"NSScreenNumber"] unsignedIntValue];
