@@ -626,7 +626,62 @@ namespace core {
         
         void (*_updateOrientation)(ParticleEmitterImpl &self, const math::vector3f &camRight, const math::vector3f &camUp);
     };
-    
+
+    //---
+
+    class CustomMeshImpl : public SceneInterface::CustomMesh {
+    public:
+        const foundation::RenderingInterfacePtr rendering;
+        const foundation::RenderShaderPtr shader;
+        const bool renderToGBuffer;
+        bool enabled = true;
+        foundation::RenderTopology topology = foundation::RenderTopology::TRIANGLES;
+        foundation::RenderDataPtr mesh;
+        foundation::RenderTexturePtr texture;
+        math::transform3f transform = math::transform3f::identity();
+
+    public:
+        CustomMeshImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderShaderPtr &shader, bool renderToGBuffer)
+        : rendering(rendering)
+        , shader(shader)
+        , renderToGBuffer(renderToGBuffer)
+        {}
+        ~CustomMeshImpl() override {}
+
+        void setEnabled(bool value) override {
+            enabled = value;
+        }
+        void setTransform(const math::transform3f &trfm) override {
+            transform = trfm;
+        }
+        void setPosition(const math::vector3f &pos) override {
+            transform.m41 = pos.x;
+            transform.m42 = pos.y;
+            transform.m43 = pos.z;
+        }
+        void setTexture(const foundation::RenderTexturePtr &tx) override {
+            texture = tx;
+        }
+        void setGeometry(foundation::RenderTopology tp, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override {
+            if (shader) {
+                topology = tp;
+                mesh = rendering->createData(shader->getInputLayout(), data, vcnt, indexes, icnt);
+            }
+        }
+        void draw(foundation::RenderingInterface &rendering, foundation::BlendType blendType) {
+            if (enabled && mesh) {
+                rendering.applyShader(shader, topology, blendType, foundation::DepthBehavior::TEST_AND_WRITE);
+                rendering.applyShaderConstants(&transform);
+                if (texture) {
+                    rendering.applyTextures({
+                        {texture, foundation::SamplerType::NEAREST}
+                    });
+                }
+                rendering.draw(mesh);
+            }
+        }
+    };
+
     //---
     
     class SceneInterfaceImpl : public SceneInterface {
@@ -649,6 +704,7 @@ namespace core {
         auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const foundation::RenderTexturePtr &tx) -> VegetationPtr override;
         auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) -> VegetationPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) -> ParticlesPtr override;
+        auto addCustomMesh(const foundation::InputLayout &layout, const char *shaderSource, bool renderToGBuffer) -> CustomMeshPtr override;
         auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
         auto getCameraDirection() const -> math::vector3f override;
@@ -701,7 +757,8 @@ namespace core {
         std::vector<std::shared_ptr<GroundMeshImpl>> _groundMeshes;
         std::vector<std::shared_ptr<VegetationImpl>> _vegetations;
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
-        
+        std::vector<std::shared_ptr<CustomMeshImpl>> _customMeshes;
+
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
 
         bool _initialized = false;
@@ -1092,6 +1149,11 @@ namespace core {
         return _particleEmitters.emplace_back(result);
     }
     
+    SceneInterface::CustomMeshPtr SceneInterfaceImpl::addCustomMesh(const foundation::InputLayout &layout, const char *shaderSource, bool renderToGBuffer) {
+        std::shared_ptr<CustomMeshImpl> result = std::make_shared<CustomMeshImpl>(_rendering, _rendering->createShader(shaderSource, layout), renderToGBuffer);
+        return _customMeshes.emplace_back(result);
+    }
+
     SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(float r, float g, float b, float radius) {
         return nullptr;
     }
@@ -1150,6 +1212,7 @@ namespace core {
         util::cleanupUnused(_groundMeshes);
         util::cleanupUnused(_vegetations);
         util::cleanupUnused(_particleEmitters);
+        util::cleanupUnused(_customMeshes);
 
         if (_initialized == false) {
             _initialized = true;
@@ -1218,7 +1281,11 @@ namespace core {
                         rendering.draw(vegetation->mesh);
                     }
                 }
-
+                for (const auto &customMesh : _customMeshes) {
+                    if (customMesh->renderToGBuffer) {
+                        customMesh->draw(rendering, foundation::BlendType::DISABLED);
+                    }
+                }
             });
             _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
@@ -1230,6 +1297,11 @@ namespace core {
                 rendering.draw();
             });
             _rendering->forTarget(nullptr, _gbuffer->getDepth(), std::nullopt, [&](foundation::RenderingInterface &rendering) {
+                for (const auto &customMesh : _customMeshes) {
+                    if (customMesh->renderToGBuffer == false) {
+                        customMesh->draw(rendering, foundation::BlendType::MIXING);
+                    }
+                }
                 rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
                 for (const auto &emitter : _particleEmitters) {
                     if (emitter->enabled) {
