@@ -17,6 +17,6 @@ rm -rf "$DATA"/Documents/*
 xcrun simctl launch --console-pty "$UDID" "$BUNDLE" || true
 
 RESULT=$(cat "$DATA/Documents/exit_code" 2>/dev/null || echo 1)
-cp "$DATA"/Documents/rendering_tests/*.tga "$BINARY/data/rendering_tests/" 2>/dev/null || true
+for DIR in "$DATA"/Documents/*/; do mkdir -p "$BINARY/data/$(basename "$DIR")" && cp "$DIR"*.tga "$BINARY/data/$(basename "$DIR")/" 2>/dev/null || true; done
 python3 tools/refs2png.py -b "$BINARY"
 exit "$RESULT"

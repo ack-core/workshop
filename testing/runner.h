@@ -69,8 +69,8 @@
 
 #define REGISTER_UNIT_TEST(f) runner.registerUnitTest(#f, f)
 #define REGISTER_STEP_TEST(c) runner.registerStepTest(#c, c::make)
-#define REGISTER_PIXEL_TEST(c) runner.registerPixelTest(#c, c::make)
-#define REGISTER_SCREENSHOT_TEST(c) runner.registerScreenshotTest(#c, c::make)
+#define REGISTER_PIXEL_TEST(folder, c) runner.registerPixelTest(folder, #c, c::make)
+#define REGISTER_SCREENSHOT_TEST(folder, c) runner.registerScreenshotTest(folder, #c, c::make)
 
 namespace test {
     static const std::size_t MAX_UNIT_TESTS_PER_FRAME = 1;
@@ -96,7 +96,7 @@ namespace test {
     };
 
     // testResult is called when async work is complete, but not earlier than next frame after init
-    // @ref   - RGBA pixels of 'rendering_tests/<test name>_ref.tga'
+    // @ref   - RGBA pixels of '<folder>/<test name>_ref.png'
     // @frame - RGBA pixels of the rendered frame
     // Both are TESTING_RENDER_WIDTH x TESTING_RENDER_HEIGHT, rows top-down
     //
@@ -110,7 +110,7 @@ namespace test {
         virtual ~PixelTestInterface() = default;
     };
 
-    // Rendered frame is compared with 'rendering_tests/<test name>_ref.png' when async work is complete, but not earlier than next frame after init
+    // Rendered frame is compared with '<folder>/<test name>_ref.png' when async work is complete, but not earlier than next frame after init
     // getThreshold - max allowed absolute difference per RGBA channel, 0 means exact match
     //
     class ScreenshotTestInterface {
@@ -139,8 +139,8 @@ namespace test {
 
         void registerUnitTest(const char *name, bool (*testFunc)(const API &api));
         void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)());
-        void registerPixelTest(const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)());
-        void registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)());
+        void registerPixelTest(const char* folder, const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)());
+        void registerScreenshotTest(const char* folder, const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)());
 
         void nextFrame(float dtSec);
 
@@ -166,4 +166,14 @@ namespace test {
         std::unique_ptr<ScreenshotTestInterface> _currentScreenshotTest;
         ByteDataPtr _screenshotRef;
     };
+
+    void registerMathTests(TestRunner &runner);
+    void registerUtilTests(TestRunner &runner);
+    void registerShaderTests(TestRunner &runner);
+    void registerPlatformTests(TestRunner &runner);
+    void registerRenderingTests(TestRunner &runner);
+    void registerResourceProviderTests(TestRunner &runner);
+    void registerSceneTests(TestRunner &runner);
+    void registerRaycastTests(TestRunner &runner);
+    void registerSimulationTests(TestRunner &runner);
 }

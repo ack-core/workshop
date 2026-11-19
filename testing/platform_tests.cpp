@@ -1,5 +1,5 @@
 
-#include "platform_tests.h"
+#include "runner.h"
 
 namespace test {
     bool platform_uniquty_test(const API &api) {

@@ -1,5 +1,5 @@
 
-#include "raycast_tests.h"
+#include "runner.h"
 
 namespace test {
     bool raycast_sphere_hit_test(const API &api) {

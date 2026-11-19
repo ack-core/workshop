@@ -5,23 +5,14 @@ set(
 	m_sources_list
 	"${m_source_root}/runner.h"
 	"${m_source_root}/runner.cpp"
-	"${m_source_root}/math_tests.h"
 	"${m_source_root}/math_tests.cpp"
-	"${m_source_root}/util_tests.h"
 	"${m_source_root}/util_tests.cpp"
-	"${m_source_root}/shader_tests.h"
 	"${m_source_root}/shader_tests.cpp"
-	"${m_source_root}/platform_tests.h"
 	"${m_source_root}/platform_tests.cpp"
-	"${m_source_root}/rendering_tests.h"
 	"${m_source_root}/rendering_tests.cpp"
-	"${m_source_root}/resource_provider_tests.h"
 	"${m_source_root}/resource_provider_tests.cpp"
-	"${m_source_root}/scene_tests.h"
 	"${m_source_root}/scene_tests.cpp"
-	"${m_source_root}/raycast_tests.h"
 	"${m_source_root}/raycast_tests.cpp"
-	"${m_source_root}/simulation_tests.h"
 	"${m_source_root}/simulation_tests.cpp"
 )
 source_group("" FILES ${m_sources_list})

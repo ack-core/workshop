@@ -57,12 +57,12 @@ namespace test {
         _stepTests.emplace_back(name, makeTestInstance);
     }
 
-    void TestRunner::registerPixelTest(const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)()) {
-        _pixelTests.emplace_back(name, makeTestInstance);
+    void TestRunner::registerPixelTest(const char* folder, const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)()) {
+        _pixelTests.emplace_back(std::string(folder) + "/" + name, makeTestInstance);
     }
 
-    void TestRunner::registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)()) {
-        _screenshotTests.emplace_back(name, makeTestInstance);
+    void TestRunner::registerScreenshotTest(const char* folder, const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)()) {
+        _screenshotTests.emplace_back(std::string(folder) + "/" + name, makeTestInstance);
     }
 
     void TestRunner::nextFrame(float dtSec) {
@@ -206,7 +206,7 @@ namespace test {
     }
 
     void TestRunner::loadScreenshotRef(const std::string &name) {
-        _api.platform->loadFile(("rendering_tests/" + name + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
+        _api.platform->loadFile((name + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
             _screenshotRef = decodeScreenshotPNG(data.get(), size);
         }, true);
     }
@@ -214,7 +214,7 @@ namespace test {
     void TestRunner::saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix) {
         auto tga = util::writeTGA(frame, foundation::TESTING_RENDER_WIDTH, foundation::TESTING_RENDER_HEIGHT);
         const std::uint8_t *data = tga.first.get();
-        _api.platform->saveFile(("rendering_tests/" + name + suffix + ".tga").data(), data, tga.second, [this, name, suffix, tga = std::move(tga.first)](bool saved) {
+        _api.platform->saveFile((name + suffix + ".tga").data(), data, tga.second, [this, name, suffix, tga = std::move(tga.first)](bool saved) {
             if (saved == false) {
                 _api.platform->logMsg("[TEST] '%s' %s saving failed", name.data(), suffix);
             }

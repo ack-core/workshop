@@ -13,15 +13,6 @@
 #include "game/state_manager.h"
 #elif defined(IS_TESTS)
 #include "testing/runner.h"
-#include "testing/math_tests.h"
-#include "testing/util_tests.h"
-#include "testing/shader_tests.h"
-#include "testing/platform_tests.h"
-#include "testing/rendering_tests.h"
-#include "testing/resource_provider_tests.h"
-#include "testing/scene_tests.h"
-#include "testing/raycast_tests.h"
-#include "testing/simulation_tests.h"
 #endif
 
 foundation::PlatformInterfacePtr platform;

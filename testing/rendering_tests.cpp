@@ -1,5 +1,5 @@
 
-#include "rendering_tests.h"
+#include "runner.h"
 
 namespace test {
     bool rendering_uniquty_test(const API &api) {
@@ -527,13 +527,13 @@ namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_statistics_test);
-        REGISTER_PIXEL_TEST(rendering_fill_green_test);
-        REGISTER_PIXEL_TEST(rendering_white_line_on_black_test);
-        REGISTER_PIXEL_TEST(rendering_red_triangle_on_black_test);
-        REGISTER_PIXEL_TEST(rendering_static_data_triangle_test);
-        REGISTER_PIXEL_TEST(rendering_strip_quads_test);
-        REGISTER_PIXEL_TEST(rendering_shader_constants_test);
-        REGISTER_PIXEL_TEST(rendering_textured_quad_test);
-        REGISTER_SCREENSHOT_TEST(rendering_4x4_linear_texture_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_fill_green_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_white_line_on_black_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_red_triangle_on_black_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_static_data_triangle_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_strip_quads_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_shader_constants_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_textured_quad_test);
+        REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }

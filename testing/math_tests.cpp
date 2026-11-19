@@ -1,5 +1,5 @@
 
-#include "math_tests.h"
+#include "runner.h"
 
 namespace {
     bool eq2(const math::vector2f &v, float x, float y) {

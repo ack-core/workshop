@@ -1,5 +1,5 @@
 
-#include "simulation_tests.h"
+#include "runner.h"
 
 namespace test {
     bool simulationCircleMovesByVelocity(const API &api) {

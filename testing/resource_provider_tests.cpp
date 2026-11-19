@@ -1,5 +1,5 @@
 
-#include "resource_provider_tests.h"
+#include "runner.h"
 
 namespace test {
     bool resource_provider_non_uniquity_test(const API &api) {

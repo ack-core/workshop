@@ -1,5 +1,5 @@
 
-#include "scene_tests.h"
+#include "runner.h"
 
 namespace test {
     bool scene_statistics_test(const API &api) {
@@ -75,6 +75,6 @@ namespace test {
     void registerSceneTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
-        REGISTER_SCREENSHOT_TEST(scene_line_square_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
     }
 }

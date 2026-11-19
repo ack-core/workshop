@@ -4,7 +4,7 @@ from __future__ import annotations
 Tool to convert rendering tests references saved as *.tga to *.png and move them to testing resources
 Launched from the repository root
 
-<binary>/data/rendering_tests/<name>_ref.tga -> testing/resources/rendering_tests/<name>_ref.png
+<binary>/data/<folder>/<name>_<ref|fail|diff>.tga -> testing/resources/<folder>/<name>_<ref|fail|diff>.png
 TGA: uncompressed 32-bit BGRA, origin top-left or bottom-left
 """
 
@@ -15,8 +15,9 @@ import sys
 
 import png
 
-REFS_SRC_DIR = os.path.join("data", "rendering_tests")
-REFS_DST_DIR = os.path.join("testing", "resources", "rendering_tests")
+REFS_SRC_DIR = "data"
+REFS_DST_DIR = os.path.join("testing", "resources")
+REFS_SUFFIXES = ("_ref", "_fail", "_diff")
 TGA_HEADER = 18
 
 
@@ -73,14 +74,18 @@ def move_refs(src_dir: str, dst_dir: str):
     if not os.path.isdir(src_dir):
         return
 
-    os.makedirs(dst_dir, exist_ok=True)
+    for folder in sorted(os.listdir(src_dir)):
+        folder_dir = os.path.join(src_dir, folder)
+        if not os.path.isdir(folder_dir):
+            continue
 
-    for name in sorted(os.listdir(src_dir)):
-        base, ext = os.path.splitext(name)
-        if ext.lower() == ".tga":
-            src = os.path.join(src_dir, name)
-            convert_tga(src, os.path.join(dst_dir, base + ".png"))
-            os.remove(src)
+        for name in sorted(os.listdir(folder_dir)):
+            base, ext = os.path.splitext(name)
+            if ext.lower() == ".tga" and base.endswith(REFS_SUFFIXES):
+                src = os.path.join(folder_dir, name)
+                os.makedirs(os.path.join(dst_dir, folder), exist_ok=True)
+                convert_tga(src, os.path.join(dst_dir, folder, base + ".png"))
+                os.remove(src)
 
 
 def main() -> int:

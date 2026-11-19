@@ -1,5 +1,5 @@
 
-#include "math_tests.h"
+#include "runner.h"
 
 namespace test {
     bool shader_bad_args_test(const API& api) {
