@@ -56,6 +56,8 @@ namespace test {
             return std::make_unique<scene_line_square_test>();
         }
         void init(const API &api) override {
+            api.raycast->update(0.0f);
+            api.simulation->update(0.0f);
             api.scene->setLinesDrawingEnabled(true);
             api.scene->setCameraLookAt({0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, 0.0f});
             _square = api.scene->addLineSet();
