@@ -149,6 +149,7 @@ namespace test {
 
         // Screenshot tests
         if (_currentScreenshotTest) {
+            _api.scene->updateAndDraw(dtSec);
             _currentScreenshotTest->updateAndDraw(_api);
             ByteDataPtr frame = _api.rendering->presentFrame();
 
