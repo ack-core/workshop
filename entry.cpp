@@ -92,6 +92,7 @@ extern "C" void initialize() {
     test::registerPlatformTests(*testRunner);
     test::registerRenderingTests(*testRunner);
     test::registerResourceProviderTests(*testRunner);
+    test::registerFontAtlasProviderTests(*testRunner);
     test::registerSceneTests(*testRunner);
     test::registerRaycastTests(*testRunner);
     test::registerSimulationTests(*testRunner);
