@@ -717,6 +717,47 @@ namespace test {
 
         return true;
     }
+
+    bool util_random_source_test(const API &api) {
+        util::RandomSource a (42, 7), b (42, 7), otherSeed (43, 7), otherSeq (42, 8);
+        int seedDiffs = 0, seqDiffs = 0;
+
+        for (int i = 0; i < 100; i++) {
+            const std::uint32_t value = a.getNextRandom();
+            EXPECT_EQ(value, b.getNextRandom());
+            seedDiffs += value != otherSeed.getNextRandom();
+            seqDiffs += value != otherSeq.getNextRandom();
+        }
+        EXPECT_LT(90, seedDiffs);
+        EXPECT_LT(90, seqDiffs);
+
+        float min = 1.0f, max = -1.0f;
+        for (int i = 0; i < 10000; i++) {
+            const float value = a.getNextRandomF();
+            min = std::min(min, value);
+            max = std::max(max, value);
+        }
+        EXPECT_FALSE(min < -1.0f);
+        EXPECT_FALSE(max > 1.0f);
+        EXPECT_LT(min, -0.99f);
+        EXPECT_LT(0.99f, max);
+
+        util::GaussRandomSource ga (42, 7), gb (42, 7), gc (43, 7);
+        int gaussDiffs = 0;
+        float sum = 0.0f;
+
+        for (int i = 0; i < 1000; i++) {
+            const float value = ga.getNextRandomF();
+            EXPECT_TRUE(std::isfinite(value));
+            EXPECT_EQ_F(value, gb.getNextRandomF());
+            gaussDiffs += value != gc.getNextRandomF();
+            sum += value;
+        }
+        EXPECT_LT(900, gaussDiffs);
+        EXPECT_LT(std::abs(sum / 1000.0f), 0.1f);
+
+        return true;
+    }
 }
 
 
@@ -736,5 +777,6 @@ namespace test {
         REGISTER_UNIT_TEST(util_description_parse_test);
         REGISTER_UNIT_TEST(util_description_serialize_test);
         REGISTER_UNIT_TEST(util_easing_test);
+        REGISTER_UNIT_TEST(util_random_source_test);
     }
 }
