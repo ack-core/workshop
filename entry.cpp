@@ -97,6 +97,7 @@ extern "C" void initialize() {
     test::registerSceneTests(*testRunner);
     test::registerRaycastTests(*testRunner);
     test::registerSimulationTests(*testRunner);
+    test::registerStageTests(*testRunner);
 
     platform->setLoop([](float dtSec) {
         testRunner->nextFrame(dtSec);

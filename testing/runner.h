@@ -178,4 +178,5 @@ namespace test {
     void registerSceneTests(TestRunner &runner);
     void registerRaycastTests(TestRunner &runner);
     void registerSimulationTests(TestRunner &runner);
+    void registerStageTests(TestRunner &runner);
 }
