@@ -105,6 +105,9 @@ namespace test {
             return;
         }
         if (_stepTestIndex < _stepTests.size()) {
+            if (_api.platform->isAsyncWorkInProgress()) {
+                return;
+            }
             const auto &test = _stepTests[_stepTestIndex];
             _currentStepTest = test.second();
             _currentStepTest->init(_api);
