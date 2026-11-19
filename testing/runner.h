@@ -70,6 +70,7 @@
 #define REGISTER_UNIT_TEST(f) runner.registerUnitTest(#f, f)
 #define REGISTER_STEP_TEST(c) runner.registerStepTest(#c, c::make)
 #define REGISTER_PIXEL_TEST(c) runner.registerPixelTest(#c, c::make)
+#define REGISTER_SCREENSHOT_TEST(c) runner.registerScreenshotTest(#c, c::make)
 
 namespace test {
     static const std::size_t MAX_UNIT_TESTS_PER_FRAME = 1;
@@ -109,6 +110,19 @@ namespace test {
         virtual ~PixelTestInterface() = default;
     };
 
+    // Rendered frame is compared with 'rendering_tests/<test name>_ref.png' when async work is complete, but not earlier than next frame after init
+    // getThreshold - max allowed absolute difference per RGBA channel, 0 means exact match
+    //
+    class ScreenshotTestInterface {
+    public:
+        virtual void init(const API& api) = 0;
+        virtual void updateAndDraw(const API& api) = 0;
+        virtual std::uint8_t getThreshold() const = 0;
+
+    public:
+        virtual ~ScreenshotTestInterface() = default;
+    };
+
     class TestRunner {
     public:
         TestRunner(
@@ -126,10 +140,12 @@ namespace test {
         void registerUnitTest(const char *name, bool (*testFunc)(const API &api));
         void registerStepTest(const char* name, std::unique_ptr<StepTestInterface>(*makeTestInstance)());
         void registerPixelTest(const char* name, std::unique_ptr<PixelTestInterface>(*makeTestInstance)());
+        void registerScreenshotTest(const char* name, std::unique_ptr<ScreenshotTestInterface>(*makeTestInstance)());
 
         void nextFrame(float dtSec);
 
     private:
+        void loadScreenshotRef(const std::string &name);
         void saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix);
 
     private:
@@ -138,6 +154,7 @@ namespace test {
         std::vector<std::pair<std::string, bool (*)(const API &api)>> _unitTests;
         std::vector<std::pair<std::string, std::unique_ptr<StepTestInterface>(*)()>> _stepTests;
         std::vector<std::pair<std::string, std::unique_ptr<PixelTestInterface>(*)()>> _pixelTests;
+        std::vector<std::pair<std::string, std::unique_ptr<ScreenshotTestInterface>(*)()>> _screenshotTests;
 
         int _testsFailed = 0;
         std::size_t _unitTestIndex = 0;
@@ -145,7 +162,8 @@ namespace test {
         std::unique_ptr<StepTestInterface> _currentStepTest;
         std::size_t _pixelTestIndex = 0;
         std::unique_ptr<PixelTestInterface> _currentPixelTest;
+        std::size_t _screenshotTestIndex = 0;
+        std::unique_ptr<ScreenshotTestInterface> _currentScreenshotTest;
         ByteDataPtr _screenshotRef;
-        ByteDataPtr _screenshotFrameTGA;
     };
 }
