@@ -67,6 +67,7 @@ namespace test {
 
     void TestRunner::nextFrame(float dtSec) {
         _api.resourceProvider->update(dtSec);
+        _api.scene->updateAndDraw(dtSec);
 
         // Unit tests
         if (_unitTestIndex < _unitTests.size()) {
@@ -149,9 +150,6 @@ namespace test {
 
         // Screenshot tests
         if (_currentScreenshotTest) {
-            _api.raycast->update(dtSec);
-            _api.simulation->update(dtSec);
-            _api.scene->updateAndDraw(dtSec);
             _currentScreenshotTest->updateAndDraw(_api);
             ByteDataPtr frame = _api.rendering->presentFrame();
 
