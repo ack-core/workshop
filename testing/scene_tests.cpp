@@ -50,8 +50,30 @@ namespace test {
 }
 
 namespace test {
+    class scene_bounding_box_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_bounding_box_test>();
+        }
+        void init(const API &api) override {
+            api.scene->setLinesDrawingEnabled(true);
+            api.scene->setCameraLookAt({4.0f, 3.0f, 5.0f}, {0.0f, 0.0f, 0.0f});
+            _box = api.scene->addBoundingBox({0.0f, 0.0f, 0.0f}, {-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+    private:
+        core::SceneInterface::BoundingBoxPtr _box;
+    };
+}
+
+namespace test {
     void registerSceneTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
+        REGISTER_SCREENSHOT_TEST(scene_bounding_box_test);
     }
 }
