@@ -82,6 +82,7 @@ namespace test {
         const core::SceneInterfacePtr& scene;
         const core::RaycastInterfacePtr& raycast;
         const core::SimulationInterfacePtr& simulation;
+        const ui::StageInterfacePtr& stage;
     };
 
     // testResult is called when async work is complete, but not earlier than next frame after init
@@ -131,7 +132,8 @@ namespace test {
             const resource::ResourceProviderPtr& resourceProvider,
             const core::SceneInterfacePtr& scene,
             const core::RaycastInterfacePtr& raycast,
-            const core::SimulationInterfacePtr& simulation
+            const core::SimulationInterfacePtr& simulation,
+            const ui::StageInterfacePtr& stage
         );
         ~TestRunner();
 

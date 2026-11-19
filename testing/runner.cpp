@@ -38,9 +38,10 @@ namespace test {
         const resource::ResourceProviderPtr& resourceProvider,
         const core::SceneInterfacePtr& scene,
         const core::RaycastInterfacePtr& raycast,
-        const core::SimulationInterfacePtr& simulation
+        const core::SimulationInterfacePtr& simulation,
+        const ui::StageInterfacePtr& stage
     )
-    : _api{platform, rendering, resourceProvider, scene, raycast, simulation}
+    : _api{platform, rendering, resourceProvider, scene, raycast, simulation, stage}
     {
 
     }
@@ -70,6 +71,7 @@ namespace test {
         _api.raycast->update(dtSec);
         _api.simulation->update(dtSec);
         _api.scene->updateAndDraw(dtSec);
+        _api.stage->updateAndDraw(dtSec);
 
         // Unit tests
         if (_unitTestIndex < _unitTests.size()) {

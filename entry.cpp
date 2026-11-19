@@ -84,8 +84,10 @@ extern "C" void initialize() {
     scene = core::SceneInterface::instance(platform, rendering);
     raycast = core::RaycastInterface::instance(platform, scene);
     simulation = core::SimulationInterface::instance(platform, scene);
+    fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering);
+    stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
 
-    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, scene, raycast, simulation);
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, scene, raycast, simulation, stage);
     test::registerMathTests(*testRunner);
     test::registerUtilTests(*testRunner);
     test::registerShaderTests(*testRunner);
