@@ -112,7 +112,7 @@ namespace test {
 
     // Rendered frame is compared with 'rendering_tests/<test name>_ref.png' when async work is complete, but not earlier than next frame after init
     // getThreshold - max allowed absolute difference per RGBA channel, 0 means exact match
-    // Scene is updated and drawn every frame before test's updateAndDraw
+    // Raycast, simulation and scene are updated and scene is drawn every frame before test's updateAndDraw
     //
     class ScreenshotTestInterface {
     public:
