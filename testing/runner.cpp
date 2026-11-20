@@ -197,6 +197,10 @@ namespace test {
             return;
         }
 
+        if (_testsFailed == 0) {
+            _api.platform->logMsg("All tests passed");
+        }
+
         _api.platform->exit(_testsFailed);
     }
 
