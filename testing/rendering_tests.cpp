@@ -470,60 +470,6 @@ namespace test {
 }
 
 namespace test {
-    class rendering_4x4_linear_texture_test : public ScreenshotTestInterface {
-    public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
-            return std::make_unique<rendering_4x4_linear_texture_test>();
-        }
-        void init(const API &api) override {
-            // Fullscreen quad sampling 4x4 multicolor texture with linear filtering
-            //
-            const char *shaderSrc = R"(
-                fixed {
-                    quad[4] : float2 = [-1.0, 1.0][1.0, 1.0][-1.0, -1.0][1.0, -1.0]
-                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
-                }
-                inout {
-                    uv : float2
-                }
-                vssrc {
-                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0);
-                    output_uv = fixed_uv[repeat_ID];
-                }
-                fssrc {
-                    output_color[0] = _tex2d(0, input_uv);
-                }
-            )";
-            const foundation::InputLayout layout = foundation::InputLayout {
-                .repeat = 4
-            };
-            const std::uint32_t pixels[] = {
-                0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff,
-                0xff00ffff, 0xffffff00, 0xffff00ff, 0xff000000,
-                0xff0080ff, 0xff800080, 0xff808080, 0xff808000,
-                0xffcbc0ff, 0xff00ff80, 0xff800000, 0xff008080,
-            };
-            _shader = api.rendering->createShader(shaderSrc, layout);
-            _texture = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, { pixels });
-        }
-        void updateAndDraw(const API &api) override {
-            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
-                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
-                rendering.applyTextures({ { _texture, foundation::SamplerType::LINEAR } });
-                rendering.draw(1);
-            });
-        }
-        std::uint8_t getThreshold() const override {
-            return 4;
-        }
-
-    private:
-        foundation::RenderShaderPtr _shader;
-        foundation::RenderTexturePtr _texture;
-    };
-}
-
-namespace test {
     class rendering_render_target_test : public PixelTestInterface {
     public:
         static auto make() -> std::unique_ptr<PixelTestInterface> {
@@ -608,6 +554,60 @@ namespace test {
 }
 
 namespace test {
+    class rendering_4x4_linear_texture_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<rendering_4x4_linear_texture_test>();
+        }
+        void init(const API &api) override {
+            // Fullscreen quad sampling 4x4 multicolor texture with linear filtering
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [-1.0, 1.0][1.0, 1.0][-1.0, -1.0][1.0, -1.0]
+                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0);
+                    output_uv = fixed_uv[repeat_ID];
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 4
+            };
+            const std::uint32_t pixels[] = {
+                0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff,
+                0xff00ffff, 0xffffff00, 0xffff00ff, 0xff000000,
+                0xff0080ff, 0xff800080, 0xff808080, 0xff808000,
+                0xffcbc0ff, 0xff00ff80, 0xff800000, 0xff008080,
+            };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+            _texture = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, { pixels });
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyTextures({ { _texture, foundation::SamplerType::LINEAR } });
+                rendering.draw(1);
+            });
+        }
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+    private:
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderTexturePtr _texture;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_statistics_test);
@@ -618,7 +618,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_strip_quads_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_shader_constants_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_textured_quad_test);
-        REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_render_target_test);
+        REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
