@@ -112,13 +112,14 @@ namespace test {
     };
 
     // Rendered frame is compared with '<folder>/<test name>_ref.png' when async work is complete, but not earlier than next frame after init
-    // getThreshold - max allowed absolute difference per RGBA channel, 0 means exact match
+    // getThresholdAndMaxDiff - max allowed absolute difference per RGBA channel (0 means exact match)
+    //                          and max count of pixels allowed to exceed it
     //
     class ScreenshotTestInterface {
     public:
         virtual void init(const API& api) = 0;
         virtual void updateAndDraw(const API& api) = 0;
-        virtual std::uint8_t getThreshold() const = 0;
+        virtual std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const = 0;
 
     public:
         virtual ~ScreenshotTestInterface() = default;

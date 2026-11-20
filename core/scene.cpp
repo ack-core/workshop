@@ -1038,10 +1038,10 @@ namespace {
             float3 wpos = getWPos(input_uv, gdepth);
             float3 wnpos = wpos + 0.1 * normal;
             float  lit = 0.0;
-            float  rnd = _sin(_dot(wpos, float3(12.9898, 78.233, 37.719)));
-            
+            float  base = _frac(52.9829189 * _frac(_dot(_floor(input_uv * frame_rtBounds.xy), float2(0.06711056, 0.00583715))));
+
             for (int i = 0; i < 12; i++) {
-                rnd = 0.1 + _frac(rnd * 143758.5453);
+                float  rnd = 0.1 + _frac(base + float(i) * 0.618034);
                 float3 rv = _norm(fixed_rndv[i]) * rnd;
                 float3 dpos = getDPos(wnpos + _sign(_dot(normal, rv)) * rv);
                 float  rdepth = _tex2d(2, dpos.xy).r;
