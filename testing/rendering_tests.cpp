@@ -524,6 +524,90 @@ namespace test {
 }
 
 namespace test {
+    class rendering_render_target_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_render_target_test>();
+        }
+        void init(const API &api) override {
+            // Red triangle in the top-left quadrant of the blue target, then target texture drawn as fullscreen quad
+            //
+            const char *triangleSrc = R"(
+                fixed {
+                    triangle[3] : float2 = [-1.0, 1.0][0.0, 1.0][-1.0, 0.0]
+                }
+                vssrc {
+                    output_position = float4(fixed_triangle[repeat_ID], 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = float4(1.0, 0.0, 0.0, 1.0);
+                }
+            )";
+            const char *quadSrc = R"(
+                fixed {
+                    quad[4] : float2 = [-1.0, 1.0][1.0, 1.0][-1.0, -1.0][1.0, -1.0]
+                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0);
+                    output_uv = fixed_uv[repeat_ID];
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            _triangleShader = api.rendering->createShader(triangleSrc, foundation::InputLayout { .repeat = 3 });
+            _quadShader = api.rendering->createShader(quadSrc, foundation::InputLayout { .repeat = 4 });
+            _target = api.rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, 64, 64, false);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(_target, nullptr, math::color{ 0.0f, 0.0f, 1.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_triangleShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(1);
+            });
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_quadShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyTextures({ { _target->getTexture(0), foundation::SamplerType::NEAREST } });
+                rendering.draw(1);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_triangleShader, nullptr);
+            EXPECT_NOT_EQ(_quadShader, nullptr);
+            EXPECT_NOT_EQ(_target, nullptr);
+            EXPECT_EQ(_target->getWidth(), 64);
+            EXPECT_EQ(_target->getHeight(), 64);
+            EXPECT_EQ(_target->getTextureCount(), 1);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == 0 && p[2] == b && p[3] == 255;
+            };
+
+            const std::size_t w = foundation::TESTING_RENDER_WIDTH;
+            const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
+
+            EXPECT_TRUE(pixelIs(w / 8, h / 8, 255, 0));           // triangle: top-left
+            EXPECT_TRUE(pixelIs(w * 3 / 8, h / 16, 255, 0));      // triangle: top-right corner
+            EXPECT_TRUE(pixelIs(w / 16, h * 3 / 8, 255, 0));      // triangle: bottom-left corner
+            EXPECT_TRUE(pixelIs(w * 3 / 8, h * 3 / 8, 0, 255));   // cleared: outside triangle hypotenuse
+            EXPECT_TRUE(pixelIs(w * 7 / 8, h / 8, 0, 255));       // cleared: top-right
+            EXPECT_TRUE(pixelIs(w / 8, h * 7 / 8, 0, 255));       // cleared: bottom-left
+            EXPECT_TRUE(pixelIs(w * 7 / 8, h * 7 / 8, 0, 255));   // cleared: bottom-right
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _triangleShader;
+        foundation::RenderShaderPtr _quadShader;
+        foundation::RenderTargetPtr _target;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_statistics_test);
@@ -535,5 +619,6 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_shader_constants_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_textured_quad_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_render_target_test);
     }
 }
