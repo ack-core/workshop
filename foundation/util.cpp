@@ -477,7 +477,7 @@ namespace util {
 
     GaussRandomSource::GaussRandomSource(std::uint64_t seed, std::uint64_t seq) : _rnd(seed, seq) {}
     float GaussRandomSource::getNextRandomF() {
-        const float u1 = _rnd.getNextRandomF();
+        const float u1 = std::max(std::abs(_rnd.getNextRandomF()), std::numeric_limits<float>::min());
         const float u2 = _rnd.getNextRandomF();
         float r = std::sqrtf(-2.0f * std::logf(u1));
         float theta = 2.0f * MATH_PI * u2;

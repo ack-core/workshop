@@ -717,6 +717,56 @@ namespace test {
 
         return true;
     }
+
+    bool util_random_source_test(const API &api) {
+        util::RandomSource a (42, 7), b (42, 7), otherSeed (43, 7), otherSeq (42, 8);
+        int seedDiffs = 0, seqDiffs = 0;
+
+        for (int i = 0; i < 100; i++) {
+            const std::uint32_t value = a.getNextRandom();
+            EXPECT_EQ(value, b.getNextRandom());
+            seedDiffs += value != otherSeed.getNextRandom();
+            seqDiffs += value != otherSeq.getNextRandom();
+        }
+        EXPECT_LT(90, seedDiffs);
+        EXPECT_LT(90, seqDiffs);
+
+        float min = 1.0f, max = -1.0f;
+        for (int i = 0; i < 10000; i++) {
+            const float value = a.getNextRandomF();
+            min = std::min(min, value);
+            max = std::max(max, value);
+        }
+        EXPECT_FALSE(min < -1.0f);
+        EXPECT_FALSE(max > 1.0f);
+        EXPECT_LT(min, -0.99f);
+        EXPECT_LT(0.99f, max);
+
+        util::GaussRandomSource ga (42, 7), gb (42, 7), gc (43, 7);
+        const int count = 10000;
+        int gaussDiffs = 0, within1 = 0, within2 = 0, within3 = 0;
+        float sum = 0.0f, sumSq = 0.0f;
+
+        for (int i = 0; i < count; i++) {
+            const float value = ga.getNextRandomF();
+            EXPECT_TRUE(std::isfinite(value));
+            EXPECT_EQ_F(value, gb.getNextRandomF());
+            gaussDiffs += value != gc.getNextRandomF();
+            sum += value;
+            sumSq += value * value;
+            within1 += std::abs(value) < 1.0f;
+            within2 += std::abs(value) < 2.0f;
+            within3 += std::abs(value) < 3.0f;
+        }
+        EXPECT_LT(9000, gaussDiffs);
+        EXPECT_LT(std::abs(sum / count), 0.05f);
+        EXPECT_LT(std::abs(sumSq / count - 1.0f), 0.05f);
+        EXPECT_LT(std::abs(float(within1) / count - 0.6827f), 0.02f);
+        EXPECT_LT(std::abs(float(within2) / count - 0.9545f), 0.01f);
+        EXPECT_LT(std::abs(float(within3) / count - 0.9973f), 0.005f);
+
+        return true;
+    }
 }
 
 
@@ -736,5 +786,6 @@ namespace test {
         REGISTER_UNIT_TEST(util_description_parse_test);
         REGISTER_UNIT_TEST(util_description_serialize_test);
         REGISTER_UNIT_TEST(util_easing_test);
+        REGISTER_UNIT_TEST(util_random_source_test);
     }
 }
