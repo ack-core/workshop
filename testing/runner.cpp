@@ -73,6 +73,10 @@ namespace test {
         _api.scene->updateAndDraw(dtSec);
         _api.stage->updateAndDraw(dtSec);
 
+        if (_api.platform->isAsyncWorkInProgress()) {
+            return;
+        }
+
         // Unit tests
         if (_unitTestIndex < _unitTests.size()) {
             for (std::size_t i = 0; i < MAX_UNIT_TESTS_PER_FRAME && _unitTestIndex < _unitTests.size(); i++, _unitTestIndex++) {
@@ -91,23 +95,18 @@ namespace test {
 
         // Step tests
         if (_currentStepTest) {
-            if (_api.platform->isAsyncWorkInProgress() == false) {
-                if (_currentStepTest->testResult(_api)) {
-                    //_api.platform->logMsg("[PASSED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
-                }
-                else {
-                    _api.platform->logMsg("[FAILED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
-                    _testsFailed++;
-                }
-                _currentStepTest.reset();
-                _stepTestIndex++;
+            if (_currentStepTest->testResult(_api)) {
+                //_api.platform->logMsg("[PASSED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
             }
+            else {
+                _api.platform->logMsg("[FAILED STEP TEST] '%s'", _stepTests[_stepTestIndex].first.data());
+                _testsFailed++;
+            }
+            _currentStepTest.reset();
+            _stepTestIndex++;
             return;
         }
         if (_stepTestIndex < _stepTests.size()) {
-            if (_api.platform->isAsyncWorkInProgress()) {
-                return;
-            }
             const auto &test = _stepTests[_stepTestIndex];
             _currentStepTest = test.second();
             _currentStepTest->init(_api);
@@ -118,33 +117,30 @@ namespace test {
         if (_currentPixelTest) {
             _currentPixelTest->updateAndDraw(_api);
             ByteDataPtr frame = _api.rendering->presentFrame();
+            const std::string &name = _pixelTests[_pixelTestIndex].first;
 
-            if (_api.platform->isAsyncWorkInProgress() == false) {
-                const std::string &name = _pixelTests[_pixelTestIndex].first;
-
-                if (frame == nullptr) {
-                    _api.platform->logMsg("[FAILED PIXEL TEST] '%s' : frame capture isn't supported", name.data());
-                    _testsFailed++;
-                }
-                else if (_screenshotRef) {
-                    if (_currentPixelTest->testResult(_api, _screenshotRef.get(), frame.get())) {
-                        //_api.platform->logMsg("[PASSED PIXEL TEST] '%s'", name.data());
-                    }
-                    else {
-                        _api.platform->logMsg("[FAILED PIXEL TEST] '%s', frame saved", name.data());
-                        _testsFailed++;
-                        saveScreenshot(name, frame.get(), "_fail");
-                    }
+            if (frame == nullptr) {
+                _api.platform->logMsg("[FAILED PIXEL TEST] '%s' : frame capture isn't supported", name.data());
+                _testsFailed++;
+            }
+            else if (_screenshotRef) {
+                if (_currentPixelTest->testResult(_api, _screenshotRef.get(), frame.get())) {
+                    //_api.platform->logMsg("[PASSED PIXEL TEST] '%s'", name.data());
                 }
                 else {
-                    _api.platform->logMsg("[PIXEL TEST] '%s' has no reference, ref saved", name.data());
-                    saveScreenshot(name, frame.get(), "_ref");
+                    _api.platform->logMsg("[FAILED PIXEL TEST] '%s', frame saved", name.data());
+                    _testsFailed++;
+                    saveScreenshot(name, frame.get(), "_fail");
                 }
-
-                _currentPixelTest.reset();
-                _screenshotRef = nullptr;
-                _pixelTestIndex++;
             }
+            else {
+                _api.platform->logMsg("[PIXEL TEST] '%s' has no reference, ref saved", name.data());
+                saveScreenshot(name, frame.get(), "_ref");
+            }
+
+            _currentPixelTest.reset();
+            _screenshotRef = nullptr;
+            _pixelTestIndex++;
             return;
         }
         if (_pixelTestIndex < _pixelTests.size()) {
@@ -159,41 +155,38 @@ namespace test {
         if (_currentScreenshotTest) {
             _currentScreenshotTest->updateAndDraw(_api);
             ByteDataPtr frame = _api.rendering->presentFrame();
+            const std::string &name = _screenshotTests[_screenshotTestIndex].first;
 
-            if (_api.platform->isAsyncWorkInProgress() == false) {
-                const std::string &name = _screenshotTests[_screenshotTestIndex].first;
-
-                if (frame == nullptr) {
-                    _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s' : frame capture isn't supported", name.data());
-                    _testsFailed++;
-                }
-                else if (_screenshotRef) {
-                    const std::size_t size = foundation::TESTING_RENDER_WIDTH * foundation::TESTING_RENDER_HEIGHT * 4;
-                    const int threshold = _currentScreenshotTest->getThreshold();
-                    ByteDataPtr diff = std::make_unique<std::uint8_t[]>(size);
-                    bool passed = true;
-
-                    for (std::size_t i = 0; i < size; i++) {
-                        diff[i] = std::uint8_t(std::abs(int(frame[i]) - int(_screenshotRef[i])));
-                        passed = passed && diff[i] <= threshold;
-                    }
-
-                    if (passed == false) {
-                        _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s', frame and diff saved", name.data());
-                        _testsFailed++;
-                        saveScreenshot(name, frame.get(), "_fail");
-                        saveScreenshot(name, diff.get(), "_diff");
-                    }
-                }
-                else {
-                    _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
-                    saveScreenshot(name, frame.get(), "_ref");
-                }
-
-                _currentScreenshotTest.reset();
-                _screenshotRef = nullptr;
-                _screenshotTestIndex++;
+            if (frame == nullptr) {
+                _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s' : frame capture isn't supported", name.data());
+                _testsFailed++;
             }
+            else if (_screenshotRef) {
+                const std::size_t size = foundation::TESTING_RENDER_WIDTH * foundation::TESTING_RENDER_HEIGHT * 4;
+                const int threshold = _currentScreenshotTest->getThreshold();
+                ByteDataPtr diff = std::make_unique<std::uint8_t[]>(size);
+                bool passed = true;
+
+                for (std::size_t i = 0; i < size; i++) {
+                    diff[i] = std::uint8_t(std::abs(int(frame[i]) - int(_screenshotRef[i])));
+                    passed = passed && diff[i] <= threshold;
+                }
+
+                if (passed == false) {
+                    _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s', frame and diff saved", name.data());
+                    _testsFailed++;
+                    saveScreenshot(name, frame.get(), "_fail");
+                    saveScreenshot(name, diff.get(), "_diff");
+                }
+            }
+            else {
+                _api.platform->logMsg("[SCREENSHOT TEST] '%s' has no reference, ref saved", name.data());
+                saveScreenshot(name, frame.get(), "_ref");
+            }
+
+            _currentScreenshotTest.reset();
+            _screenshotRef = nullptr;
+            _screenshotTestIndex++;
             return;
         }
         if (_screenshotTestIndex < _screenshotTests.size()) {
@@ -204,10 +197,7 @@ namespace test {
             return;
         }
 
-        // Wait for the last frame saving
-        if (_api.platform->isAsyncWorkInProgress() == false) {
-            _api.platform->exit(_testsFailed);
-        }
+        _api.platform->exit(_testsFailed);
     }
 
     void TestRunner::loadScreenshotRef(const std::string &name) {
