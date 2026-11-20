@@ -918,7 +918,7 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
     vsout += inoutVS;
 
     if (layout.repeat > 1) {
-        vsout += "cbuffer _DrawData : register(b2) {\n    uint _vertexCount;\n};\n\n";
+        vsout += "cbuffer _DrawData : register(b2) {\n    uint _instanceCount;\n};\n\n";
     }
 
     std::string variables;
@@ -947,8 +947,8 @@ void formVSBlock(const foundation::InputLayout &layout, const std::string &fixed
 
     if (layout.repeat > 1) {
         vsout += "    const int repeat_ID = _v_ID;\n";
-        vsout += "    const int vertex_ID = _i_ID % _vertexCount;\n";
-        vsout += "    const int instance_ID = _i_ID / _vertexCount;\n";
+        vsout += "    const int vertex_ID = _i_ID / _instanceCount;\n";
+        vsout += "    const int instance_ID = _i_ID % _instanceCount;\n";
     }
     else {
         vsout += "    const int repeat_ID = 0;\n";

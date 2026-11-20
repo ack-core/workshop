@@ -12,7 +12,7 @@ namespace foundation {
 
     class Direct3D11Shader : public RenderShader {
     public:
-        Direct3D11Shader(const InputLayout &layout, const ComPtr<ID3D11InputLayout> &inputLayout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::uint32_t constBufferLength);
+        Direct3D11Shader(const InputLayout &layout, const std::vector<D3D11_INPUT_ELEMENT_DESC> &elements, const ComPtr<ID3DBlob> &vsBinary, const ComPtr<ID3D11InputLayout> &inputLayout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::uint32_t constBufferLength);
         ~Direct3D11Shader() override;
 
         auto getInputLayout() const -> const InputLayout & override;
@@ -21,11 +21,14 @@ namespace foundation {
         void apply(const ComPtr<ID3D11DeviceContext1> &context) const;
         void updateConstants(const ComPtr<ID3D11DeviceContext1> &context, const void *constants) const;
 
+        std::vector<D3D11_INPUT_ELEMENT_DESC> elements;
+        const ComPtr<ID3DBlob> vsBinary;
+        std::unordered_map<std::uint32_t, ComPtr<ID3D11InputLayout>> inputLayouts; // by per-instance step rate
+
     private:
         const InputLayout _layout;
         const std::uint32_t _constBufferLength;
 
-        ComPtr<ID3D11InputLayout> _inputLayout;
         ComPtr<ID3D11VertexShader> _vshader;
         ComPtr<ID3D11PixelShader> _pshader;
         ComPtr<ID3D11Buffer> _constBuffer;
@@ -141,7 +144,8 @@ namespace foundation {
     private:
         bool _createDefaultTargets();
         void _applyTextures(const std::pair<RenderTexturePtr, SamplerType> *textures, std::size_t size);
-        void _applyDrawConstants(std::uint32_t vertexCount);
+        void _applyDrawConstants(std::uint32_t instanceCount);
+        void _applyInputLayout(std::uint32_t stepRate);
 
         struct FrameConstants {
             math::transform3f plmVPMatrix = math::transform3f::identity();
@@ -158,6 +162,7 @@ namespace foundation {
 
         std::unordered_map<std::string, std::weak_ptr<RenderShader>> _shaders;
         std::shared_ptr<Direct3D11Shader> _currentShader;
+        ID3D11InputLayout *_currentInputLayout = nullptr;
         RenderTopology _currentTopology = RenderTopology::TRIANGLES;
         bool _isForTarget = false;
 
@@ -168,7 +173,7 @@ namespace foundation {
         ComPtr<ID3D11RenderTargetView> _defaultRTView;
         ComPtr<ID3D11DepthStencilView> _defaultDepthView;
         ComPtr<ID3D11Buffer> _frameConstantsBuffer;
-        ComPtr<ID3D11Buffer> _drawConstantsBuffer;              // vertex count for repeated layouts
+        ComPtr<ID3D11Buffer> _drawConstantsBuffer;              // instance count of a draw call for repeated layouts
         ComPtr<ID3D11Buffer> _dynamicBuffer;                    // ring buffer for dynamic vertexes and indexes
 
         static const std::uint32_t DYNAMIC_BUFFER_LENGTH = 1024 * 1024;

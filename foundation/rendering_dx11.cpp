@@ -76,10 +76,12 @@ namespace {
 }
 
 namespace foundation {
-    Direct3D11Shader::Direct3D11Shader(const InputLayout &layout, const ComPtr<ID3D11InputLayout> &inputLayout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::uint32_t constBufferLength)
-        : _layout(layout)
+    Direct3D11Shader::Direct3D11Shader(const InputLayout &layout, const std::vector<D3D11_INPUT_ELEMENT_DESC> &elements, const ComPtr<ID3DBlob> &vsBinary, const ComPtr<ID3D11InputLayout> &inputLayout, const ComPtr<ID3D11VertexShader> &vs, const ComPtr<ID3D11PixelShader> &ps, const ComPtr<ID3D11Buffer> &cb, std::uint32_t constBufferLength)
+        : elements(elements)
+        , vsBinary(vsBinary)
+        , inputLayouts{{layout.repeat > 1 ? 1u : 0u, inputLayout}}
+        , _layout(layout)
         , _constBufferLength(constBufferLength)
-        , _inputLayout(inputLayout)
         , _vshader(vs)
         , _pshader(ps)
         , _constBuffer(cb)
@@ -100,7 +102,6 @@ namespace foundation {
     }
 
     void Direct3D11Shader::apply(const ComPtr<ID3D11DeviceContext1> &context) const {
-        context->IASetInputLayout(_inputLayout.Get());
         context->VSSetShader(_vshader.Get(), nullptr, 0);
         context->PSSetShader(_pshader.Get(), nullptr, 0);
 
@@ -542,7 +543,7 @@ namespace foundation {
                     }
 
                     if ((hresult = _device->CreatePixelShader(psBinary->GetBufferPointer(), psBinary->GetBufferSize(), nullptr, &pixelShader)) == S_OK) {
-                        result = std::make_shared<Direct3D11Shader>(layout, inputLayout, vertexShader, pixelShader, constBuffer, constLength);
+                        result = std::make_shared<Direct3D11Shader>(layout, elements, vsBinary, inputLayout, vertexShader, pixelShader, constBuffer, constLength);
                     }
                     else if (suppressErrors == false) {
                         _platform->logError("[Direct3D11Rendering::createShader] pixel shader creation failed with result = %p", hresult);
@@ -776,12 +777,30 @@ namespace foundation {
         }
     }
 
-    void Direct3D11Rendering::_applyDrawConstants(std::uint32_t vertexCount) {
+    void Direct3D11Rendering::_applyDrawConstants(std::uint32_t instanceCount) {
         D3D11_MAPPED_SUBRESOURCE mapped;
 
         if (_context->Map(_drawConstantsBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped) == S_OK) {
-            *static_cast<std::uint32_t *>(mapped.pData) = vertexCount;
+            *static_cast<std::uint32_t *>(mapped.pData) = instanceCount;
             _context->Unmap(_drawConstantsBuffer.Get(), 0);
+        }
+    }
+
+    void Direct3D11Rendering::_applyInputLayout(std::uint32_t stepRate) {
+        ComPtr<ID3D11InputLayout> &inputLayout = _currentShader->inputLayouts[stepRate];
+
+        if (inputLayout == nullptr && _currentShader->elements.empty() == false) {
+            for (D3D11_INPUT_ELEMENT_DESC &element : _currentShader->elements) {
+                element.InstanceDataStepRate = stepRate;
+            }
+
+            ID3DBlob *vsBinary = _currentShader->vsBinary.Get();
+            _device->CreateInputLayout(_currentShader->elements.data(), UINT(_currentShader->elements.size()), vsBinary->GetBufferPointer(), vsBinary->GetBufferSize(), &inputLayout);
+        }
+
+        if (_currentInputLayout != inputLayout.Get()) {
+            _currentInputLayout = inputLayout.Get();
+            _context->IASetInputLayout(_currentInputLayout);
         }
     }
 
@@ -822,9 +841,10 @@ namespace foundation {
             const UINT zero = 0;
 
             _context->IASetVertexBuffers(0, 1, &nullBuffer, &zero, &zero);
+            _applyInputLayout(layout.repeat > 1 ? 1 : 0);
 
             if (layout.repeat > 1) {
-                _applyDrawConstants(vertexCount);
+                _applyDrawConstants(1);
                 _context->DrawInstanced(layout.repeat, vertexCount, 0, 0);
                 g_frameVertexCount += layout.repeat * vertexCount;
             }
@@ -843,9 +863,10 @@ namespace foundation {
             const UINT offset = 0;
 
             _context->IASetVertexBuffers(0, 1, &vbuffer, &stride, &offset);
+            _applyInputLayout(layout.repeat > 1 ? instanceCount : 0);
 
             if (layout.repeat > 1) {
-                _applyDrawConstants(platformData->getVertexCount());
+                _applyDrawConstants(instanceCount);
                 _context->DrawInstanced(layout.repeat, platformData->getVertexCount() * instanceCount, 0, 0);
                 g_frameVertexCount += layout.repeat * platformData->getVertexCount() * instanceCount;
             }
@@ -889,9 +910,10 @@ namespace foundation {
 
                 const UINT offset = _dynamicBufferOffset;
                 _context->IASetVertexBuffers(0, 1, _dynamicBuffer.GetAddressOf(), &stride, &offset);
+                _applyInputLayout(layout.repeat > 1 ? 1 : 0);
 
                 if (layout.repeat > 1) {
-                    _applyDrawConstants(vcnt);
+                    _applyDrawConstants(1);
                     _context->DrawInstanced(layout.repeat, vcnt, 0, 0);
                     g_frameVertexCount += layout.repeat * vcnt;
                 }
