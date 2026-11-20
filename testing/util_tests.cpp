@@ -743,18 +743,27 @@ namespace test {
         EXPECT_LT(0.99f, max);
 
         util::GaussRandomSource ga (42, 7), gb (42, 7), gc (43, 7);
-        int gaussDiffs = 0;
-        float sum = 0.0f;
+        const int count = 10000;
+        int gaussDiffs = 0, within1 = 0, within2 = 0, within3 = 0;
+        float sum = 0.0f, sumSq = 0.0f;
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < count; i++) {
             const float value = ga.getNextRandomF();
             EXPECT_TRUE(std::isfinite(value));
             EXPECT_EQ_F(value, gb.getNextRandomF());
             gaussDiffs += value != gc.getNextRandomF();
             sum += value;
+            sumSq += value * value;
+            within1 += std::abs(value) < 1.0f;
+            within2 += std::abs(value) < 2.0f;
+            within3 += std::abs(value) < 3.0f;
         }
-        EXPECT_LT(900, gaussDiffs);
-        EXPECT_LT(std::abs(sum / 1000.0f), 0.1f);
+        EXPECT_LT(9000, gaussDiffs);
+        EXPECT_LT(std::abs(sum / count), 0.05f);
+        EXPECT_LT(std::abs(sumSq / count - 1.0f), 0.05f);
+        EXPECT_LT(std::abs(float(within1) / count - 0.6827f), 0.02f);
+        EXPECT_LT(std::abs(float(within2) / count - 0.9545f), 0.01f);
+        EXPECT_LT(std::abs(float(within3) / count - 0.9973f), 0.005f);
 
         return true;
     }
