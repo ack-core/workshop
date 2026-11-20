@@ -7,10 +7,10 @@ import subprocess
 import sys
 import time
 
-LOOP_WAIT_MAX_SEC = 60
+LOOP_WAIT_MAX_SEC = 120
 OPEN_PR_MAX = 3
 CANDIDATES_MIN = 10
-USAGE_LIMIT_MAX = 0.5
+USAGE_LIMIT_MAX = 0.75
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
 LOG_PATH = os.path.join(REPO_ROOT, "dev-bot.log")
