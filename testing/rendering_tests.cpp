@@ -554,6 +554,193 @@ namespace test {
 }
 
 namespace test {
+    class rendering_instanced_data_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_instanced_data_test>();
+        }
+        void init(const API &api) override {
+            // Three instances shifted right by instance_ID with red, green, blue colors:
+            // top row - triangle from data, bottom rows - repeated quads at two data origins
+            //
+            const char *triangleSrc = R"(
+                fixed {
+                    color[3] : float4 = [1.0, 0.0, 0.0, 1.0][0.0, 1.0, 0.0, 1.0][0.0, 0.0, 1.0, 1.0]
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(vertex_position + float2(0.6 * float(instance_ID), 0.0), 0.5, 1.0);
+                    output_color = fixed_color[instance_ID];
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const char *quadSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][0.4, 0.0][0.0, -0.3][0.4, -0.3]
+                    color[3] : float4 = [1.0, 0.0, 0.0, 1.0][0.0, 1.0, 0.0, 1.0][0.0, 0.0, 1.0, 1.0]
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(vertex_position + fixed_quad[repeat_ID] + float2(0.6 * float(instance_ID), 0.0), 0.5, 1.0);
+                    output_color = fixed_color[instance_ID];
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const foundation::InputLayout triangleLayout = foundation::InputLayout {
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT2},
+                }
+            };
+            const foundation::InputLayout quadLayout = foundation::InputLayout {
+                .repeat = 4,
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT2},
+                }
+            };
+            const float triangle[] = { -0.9f, 0.9f, -0.5f, 0.9f, -0.9f, 0.5f };
+            const float origins[] = { -0.9f, -0.1f, -0.9f, -0.6f };
+            _triangleShader = api.rendering->createShader(triangleSrc, triangleLayout);
+            _quadShader = api.rendering->createShader(quadSrc, quadLayout);
+            _triangleData = api.rendering->createData(triangleLayout, triangle, 3);
+            _quadData = api.rendering->createData(quadLayout, origins, 2);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_triangleShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(_triangleData, 3);
+                rendering.applyShader(_quadShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(_quadData, 3);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_triangleShader, nullptr);
+            EXPECT_NOT_EQ(_quadShader, nullptr);
+            EXPECT_NOT_EQ(_triangleData, nullptr);
+            EXPECT_NOT_EQ(_quadData, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(38, 38, 255, 0, 0));     // triangle instance 0: red
+            EXPECT_TRUE(pixelIs(192, 38, 0, 255, 0));    // triangle instance 1: green
+            EXPECT_TRUE(pixelIs(346, 38, 0, 0, 255));    // triangle instance 2: blue
+            EXPECT_TRUE(pixelIs(115, 115, 0, 0, 0));     // outside triangle instance 0 hypotenuse
+            EXPECT_TRUE(pixelIs(423, 115, 0, 0, 0));     // outside triangle instance 2 hypotenuse
+            EXPECT_TRUE(pixelIs(480, 38, 0, 0, 0));      // no triangle instance 3
+            EXPECT_TRUE(pixelIs(77, 320, 255, 0, 0));    // quad origin 0, instance 0: red
+            EXPECT_TRUE(pixelIs(230, 320, 0, 255, 0));   // quad origin 0, instance 1: green
+            EXPECT_TRUE(pixelIs(384, 320, 0, 0, 255));   // quad origin 0, instance 2: blue
+            EXPECT_TRUE(pixelIs(77, 448, 255, 0, 0));    // quad origin 1, instance 0: red
+            EXPECT_TRUE(pixelIs(230, 448, 0, 255, 0));   // quad origin 1, instance 1: green
+            EXPECT_TRUE(pixelIs(384, 448, 0, 0, 255));   // quad origin 1, instance 2: blue
+            EXPECT_TRUE(pixelIs(154, 320, 0, 0, 0));     // between quad instances 0 and 1
+            EXPECT_TRUE(pixelIs(230, 384, 0, 0, 0));     // between quad origins
+            EXPECT_TRUE(pixelIs(480, 320, 0, 0, 0));     // no quad instance 3
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _triangleShader;
+        foundation::RenderShaderPtr _quadShader;
+        foundation::RenderDataPtr _triangleData;
+        foundation::RenderDataPtr _quadData;
+    };
+}
+
+namespace test {
+    class rendering_triple_instancing_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_triple_instancing_test>();
+        }
+        void init(const API &api) override {
+            // Triangle from fixed block by repeat_ID, two triangles in group from vertex data,
+            // three groups at positions from constants by instance_ID with red, green, blue colors
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    triangle[3] : float2 = [0.0, 0.0][0.3, 0.0][0.0, -0.3]
+                    color[3] : float4 = [1.0, 0.0, 0.0, 1.0][0.0, 1.0, 0.0, 1.0][0.0, 0.0, 1.0, 1.0]
+                }
+                const {
+                    positions[3] : float4
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_triangle[repeat_ID] + vertex_position + const_positions[instance_ID].xy, 0.5, 1.0);
+                    output_color = fixed_color[instance_ID];
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 3,
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT2},
+                }
+            };
+            const float group[] = { 0.0f, 0.0f, 0.4f, 0.0f };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+            _data = api.rendering->createData(layout, group, 2);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                const Constants constants = {{
+                    { -0.9f, 0.9f, 0.0f, 0.0f },
+                    { -0.9f, 0.3f, 0.0f, 0.0f },
+                    { -0.9f, -0.3f, 0.0f, 0.0f },
+                }};
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyShaderConstants(&constants);
+                rendering.draw(_data, 3);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_data, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(38, 38, 255, 0, 0));     // group 0, triangle 0: red
+            EXPECT_TRUE(pixelIs(141, 38, 255, 0, 0));    // group 0, triangle 1: red
+            EXPECT_TRUE(pixelIs(38, 192, 0, 255, 0));    // group 1, triangle 0: green
+            EXPECT_TRUE(pixelIs(141, 192, 0, 255, 0));   // group 1, triangle 1: green
+            EXPECT_TRUE(pixelIs(38, 346, 0, 0, 255));    // group 2, triangle 0: blue
+            EXPECT_TRUE(pixelIs(141, 346, 0, 0, 255));   // group 2, triangle 1: blue
+            EXPECT_TRUE(pixelIs(115, 38, 0, 0, 0));      // between triangles
+            EXPECT_TRUE(pixelIs(77, 77, 0, 0, 0));       // outside triangle hypotenuse
+            EXPECT_TRUE(pixelIs(243, 38, 0, 0, 0));      // no triangle 2
+            EXPECT_TRUE(pixelIs(38, 499, 0, 0, 0));      // no group 3
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f positions[3];
+        };
+
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderDataPtr _data;
+    };
+}
+
+namespace test {
     class rendering_4x4_linear_texture_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -597,8 +784,8 @@ namespace test {
                 rendering.draw(1);
             });
         }
-        std::uint8_t getThreshold() const override {
-            return 4;
+        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
+            return {4, 0};
         }
 
     private:
@@ -619,6 +806,8 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_shader_constants_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_textured_quad_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_render_target_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_instanced_data_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_triple_instancing_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }

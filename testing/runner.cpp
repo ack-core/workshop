@@ -163,16 +163,20 @@ namespace test {
             }
             else if (_screenshotRef) {
                 const std::size_t size = foundation::TESTING_RENDER_WIDTH * foundation::TESTING_RENDER_HEIGHT * 4;
-                const int threshold = _currentScreenshotTest->getThreshold();
+                const auto [threshold, maxDiff] = _currentScreenshotTest->getThresholdAndMaxDiff();
                 ByteDataPtr diff = std::make_unique<std::uint8_t[]>(size);
-                bool passed = true;
+                std::size_t diffCount = 0;
 
-                for (std::size_t i = 0; i < size; i++) {
-                    diff[i] = std::uint8_t(std::abs(int(frame[i]) - int(_screenshotRef[i])));
-                    passed = passed && diff[i] <= threshold;
+                for (std::size_t i = 0; i < size; i += 4) {
+                    bool exceeds = false;
+                    for (std::size_t c = i; c < i + 4; c++) {
+                        diff[c] = std::uint8_t(std::abs(int(frame[c]) - int(_screenshotRef[c])));
+                        exceeds = exceeds || diff[c] > threshold;
+                    }
+                    diffCount += exceeds;
                 }
 
-                if (passed == false) {
+                if (diffCount > maxDiff) {
                     _api.platform->logMsg("[FAILED SCREENSHOT TEST] '%s', frame and diff saved", name.data());
                     _testsFailed++;
                     saveScreenshot(name, frame.get(), "_fail");

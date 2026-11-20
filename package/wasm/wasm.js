@@ -489,7 +489,7 @@ const imports = {
         },
         webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {
             if (uniformInstanceCountLocation) {
-                glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);
+                glcontext.uniform1i(uniformInstanceCountLocation, 1);
             }
             glcontext.bindVertexArray(glbuffers[buffer].layout);
             glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);

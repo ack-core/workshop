@@ -25,7 +25,7 @@ namespace {
     static const std::uint32_t FRAME_CONST_BINDING_INDEX = 0;
     static const std::uint32_t DRAW_CONST_BINDING_INDEX = 1;
     static const std::uint32_t VS_INPUT_BINDING_START = 2;
-    static const std::uint32_t VS_INPUT_VERTEX_COUNT = 3;
+    static const std::uint32_t VS_INPUT_INSTANCE_COUNT = 3;
     
     std::uint32_t roundTo256(std::uint32_t value) {
         std::uint32_t result = ((value - std::uint32_t(1)) & ~std::uint32_t(255)) + 256;
@@ -650,7 +650,8 @@ namespace foundation {
             [_currentRenderCommandEncoder setVertexBuffer:nil offset:0 atIndex:VS_INPUT_BINDING_START];
             
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vertexCount length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
+                const std::uint32_t one = 1;
+                [_currentRenderCommandEncoder setVertexBytes:&one length:sizeof(std::uint32_t) atIndex:VS_INPUT_INSTANCE_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vertexCount];
                 g_frameVertexCount += layout.repeat * vertexCount;
             }
@@ -683,7 +684,7 @@ namespace foundation {
             [_currentRenderCommandEncoder setVertexBuffer:vbuffer offset:0 atIndex:VS_INPUT_BINDING_START];
 
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
+                [_currentRenderCommandEncoder setVertexBytes:&instanceCount length:sizeof(std::uint32_t) atIndex:VS_INPUT_INSTANCE_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt * instanceCount];
                 g_frameVertexCount += layout.repeat * vcnt * instanceCount;
             }
@@ -722,7 +723,8 @@ namespace foundation {
             }
             
             if (layout.repeat > 1) {
-                [_currentRenderCommandEncoder setVertexBytes:&vcnt length:sizeof(std::uint32_t) atIndex:VS_INPUT_VERTEX_COUNT];
+                const std::uint32_t one = 1;
+                [_currentRenderCommandEncoder setVertexBytes:&one length:sizeof(std::uint32_t) atIndex:VS_INPUT_INSTANCE_COUNT];
                 [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt];
                 g_frameVertexCount += layout.repeat * vcnt;
             }
