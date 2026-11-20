@@ -173,6 +173,7 @@ namespace test {
     void registerPlatformTests(TestRunner &runner);
     void registerRenderingTests(TestRunner &runner);
     void registerResourceProviderTests(TestRunner &runner);
+    void registerFontAtlasProviderTests(TestRunner &runner);
     void registerSceneTests(TestRunner &runner);
     void registerRaycastTests(TestRunner &runner);
     void registerSimulationTests(TestRunner &runner);
