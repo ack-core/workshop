@@ -1063,7 +1063,9 @@ namespace ui {
     }
     
     void StageInterfaceImpl::clear() {
-    
+        _topLevelElements.clear();
+        _namedElements.clear();
+        statistics.topLevelElementsCount = 0;
     }
     
     void StageInterfaceImpl::updateAndDraw(float dtSec) {
