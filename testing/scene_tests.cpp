@@ -1,4 +1,4 @@
-﻿
+
 #include "runner.h"
 
 namespace test {
