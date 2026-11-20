@@ -127,6 +127,26 @@ namespace test {
         core::SceneInterface::CustomMeshPtr _gbufferMesh;
         core::SceneInterface::CustomMeshPtr _screenMesh;
     };
+
+    class scene_voxel_mesh_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_voxel_mesh_test>();
+        }
+        void init(const API &api) override {
+            api.scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
+            api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this, scene = api.scene](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
+                _mesh = scene->addVoxelMesh(frames, desc);
+            });
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+    private:
+        core::SceneInterface::VoxelMeshPtr _mesh;
+    };
 }
 
 namespace test {
@@ -135,5 +155,6 @@ namespace test {
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
     }
 }
