@@ -497,6 +497,12 @@ namespace foundation {
                 return;
             }
         }
+        for (auto index = g_editorHandlers.begin(); index != g_editorHandlers.end(); ++index) {
+            if (index->first == token) {
+                g_editorHandlers.erase(index);
+                return;
+            }
+        }
     }
 
     void IOSPlatform::sendPointerEvent(const PlatformPointerEventArgs &args) {
