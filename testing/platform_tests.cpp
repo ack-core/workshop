@@ -47,6 +47,63 @@ namespace test {
         EXPECT_TRUE(calls.empty());
         return true;
     }
+    bool platform_pointer_event_handlers_test(const API &api) {
+        using Args = foundation::PlatformPointerEventArgs;
+        std::string calls;
+        bool consume = false;
+
+        const foundation::EventHandlerToken first = api.platform->addPointerEventHandler([&](const Args &args) {
+            calls += "1";
+            calls += args.type == Args::EventType::START ? "S" : args.type == Args::EventType::MOVE ? "M" : args.type == Args::EventType::FINISH ? "F" : "?";
+            calls += args.pointerID == 0 ? "0" : "?";
+            calls += args.coordinateX == 10.0f && args.coordinateY == 20.0f ? "C" : "?";
+            calls += args.flags.isLeftButton ? "L" : "";
+            calls += args.flags.isRightButton ? "R" : "";
+            return false;
+        }, true);
+        const foundation::EventHandlerToken second = api.platform->addPointerEventHandler([&](const Args &args) {
+            calls += "2";
+            return consume;
+        }, true);
+
+        EXPECT_NOT_EQ(first, foundation::INVALID_EVENT_TOKEN);
+        EXPECT_NOT_EQ(second, foundation::INVALID_EVENT_TOKEN);
+
+        Args args {};
+        args.pointerID = 0;
+        args.coordinateX = 10.0f;
+        args.coordinateY = 20.0f;
+        args.type = Args::EventType::START;
+        args.flags.isLeftButton = 1;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(calls, "21S0CL");
+
+        calls.clear();
+        args.type = Args::EventType::MOVE;
+        args.flags.isLeftButton = 0;
+        args.flags.isRightButton = 1;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(calls, "21M0CR");
+
+        calls.clear();
+        consume = true;
+        args.type = Args::EventType::FINISH;
+        args.flags.isRightButton = 0;
+        args.flags.isLeftButton = 1;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(calls, "2");
+
+        calls.clear();
+        api.platform->removeEventHandler(second);
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(calls, "1F0CL");
+
+        calls.clear();
+        api.platform->removeEventHandler(first);
+        api.platform->sendPointerEvent(args);
+        EXPECT_TRUE(calls.empty());
+        return true;
+    }
 }
 
 namespace test {
@@ -176,6 +233,7 @@ namespace test {
         REGISTER_UNIT_TEST(platform_uniquty_test);
         REGISTER_UNIT_TEST(platform_screen_scale_test);
         REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
+        REGISTER_UNIT_TEST(platform_pointer_event_handlers_test);
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);
