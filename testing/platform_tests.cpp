@@ -104,6 +104,41 @@ namespace test {
         EXPECT_TRUE(calls.empty());
         return true;
     }
+    bool platform_editor_event_handlers_test(const API &api) {
+        std::string calls;
+        bool consume = false;
+
+        const foundation::EventHandlerToken first = api.platform->addEditorEventHandler([&](const std::string &msg, const std::string &data) {
+            calls += "1" + msg + data;
+            return false;
+        });
+        const foundation::EventHandlerToken second = api.platform->addEditorEventHandler([&](const std::string &msg, const std::string &data) {
+            calls += "2" + msg + data;
+            return consume;
+        }, true);
+
+        EXPECT_NOT_EQ(first, foundation::INVALID_EVENT_TOKEN);
+        EXPECT_NOT_EQ(second, foundation::INVALID_EVENT_TOKEN);
+
+        api.platform->editorLoopbackMsg("m", "d");
+        EXPECT_EQ(calls, "2md1md");
+
+        calls.clear();
+        consume = true;
+        api.platform->editorLoopbackMsg("m", "d");
+        EXPECT_EQ(calls, "2md");
+
+        calls.clear();
+        api.platform->removeEventHandler(second);
+        api.platform->editorLoopbackMsg("x", "y");
+        EXPECT_EQ(calls, "1xy");
+
+        calls.clear();
+        api.platform->removeEventHandler(first);
+        api.platform->editorLoopbackMsg("m", "d");
+        EXPECT_TRUE(calls.empty());
+        return true;
+    }
 }
 
 namespace test {
@@ -234,6 +269,7 @@ namespace test {
         REGISTER_UNIT_TEST(platform_screen_scale_test);
         REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
         REGISTER_UNIT_TEST(platform_pointer_event_handlers_test);
+        REGISTER_UNIT_TEST(platform_editor_event_handlers_test);
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);
