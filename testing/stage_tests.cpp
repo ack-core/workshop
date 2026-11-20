@@ -2,9 +2,8 @@
 #include "runner.h"
 
 namespace test {
-    const char *STAGE_TEXTURE = "stage_tests/stage_texture";
-
     bool stage_statistics_test(const API &api) {
+        const char *STAGE_TEXTURE = "stage_tests/stage_texture";
         {
             ui::PivotPtr pivot = api.stage->addPivot(std::nullopt, nullptr, {});
             ui::ImagePtr image = api.stage->addImage(std::nullopt, nullptr, {.texture = STAGE_TEXTURE});
