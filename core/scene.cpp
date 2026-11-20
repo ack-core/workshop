@@ -638,8 +638,7 @@ namespace core {
         foundation::RenderTopology topology = foundation::RenderTopology::TRIANGLES;
         foundation::RenderDataPtr mesh;
         foundation::RenderTexturePtr texture;
-        math::transform3f transform = math::transform3f::identity();
-        const void *constants = nullptr;
+        std::vector<std::uint8_t> constants;
 
     public:
         CustomMeshImpl(const foundation::RenderingInterfacePtr &rendering, const foundation::RenderShaderPtr &shader, bool renderToGBuffer)
@@ -652,14 +651,6 @@ namespace core {
         void setEnabled(bool value) override {
             enabled = value;
         }
-        void setTransform(const math::transform3f &trfm) override {
-            transform = trfm;
-        }
-        void setPosition(const math::vector3f &pos) override {
-            transform.m41 = pos.x;
-            transform.m42 = pos.y;
-            transform.m43 = pos.z;
-        }
         void setTexture(const foundation::RenderTexturePtr &tx) override {
             texture = tx;
         }
@@ -670,7 +661,10 @@ namespace core {
             }
         }
         void setShaderConstants(const void *value) override {
-            constants = value;
+            if (shader) {
+                const std::uint8_t *bytes = static_cast<const std::uint8_t *>(value);
+                constants.assign(bytes, bytes + shader->getConstBufferLength());
+            }
         }
     };
 
@@ -1241,7 +1235,9 @@ namespace core {
                 for (const auto &customMesh : _customMeshes) {
                     if (customMesh->enabled && customMesh->mesh && customMesh->renderToGBuffer == renderToGBuffer) {
                         rendering.applyShader(customMesh->shader, customMesh->topology, blendType, foundation::DepthBehavior::TEST_AND_WRITE);
-                        rendering.applyShaderConstants(customMesh->constants ? customMesh->constants : &customMesh->transform);
+                        if (customMesh->constants.size()) {
+                            rendering.applyShaderConstants(customMesh->constants.data());
+                        }
                         if (customMesh->texture) {
                             rendering.applyTextures({
                                 {customMesh->texture, foundation::SamplerType::NEAREST}

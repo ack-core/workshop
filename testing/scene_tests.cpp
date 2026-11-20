@@ -1,4 +1,4 @@
-
+﻿
 #include "runner.h"
 
 namespace test {
@@ -113,10 +113,10 @@ namespace test {
             api.scene->setCameraLookAt({0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, 0.0f});
             _gbufferMesh = api.scene->addCustomMesh(layout, gbufferShaderSrc, true);
             _gbufferMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
-            _gbufferMesh->setPosition({-1.0f, 0.0f, 0.0f});
+            _gbufferMesh->setShaderConstants(math::transform3f::identity().translated({-1.0f, 0.0f, 0.0f}).flat);
             _screenMesh = api.scene->addCustomMesh(layout, screenShaderSrc, false);
             _screenMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
-            _screenMesh->setPosition({1.0f, 0.0f, 0.0f});
+            _screenMesh->setShaderConstants(math::transform3f::identity().translated({1.0f, 0.0f, 0.0f}).flat);
         }
         void updateAndDraw(const API &api) override {}
         std::uint8_t getThreshold() const override {
