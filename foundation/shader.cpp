@@ -285,7 +285,7 @@ namespace foundation {
 
 namespace {
 #if PLATFORM_IOS || PLATFORM_MAC
-    static const std::uint32_t VS_INPUT_VERTEX_COUNT = 3;
+    static const std::uint32_t VS_INPUT_INSTANCE_COUNT = 3;
 
     void transformTypes(std::string &code) {
         shaderUtils::replace(code, "float1", "float", SEPARATORS, SEPARATORS);
@@ -484,9 +484,9 @@ namespace {
             "    constant _FrameData &framedata [[buffer(0)]],\n"
             "    constant _Constants &constants [[buffer(1)]],\n"
             "    device const _VSVertexIn *vertices [[buffer(2)]],\n"
-            "    constant uint &_vertexCount [[buffer(";
+            "    constant uint &_instanceCount [[buffer(";
             
-        vsout += std::to_string(VS_INPUT_VERTEX_COUNT);
+        vsout += std::to_string(VS_INPUT_INSTANCE_COUNT);
         vsout += ")]],\n"
             "    sampler _sampler [[sampler(0)]],\n"
             "    texture2d<float> _texture0 [[texture(0)]],\n"
@@ -496,8 +496,8 @@ namespace {
         
         if (layout.repeat > 1) {
             vsout += "    const int repeat_ID = _r_ID;\n";
-            vsout += "    const int vertex_ID = _i_ID % _vertexCount;\n";
-            vsout += "    const int instance_ID = _i_ID / _vertexCount;\n";
+            vsout += "    const int vertex_ID = _i_ID / _instanceCount;\n";
+            vsout += "    const int instance_ID = _i_ID % _instanceCount;\n";
         }
         else {
             vsout += "    const int repeat_ID = 0;\n";
