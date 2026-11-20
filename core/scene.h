@@ -87,6 +87,13 @@ namespace core {
             virtual void setTime(float totalTimeSec, float fadingTimeSec) = 0;
             virtual ~Particles() = default;
         };
+        struct CustomMesh {
+            virtual void setEnabled(bool enabled) = 0;
+            virtual void setTexture(const foundation::RenderTexturePtr &texture) = 0;
+            virtual void setGeometry(foundation::RenderTopology topology, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) = 0;
+            virtual void setShaderConstants(const void *constants) = 0;
+            virtual ~CustomMesh() = default;
+        };
         struct LightSource {
             virtual void setEnabled(bool enabled) = 0;
             virtual void setPosition(const math::vector3f &position) = 0;
@@ -102,6 +109,7 @@ namespace core {
         using LightSourcePtr = std::shared_ptr<LightSource>;
         using VegetationPtr = std::shared_ptr<Vegetation>;
         using ParticlesPtr = std::shared_ptr<Particles>;
+        using CustomMeshPtr = std::shared_ptr<CustomMesh>;
 
         struct StatInfo {
             std::size_t arrowsCount = 0;
@@ -173,6 +181,14 @@ namespace core {
         // @desc        - emitter description
         //
         virtual auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &desc) -> ParticlesPtr = 0;
+
+        // Mesh with user geometry, shader and optional texture (texture slot 0)
+        // @layout          - vertex layout of geometry
+        // @shaderSource    - shader with optional 'const' block, data is copied by setShaderConstants
+        // @renderToGBuffer - true: drawn into gbuffer and lit like voxel meshes. Shader must write float4(normal * 0.5 + 0.5, paletteIndex / 255.0) to output_color[0]
+        //                    false: drawn straight to the screen with alpha blending and gbuffer depth
+        //
+        virtual auto addCustomMesh(const foundation::InputLayout &layout, const char *shaderSource, bool renderToGBuffer) -> CustomMeshPtr = 0;
 
         // Point light
         //

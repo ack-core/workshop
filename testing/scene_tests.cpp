@@ -69,6 +69,64 @@ namespace test {
     private:
         core::SceneInterface::LineSetPtr _square;
     };
+
+    class scene_custom_mesh_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_custom_mesh_test>();
+        }
+        void init(const API &api) override {
+            const char *gbufferShaderSrc = R"(
+                const {
+                    modelTransform : matrix4
+                }
+                vssrc {
+                    output_position = _transform(float4(vertex_position.xyz, 1.0), _transform(const_modelTransform, frame_plmVPMatrix));
+                }
+                fssrc {
+                    output_color[0] = float4(0.5, 0.5, 1.0, 10.0 / 255.0);
+                }
+            )";
+            const char *screenShaderSrc = R"(
+                const {
+                    modelTransform : matrix4
+                }
+                vssrc {
+                    output_position = _transform(float4(vertex_position.xyz, 1.0), _transform(const_modelTransform, frame_plmVPMatrix));
+                }
+                fssrc {
+                    output_color[0] = float4(0.0, 1.0, 0.0, 1.0);
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT3},
+                }
+            };
+            const float vertexes[] = {
+                -0.5f, -0.5f, 0.0f,
+                 0.5f, -0.5f, 0.0f,
+                -0.5f,  0.5f, 0.0f,
+                 0.5f,  0.5f, 0.0f,
+            };
+
+            api.scene->setCameraLookAt({0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, 0.0f});
+            _gbufferMesh = api.scene->addCustomMesh(layout, gbufferShaderSrc, true);
+            _gbufferMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
+            _gbufferMesh->setShaderConstants(math::transform3f::identity().translated({-1.0f, 0.0f, 0.0f}).flat);
+            _screenMesh = api.scene->addCustomMesh(layout, screenShaderSrc, false);
+            _screenMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
+            _screenMesh->setShaderConstants(math::transform3f::identity().translated({1.0f, 0.0f, 0.0f}).flat);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+    private:
+        core::SceneInterface::CustomMeshPtr _gbufferMesh;
+        core::SceneInterface::CustomMeshPtr _screenMesh;
+    };
 }
 
 namespace test {
@@ -76,5 +134,6 @@ namespace test {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
     }
 }
