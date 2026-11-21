@@ -7,6 +7,13 @@ namespace test {
         return true;
     }
 
+    bool rendering_back_buffer_size_test(const API &api) {
+        const math::vector2f size = api.rendering->getBackBufferSize();
+        EXPECT_EQ(size.x, api.platform->getScreenWidth());
+        EXPECT_EQ(size.y, api.platform->getScreenHeight());
+        return true;
+    }
+
     bool rendering_statistics_test(const API &api) {
         const foundation::RenderingInterface::StatInfo before = api.rendering->getStatistics();
         const char *shaderSrc = R"(
@@ -797,6 +804,7 @@ namespace test {
 namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
+        REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
         REGISTER_UNIT_TEST(rendering_statistics_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_fill_green_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_white_line_on_black_test);

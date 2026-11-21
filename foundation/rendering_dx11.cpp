@@ -699,12 +699,8 @@ namespace foundation {
         return std::make_shared<Direct3D11Data>(vbuffer, ibuffer, vcnt, icnt, stride);
     }
 
-    auto Direct3D11Rendering::getBackBufferWidth() const -> float {
-        return _platform->getScreenWidth();
-    }
-
-    auto Direct3D11Rendering::getBackBufferHeight() const -> float {
-        return _platform->getScreenHeight();
+    auto Direct3D11Rendering::getBackBufferSize() const -> math::vector2f {
+        return { _platform->getScreenWidth(), _platform->getScreenHeight() };
     }
 
     auto Direct3D11Rendering::getStdVPMatrix() const -> math::transform3f {
