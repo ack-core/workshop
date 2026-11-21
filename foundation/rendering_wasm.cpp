@@ -362,12 +362,8 @@ namespace foundation {
         return result;
     }
     
-    float WASMRendering::getBackBufferWidth() const {
-        return _platform->getScreenWidth();
-    }
-    
-    float WASMRendering::getBackBufferHeight() const {
-        return _platform->getScreenHeight();
+    math::vector2f WASMRendering::getBackBufferSize() const {
+        return { _platform->getScreenWidth(), _platform->getScreenHeight() };
     }
     
     math::transform3f WASMRendering::getStdVPMatrix() const {

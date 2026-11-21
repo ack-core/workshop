@@ -442,12 +442,8 @@ namespace foundation {
         }
     }
     
-    float MetalRendering::getBackBufferWidth() const {
-        return _platform->getScreenWidth();
-    }
-    
-    float MetalRendering::getBackBufferHeight() const {
-        return _platform->getScreenHeight();
+    math::vector2f MetalRendering::getBackBufferSize() const {
+        return { _platform->getScreenWidth(), _platform->getScreenHeight() };
     }
     
     math::transform3f MetalRendering::getStdVPMatrix() const {

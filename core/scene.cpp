@@ -1222,9 +1222,9 @@ namespace core {
                 .repeat = 4
             });
 
-            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
+            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferSize().x), std::uint32_t(_rendering->getBackBufferSize().y), true);
             _resizeToken = _platform->addResizeHandler([this]() {
-                _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferWidth()), std::uint32_t(_rendering->getBackBufferHeight()), true);
+                _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferSize().x), std::uint32_t(_rendering->getBackBufferSize().y), true);
             });
         }
 

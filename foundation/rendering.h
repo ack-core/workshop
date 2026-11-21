@@ -233,8 +233,7 @@ namespace foundation {
         
         // Return actual rendering area size
         //
-        virtual auto getBackBufferWidth() const -> float = 0;
-        virtual auto getBackBufferHeight() const -> float = 0;
+        virtual auto getBackBufferSize() const -> math::vector2f = 0;
         
         // Get svp transform passed to updateFrameConstants
         //
