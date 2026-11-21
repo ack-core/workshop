@@ -281,6 +281,7 @@ const imports = {
                     }
                     
                     program.uniformSamplersLocation = glcontext.getUniformLocation(program, "_samplers");
+                    program.uniformSamplerLocations = [0, 1, 2, 3].map(i => glcontext.getUniformLocation(program, "_sampler" + i));
                     program.uniformInstanceCountLocation = glcontext.getUniformLocation(program, "_instance_count");
 
                     if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
@@ -469,6 +470,7 @@ const imports = {
             if (program.uniformSamplersLocation) {
                 glcontext.uniform1iv(program.uniformSamplersLocation, [0, 1, 2, 3])
             }
+            program.uniformSamplerLocations.forEach((location, i) => location && glcontext.uniform1i(location, i));
             uniformInstanceCountLocation = program.uniformInstanceCountLocation;
 
             dtypes[dtype]();

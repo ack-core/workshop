@@ -200,11 +200,13 @@ namespace foundation {
         //     frame_rtBounds           : float4  - render target size in pixels (.xy)
         //
         // Textures. There are 4 texture slots. Example of getting color from the last slot: float4 color = _tex2d(3, float2(0, 0));
+        //     Fragment shader slot types can be declared as 'fssrc [tex2d cube] {...}' - up to 4 of 'tex2d' or 'cube', missing slots are 'tex2d'
+        //     Cube slots are sampled with float3 direction: float4 color = _texcube(1, float3(0, 0, 1)); Vertex shader slots are always 'tex2d'
         //
         // Global functions:
         //     _transform(v, m), _dot(a, b), _cross(a, b), _len(v), _norm(v), _sign(a), _abs(a), _sin(a), _cos(a), _pow(a, b),
         //     _floor(a), _frac(a), _sat(a), _clamp(a), _min(a, b), _max(a, b), _lerp(a, b, k), _step(k, a), _smooth(a, b, k),
-        //     _select(a, b, k), _tex2d(index, uv), _discard()
+        //     _select(a, b, k), _tex2d(index, uv), _texcube(index, dir), _discard()
         //
         virtual auto createShader(const char *src, const InputLayout &layout, bool suppressErrors = false) -> RenderShaderPtr = 0;
         
