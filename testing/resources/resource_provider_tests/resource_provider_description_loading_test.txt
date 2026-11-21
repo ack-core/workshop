@@ -1,0 +1,5 @@
+i : integer = 7
+s : string = "abc"
+d {
+    b : bool = true
+}
