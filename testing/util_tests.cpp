@@ -767,6 +767,42 @@ namespace test {
 
         return true;
     }
+
+    bool util_cleanup_unused_test(const API &api) {
+        std::vector<std::shared_ptr<int>> emptyVector;
+        std::list<std::shared_ptr<int>> emptyList;
+        util::cleanupUnused(emptyVector);
+        util::cleanupUnused(emptyList);
+        EXPECT_TRUE(emptyVector.empty());
+        EXPECT_TRUE(emptyList.empty());
+
+        auto held1 = std::make_shared<int>(1);
+        auto held2 = std::make_shared<int>(2);
+
+        std::vector<std::shared_ptr<int>> v = {std::make_shared<int>(0), held1, std::make_shared<int>(3), held2, std::make_shared<int>(4)};
+        util::cleanupUnused(v);
+        EXPECT_EQ(v.size(), 2);
+        EXPECT_EQ(std::count(v.begin(), v.end(), held1), 1);
+        EXPECT_EQ(std::count(v.begin(), v.end(), held2), 1);
+
+        std::list<std::shared_ptr<int>> l = {held1, std::make_shared<int>(0), std::make_shared<int>(3), held2, std::make_shared<int>(4)};
+        util::cleanupUnused(l);
+        EXPECT_EQ(l.size(), 2);
+        EXPECT_EQ(l.front(), held1);
+        EXPECT_EQ(l.back(), held2);
+
+        held1.reset();
+        v.clear();
+        util::cleanupUnused(l);
+        EXPECT_EQ(l.size(), 1);
+        EXPECT_EQ(l.front(), held2);
+
+        held2.reset();
+        util::cleanupUnused(l);
+        EXPECT_TRUE(l.empty());
+
+        return true;
+    }
 }
 
 
@@ -787,5 +823,6 @@ namespace test {
         REGISTER_UNIT_TEST(util_description_serialize_test);
         REGISTER_UNIT_TEST(util_easing_test);
         REGISTER_UNIT_TEST(util_random_source_test);
+        REGISTER_UNIT_TEST(util_cleanup_unused_test);
     }
 }
