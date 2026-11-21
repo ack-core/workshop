@@ -15,6 +15,7 @@ namespace game {
             _debris = _api.scene->addVoxelMesh(data, desc);
             _debris->setPosition({5, 0, 5});
         });
+        _api.scene->setSun({ 1, 1, 0 }, {});
     }
 }
 

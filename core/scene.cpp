@@ -714,7 +714,9 @@ namespace core {
             math::vector3f up;
         }
         _camera;
-        
+
+        math::vector3f _sunDirection = math::vector3f(0.5f, 1.0f, 0.3f).normalized();
+
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
 
@@ -1056,18 +1058,25 @@ namespace {
             float3 wpos = getWPos(input_uv, gdepth);
             float3 wnpos = wpos + 0.1 * normal;
             float  lit = 0.0;
+            float  wsum = 0.0;
             int2   cell = int2(input_uv * frame_rtBounds.xy) & 15;
             int    offset = 16 * ((fixed_rndo[cell.x].x + fixed_rndo[cell.y].y) % 24);
             float  rscale = 0.1 / (gdepth * gdepth + 0.0000001);
 
             for (int i = 0; i < 16; i++) {
-                float3 rv = 2.0 * fixed_rndv[offset + i];
-                float3 dpos = getDPos(wnpos + _sign(_dot(normal, rv)) * rv);
+                float3 rv = 3.0 * fixed_rndv[offset + i];
+                rv = _sign(_dot(frame_sunDirection.xyz, rv)) * rv;
+                rv = _sign(_dot(normal, rv)) * rv;
+                float  w = 0.5 + 0.5 * (_dot(_norm(rv), frame_sunDirection.xyz));
+                rv = rv * w;
+                float3 dpos = getDPos(wnpos + rv);
                 float  rdepth = _tex2d(2, dpos.xy).r;
-                lit += _step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z));
+                lit += w * (_step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z)));
+                wsum += w;
             }
-            
-            lit = _step(0.0000001, gdepth) * lit / 16.0f * 0.5 + 0.5;
+
+            float  lambert = _clamp(_dot(normal, frame_sunDirection.xyz));
+            lit = _step(0.0000001, gdepth) * lit / (wsum + 0.0001);// * lambert * 0.5 + 0.5;
             output_color[0] = float4(lit, lit, lit, 1); //float4(lit * color, 1);
 
         }
@@ -1112,7 +1121,7 @@ namespace core {
     }
     
     void SceneInterfaceImpl::setSun(const math::vector3f &directionToSun, const math::color &rgba) {
-    
+        _sunDirection = directionToSun.normalized();
     }
     
     SceneInterface::ArrowsPtr SceneInterfaceImpl::addArrows() {
@@ -1248,7 +1257,7 @@ namespace core {
             });
         }
 
-        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
+        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward, _sunDirection);
         
         if (_gbuffer) {
             const auto drawCustomMeshes = [this](foundation::RenderingInterface &rendering, bool renderToGBuffer, foundation::BlendType blendType) {

@@ -118,7 +118,7 @@ namespace foundation {
         MetalRendering(const std::shared_ptr<PlatformInterface> &platform);
         ~MetalRendering() override;
         
-        void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) override;
+        void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir, const math::vector3f &sunDir) override;
         
         RenderShaderPtr createShader(const char *src, const InputLayout &layout, bool suppressErrors) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
@@ -157,6 +157,7 @@ namespace foundation {
             math::vector4f cameraPosition = math::vector4f(0, 0, 0, 1);
             math::vector4f cameraDirection = math::vector4f(1, 0, 0, 0);
             math::vector4f rtBounds = {0, 0, 0, 0};
+            math::vector4f sunDirection = math::vector4f(0, 1, 0, 0);
         }
         _frameConstants;
         
