@@ -552,6 +552,33 @@ namespace test {
 
         return true;
     }
+
+    bool math_color_conversion_test(const API &api) {
+        const math::color packed(0x80FF3300u);
+        EXPECT_EQ_F(packed.r, 0.0f);
+        EXPECT_EQ_F(packed.g, 0.2f);
+        EXPECT_EQ_F(packed.b, 1.0f);
+        EXPECT_EQ_F(packed.a, 128.0f / 255.0f);
+
+        const math::color scalars(0.2f, 0.4f, 0.6f, 1.0f);
+        EXPECT_TRUE(eq4(scalars, 0.2f, 0.4f, 0.6f, 1.0f));
+        EXPECT_EQ(unsigned(scalars), 0xFF996633u);
+
+        const math::color vector(math::vector4f(1.0f, 0.0f, 0.2f, 0.4f));
+        EXPECT_TRUE(eq4(vector, 1.0f, 0.0f, 0.2f, 0.4f));
+        EXPECT_EQ(unsigned(vector), 0x663300FFu);
+
+        EXPECT_EQ(unsigned(math::color(0x80FF3300u)), 0x80FF3300u);
+        EXPECT_EQ(unsigned(math::color(0x01020304u)), 0x01020304u);
+        EXPECT_EQ(unsigned(math::color(0xFFFFFFFFu)), 0xFFFFFFFFu);
+        EXPECT_EQ(unsigned(math::color(0u)), 0u);
+
+        for (unsigned i = 0; i < 256; i++) {
+            EXPECT_EQ(unsigned(math::color(i * 0x01010101u)), i * 0x01010101u);
+        }
+
+        return true;
+    }
 }
 
 
@@ -569,5 +596,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_transform3f_translated_inverted_test);
         REGISTER_UNIT_TEST(math_transform2f_methods_test);
         REGISTER_UNIT_TEST(math_vector_rotated_angle_test);
+        REGISTER_UNIT_TEST(math_color_conversion_test);
     }
 }
