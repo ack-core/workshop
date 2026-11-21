@@ -579,6 +579,35 @@ namespace test {
 
         return true;
     }
+
+    bool math_transform3f_camera_test(const API &api) {
+        const math::transform3f view = math::transform3f::lookAtRH({5.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 3.0f, 0.0f});
+        EXPECT_TRUE(near3(math::vector3f(5.0f, 0.0f, 0.0f).transformed(view, true), 0.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 0.0f).transformed(view, true), 0.0f, 0.0f, -5.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, -1.0f).transformed(view, true), 1.0f, 0.0f, -5.0f));
+        EXPECT_TRUE(near3(math::vector3f(5.0f, 2.0f, 0.0f).transformed(view, true), 0.0f, 2.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(view), 0.0f, 0.0f, 1.0f));
+
+        const math::transform3f proj = math::transform3f::perspectiveFovRH(MATH_PI * 0.5f, 2.0f, 1.0f, 3.0f);
+        EXPECT_TRUE(near4(math::vector4f(2.0f, 1.0f, -1.0f, 1.0f).transformed(proj), 1.0f, 1.0f, 1.0f, 1.0f));
+        EXPECT_TRUE(near4(math::vector4f(-6.0f, -3.0f, -3.0f, 1.0f).transformed(proj), -3.0f, -3.0f, 0.0f, 3.0f));
+        EXPECT_TRUE(near4(math::vector4f(0.0f, 0.0f, -2.0f, 1.0f).transformed(proj), 0.0f, 0.0f, 0.5f, 2.0f));
+
+        const math::vector4f clip = math::vector4f(0.0f, 1.0f, 0.0f, 1.0f).transformed(view * proj);
+        EXPECT_TRUE(near4(clip, 0.0f, 1.0f, -1.0f, 5.0f));
+
+        const math::transform3f dz = math::transform3f::directionXZ({0.0f, 0.0f, 1.0f});
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(dz), 0.0f, 0.0f, 1.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).transformed(dz), 0.0f, 1.0f, 0.0f));
+
+        const float h = std::sqrt(0.5f);
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(math::transform3f::directionXZ({1.0f, 0.0f, 0.0f})), 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(math::transform3f::directionXZ({0.0f, 0.0f, -2.0f})), 0.0f, 0.0f, -1.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(math::transform3f::directionXZ({2.0f, 0.0f, 2.0f})), h, 0.0f, h));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(math::transform3f::directionXZ({-1.0f, 0.0f, -1.0f})), -h, 0.0f, -h));
+
+        return true;
+    }
 }
 
 
@@ -597,5 +626,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_transform2f_methods_test);
         REGISTER_UNIT_TEST(math_vector_rotated_angle_test);
         REGISTER_UNIT_TEST(math_color_conversion_test);
+        REGISTER_UNIT_TEST(math_transform3f_camera_test);
     }
 }
