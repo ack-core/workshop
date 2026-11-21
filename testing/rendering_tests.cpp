@@ -802,6 +802,80 @@ namespace test {
 }
 
 namespace test {
+    class rendering_blend_types_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_blend_types_test>();
+        }
+        void init(const API &api) override {
+            // Overlapping semi-transparent red and blue quads: mixing on the top half, additive on the bottom half
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.8][0.8, 0.8][0.0, 0.0][0.8, 0.0]
+                }
+                const {
+                    offset : float4
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0) + const_offset;
+                }
+                fssrc {
+                    output_color[0] = const_color;
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 4
+            };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                drawPair(rendering, foundation::BlendType::MIXING, 0.1f);
+                drawPair(rendering, foundation::BlendType::ADDITIVE, -0.9f);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+
+            EXPECT_TRUE(isPixel(frame, 77, 128, 128, 0));     // mixing: red only
+            EXPECT_TRUE(isPixel(frame, 179, 128, 64, 128));   // mixing: blue over red
+            EXPECT_TRUE(isPixel(frame, 282, 128, 0, 128));    // mixing: blue only
+            EXPECT_TRUE(isPixel(frame, 77, 384, 128, 0));     // additive: red only
+            EXPECT_TRUE(isPixel(frame, 179, 384, 128, 128));  // additive: blue plus red
+            EXPECT_TRUE(isPixel(frame, 282, 384, 0, 128));    // additive: blue only
+            EXPECT_TRUE(isPixel(frame, 450, 128, 0, 0));      // empty
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f offset;
+            math::vector4f color;
+        };
+
+        void drawPair(foundation::RenderingInterface &rendering, foundation::BlendType blendType, float y) {
+            const Constants red = { { -0.9f, y, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 0.5f } };
+            const Constants blue = { { -0.5f, y, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.5f } };
+
+            rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, blendType, foundation::DepthBehavior::DISABLED);
+            rendering.applyShaderConstants(&red);
+            rendering.draw(1);
+            rendering.applyShaderConstants(&blue);
+            rendering.draw(1);
+        }
+
+        static bool isPixel(const std::uint8_t *frame, std::size_t x, std::size_t y, int r, int b) {
+            const std::uint8_t *pixel = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+            return std::abs(pixel[0] - r) < 3 && pixel[1] == 0 && std::abs(pixel[2] - b) < 3;
+        }
+
+        foundation::RenderShaderPtr _shader;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -816,6 +890,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_render_target_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_instanced_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_triple_instancing_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_blend_types_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
