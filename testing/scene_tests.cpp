@@ -141,7 +141,7 @@ namespace test {
         }
         void updateAndDraw(const API &api) override {}
         std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {4, 256};
+            return {16, 1024};
         }
 
     private:

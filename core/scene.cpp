@@ -714,7 +714,9 @@ namespace core {
             math::vector3f up;
         }
         _camera;
-        
+
+        math::vector3f _sunDirection = math::vector3f(0.5f, 1.0f, 0.3f).normalized();
+
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
 
@@ -733,7 +735,10 @@ namespace core {
         foundation::RenderShaderPtr _particlesShader;
         
         foundation::RenderTargetPtr _gbuffer;
-        foundation::RenderShaderPtr _gbufferToScreenShader;
+        foundation::RenderTargetPtr _img;
+
+        foundation::RenderShaderPtr _gbufferToImgShader;
+        foundation::RenderShaderPtr _imgToScreenShader;
         
         std::vector<std::shared_ptr<ArrowsImpl>> _arrows;
         std::vector<std::shared_ptr<LineSetImpl>> _lineSets;
@@ -892,7 +897,7 @@ namespace {
             float4 relVertexPos = float4(toCamSign, 1.0) * float4(_lerp(float3(0.5, 0.5, 0.5), fixed_cube[repeat_ID].xyz, float(mask)), 1.0);
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
-            output_normalc = float4(_transform(float4(fixed_normal[faceIndex], 1.0), const_modelTransform).xyz * 0.5 + 0.5, float(colorIndex) / 255.0); //
+            output_normalc = float4(_transform(float4(fixed_normal[faceIndex], 0.0), const_modelTransform).xyz * 0.5 + 0.5, float(colorIndex) / 255.0); //
             output_position = _transform(absVertexPos, _transform(const_modelTransform, frame_plmVPMatrix));
         }
         fssrc {
@@ -1000,17 +1005,35 @@ namespace {
             output_color[0] = _tex2d(1, input_uv_alpha.xy) * float4(1.0, 1.0, 1.0, input_uv_alpha.z);
         }
     )";
-    const char *g_gbufferToScreenShaderSrc = R"(
+    const char *g_gbufferToImgShaderSrc = R"(
         fixed {
-            rndv[64] : float3 =
-                [0.80,0.76,0.69][-0.67,0.62,-0.25][0.32,-0.06,-0.68][-0.07,-0.60,-0.03][0.16,-0.11,0.46][-0.33,-0.20,0.11][-0.18,0.25,0.17][-0.07,-0.22,0.20]
-                [-0.89,-0.90,-0.28][-0.65,0.44,-0.54][0.42,-0.38,-0.50][0.39,0.32,-0.33][-0.09,0.48,-0.10][0.01,0.06,-0.39][-0.07,-0.21,-0.27][-0.30,0.03,0.01]
-                [1.18,0.28,-0.46][-0.65,0.53,0.45][-0.26,-0.66,-0.25][0.07,-0.25,0.54][0.30,0.13,0.37][0.28,-0.21,0.18][-0.15,-0.27,0.17][0.04,-0.09,-0.28]
-                [-0.78,-0.67,0.79][-0.85,-0.37,-0.21][0.07,0.34,0.67][0.20,-0.43,0.37][0.39,-0.11,-0.29][0.01,0.39,0.07][0.31,-0.16,0.06][0.19,-0.01,0.23]
-                [-0.30,0.92,-0.87][-0.08,-0.10,0.94][0.40,0.46,-0.43][0.19,0.31,0.48][-0.12,0.46,0.14][-0.27,0.12,0.27][-0.29,0.18,-0.08][0.27,0.11,0.08]
-                [1.12,0.43,0.50][-0.24,-0.56,-0.73][-0.60,0.35,-0.28][0.22,0.20,-0.52][0.38,-0.27,-0.19][-0.03,0.35,-0.19][-0.22,-0.26,0.07][-0.11,0.05,-0.27]
-                [0.43,-1.16,-0.41][0.42,0.66,-0.54][0.35,-0.08,0.66][-0.44,0.02,0.41][0.46,0.20,0.01][0.36,-0.17,0.04][0.12,0.22,0.25][0.10,-0.24,0.15]
-                [-0.45,-0.84,0.88][-0.64,-0.31,-0.63][-0.31,0.68,0.02][-0.28,0.35,-0.40][0.05,-0.01,0.50][0.14,-0.22,-0.30][0.11,0.32,0.10][-0.29,0.05,0.04]
+            rndv[288] : float3 =
+                [-0.02,0.10,0.02][0.06,-0.00,-0.09][0.11,-0.07,0.03][-0.11,-0.11,-0.07][0.10,0.05,0.19][0.00,-0.21,0.20][-0.25,0.17,0.21][-0.44,-0.15,0.00][-0.39,-0.29,0.31][0.04,-0.06,-0.70][-0.05,0.56,0.63][0.52,0.86,-0.05]
+                [-0.08,0.04,0.05][-0.04,-0.07,-0.07][0.04,0.03,-0.12][0.11,-0.11,0.06][-0.02,0.21,-0.05][0.24,0.14,-0.05][-0.01,0.20,0.31][0.27,-0.12,0.36][0.47,0.15,0.30][-0.15,-0.67,-0.14][-0.32,0.72,0.30][-0.95,0.25,-0.20]
+                [0.04,-0.04,0.08][0.05,0.09,-0.01][0.06,0.00,-0.12][-0.15,0.08,-0.02][0.11,-0.18,-0.06][-0.10,-0.14,-0.23][-0.14,-0.28,0.20][-0.45,-0.02,0.10][-0.49,-0.27,-0.13][0.02,0.69,0.11][0.23,-0.75,0.32][0.88,-0.10,0.47]
+                [-0.02,0.09,0.03][0.10,-0.02,0.04][-0.01,-0.11,0.07][0.05,-0.04,-0.15][-0.17,-0.01,0.13][-0.19,-0.20,-0.07][-0.25,0.24,-0.12][-0.06,0.07,-0.46][-0.36,-0.11,-0.44][0.70,-0.03,-0.07][-0.63,0.48,0.29][0.11,0.53,0.84]
+                [0.01,0.03,0.09][-0.01,-0.11,0.01][-0.11,-0.03,-0.06][0.13,-0.02,-0.11][-0.17,0.13,0.04][-0.10,0.15,-0.22][0.12,0.32,0.13][0.38,0.19,-0.18][0.18,0.42,-0.35][0.29,-0.64,-0.00][-0.23,0.64,0.50][-0.40,-0.19,0.90]
+                [0.06,-0.01,-0.08][0.05,-0.06,0.07][0.02,0.07,0.11][-0.15,-0.08,0.02][0.09,0.20,-0.04][-0.16,0.23,0.07][-0.06,0.09,-0.35][-0.41,-0.11,-0.20][-0.50,0.22,-0.18][0.03,-0.62,0.32][0.33,0.46,-0.62][0.98,-0.05,-0.20]
+                [0.06,0.06,0.06][0.07,-0.05,-0.07][-0.02,-0.13,0.01][-0.09,0.05,-0.13][-0.02,-0.08,0.20][-0.25,-0.12,0.07][-0.10,0.28,0.22][-0.30,0.32,-0.15][-0.55,0.18,0.05][0.33,-0.00,-0.62][0.07,0.25,0.80][0.88,-0.05,0.47]
+                [-0.01,-0.10,0.02][0.09,0.00,-0.05][-0.03,0.06,-0.11][0.05,0.12,0.10][-0.18,-0.08,-0.10][-0.22,0.18,-0.04][-0.22,-0.16,0.25][-0.04,0.18,0.42][-0.36,0.29,0.34][0.69,0.13,-0.01][-0.58,-0.61,0.06][0.16,-0.89,-0.43]
+                [0.09,-0.05,0.02][0.03,0.08,-0.06][-0.07,-0.01,-0.11][-0.07,0.11,0.11][-0.02,-0.20,-0.09][-0.26,-0.11,0.00][0.08,-0.25,0.26][-0.14,0.07,0.44][-0.38,-0.16,0.40][0.19,0.67,-0.08][0.30,-0.79,0.08][0.81,-0.29,-0.50]
+                [0.10,-0.01,-0.00][-0.02,0.02,-0.10][-0.09,-0.09,-0.04][-0.08,0.14,0.05][0.04,-0.21,0.06][-0.19,-0.12,0.18][0.24,0.00,0.28][-0.03,0.32,0.33][-0.16,0.08,0.55][-0.13,0.47,-0.50][0.60,-0.48,0.34][0.70,-0.42,-0.58]
+                [-0.09,0.04,-0.01][0.03,0.03,0.10][0.02,-0.11,0.07][0.15,0.05,-0.06][-0.15,-0.16,-0.02][0.09,-0.24,-0.12][-0.19,0.05,-0.31][0.22,0.15,-0.38][0.19,-0.17,-0.52][0.36,0.44,0.41][-0.76,-0.14,-0.33][-0.83,0.20,0.53]
+                [-0.03,0.03,0.09][0.10,-0.04,0.02][0.00,-0.12,-0.04][0.05,0.09,-0.13][-0.17,-0.12,0.07][-0.17,-0.10,-0.21][-0.28,0.23,0.08][-0.08,0.38,-0.26][-0.35,0.22,-0.40][0.69,0.10,-0.01][-0.68,0.04,0.50][0.06,-0.26,0.96]
+                [-0.05,-0.09,-0.01][-0.04,0.04,0.09][0.10,0.03,0.08][-0.03,0.14,-0.09][0.15,-0.16,0.02][0.26,0.05,-0.10][-0.04,-0.23,-0.29][-0.09,0.17,-0.42][0.24,0.10,-0.51][-0.45,0.45,0.30][0.11,-0.81,-0.21][-0.32,-0.73,0.61]
+                [-0.02,-0.09,-0.05][0.10,-0.02,0.04][0.08,0.10,-0.04][-0.07,0.04,0.15][-0.01,0.04,-0.21][-0.10,0.26,-0.07][-0.31,-0.13,-0.13][-0.39,0.02,0.25][-0.50,0.28,0.05][0.38,-0.18,0.56][-0.33,-0.30,-0.72][0.51,-0.66,-0.55]
+                [-0.01,0.08,-0.05][0.10,0.01,0.04][-0.01,-0.01,0.13][0.03,-0.15,-0.07][-0.16,0.11,0.10][-0.20,-0.15,0.13][-0.26,0.08,-0.25][-0.11,-0.31,-0.33][-0.41,-0.37,-0.16][0.68,-0.15,-0.06][-0.59,0.58,-0.16][0.22,0.97,0.08]
+                [0.03,-0.10,0.01][0.01,0.04,0.10][0.08,0.11,-0.01][-0.16,0.05,-0.00][0.18,-0.02,-0.13][0.01,0.16,-0.24][-0.06,-0.28,-0.23][-0.42,-0.07,-0.18][-0.30,0.05,-0.49][-0.27,0.16,0.63][0.43,-0.59,-0.42][0.73,-0.52,0.45]
+                [0.05,-0.09,-0.01][-0.09,-0.01,-0.06][-0.11,0.02,0.07][0.04,0.14,-0.07][-0.00,-0.10,0.19][0.00,0.17,0.23][0.35,-0.09,0.09][0.35,0.29,-0.10][0.37,0.38,0.24][-0.31,0.12,-0.62][0.44,-0.57,0.44][-0.21,-0.97,-0.08]
+                [0.06,-0.08,-0.02][0.07,0.08,-0.02][-0.06,0.07,-0.09][-0.03,0.07,0.15][-0.09,-0.11,-0.16][-0.28,0.02,-0.02][-0.05,-0.35,0.11][-0.13,-0.09,0.44][-0.45,-0.16,0.32][0.46,0.49,0.21][-0.06,-0.78,-0.31][0.66,-0.33,-0.67]
+                [-0.09,0.02,0.03][0.01,0.06,-0.09][0.10,0.08,0.02][0.05,-0.13,-0.09][0.01,0.09,0.20][0.22,-0.08,0.17][-0.21,-0.20,0.23][-0.01,-0.46,-0.04][0.18,-0.48,0.25][-0.01,0.08,-0.70][-0.46,0.09,0.70][-0.64,0.77,0.09]
+                [0.08,0.05,-0.03][0.03,-0.10,-0.02][-0.01,-0.06,0.11][-0.14,-0.03,-0.08][0.08,0.11,0.17][-0.19,0.08,0.20][0.02,0.36,-0.09][-0.34,0.20,-0.25][-0.45,0.35,0.04][-0.01,-0.58,-0.40][0.44,0.69,0.19][1.00,-0.03,0.03]
+                [0.02,-0.04,-0.09][-0.04,-0.08,0.06][0.07,-0.01,0.11][-0.13,0.10,0.04][0.22,0.00,-0.04][0.14,0.22,0.11][0.05,0.15,-0.33][-0.26,0.36,-0.14][0.01,0.57,-0.08][-0.55,-0.33,0.27][0.55,-0.01,-0.64][0.34,-0.87,-0.36]
+                [0.07,0.05,0.04][-0.08,0.02,0.07][-0.10,0.04,-0.07][-0.02,-0.16,0.02][0.05,0.15,-0.15][-0.04,-0.08,-0.27][0.36,-0.02,-0.07][0.21,-0.41,-0.01][0.23,-0.39,-0.36][-0.38,-0.19,0.56][0.64,0.48,-0.25][0.14,0.91,0.40]
+                [-0.02,0.02,0.10][0.09,0.06,-0.02][0.09,-0.08,-0.05][-0.08,0.08,-0.12][0.02,-0.19,0.10][-0.08,-0.23,-0.15][-0.30,-0.06,0.20][-0.41,0.13,-0.16][-0.49,-0.20,-0.23][0.30,0.59,-0.23][-0.26,-0.40,0.69][0.53,0.06,0.84]
+                [0.03,-0.09,-0.01][-0.09,-0.02,0.05][0.00,0.07,0.11][-0.07,0.09,-0.12][0.18,-0.02,0.12][0.16,0.24,0.03][0.27,-0.12,-0.22][0.03,0.15,-0.44][0.30,0.35,-0.35][-0.70,-0.06,-0.04][0.72,-0.44,0.04][0.03,-0.86,0.51]
+            rndo[16] : int4 =
+                [8,3,9,0][6,14,3,0][10,0,12,0][11,7,5,0][12,1,13,0][7,6,2,0][13,8,15,0][9,10,14,0][1,5,1,0][3,11,0,0][0,2,11,0][14,9,8,0][5,4,4,0][2,15,10,0][4,13,6,0][15,12,7,0]
             quad[4] : float2 = [-1, 1][1, 1][-1, -1][1, -1]
             uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
         }
@@ -1038,18 +1061,44 @@ namespace {
             float3 wpos = getWPos(input_uv, gdepth);
             float3 wnpos = wpos + 0.1 * normal;
             float  lit = 0.0;
-            float  base = _frac(52.9829189 * _frac(_dot(_floor(input_uv * frame_rtBounds.xy), float2(0.06711056, 0.00583715))));
+            int3   cell = int3(_floor(wpos * 32.0)) & 15;
+            int    offset = 12 * ((fixed_rndo[cell.x].x + fixed_rndo[cell.y].y + fixed_rndo[cell.z].z) % 24);
+            float  rscale = 0.015 / (gdepth * gdepth + 0.0000001);
 
             for (int i = 0; i < 12; i++) {
-                float  rnd = 0.1 + _frac(base + float(i) * 0.618034);
-                float3 rv = _norm(fixed_rndv[i]) * rnd;
-                float3 dpos = getDPos(wnpos + _sign(_dot(normal, rv)) * rv);
+                float3 rv = 3.5 * fixed_rndv[offset + i];
+                rv = _sign(_dot(normal, rv)) * rv;
+                float3 dpos = getDPos(wnpos + rv);
                 float  rdepth = _tex2d(2, dpos.xy).r;
-                lit += _step(rdepth, dpos.z) + _clamp(20000.0 * (rdepth - dpos.z));
+                lit += _step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z));
             }
-            
-            lit = _step(0.0000001, gdepth) * (lit * 0.0625 * 0.5 + 0.5);
-            output_color[0] = float4(lit * color, 1);
+
+            lit = _step(0.0000001, gdepth) * lit / 12.0;
+            output_color[0] = float4(lit * color, 1); //float4(lit, lit, lit, 1); //
+
+        }
+    )";
+    const char *g_imgToScreenShaderSrc = R"(
+        fixed {
+            quad[4] : float2 = [-1, 1][1, 1][-1, -1][1, -1]
+            uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
+        }
+        inout {
+            uv : float2
+        }
+        vssrc {
+            output_position = float4(fixed_quad[repeat_ID], 0.1, 1.0);
+            output_uv = fixed_uv[repeat_ID];
+        }
+        fssrc {
+            float2 texel = float2(1.0, 1.0) / frame_rtBounds.xy;
+            float4 sum = float4(0.0, 0.0, 0.0, 0.0);
+            for (int y = -1; y <= 1; y++) {
+                for (int x = -1; x <= 1; x++) {
+                    sum += _tex2d(0, input_uv + float2(float(x), float(y)) * texel);
+                }
+            }
+            output_color[0] = sum / 9.0;
         }
     )";
 }
@@ -1092,7 +1141,7 @@ namespace core {
     }
     
     void SceneInterfaceImpl::setSun(const math::vector3f &directionToSun, const math::color &rgba) {
-    
+        _sunDirection = directionToSun.normalized();
     }
     
     SceneInterface::ArrowsPtr SceneInterfaceImpl::addArrows() {
@@ -1218,17 +1267,24 @@ namespace core {
             _particlesShader = _rendering->createShader(g_particlesShaderSrc, foundation::InputLayout{
                 .repeat = 4
             });
-            _gbufferToScreenShader = _rendering->createShader(g_gbufferToScreenShaderSrc, foundation::InputLayout{
+            _gbufferToImgShader = _rendering->createShader(g_gbufferToImgShaderSrc, foundation::InputLayout{
+                .repeat = 4
+            });
+            _imgToScreenShader = _rendering->createShader(g_imgToScreenShaderSrc, foundation::InputLayout{
                 .repeat = 4
             });
 
-            _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferSize().x), std::uint32_t(_rendering->getBackBufferSize().y), true);
-            _resizeToken = _platform->addResizeHandler([this]() {
-                _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, std::uint32_t(_rendering->getBackBufferSize().x), std::uint32_t(_rendering->getBackBufferSize().y), true);
-            });
+            auto createTargets = [this]() {
+                const std::uint32_t w = std::uint32_t(_rendering->getBackBufferSize().x);
+                const std::uint32_t h = std::uint32_t(_rendering->getBackBufferSize().y);
+                _gbuffer = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, w, h, true);
+                _img = _rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, w, h, false);
+            };
+            createTargets();
+            _resizeToken = _platform->addResizeHandler(std::move(createTargets));
         }
 
-        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
+        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward, _sunDirection);
         
         if (_gbuffer) {
             const auto drawCustomMeshes = [this](foundation::RenderingInterface &rendering, bool renderToGBuffer, foundation::BlendType blendType) {
@@ -1285,12 +1341,19 @@ namespace core {
                 }
                 drawCustomMeshes(rendering, true, foundation::BlendType::DISABLED);
             });
-            _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
-                rendering.applyShader(_gbufferToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+            _rendering->forTarget(_img, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_gbufferToImgShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
                 rendering.applyTextures({
                     {_palette, foundation::SamplerType::NEAREST},
                     {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
                     {_gbuffer->getDepth(), foundation::SamplerType::NEAREST},
+                });
+                rendering.draw();
+            });
+            _rendering->forTarget(nullptr, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_imgToScreenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyTextures({
+                    {_img->getTexture(0), foundation::SamplerType::NEAREST},
                 });
                 rendering.draw();
             });
