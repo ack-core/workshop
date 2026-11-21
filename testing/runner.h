@@ -79,6 +79,7 @@ namespace test {
         const foundation::PlatformInterfacePtr &platform;
         const foundation::RenderingInterfacePtr& rendering;
         const resource::ResourceProviderPtr& resourceProvider;
+        const resource::FontAtlasProviderPtr& fontAtlasProvider;
         const core::SceneInterfacePtr& scene;
         const core::RaycastInterfacePtr& raycast;
         const core::SimulationInterfacePtr& simulation;
@@ -131,6 +132,7 @@ namespace test {
             const foundation::PlatformInterfacePtr& platform,
             const foundation::RenderingInterfacePtr& rendering,
             const resource::ResourceProviderPtr& resourceProvider,
+            const resource::FontAtlasProviderPtr& fontAtlasProvider,
             const core::SceneInterfacePtr& scene,
             const core::RaycastInterfacePtr& raycast,
             const core::SimulationInterfacePtr& simulation,
