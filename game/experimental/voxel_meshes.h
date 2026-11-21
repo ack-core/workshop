@@ -16,6 +16,7 @@ namespace game {
         core::SceneInterface::VoxelMeshPtr _plane;
         core::SceneInterface::VoxelMeshPtr _ruins;
         core::SceneInterface::VoxelMeshPtr _debris;
+        core::SceneInterface::VoxelMeshPtr _knight;
     };
 }
 

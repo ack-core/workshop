@@ -15,6 +15,10 @@ namespace game {
             _debris = _api.scene->addVoxelMesh(data, desc);
             _debris->setPosition({5, 0, 5});
         });
+        _api.resources->getOrLoadVoxelMesh("meshes/knight", [this](const std::vector<foundation::RenderDataPtr>& data, const util::Description& desc) {
+            _knight = _api.scene->addVoxelMesh(data, desc);
+            _knight->setPosition({ 0, 1, 0 });
+        });
         _api.scene->setSun({ 1, 1, 0 }, {});
     }
 }

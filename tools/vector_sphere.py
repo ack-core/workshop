@@ -3,7 +3,7 @@ import math
 import random
 import sys
 
-MIN_ANGLE = math.radians(20.0)
+MIN_ANGLE = math.radians(40.0)
 MIN_VECTOR_LENGTH = 0.1
 LOOKUP_SIZE = 16
 
