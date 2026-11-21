@@ -36,6 +36,7 @@ namespace game {
 #else
 #include "experimental/render_dev.h"
 #include "experimental/vegetation.h"
+#include "experimental/voxel_meshes.h"
 #include "experimental/uielements.h"
 
 namespace game {
@@ -46,6 +47,10 @@ namespace game {
         {"vegetation", {
             &makeContext<RenderDevContext>,
             &makeContext<VegetationContext>
+        }},
+        {"voxelmeshes", {
+            &makeContext<RenderDevContext>,
+            &makeContext<VoxelMeshesContext>
         }},
         {"uielements", {
             &makeContext<RenderDevContext>,
