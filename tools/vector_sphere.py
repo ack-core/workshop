@@ -3,8 +3,9 @@ import math
 import random
 import sys
 
-MIN_ANGLE = math.radians(40.0)
+MIN_ANGLE = math.radians(30.0)
 MIN_VECTOR_LENGTH = 0.1
+QUADRATIC_LENGTH = True
 LOOKUP_SIZE = 16
 
 def random_unit():
@@ -23,12 +24,17 @@ def scale(v, k):
     return [c * k for c in v]
 
 
+def vector_length(i, m):
+    t = i / max(m - 1, 1)
+    return MIN_VECTOR_LENGTH + (1.0 - MIN_VECTOR_LENGTH) * (t * t if QUADRATIC_LENGTH else t)
+
+
 def make_set(m, min_angle, attempts):
     max_cos = math.cos(min_angle)
     result = [random_unit()]
     for _ in range(attempts):
         if len(result) == m:
-            return [scale(v, random.uniform(MIN_VECTOR_LENGTH, 1.0)) for v in result]
+            return [scale(v, vector_length(i, m)) for i, v in enumerate(result)]
         v = random_unit()
         if all(abs(dot(v, u)) < max_cos for u in result):
             result.append(v)
