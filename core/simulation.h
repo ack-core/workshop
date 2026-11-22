@@ -27,6 +27,7 @@ namespace core {
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual auto getVelocity() const -> const math::vector3f = 0;
             virtual void setVelocity(const math::vector3f &v) = 0;
+            virtual void addImpulse(const math::vector3f &impulse, float timeSec) = 0;
             virtual ~Body() = default;
         };
         

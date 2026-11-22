@@ -52,21 +52,29 @@ namespace core {
             _prevpos = transform.v3.xyz - math::vector3f(v.x, 0.0f, v.z);
             _lastDt = 1.0f;
         }
+        void addImpulse(const math::vector3f &impulse, float timeSec) override {
+            _impulse = _impulse + math::vector3f(impulse.x, 0.0f, impulse.z);
+            _impulseFade = std::log(100.0f) / std::max(timeSec, std::numeric_limits<float>::epsilon());
+        }
         void update(float dtSec) {
             const math::vector3f v = getVelocity();
-            _prevpos = transform.v3.xyz;
+            const math::vector3f impulseOffset = _impulse * dtSec;
+            _prevpos = transform.v3.xyz + impulseOffset;
             _lastDt = std::max(dtSec, std::numeric_limits<float>::epsilon());
-            transform.v3.xyz = transform.v3.xyz + math::vector3f(v.x, 0.0f, v.z) * dtSec;
+            transform.v3.xyz = transform.v3.xyz + math::vector3f(v.x, 0.0f, v.z) * dtSec + impulseOffset;
+            _impulse = _impulse.lengthSq() > std::numeric_limits<float>::epsilon() ? _impulse * std::exp(-_impulseFade * dtSec) : math::vector3f(0.0f, 0.0f, 0.0f);
             _visual->setPosition(transform.v3.xyz);
         }
 
     private:
         float _lastDt = 1.0f;
-        math::vector3f _prevpos;
+        float _impulseFade = 0.0f;
+        math::vector3f _impulse = {0.0f, 0.0f, 0.0f};
+        math::vector3f _prevpos = {0.0f, 0.0f, 0.0f};
         core::SceneInterface::LineSetPtr _visual;
     };
 }
- 
+
 namespace core {
     class ObstaclePolygonXZImpl : public CollisionBodyBase {
     public:
@@ -104,6 +112,7 @@ namespace core {
             return {};
         }
         void setVelocity(const math::vector3f &v) override {}
+        void addImpulse(const math::vector3f &impulse, float timeSec) override {}
 
     private:
         math::transform3f _transform;

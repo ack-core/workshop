@@ -159,6 +159,7 @@ const imports = {
         acosf: Math.acos,
         atan2f: Math.atan2,
         logf: Math.log,
+        expf: Math.exp,
         pow: Math.pow,
         js_dbg: (arg0, arg1, arg2) => console.log("!!!> " + arg0 + " | " + arg1 + " | " + arg2),
         js_log: function(str, len) {
