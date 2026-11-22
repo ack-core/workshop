@@ -803,6 +803,35 @@ namespace test {
 
         return true;
     }
+
+    bool util_write_tga_test(const API &api) {
+        const std::size_t width = 300;
+        const std::size_t height = 2;
+        std::vector<std::uint8_t> rgba(width * height * 4);
+        for (std::size_t i = 0; i < rgba.size(); i++) {
+            rgba[i] = std::uint8_t(i * 7 + 3);
+        }
+
+        auto [tga, size] = util::writeTGA(rgba.data(), width, height);
+        EXPECT_EQ(size, 18 + width * height * 4);
+
+        const std::uint8_t *header = tga.get();
+        EXPECT_EQ(header[2], 2);
+        EXPECT_EQ(header[12] | (header[13] << 8), width);
+        EXPECT_EQ(header[14] | (header[15] << 8), height);
+        EXPECT_EQ(header[16], 32);
+        EXPECT_EQ(header[17], 0x20);
+
+        const std::uint8_t *pixels = tga.get() + 18;
+        for (std::size_t i = 0; i < width * height; i++) {
+            EXPECT_EQ(pixels[i * 4 + 0], rgba[i * 4 + 2]);
+            EXPECT_EQ(pixels[i * 4 + 1], rgba[i * 4 + 1]);
+            EXPECT_EQ(pixels[i * 4 + 2], rgba[i * 4 + 0]);
+            EXPECT_EQ(pixels[i * 4 + 3], rgba[i * 4 + 3]);
+        }
+
+        return true;
+    }
 }
 
 
@@ -824,5 +853,6 @@ namespace test {
         REGISTER_UNIT_TEST(util_easing_test);
         REGISTER_UNIT_TEST(util_random_source_test);
         REGISTER_UNIT_TEST(util_cleanup_unused_test);
+        REGISTER_UNIT_TEST(util_write_tga_test);
     }
 }
