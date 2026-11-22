@@ -10,8 +10,6 @@
 
 #include <UIKit/UIKit.h>
 #include <MetalKit/MetalKit.h>
-#include <sys/sysctl.h>
-#include <unistd.h>
 
 namespace {
     const unsigned BUFFER_SIZE = 65536;
@@ -78,12 +76,6 @@ namespace {
             threadData.queue.emplace_back(std::move(task));
         }
         threadData.notifier.notify_one();
-    }
-    bool isDebuggerPresent() {
-        kinfo_proc info = {};
-        std::size_t size = sizeof(info);
-        int request[] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, ::getpid()};
-        return ::sysctl(request, 4, &info, &size, nullptr, 0) == 0 && (info.kp_proc.p_flag & P_TRACED) != 0;
     }
 }
 
@@ -561,10 +553,6 @@ namespace foundation {
         va_end(args);
         
         printf("%s\n", g_buffer);
-
-        if (isDebuggerPresent()) {
-            __builtin_debugtrap();
-        }
     }
 
     const IOSPlatform::StatInfo& IOSPlatform::getStatistics() const {
