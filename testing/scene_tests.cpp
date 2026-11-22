@@ -220,6 +220,32 @@ namespace test {
         core::SceneInterface::BoundingSpherePtr _hiddenSphere;
         core::SceneInterface::BoundingBoxPtr _hiddenBox;
     };
+
+    class scene_environment_fog_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_environment_fog_test>();
+        }
+        ~scene_environment_fog_test() override {
+            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {9000.0f, 10000.0f});
+        }
+        void init(const API &api) override {
+            _scene = api.scene;
+            _scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
+            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {2.0f, 12.0f});
+            api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
+                _mesh = _scene->addVoxelMesh(frames, desc);
+            });
+        }
+        void updateAndDraw(const API &api) override {}
+        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
+            return {16, 1024};
+        }
+
+    private:
+        core::SceneInterfacePtr _scene;
+        core::SceneInterface::VoxelMeshPtr _mesh;
+    };
 }
 
 namespace test {
@@ -231,5 +257,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
     }
 }
