@@ -63,6 +63,8 @@ namespace core {
             _lastDt = std::max(dtSec, std::numeric_limits<float>::epsilon());
             transform.v3.xyz = transform.v3.xyz + math::vector3f(v.x, 0.0f, v.z) * dtSec + impulseOffset;
             _impulse = _impulse.lengthSq() > std::numeric_limits<float>::epsilon() ? _impulse * std::exp(-_impulseFade * dtSec) : math::vector3f(0.0f, 0.0f, 0.0f);
+        }
+        void updateVisual() {
             _visual->setPosition(transform.v3.xyz);
         }
 
@@ -144,11 +146,12 @@ namespace core {
     }
     void resolveCollisionCircleCircleXZ(const CollisionInfo &info, CircleXZImpl &a, CircleXZImpl &b) {
         const float invMassSumm = a.invMass + b.invMass;
+        const float aShare = invMassSumm > 0.0f ? a.invMass / invMassSumm : 0.5f;
         if (a.movable) {
-            a.transform.v3.xyz = a.transform.v3.xyz - info.normal * info.penetration * (a.invMass / invMassSumm);
+            a.transform.v3.xyz = a.transform.v3.xyz - info.normal * info.penetration * aShare;
         }
         if (b.movable) {
-            b.transform.v3.xyz = b.transform.v3.xyz + info.normal * info.penetration * (b.invMass / invMassSumm);
+            b.transform.v3.xyz = b.transform.v3.xyz + info.normal * info.penetration * (1.0f - aShare);
         }
     }
 
@@ -249,6 +252,12 @@ namespace core {
                             resolveCollisionCircleObstacleXZ(info, *_circlesXZ[i], *_obstaclesXZ[c]);
                         }
                     }
+                }
+            }
+
+            for (auto &obj : _circlesXZ) {
+                if (obj->enabled) {
+                    obj->updateVisual();
                 }
             }
         }

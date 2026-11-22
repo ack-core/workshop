@@ -8,6 +8,7 @@
 #include "core/scene.h"
 #include "core/world.h"
 #include "core/raycast.h"
+#include "core/simulation.h"
 #include "ui/stage.h"
 #include "game/state_manager.h"
 
@@ -20,6 +21,7 @@ namespace game {
         const core::SceneInterfacePtr &scene;
         const core::WorldInterfacePtr &world;
         const core::RaycastInterfacePtr &raycast;
+        const core::SimulationInterfacePtr &simulation;
         const ui::StageInterfacePtr &ui;
     };
     
