@@ -216,7 +216,13 @@ namespace foundation {
         // @mips        - array of pointers. Each [i] pointer represents binary data for i'th mip and cannot be nullptr. Array can be empty if there is only one mip-level
         //
         virtual auto createTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr = 0;
-        
+
+        // Create cube texture (without mips) from binary data
+        // @w and @h    - width and height of each face
+        // @faceData    - pointers to 6 faces in order: +x, -x, +y, -y, +z, -z
+        //
+        virtual auto createCubeTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const void *(&faceData)[6]) -> RenderTexturePtr = 0;
+
         // TODO: create texture from as atlas region + getBase(), getAtlasSize() -> RenderTexture. For the upper levels atlas texture == common texture
         
         // Create render target texture

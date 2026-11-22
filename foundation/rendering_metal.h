@@ -122,6 +122,7 @@ namespace foundation {
         
         RenderShaderPtr createShader(const char *src, const InputLayout &layout, bool suppressErrors) override;
         RenderTexturePtr createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) override;
+        RenderTexturePtr createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const void *(&faceData)[6]) override;
         RenderTargetPtr createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) override;
         RenderDataPtr createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
         

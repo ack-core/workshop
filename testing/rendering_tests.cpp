@@ -876,6 +876,95 @@ namespace test {
 }
 
 namespace test {
+    class rendering_cube_texture_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_cube_texture_test>();
+        }
+        void init(const API &api) override {
+            // Sphere sampling 1x1 cube texture by normal: red +x, green -x, blue +y, yellow -y, magenta +z, cyan -z. Back half is discarded
+            //
+            const char *shaderSrc = R"(
+                inout {
+                    normal : float3
+                }
+                vssrc {
+                    output_position = float4(vertex_position.xy * 0.8, 0.5, 1.0);
+                    output_normal = vertex_position;
+                }
+                fssrc [cube] {
+                    if (input_normal.z < 0.0) {
+                        _discard();
+                    }
+                    output_color[0] = _texcube(0, input_normal);
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT3},
+                }
+            };
+            const std::uint32_t faces[] = { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xff00ffff, 0xffff00ff, 0xffffff00 };
+            const std::uint32_t rings = 16;
+            const std::uint32_t segments = 32;
+
+            std::vector<math::vector3f> vertexes;
+            std::vector<std::uint32_t> indexes;
+
+            for (std::uint32_t r = 0; r <= rings; r++) {
+                const float theta = MATH_PI * float(r) / float(rings);
+                for (std::uint32_t s = 0; s <= segments; s++) {
+                    const float phi = 2.0f * MATH_PI * float(s) / float(segments);
+                    vertexes.emplace_back(std::sin(theta) * std::cos(phi), std::cos(theta), std::sin(theta) * std::sin(phi));
+                }
+            }
+            for (std::uint32_t r = 0; r < rings; r++) {
+                for (std::uint32_t s = 0; s < segments; s++) {
+                    const std::uint32_t i = r * (segments + 1) + s;
+                    indexes.insert(indexes.end(), { i, i + segments + 1, i + 1, i + 1, i + segments + 1, i + segments + 2 });
+                }
+            }
+
+            _shader = api.rendering->createShader(shaderSrc, layout);
+            const void *faceData[] = { &faces[0], &faces[1], &faces[2], &faces[3], &faces[4], &faces[5] };
+            _texture = api.rendering->createCubeTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 1, faceData);
+            _data = api.rendering->createData(layout, vertexes.data(), std::uint32_t(vertexes.size()), indexes.data(), std::uint32_t(indexes.size()));
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyTextures({ { _texture, foundation::SamplerType::NEAREST } });
+                rendering.draw(_data);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_texture, nullptr);
+            EXPECT_NOT_EQ(_data, nullptr);
+            EXPECT_EQ(_texture->getMipCount(), 1);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(256, 256, 255, 0, 255));    // center: +z
+            EXPECT_TRUE(pixelIs(436, 256, 255, 0, 0));      // right: +x
+            EXPECT_TRUE(pixelIs(76, 256, 0, 255, 0));       // left: -x
+            EXPECT_TRUE(pixelIs(256, 76, 0, 0, 255));       // top: +y
+            EXPECT_TRUE(pixelIs(256, 436, 255, 255, 0));    // bottom: -y
+            EXPECT_TRUE(pixelIs(20, 20, 0, 0, 0));          // outside
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderTexturePtr _texture;
+        foundation::RenderDataPtr _data;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -891,6 +980,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_instanced_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_triple_instancing_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_blend_types_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_cube_texture_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
