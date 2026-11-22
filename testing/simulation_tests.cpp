@@ -1,6 +1,30 @@
 
 #include "runner.h"
 
+namespace {
+    core::SimulationInterface::BodyPtr addTestCircle(const test::API &api, const math::vector3f &position, const math::vector3f &velocity) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
+        desc.setNumber("mass", 1.0);
+        desc.setNumber("radius", 0.5);
+
+        core::SimulationInterface::BodyPtr body = api.simulation->addBody(desc);
+        body->setTransform(math::transform3f::identity().translated(position));
+        body->setVelocity(velocity);
+        return body;
+    }
+
+    core::SimulationInterface::BodyPtr addTestWall(const test::API &api) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::ObstaclePolygonXZ));
+        desc.setVector3f("points", math::vector3f(2.0f, 0.0f, -10.0f), false);
+        desc.setVector3f("points", math::vector3f(2.0f, 0.0f, 10.0f), false);
+        desc.setVector3f("points", math::vector3f(4.0f, 0.0f, 10.0f), false);
+        desc.setVector3f("points", math::vector3f(4.0f, 0.0f, -10.0f), false);
+        return api.simulation->addBody(desc);
+    }
+}
+
 namespace test {
     bool simulationCircleMovesByVelocity(const API &api) {
         util::Description desc;
@@ -20,10 +44,53 @@ namespace test {
         EXPECT_EQ_F(position.z, 0.0f);
         return true;
     }
+
+    bool simulationCircleObstacleStopAndSlide(const API &api) {
+        core::SimulationInterface::BodyPtr wall = addTestWall(api);
+        core::SimulationInterface::BodyPtr stopping = addTestCircle(api, {0, 0, 0}, {1, 0, 0});
+        core::SimulationInterface::BodyPtr sliding = addTestCircle(api, {0, 0, -5}, {1, 0, 1});
+        EXPECT_TRUE(wall != nullptr);
+
+        for (int i = 0; i < 30; i++) {
+            api.simulation->update(0.1f);
+            EXPECT_LT(stopping->getTransform().v3.x, 1.5f + 1.0e-4f);
+            EXPECT_LT(sliding->getTransform().v3.x, 1.5f + 1.0e-4f);
+        }
+
+        const math::vector3f stopPos = stopping->getTransform().v3.xyz;
+        const math::vector3f slidePos = sliding->getTransform().v3.xyz;
+        EXPECT_LT(std::fabs(stopPos.x - 1.5f), 1.0e-4f);
+        EXPECT_LT(std::fabs(stopPos.z), 1.0e-4f);
+        EXPECT_LT(std::fabs(slidePos.x - 1.5f), 1.0e-4f);
+        EXPECT_LT(std::fabs(slidePos.z + 2.0f), 1.0e-4f);
+        return true;
+    }
+
+    bool simulationCircleObstacleInactiveBodies(const API &api) {
+        core::SimulationInterface::BodyPtr wall = addTestWall(api);
+        core::SimulationInterface::BodyPtr disabled = addTestCircle(api, {1.8f, 0, 0}, {1, 0, 0});
+        core::SimulationInterface::BodyPtr fixed = addTestCircle(api, {1.8f, 0, 3}, {1, 0, 0});
+        disabled->setEnabled(false);
+        fixed->setMovable(false);
+
+        for (int i = 0; i < 5; i++) {
+            api.simulation->update(0.1f);
+        }
+
+        const math::vector3f disabledPos = disabled->getTransform().v3.xyz;
+        const math::vector3f fixedPos = fixed->getTransform().v3.xyz;
+        EXPECT_EQ_F(disabledPos.x, 1.8f);
+        EXPECT_EQ_F(disabledPos.z, 0.0f);
+        EXPECT_EQ_F(fixedPos.x, 1.8f);
+        EXPECT_EQ_F(fixedPos.z, 3.0f);
+        return true;
+    }
 }
 
 namespace test {
     void registerSimulationTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(simulationCircleMovesByVelocity);
+        REGISTER_UNIT_TEST(simulationCircleObstacleStopAndSlide);
+        REGISTER_UNIT_TEST(simulationCircleObstacleInactiveBodies);
     }
 }
