@@ -47,6 +47,43 @@ namespace test {
         EXPECT_EQ_F(cameraDirection.z, direction.z);
         return true;
     }
+
+    bool scene_screen_world_projection_test(const API &api) {
+        const float width = api.platform->getScreenWidth();
+        const float height = api.platform->getScreenHeight();
+        api.scene->setCameraLookAt({10, 0, 0}, {0, 0, 0});
+
+        const math::vector3f right = api.scene->getCameraRight();
+        const math::vector2f center = api.scene->getScreenCoordinates({0, 0, 0});
+        const math::vector2f behind = api.scene->getScreenCoordinates({20, 0, 0});
+        const math::vector2f shifted = api.scene->getScreenCoordinates(math::vector3f(0, 1, 0) + right * 2.0f);
+
+        math::vector3f camPosition;
+        const math::vector3f centerDir = api.scene->getWorldDirection({width * 0.5f, height * 0.5f}, &camPosition);
+        const math::vector3f shiftedDir = api.scene->getWorldDirection(shifted);
+        const math::vector3f expectedDir = (math::vector3f(0, 1, 0) + right * 2.0f - camPosition).normalized();
+        api.scene->setCameraLookAt({45, 45, 45}, {0, 0, 0});
+
+        EXPECT_EQ_F(right.x, 0.0f);
+        EXPECT_EQ_F(right.y, 0.0f);
+        EXPECT_EQ_F(right.z, -1.0f);
+        EXPECT_LT(std::fabs(center.x - width * 0.5f), 0.01f);
+        EXPECT_LT(std::fabs(center.y - height * 0.5f), 0.01f);
+        EXPECT_EQ(behind.x, std::numeric_limits<float>::min());
+        EXPECT_EQ(behind.y, std::numeric_limits<float>::min());
+        EXPECT_LT(width * 0.5f, shifted.x);
+        EXPECT_LT(shifted.y, height * 0.5f);
+        EXPECT_EQ_F(camPosition.x, 10.0f);
+        EXPECT_EQ_F(camPosition.y, 0.0f);
+        EXPECT_EQ_F(camPosition.z, 0.0f);
+        EXPECT_LT(std::fabs(centerDir.x + 1.0f), 1.0e-4f);
+        EXPECT_LT(std::fabs(centerDir.y), 1.0e-4f);
+        EXPECT_LT(std::fabs(centerDir.z), 1.0e-4f);
+        EXPECT_LT(std::fabs(shiftedDir.x - expectedDir.x), 1.0e-4f);
+        EXPECT_LT(std::fabs(shiftedDir.y - expectedDir.y), 1.0e-4f);
+        EXPECT_LT(std::fabs(shiftedDir.z - expectedDir.z), 1.0e-4f);
+        return true;
+    }
 }
 
 namespace test {
@@ -153,6 +190,7 @@ namespace test {
     void registerSceneTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
+        REGISTER_UNIT_TEST(scene_screen_world_projection_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
