@@ -8,6 +8,15 @@ namespace game {
         playerDesc.setNumber("radius", 0.5);
         _player = _api.simulation->addBody(playerDesc);
 
+        _circles.emplace_back(_api.simulation->addBody(playerDesc));
+        _circles.back()->setTransform(math::transform3f::identity().translated({-2, 0, 1}));
+
+        util::Description bigDesc = playerDesc;
+        bigDesc.setNumber("mass", 4.0);
+        bigDesc.setNumber("radius", 1.0);
+        _circles.emplace_back(_api.simulation->addBody(bigDesc));
+        _circles.back()->setTransform(math::transform3f::identity().translated({1, 0, -3}));
+
         const std::vector<std::vector<math::vector3f>> obstacles = {
             {{3, 0, -2}, {3, 0, 2}, {4, 0, 2}, {4, 0, -2}},
             {{-5, 0, -4}, {-4, 0, -2}, {-2, 0, -4}},
@@ -57,6 +66,9 @@ namespace game {
 
     void CollisionContext::update(float dtSec) {
         _player->setVelocity(_direction.normalized(4.0f));
+        for (auto &circle : _circles) {
+            circle->setVelocity({0, 0, 0});
+        }
         _api.scene->setCameraLookAt({0, 20, 0.01f}, {0, 0, 0});
     }
 }
