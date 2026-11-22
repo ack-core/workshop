@@ -340,7 +340,9 @@ const imports = {
             glbuffers[glBufferIDCounter] = {
                 indexes: ibo,
                 buffer: vbo,
-                layout: vao
+                layout: vao,
+                attributes: lmem.slice(),
+                stride: stride
             };
 
             return glBufferIDCounter++;
@@ -507,24 +509,27 @@ const imports = {
             glcontext.bindTexture(cube ? glcontext.TEXTURE_CUBE_MAP : glcontext.TEXTURE_2D, texture);
             glcontext.bindSampler(index, glsamplers[samplingType]);
         },
-        webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {
+        webgl_drawDefault: function(buffer, start, vertexCount, instanceCount, topology) {
             if (uniformInstanceCountLocation) {
                 glcontext.uniform1i(uniformInstanceCountLocation, 1);
             }
             glcontext.bindVertexArray(glbuffers[buffer].layout);
-            glcontext.drawArraysInstanced(topology, 0, vertexCount, instanceCount);
+            glcontext.drawArraysInstanced(topology, start, vertexCount, instanceCount);
         },
-        webgl_drawIndexed: function(buffer, indexCount, instanceCount, topology) {
+        webgl_drawIndexed: function(buffer, start, indexCount, instanceCount, topology) {
             glcontext.bindVertexArray(glbuffers[buffer].layout);
-            glcontext.drawElementsInstanced(topology, indexCount, glcontext.UNSIGNED_INT, 0, instanceCount);
+            glcontext.drawElementsInstanced(topology, indexCount, glcontext.UNSIGNED_INT, start * 4, instanceCount);
         },
-        webgl_drawWithRepeat: function(buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) {
+        webgl_drawWithRepeat: function(buffer, attrCount, instanceCount, vertexCount, totalInstCount, start, topology) {
+            const data = glbuffers[buffer];
             if (uniformInstanceCountLocation) {
                 glcontext.uniform1i(uniformInstanceCountLocation, instanceCount);
             }
-            glcontext.bindVertexArray(glbuffers[buffer].layout);
-            for (let i = 0; i < attrCount; i++) {
+            glcontext.bindVertexArray(data.layout);
+            glcontext.bindBuffer(glcontext.ARRAY_BUFFER, data.buffer);
+            for (let i = 0, offset = start * data.stride; i < attrCount; i++) {
                 glcontext.vertexAttribDivisor(i, instanceCount);
+                offset += vertexAttribFunctions[data.attributes[i]](i, data.stride, offset);
             }
             glcontext.drawArraysInstanced(topology, 0, vertexCount, totalInstCount);
         },
