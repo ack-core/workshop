@@ -19,18 +19,17 @@ namespace test {
             return std::make_unique<fontatlas_provider_blur_precache_test>();
         }
         void init(const API &api) override {
-            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 2, [this]() {
-                _ready = true;
+            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 2, [this, provider = api.fontAtlasProvider]() {
+                _blurredTexture = provider->getTextFontAtlas(TEXT, FONT_SIZE, 2, _blurred);
+                _unblurredTexture = provider->getTextFontAtlas(TEXT, FONT_SIZE, 0, _unblurred);
             });
         }
         bool testResult(const API &api) override {
-            std::vector<resource::FontCharInfo> blurred, unblurred;
-            EXPECT_TRUE(_ready);
-            EXPECT_NOT_EQ(api.fontAtlasProvider->getTextFontAtlas(TEXT, FONT_SIZE, 2, blurred), nullptr);
-            EXPECT_NOT_EQ(api.fontAtlasProvider->getTextFontAtlas(TEXT, FONT_SIZE, 0, unblurred), nullptr);
-            EXPECT_EQ(blurred.size(), 4);
-            EXPECT_EQ(unblurred.size(), 4);
-            EXPECT_LT(unblurred[0].pxSize.x, blurred[0].pxSize.x);
+            EXPECT_NOT_EQ(_blurredTexture, nullptr);
+            EXPECT_NOT_EQ(_unblurredTexture, nullptr);
+            EXPECT_EQ(_blurred.size(), 4);
+            EXPECT_EQ(_unblurred.size(), 4);
+            EXPECT_LT(_unblurred[0].pxSize.x, _blurred[0].pxSize.x);
             return true;
         }
 
@@ -38,7 +37,8 @@ namespace test {
         static constexpr const char *TEXT = "Blur";
         static constexpr std::uint8_t FONT_SIZE = 24;
 
-        bool _ready = false;
+        foundation::RenderTexturePtr _blurredTexture, _unblurredTexture;
+        std::vector<resource::FontCharInfo> _blurred, _unblurred;
     };
 }
 
