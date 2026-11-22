@@ -232,7 +232,7 @@ namespace test {
         void init(const API &api) override {
             _scene = api.scene;
             _scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
-            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {2.0f, 12.0f});
+            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {5.0f, 30.0f});
             api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
                 _mesh = _scene->addVoxelMesh(frames, desc);
             });
