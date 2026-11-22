@@ -13,7 +13,8 @@ namespace game {
     private:
         const API _api;
 
-        foundation::EventHandlerToken _token = foundation::INVALID_EVENT_TOKEN;
+        foundation::EventHandlerToken _keyboardToken = foundation::INVALID_EVENT_TOKEN;
+        foundation::EventHandlerToken _pointerToken = foundation::INVALID_EVENT_TOKEN;
         math::vector3f _direction = {0, 0, 0};
         core::SimulationInterface::BodyPtr _player;
         std::vector<core::SimulationInterface::BodyPtr> _obstacles;
