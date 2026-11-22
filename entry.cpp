@@ -87,7 +87,7 @@ extern "C" void initialize() {
     fontAtlasProvider = resource::FontAtlasProvider::instance(platform, rendering);
     stage = ui::StageInterface::instance(platform, rendering, resourceProvider, fontAtlasProvider);
 
-    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, scene, raycast, simulation, stage);
+    testRunner = std::make_unique<test::TestRunner>(platform, rendering, resourceProvider, fontAtlasProvider, scene, raycast, simulation, stage);
     test::registerMathTests(*testRunner);
     test::registerUtilTests(*testRunner);
     test::registerShaderTests(*testRunner);

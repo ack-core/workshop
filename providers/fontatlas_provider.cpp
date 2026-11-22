@@ -3,7 +3,7 @@
 #include "thirdparty/stb_mini_ttf/stb_mini_ttf.h"
 
 #include <list>
-#include <unordered_set>
+#include <set>
 #include <unordered_map>
 
 // TODO: if requested with blur, precache with blur = 0 as well
@@ -102,7 +102,7 @@ namespace resource {
         void update(float dtSec) override;
         
     private:
-        FontAtlas *_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::unordered_set<std::uint64_t> &toLoad);
+        FontAtlas *_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::set<std::uint64_t> &toLoad);
         
     private:
         const std::shared_ptr<foundation::PlatformInterface> _platform;
@@ -198,7 +198,7 @@ namespace resource {
         }
         
         std::vector<FontCharInfo> readyChars;
-        std::unordered_set<std::uint64_t> toLoad;
+        std::set<std::uint64_t> toLoad;
         FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
         
         if (toLoad.empty()) {
@@ -320,7 +320,7 @@ namespace resource {
         }
 
         std::vector<FontCharInfo> readyChars;
-        std::unordered_set<std::uint64_t> toLoad;
+        std::set<std::uint64_t> toLoad;
         FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
         if (toLoad.empty()) {
             outInfo = std::move(readyChars);
@@ -333,7 +333,7 @@ namespace resource {
         return g_empty;
     }
     
-    FontAtlasProviderImpl::FontAtlas *FontAtlasProviderImpl::_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::unordered_set<std::uint64_t> &toLoad) {
+    FontAtlasProviderImpl::FontAtlas *FontAtlasProviderImpl::_collectChars(const char *text, std::uint8_t fontSize, std::uint8_t blur, std::vector<FontCharInfo> &readyChars, std::set<std::uint64_t> &toLoad) {
         FontAtlas *suitable = nullptr;
 
         for (auto atlasIt = _atlases.begin(); atlasIt != _atlases.end(); ++atlasIt) {

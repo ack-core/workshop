@@ -36,12 +36,13 @@ namespace test {
         const foundation::PlatformInterfacePtr& platform,
         const foundation::RenderingInterfacePtr& rendering,
         const resource::ResourceProviderPtr& resourceProvider,
+        const resource::FontAtlasProviderPtr& fontAtlasProvider,
         const core::SceneInterfacePtr& scene,
         const core::RaycastInterfacePtr& raycast,
         const core::SimulationInterfacePtr& simulation,
         const ui::StageInterfacePtr& stage
     )
-    : _api{platform, rendering, resourceProvider, scene, raycast, simulation, stage}
+    : _api{platform, rendering, resourceProvider, fontAtlasProvider, scene, raycast, simulation, stage}
     {
 
     }
@@ -68,6 +69,7 @@ namespace test {
 
     void TestRunner::nextFrame(float dtSec) {
         _api.resourceProvider->update(dtSec);
+        _api.fontAtlasProvider->update(dtSec);
         _api.raycast->update(dtSec);
         _api.simulation->update(dtSec);
         _api.scene->updateAndDraw(dtSec);
