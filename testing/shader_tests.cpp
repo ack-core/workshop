@@ -409,6 +409,70 @@ namespace test {
         EXPECT_NOT_EQ(shader, nullptr);
         return true;
     }
+
+    bool shader_texture_types_test(const API& api) {
+        // 'fssrc' block can declare types of texture slots, missing slots are 'tex2d'
+        //
+        const char* shaderSrc0 = R"(
+            inout {
+                uv : float2
+            }
+            vssrc {
+                output_position = _tex2d(1, float2(0.5, 0.5));
+                output_uv = output_position.xy;
+            }
+            fssrc [tex2d cube] {
+                output_color[0] = _tex2d(0, input_uv) + _texcube(1, float3(input_uv, 1.0)) + _tex2d(3, fragment_coord);
+            }
+        )";
+        const char* shaderSrc1 = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc [cube] {
+                output_color[0] = _texcube(0, float3(0.0, 0.0, 1.0)) * _tex2d(1, fragment_coord);
+            }
+        )";
+        const char* shaderSrc2 = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc [] {
+                output_color[0] = _tex2d(0, fragment_coord);
+            }
+        )";
+        const char* badShaderSrc0 = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc [tex2d tex3d] {
+                output_color[0] = _tex2d(0, fragment_coord);
+            }
+        )";
+        const char* badShaderSrc1 = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc [tex2d cube tex2d cube tex2d] {
+                output_color[0] = _tex2d(0, fragment_coord);
+            }
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .repeat = 4
+        };
+        foundation::RenderShaderPtr shader0 = api.rendering->createShader(shaderSrc0, layout);
+        EXPECT_NOT_EQ(shader0, nullptr);
+        foundation::RenderShaderPtr shader1 = api.rendering->createShader(shaderSrc1, layout);
+        EXPECT_NOT_EQ(shader1, nullptr);
+        foundation::RenderShaderPtr shader2 = api.rendering->createShader(shaderSrc2, layout);
+        EXPECT_NOT_EQ(shader2, nullptr);
+
+        foundation::RenderShaderPtr badShader0 = api.rendering->createShader(badShaderSrc0, layout, true);
+        EXPECT_EQ(badShader0, nullptr);
+        foundation::RenderShaderPtr badShader1 = api.rendering->createShader(badShaderSrc1, layout, true);
+        EXPECT_EQ(badShader1, nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -423,5 +487,6 @@ namespace test {
         REGISTER_UNIT_TEST(shader_inout_block_test);
         REGISTER_UNIT_TEST(shader_fndef_block_test);
         REGISTER_UNIT_TEST(shader_builtin_functions_test);
+        REGISTER_UNIT_TEST(shader_texture_types_test);
     }
 }
