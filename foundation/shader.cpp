@@ -450,7 +450,6 @@ namespace {
             "    float4 cameraPosition;\n"
             "    float4 cameraDirection;\n"
             "    float4 rtBounds;\n"
-            "    float4 sunDirection;\n"
             "};\n\n";
 
         vsout += fixed;
@@ -584,7 +583,6 @@ static const std::string SHADER_DEFINES =
     "    mediump vec4 cameraPosition;\n"
     "    mediump vec4 cameraDirection;\n"
     "    mediump vec4 rtBounds;\n"
-    "    mediump vec4 sunDirection;\n"
     "}\n"
     "framedata;\n\n";
 
@@ -800,7 +798,6 @@ static const std::string SHADER_DEFINES =
     "    float4 frame_cameraPosition;\n"
     "    float4 frame_cameraDirection;\n"
     "    float4 frame_rtBounds;\n"
-    "    float4 frame_sunDirection;\n"
     "};\n\n"
     "SamplerState _sampler0 : register(s0);\n"
     "SamplerState _sampler1 : register(s1);\n"

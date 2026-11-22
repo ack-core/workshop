@@ -515,7 +515,15 @@ namespace core {
     };
 
     //---
-    
+
+    struct Environment {
+        math::vector4f sunDirection = math::vector4f(math::vector3f(0.5f, 1.0f, 0.3f).normalized(), 0.0f);
+        math::vector4f sunColor = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+        math::vector4f fogCenter = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+        math::vector4f fogColor = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+        math::vector4f fogRadius = math::vector4f(9000.0f, 10000.0f, 0.0f, 0.0f);
+    };
+
     class ParticleEmitterImpl : public SceneInterface::Particles {
         static constexpr float TYPE_MASK_NEWBORN = 1.0f;
         static constexpr float TYPE_MASK_OLD = 2.0f;
@@ -577,8 +585,11 @@ namespace core {
         }
         ~ParticleEmitterImpl() override {}
         
-        void *getUpdatedConstants(const math::vector3f &camDir, const math::vector3f &camRight) {
+        void *getUpdatedConstants(const math::vector3f &camDir, const math::vector3f &camRight, const Environment &env) {
             _updateOrientation(*this, camDir, camRight);
+            _constants.fogCenter = env.fogCenter;
+            _constants.fogColor = env.fogColor;
+            _constants.fogRadius = env.fogRadius;
             return &_constants;
         }
         void setEnabled(bool value) override {
@@ -621,6 +632,9 @@ namespace core {
             math::vector3f right; float maxH;
             math::vector3f minXYZ; float hpix;
             math::vector3f maxXYZ; float vpix;
+            math::vector4f fogCenter;
+            math::vector4f fogColor;
+            math::vector4f fogRadius;
         }
         _constants;
         
@@ -679,7 +693,7 @@ namespace core {
         ~SceneInterfaceImpl() override;
         
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift = {0, 0, 0}) override;
-        void setSun(const math::vector3f &directionToSun, const math::color &rgba) override;
+        void setEnvironment(const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) override;
         
         auto addArrows() -> ArrowsPtr override;
         auto addLineSet() -> LineSetPtr override;
@@ -715,7 +729,7 @@ namespace core {
         }
         _camera;
 
-        math::vector3f _sunDirection = math::vector3f(0.5f, 1.0f, 0.3f).normalized();
+        Environment _environment;
 
         const foundation::PlatformInterfacePtr _platform;
         const foundation::RenderingInterfacePtr _rendering;
@@ -954,9 +968,13 @@ namespace {
             right_mh : float4
             minXYZ_hpix : float4
             maxXYZ_vpix : float4
+            fogCenter : float4
+            fogColor : float4
+            fogRadius : float4
         }
         inout {
             uv_alpha : float3
+            wpos : float3
         }
         vssrc {
             float  ptcvbase = 4.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
@@ -1000,9 +1018,12 @@ namespace {
             float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
             output_position = _transform(float4(ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
             output_uv_alpha = float3(fixed_uv[repeat_ID], map3.x);
+            output_wpos = ptcpos + relVertexPos;
         }
         fssrc {
-            output_color[0] = _tex2d(1, input_uv_alpha.xy) * float4(1.0, 1.0, 1.0, input_uv_alpha.z);
+            float4 color = _tex2d(1, input_uv_alpha.xy) * float4(1.0, 1.0, 1.0, input_uv_alpha.z);
+            float  t = _sat((_len(input_wpos - const_fogCenter.xyz) - const_fogRadius.x) / (const_fogRadius.y - const_fogRadius.x));
+            output_color[0] = float4(_lerp(color.rgb, const_fogColor.rgb, t * (2.0 - t)), color.a);
         }
     )";
     const char *g_gbufferToImgShaderSrc = R"(
@@ -1036,6 +1057,13 @@ namespace {
                 [8,3,9,0][6,14,3,0][10,0,12,0][11,7,5,0][12,1,13,0][7,6,2,0][13,8,15,0][9,10,14,0][1,5,1,0][3,11,0,0][0,2,11,0][14,9,8,0][5,4,4,0][2,15,10,0][4,13,6,0][15,12,7,0]
             quad[4] : float2 = [-1, 1][1, 1][-1, -1][1, -1]
             uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
+        }
+        const {
+            sunDirection : float4
+            sunColor : float4
+            fogCenter : float4
+            fogColor : float4
+            fogRadius : float4
         }
         inout {
             uv : float2
@@ -1074,7 +1102,9 @@ namespace {
             }
 
             lit = _step(0.0000001, gdepth) * lit / 12.0;
-            output_color[0] = float4(lit * color, 1); //float4(lit, lit, lit, 1); //
+            float  t = _sat((_len(wpos - const_fogCenter.xyz) - const_fogRadius.x) / (const_fogRadius.y - const_fogRadius.x));
+            float  fog = _select(t * (2.0 - t), 1.0, gdepth < 0.0000001);
+            output_color[0] = float4(_lerp(lit * color * const_sunColor.rgb, const_fogColor.rgb, fog), 1);
 
         }
     )";
@@ -1140,8 +1170,12 @@ namespace core {
         _camera.invVPMatrix = _camera.stdVPMatrix.inverted();
     }
     
-    void SceneInterfaceImpl::setSun(const math::vector3f &directionToSun, const math::color &rgba) {
-        _sunDirection = directionToSun.normalized();
+    void SceneInterfaceImpl::setEnvironment(const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) {
+        _environment.sunDirection = math::vector4f(sunDirection.normalized(), 0.0f);
+        _environment.sunColor = math::vector4f(sunColor.r, sunColor.g, sunColor.b, sunColor.a);
+        _environment.fogCenter = math::vector4f(fogCenter, 1.0f);
+        _environment.fogColor = math::vector4f(fogColor.r, fogColor.g, fogColor.b, fogColor.a);
+        _environment.fogRadius = math::vector4f(fogRadius, 0.0f, 0.0f);
     }
     
     SceneInterface::ArrowsPtr SceneInterfaceImpl::addArrows() {
@@ -1284,7 +1318,7 @@ namespace core {
             _resizeToken = _platform->addResizeHandler(std::move(createTargets));
         }
 
-        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward, _sunDirection);
+        _rendering->updateFrameConstants(_camera.plmVPMatrix, _camera.stdVPMatrix, _camera.invVPMatrix, _camera.position, _camera.forward);
         
         if (_gbuffer) {
             const auto drawCustomMeshes = [this](foundation::RenderingInterface &rendering, bool renderToGBuffer, foundation::BlendType blendType) {
@@ -1343,6 +1377,7 @@ namespace core {
             });
             _rendering->forTarget(_img, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_gbufferToImgShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyShaderConstants(&_environment);
                 rendering.applyTextures({
                     {_palette, foundation::SamplerType::NEAREST},
                     {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
@@ -1362,7 +1397,7 @@ namespace core {
                 rendering.applyShader(_particlesShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::MIXING, foundation::DepthBehavior::TEST_ONLY);
                 for (const auto &emitter : _particleEmitters) {
                     if (emitter->enabled) {
-                        rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right));
+                        rendering.applyShaderConstants(emitter->getUpdatedConstants(_camera.forward, _camera.right, _environment));
                         rendering.applyTextures({
                             {emitter->map, foundation::SamplerType::NEAREST},
                             {emitter->texture, foundation::SamplerType::NEAREST}

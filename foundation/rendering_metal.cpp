@@ -279,14 +279,12 @@ namespace foundation {
     
     MetalRendering::~MetalRendering() {}
     
-    void MetalRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir, const math::vector3f &sunDir) {
+    void MetalRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
         _frameConstants.plmVPMatrix = vp;
         _frameConstants.stdVPMatrix = svp;
         _frameConstants.invVPMatrix = ivp;
         _frameConstants.cameraPosition.xyz = camPos;
-        _frameConstants.cameraDirection.xyz = camDir;
-        _frameConstants.sunDirection.xyz = sunDir;
-    }
+        _frameConstants.cameraDirection.xyz = camDir;    }
     
     RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout, bool suppressErrors) {
         std::shared_ptr<RenderShader> result;

@@ -130,9 +130,14 @@ namespace core {
         //
         virtual void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift = {0, 0, 0}) = 0;
 
-        // Set directional light
+        // Set directional light and fog
+        // @sunDirection - direction to sun
+        // @sunColor     - sun light color
+        // @fogCenter    - point fog distance is measured from
+        // @fogColor     - color of the fog and empty background
+        // @fogRadius    - no fog closer than .x, full fog further than .y
         //
-        virtual void setSun(const math::vector3f &directionToSun, const math::color &rgba) = 0;
+        virtual void setEnvironment(const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) = 0;
 
         // Set of debug arrows, drawn if lines drawing enabled
         //

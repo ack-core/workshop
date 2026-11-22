@@ -476,14 +476,12 @@ namespace foundation {
         return true;
     }
 
-    void Direct3D11Rendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir, const math::vector3f &sunDir) {
+    void Direct3D11Rendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
         _frameConstants.plmVPMatrix = vp;
         _frameConstants.stdVPMatrix = svp;
         _frameConstants.invVPMatrix = ivp;
         _frameConstants.cameraPosition.xyz = camPos;
-        _frameConstants.cameraDirection.xyz = camDir;
-        _frameConstants.sunDirection.xyz = sunDir;
-        _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
+        _frameConstants.cameraDirection.xyz = camDir;        _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
     }
 
     auto Direct3D11Rendering::createShader(const char *src, const InputLayout &layout, bool suppressErrors) -> RenderShaderPtr {

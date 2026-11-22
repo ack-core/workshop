@@ -147,7 +147,7 @@ namespace foundation {
         // @ivp  - inverted svp (in shader: 'frame_invVPMatrix')
         // Matrices are row-major
         //
-        virtual void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir, const math::vector3f &sunDir) = 0;
+        virtual void updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) = 0;
         
         // Create shader from source text
         // @src            - generic shader source text (see example below)
@@ -198,7 +198,6 @@ namespace foundation {
         //     frame_cameraPosition     : float4  - camera position (w = 1)
         //     frame_cameraDirection    : float4  - normalized camera direction (w = 0)
         //     frame_rtBounds           : float4  - render target size in pixels (.xy)
-        //     frame_sunDirection       : float4  - normalized direction to sun (w = 0)
         //
         // Textures. There are 4 texture slots. Example of getting color from the last slot: float4 color = _tex2d(3, float2(0, 0));
         //     Fragment shader slot types can be declared as 'fssrc [tex2d cube] {...}' - up to 4 of 'tex2d' or 'cube', missing slots are 'tex2d'
