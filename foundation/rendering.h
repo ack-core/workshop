@@ -217,11 +217,11 @@ namespace foundation {
         //
         virtual auto createTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr = 0;
 
-        // Create cube texture (without mips) from binary data or empty
+        // Create cube texture (without mips) from binary data
         // @w and @h    - width and height of each face
-        // @faceData    - array of pointers. Must be empty or contain exactly 6 faces in order: +x, -x, +y, -y, +z, -z
+        // @faceData    - pointers to 6 faces in order: +x, -x, +y, -y, +z, -z
         //
-        virtual auto createCubeTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) -> RenderTexturePtr = 0;
+        virtual auto createCubeTexture(foundation::RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const void *(&faceData)[6]) -> RenderTexturePtr = 0;
 
         // TODO: create texture from as atlas region + getBase(), getAtlasSize() -> RenderTexture. For the upper levels atlas texture == common texture
         

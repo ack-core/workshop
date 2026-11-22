@@ -11,7 +11,7 @@ extern "C" {
     auto webgl_createProgram(const std::uint16_t *vsrc, std::size_t vlen, const std::uint16_t *fsrc, std::size_t flen, bool suppressErrors) -> WebGLId;
     auto webgl_createData(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride, const std::uint32_t *idx, std::uint32_t icount) -> WebGLId;
     auto webgl_createTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *mipAdds, std::uint32_t mipCount) -> WebGLId;
-    auto webgl_createCubeTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint32_t *faceAdds, std::uint32_t faceCount) -> WebGLId;
+    auto webgl_createCubeTexture(GLenum format, GLenum internal, GLenum type, std::uint32_t sz, std::uint32_t w, std::uint32_t h, const std::uint8_t *faces) -> WebGLId;
     auto webgl_createTarget(GLenum format, GLenum internal, GLenum type, std::uint32_t w, std::uint32_t h, std::uint32_t count, bool enableDepth, WebGLId *textures) -> WebGLId;
     void webgl_viewPort(std::uint32_t w, std::uint32_t h);
     void webgl_beginTarget(WebGLId target, WebGLId depth, GLenum cmask, float r, float g, float b, float a, float d);
@@ -333,26 +333,19 @@ namespace foundation {
         return result;
     }
 
-    RenderTexturePtr WASMRendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) {
+    RenderTexturePtr WASMRendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const void *(&faceData)[6]) {
         RenderTexturePtr result = nullptr;
 
-        if (faceData.size() != 0 && faceData.size() != 6) {
-            _platform->logError("[WASMRendering::createCubeTexture] face count must be 0 or 6");
-        }
-        else if (w && h) {
+        if (w && h) {
             const NativeTextureFormat &fmt = g_textureFormatTable[int(format)];
             const std::uint32_t facelen = w * h * fmt.size;
+            std::uint8_t *memory = _getUploadBuffer(6 * facelen);
 
-            std::uint8_t *buffer = _getUploadBuffer(6 * facelen + 4 * faceData.size());
-            std::uint8_t *memory = buffer + 4 * faceData.size();
-            std::uint32_t *fptrs = reinterpret_cast<std::uint32_t *>(buffer);
-
-            for (std::size_t i = 0; i < faceData.size(); i++) {
-                memcpy(memory + i * facelen, faceData.begin()[i], facelen);
-                fptrs[i] = std::uint32_t(memory + i * facelen);
+            for (std::size_t i = 0; i < 6; i++) {
+                memcpy(memory + i * facelen, faceData[i], facelen);
             }
 
-            WebGLId webglTexture = webgl_createCubeTexture(fmt.format, fmt.internal, fmt.type, fmt.size, w, h, fptrs, faceData.size());
+            WebGLId webglTexture = webgl_createCubeTexture(fmt.format, fmt.internal, fmt.type, fmt.size, w, h, memory);
             result = std::make_shared<WASMTexture>(webglTexture, format, w, h, 1, true);
         }
 

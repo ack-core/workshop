@@ -599,15 +599,10 @@ namespace foundation {
         return std::make_shared<Direct3D11Texture>(texture, view, format, w, h, mipCount);
     }
 
-    auto Direct3D11Rendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) -> RenderTexturePtr {
+    auto Direct3D11Rendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const void *(&faceData)[6]) -> RenderTexturePtr {
         HRESULT hresult;
         ComPtr<ID3D11Texture2D> texture;
         ComPtr<ID3D11ShaderResourceView> view;
-
-        if (faceData.size() != 0 && faceData.size() != 6) {
-            _platform->logError("[Direct3D11Rendering::createCubeTexture] face count must be 0 or 6");
-            return nullptr;
-        }
 
         const auto &fmt = g_textureFormatTable[int(format)];
 
@@ -618,16 +613,16 @@ namespace foundation {
         desc.ArraySize = 6;
         desc.Format = fmt.format;
         desc.SampleDesc.Count = 1;
-        desc.Usage = faceData.size() ? D3D11_USAGE_IMMUTABLE : D3D11_USAGE_DEFAULT;
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
         desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         desc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
 
-        std::vector<D3D11_SUBRESOURCE_DATA> subresources;
-        for (const void *item : faceData) {
-            subresources.emplace_back(D3D11_SUBRESOURCE_DATA{item, w * fmt.pixelSize, 0});
+        D3D11_SUBRESOURCE_DATA subresources[6];
+        for (int i = 0; i < 6; i++) {
+            subresources[i] = D3D11_SUBRESOURCE_DATA{faceData[i], w * fmt.pixelSize, 0};
         }
 
-        if ((hresult = _device->CreateTexture2D(&desc, subresources.empty() ? nullptr : subresources.data(), &texture)) != S_OK) {
+        if ((hresult = _device->CreateTexture2D(&desc, subresources, &texture)) != S_OK) {
             _platform->logError("[Direct3D11Rendering::createCubeTexture] texture creation failed with result = %p", hresult);
             return nullptr;
         }

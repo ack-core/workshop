@@ -926,7 +926,8 @@ namespace test {
             }
 
             _shader = api.rendering->createShader(shaderSrc, layout);
-            _texture = api.rendering->createCubeTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 1, { &faces[0], &faces[1], &faces[2], &faces[3], &faces[4], &faces[5] });
+            const void *faceData[] = { &faces[0], &faces[1], &faces[2], &faces[3], &faces[4], &faces[5] };
+            _texture = api.rendering->createCubeTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 1, faceData);
             _data = api.rendering->createData(layout, vertexes.data(), std::uint32_t(vertexes.size()), indexes.data(), std::uint32_t(indexes.size()));
         }
         void updateAndDraw(const API &api) override {

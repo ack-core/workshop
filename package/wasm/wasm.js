@@ -363,15 +363,15 @@ const imports = {
             gltextures[glTextureIDCounter] = texture;
             return glTextureIDCounter++;
         },
-        webgl_createCubeTexture(format, internal, type, size, w, h, faceAddresses, faceCount) {
-            const facePtrs = new Uint32Array(memory.buffer, faceAddresses, faceCount);
+        webgl_createCubeTexture(format, internal, type, size, w, h, faces) {
+            const faceLength = w * h * size;
             const texture = glcontext.createTexture();
             glcontext.activeTexture(glcontext.TEXTURE0);
             glcontext.bindTexture(glcontext.TEXTURE_CUBE_MAP, texture);
             glcontext.texStorage2D(glcontext.TEXTURE_CUBE_MAP, 1, internal, w, h);
 
-            for (let i = 0; i < faceCount; i++) {
-                const faceData = new Uint8Array(memory.buffer, facePtrs[i], w * h * size);
+            for (let i = 0; i < 6; i++) {
+                const faceData = new Uint8Array(memory.buffer, faces + i * faceLength, faceLength);
                 glcontext.pixelStorei(glcontext.UNPACK_ALIGNMENT, 1);
                 glcontext.texSubImage2D(glcontext.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, w, h, format, type, faceData);
             }

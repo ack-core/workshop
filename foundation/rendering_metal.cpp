@@ -393,12 +393,7 @@ namespace foundation {
         }
     }
 
-    RenderTexturePtr MetalRendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) {
-        if (faceData.size() != 0 && faceData.size() != 6) {
-            _platform->logError("[MetalRendering::createCubeTexture] face count must be 0 or 6");
-            return nullptr;
-        }
-
+    RenderTexturePtr MetalRendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const void *(&faceData)[6]) {
         @autoreleasepool {
             MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
             desc.textureType = MTLTextureTypeCube;
@@ -409,11 +404,9 @@ namespace foundation {
             desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
             id<MTLTexture> texture = [_device newTextureWithDescriptor:desc];
 
-            unsigned face = 0;
-            for (auto &item : faceData) {
+            for (unsigned face = 0; face < 6; face++) {
                 MTLRegion region = {{ 0, 0, 0 }, {w, h, 1}};
-                [texture replaceRegion:region mipmapLevel:0 slice:face withBytes:item bytesPerRow:getTexture2DPitch(format, w) bytesPerImage:0];
-                face++;
+                [texture replaceRegion:region mipmapLevel:0 slice:face withBytes:faceData[face] bytesPerRow:getTexture2DPitch(format, w) bytesPerImage:0];
             }
 
             return std::make_shared<MetalTexture>(texture, format, w, h, 1);

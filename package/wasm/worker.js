@@ -39,7 +39,7 @@ onmessage = (msg) => {
                 webgl_createProgram: (vsrc, vlen, fsrc, flen, suppressErrors) => { throw "can't access webgl from background" },
                 webgl_createData: (layout, layoutLen, ptr, dataLen, stride, idx, icount) => { throw "can't access webgl from background" },
                 webgl_createTexture: (format, internal, type, w, h, mipAddresses, mipCount) => { throw "can't access webgl from background" },
-                webgl_createCubeTexture: (format, internal, type, size, w, h, faceAddresses, faceCount) => { throw "can't access webgl from background" },
+                webgl_createCubeTexture: (format, internal, type, size, w, h, faces) => { throw "can't access webgl from background" },
                 webgl_createTarget: (format, internal, type, w, h, count, enableDepth, textures) => { throw "can't access webgl from background" },
                 webgl_deleteProgram: (id) => { throw "can't access webgl from background" },
                 webgl_deleteData: (id) => { throw "can't access webgl from background" },
