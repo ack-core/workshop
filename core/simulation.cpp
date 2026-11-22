@@ -70,11 +70,11 @@ namespace core {
         float _lastDt = 1.0f;
         float _impulseFade = 0.0f;
         math::vector3f _impulse = {0.0f, 0.0f, 0.0f};
-        math::vector3f _prevpos;
+        math::vector3f _prevpos = {0.0f, 0.0f, 0.0f};
         core::SceneInterface::LineSetPtr _visual;
     };
 }
- 
+
 namespace core {
     class ObstaclePolygonXZImpl : public CollisionBodyBase {
     public:
