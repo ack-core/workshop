@@ -1,6 +1,30 @@
 
 #include "runner.h"
 
+namespace {
+    core::SimulationInterface::BodyPtr addTestCircle(const test::API &api, const math::vector3f &position, const math::vector3f &velocity) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
+        desc.setNumber("mass", 1.0);
+        desc.setNumber("radius", 0.5);
+
+        core::SimulationInterface::BodyPtr body = api.simulation->addBody(desc);
+        body->setTransform(math::transform3f::identity().translated(position));
+        body->setVelocity(velocity);
+        return body;
+    }
+
+    core::SimulationInterface::BodyPtr addTestWall(const test::API &api) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::ObstaclePolygonXZ));
+        desc.setVector3f("points", math::vector3f(2.0f, 0.0f, -10.0f), false);
+        desc.setVector3f("points", math::vector3f(2.0f, 0.0f, 10.0f), false);
+        desc.setVector3f("points", math::vector3f(4.0f, 0.0f, 10.0f), false);
+        desc.setVector3f("points", math::vector3f(4.0f, 0.0f, -10.0f), false);
+        return api.simulation->addBody(desc);
+    }
+}
+
 namespace test {
     bool simulationCircleMovesByVelocity(const API &api) {
         util::Description desc;
@@ -19,28 +43,6 @@ namespace test {
         EXPECT_EQ_F(position.y, 0.0f);
         EXPECT_EQ_F(position.z, 0.0f);
         return true;
-    }
-
-    core::SimulationInterface::BodyPtr addTestCircle(const API &api, const math::vector3f &position, const math::vector3f &velocity) {
-        util::Description desc;
-        desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
-        desc.setNumber("mass", 1.0);
-        desc.setNumber("radius", 0.5);
-
-        core::SimulationInterface::BodyPtr body = api.simulation->addBody(desc);
-        body->setTransform(math::transform3f::identity().translated(position));
-        body->setVelocity(velocity);
-        return body;
-    }
-
-    core::SimulationInterface::BodyPtr addTestWall(const API &api) {
-        util::Description desc;
-        desc.setInteger("type", int(core::SimulationInterface::ShapeType::ObstaclePolygonXZ));
-        desc.setVector3f("points", math::vector3f(2.0f, 0.0f, -10.0f), false);
-        desc.setVector3f("points", math::vector3f(2.0f, 0.0f, 10.0f), false);
-        desc.setVector3f("points", math::vector3f(4.0f, 0.0f, 10.0f), false);
-        desc.setVector3f("points", math::vector3f(4.0f, 0.0f, -10.0f), false);
-        return api.simulation->addBody(desc);
     }
 
     bool simulationCircleObstacleStopAndSlide(const API &api) {
