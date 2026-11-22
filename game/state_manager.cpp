@@ -38,6 +38,7 @@ namespace game {
 #include "experimental/vegetation.h"
 #include "experimental/voxel_meshes.h"
 #include "experimental/uielements.h"
+#include "experimental/collision.h"
 
 namespace game {
     inline const State STATES[] = {
@@ -55,6 +56,9 @@ namespace game {
         {"uielements", {
             &makeContext<RenderDevContext>,
             &makeContext<UIElementsContext>
+        }},
+        {"collision", {
+            &makeContext<CollisionContext>
         }}
     };
 }
@@ -124,7 +128,7 @@ namespace game {
 
             auto index = _currentContextList.find(makeContextFunction);
             if (index == _currentContextList.end()) {
-                ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _fontAtlasProvider, _scene, _world, _raycast, _ui }, interfaces.data(), interfaces.size());
+                ctx = makeContextFunction(API { shared_from_this(), _platform, _resourceProvider, _fontAtlasProvider, _scene, _world, _raycast, _simulation, _ui }, interfaces.data(), interfaces.size());
             }
             else {
                 ctx = index->second;
