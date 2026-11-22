@@ -473,6 +473,29 @@ namespace test {
         EXPECT_EQ(badShader1, nullptr);
         return true;
     }
+
+    bool shader_frame_data_test(const API& api) {
+        // All frame data variables should be accessible from vertex and fragment code
+        //
+        const char* shaderSrc = R"(
+            vssrc {
+                float4 p = float4(0.0, 0.0, 0.5, 1.0);
+                p = _transform(p, frame_plmVPMatrix) + _transform(p, frame_stdVPMatrix) + _transform(p, frame_invVPMatrix);
+                output_position = p + frame_cameraPosition + frame_cameraDirection + frame_rtBounds;
+            }
+            fssrc {
+                float4 p = float4(fragment_coord, 0.5, 1.0);
+                p = _transform(p, frame_plmVPMatrix) + _transform(p, frame_stdVPMatrix) + _transform(p, frame_invVPMatrix);
+                output_color[0] = p + frame_cameraPosition + frame_cameraDirection + frame_rtBounds;
+            }
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .repeat = 4
+        };
+        foundation::RenderShaderPtr shader = api.rendering->createShader(shaderSrc, layout);
+        EXPECT_NOT_EQ(shader, nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -488,5 +511,6 @@ namespace test {
         REGISTER_UNIT_TEST(shader_fndef_block_test);
         REGISTER_UNIT_TEST(shader_builtin_functions_test);
         REGISTER_UNIT_TEST(shader_texture_types_test);
+        REGISTER_UNIT_TEST(shader_frame_data_test);
     }
 }
