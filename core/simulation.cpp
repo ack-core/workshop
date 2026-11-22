@@ -73,10 +73,7 @@ namespace core {
         std::vector<math::vector3f> points;
         
     public:
-        ObstaclePolygonXZImpl(const core::SceneInterfacePtr &scene, std::vector<math::vector3f> &&points) : _src(std::move(points)) {
-            for (auto &point : _src) {
-                points.emplace_back(point);
-            }
+        ObstaclePolygonXZImpl(const core::SceneInterfacePtr &scene, std::vector<math::vector3f> &&src) : points(src), _src(std::move(src)) {
             _visual = scene->addLineSet();
             _visual->fillAsClosedPolygon(_src, {0.0f, 1.0f, 1.0f, 0.7f});
         }
@@ -183,7 +180,9 @@ namespace core {
         return false;
     }
     void resolveCollisionCircleObstacleXZ(const CollisionInfo &info, CircleXZImpl &obj, ObstaclePolygonXZImpl &obstacle) {
-        obj.transform.v3.xyz = obj.transform.v3.xyz + info.normal * info.penetration;
+        if (obj.movable) {
+            obj.transform.v3.xyz = obj.transform.v3.xyz + info.normal * info.penetration;
+        }
     }
 
 }
@@ -225,6 +224,9 @@ namespace core {
             
             CollisionInfo info;
             for (std::size_t i = 0; i < _circlesXZ.size(); i++) {
+                if (_circlesXZ[i]->enabled == false) {
+                    continue;
+                }
                 for (std::size_t c = i + 1; c < _circlesXZ.size(); c++) {
                     if (_circlesXZ[c]->enabled) {
                         if (checkCollisionCircleCircleXZ(*_circlesXZ[i], *_circlesXZ[c], info)) {
