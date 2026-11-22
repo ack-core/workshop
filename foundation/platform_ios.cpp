@@ -553,7 +553,6 @@ namespace foundation {
         va_end(args);
         
         printf("%s\n", g_buffer);
-        __builtin_debugtrap();
     }
 
     const IOSPlatform::StatInfo& IOSPlatform::getStatistics() const {
