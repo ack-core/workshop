@@ -126,10 +126,65 @@ namespace test {
 }
 
 namespace test {
+    class resource_provider_voxel_mesh_loading_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<resource_provider_voxel_mesh_loading_test>();
+        }
+        void init(const API &api) override {
+            api.resourceProvider->getOrLoadVoxelMesh(PATH, [this, provider = api.resourceProvider](const std::vector<foundation::RenderDataPtr> &first, const util::Description &desc) {
+                _first = first;
+                _config = desc.getInteger("v", 0);
+                _info = provider->getMeshInfo(PATH);
+                provider->getOrLoadVoxelMesh(PATH, [this, provider](const std::vector<foundation::RenderDataPtr> &second, const util::Description &) {
+                    _second = second;
+                    provider->getOrLoadVoxelMesh("resource_provider_tests/missing", [this, provider](const std::vector<foundation::RenderDataPtr> &missing, const util::Description &) {
+                        _missingLoaded = true;
+                        _missingEmpty = missing.empty();
+                        provider->removeMesh(PATH);
+                        provider->getOrLoadVoxelMesh(PATH, [this](const std::vector<foundation::RenderDataPtr> &reloaded, const util::Description &) {
+                            _reloaded = reloaded;
+                        });
+                    });
+                });
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_EQ(_first.size(), 2);
+            EXPECT_EQ(_first[0]->getVertexCount(), 1);
+            EXPECT_EQ(_first[1]->getVertexCount(), 2);
+            EXPECT_EQ(_config, 3);
+            EXPECT_NOT_EQ(_info, nullptr);
+            EXPECT_EQ(_info->sizeX, 2);
+            EXPECT_EQ(_info->sizeY, 3);
+            EXPECT_EQ(_info->sizeZ, 4);
+            EXPECT_EQ(_first, _second);
+            EXPECT_TRUE(_missingLoaded);
+            EXPECT_TRUE(_missingEmpty);
+            EXPECT_EQ(_reloaded.size(), 2);
+            EXPECT_NOT_EQ(_reloaded[0], _first[0]);
+            return true;
+        }
+
+    private:
+        static constexpr const char *PATH = "resource_provider_tests/resource_provider_voxel_mesh_loading_test";
+
+        std::vector<foundation::RenderDataPtr> _first;
+        std::vector<foundation::RenderDataPtr> _second;
+        std::vector<foundation::RenderDataPtr> _reloaded;
+        const resource::MeshInfo *_info = nullptr;
+        std::int64_t _config = 0;
+        bool _missingLoaded = false;
+        bool _missingEmpty = false;
+    };
+}
+
+namespace test {
     void registerResourceProviderTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(resource_provider_non_uniquity_test);
         REGISTER_STEP_TEST(resource_provider_texture_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_reload_test);
+        REGISTER_STEP_TEST(resource_provider_voxel_mesh_loading_test);
     }
 }
