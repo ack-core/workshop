@@ -965,6 +965,110 @@ namespace test {
 }
 
 namespace test {
+    class rendering_depth_behavior_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_depth_behavior_test>();
+        }
+        void init(const API &api) override {
+            // Near red and far green quads overlapping in each quadrant of the target with z-buffer, then target texture drawn as fullscreen quad
+            //
+            const char *quadSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, -1.0][1.0, -1.0]
+                }
+                const {
+                    offset : float4
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] + const_offset.xy, const_offset.z, 1.0);
+                }
+                fssrc {
+                    output_color[0] = const_color;
+                }
+            )";
+            const char *screenSrc = R"(
+                fixed {
+                    quad[4] : float2 = [-1.0, 1.0][1.0, 1.0][-1.0, -1.0][1.0, -1.0]
+                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0);
+                    output_uv = fixed_uv[repeat_ID];
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            _quadShader = api.rendering->createShader(quadSrc, foundation::InputLayout { .repeat = 4 });
+            _screenShader = api.rendering->createShader(screenSrc, foundation::InputLayout { .repeat = 4 });
+            _target = api.rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, 64, 64, true);
+        }
+        void updateAndDraw(const API &api) override {
+            using foundation::DepthBehavior;
+
+            api.rendering->forTarget(_target, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, -1.0f, 1.0f, true);
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, -1.0f, 1.0f, false);
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, -1.0f, 0.0f, false);
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, -1.0f, 0.0f, true);
+                drawQuad(rendering, DepthBehavior::TEST_ONLY, 0.0f, 1.0f, true);
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, 0.0f, 1.0f, false);
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, 0.0f, 0.0f, true);
+                drawQuad(rendering, DepthBehavior::TEST_ONLY, 0.0f, 0.0f, false);
+            });
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_screenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, DepthBehavior::DISABLED);
+                rendering.applyTextures({ { _target->getTexture(0), foundation::SamplerType::NEAREST } });
+                rendering.draw(1);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_quadShader, nullptr);
+            EXPECT_NOT_EQ(_screenShader, nullptr);
+            EXPECT_NOT_EQ(_target, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == 0 && p[3] == 255;
+            };
+
+            const std::size_t w = foundation::TESTING_RENDER_WIDTH;
+            const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
+
+            EXPECT_TRUE(pixelIs(w / 4, h / 4, 255, 0));           // test and write: near drawn first stays visible
+            EXPECT_TRUE(pixelIs(w / 4, h * 3 / 4, 255, 0));       // test and write: near drawn last overwrites far
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h / 4, 0, 255));       // test only: near doesn't write depth, far overwrites it
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h * 3 / 4, 255, 0));   // test only: far fails depth test against near
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f offset;
+            math::vector4f color;
+        };
+
+        // near quad is red, far quad is green
+        //
+        void drawQuad(foundation::RenderingInterface &rendering, foundation::DepthBehavior depthBehavior, float x, float y, bool isNear) {
+            const Constants constants = { { x, y, isNear ? 0.8f : 0.2f, 0.0f }, { isNear ? 1.0f : 0.0f, isNear ? 0.0f : 1.0f, 0.0f, 1.0f } };
+            rendering.applyShader(_quadShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, depthBehavior);
+            rendering.applyShaderConstants(&constants);
+            rendering.draw(1);
+        }
+
+        foundation::RenderShaderPtr _quadShader;
+        foundation::RenderShaderPtr _screenShader;
+        foundation::RenderTargetPtr _target;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -981,6 +1085,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_triple_instancing_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_blend_types_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_cube_texture_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_depth_behavior_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
