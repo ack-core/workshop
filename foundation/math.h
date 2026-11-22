@@ -1026,12 +1026,12 @@ namespace math {
                 float z = (r2 >= 0.0f) == maxAxis ? bb.zmax : bb.zmin;
                 return x * r0 + y * r1 + z * r2;
             };
-            float xmin = extent(boxTransform.m11, boxTransform.m12, boxTransform.m13, false) + boxTransform.m41;
-            float xmax = extent(boxTransform.m11, boxTransform.m12, boxTransform.m13, true)  + boxTransform.m41;
-            float ymin = extent(boxTransform.m21, boxTransform.m22, boxTransform.m23, false) + boxTransform.m42;
-            float ymax = extent(boxTransform.m21, boxTransform.m22, boxTransform.m23, true)  + boxTransform.m42;
-            float zmin = extent(boxTransform.m31, boxTransform.m32, boxTransform.m33, false) + boxTransform.m43;
-            float zmax = extent(boxTransform.m31, boxTransform.m32, boxTransform.m33, true)  + boxTransform.m43;
+            float xmin = extent(boxTransform.m11, boxTransform.m21, boxTransform.m31, false) + boxTransform.m41;
+            float xmax = extent(boxTransform.m11, boxTransform.m21, boxTransform.m31, true)  + boxTransform.m41;
+            float ymin = extent(boxTransform.m12, boxTransform.m22, boxTransform.m32, false) + boxTransform.m42;
+            float ymax = extent(boxTransform.m12, boxTransform.m22, boxTransform.m32, true)  + boxTransform.m42;
+            float zmin = extent(boxTransform.m13, boxTransform.m23, boxTransform.m33, false) + boxTransform.m43;
+            float zmax = extent(boxTransform.m13, boxTransform.m23, boxTransform.m33, true)  + boxTransform.m43;
             return { xmin, ymin, zmin, xmax, ymax, zmax };
         }
     };
