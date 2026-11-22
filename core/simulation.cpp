@@ -62,7 +62,7 @@ namespace core {
             _prevpos = transform.v3.xyz + impulseOffset;
             _lastDt = std::max(dtSec, std::numeric_limits<float>::epsilon());
             transform.v3.xyz = transform.v3.xyz + math::vector3f(v.x, 0.0f, v.z) * dtSec + impulseOffset;
-            _impulse = _impulse.lengthSq() > 1e-6f ? _impulse * std::exp(-_impulseFade * dtSec) : math::vector3f(0.0f, 0.0f, 0.0f);
+            _impulse = _impulse.lengthSq() > std::numeric_limits<float>::epsilon() ? _impulse * std::exp(-_impulseFade * dtSec) : math::vector3f(0.0f, 0.0f, 0.0f);
             _visual->setPosition(transform.v3.xyz);
         }
 
