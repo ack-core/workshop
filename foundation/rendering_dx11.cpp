@@ -599,6 +599,48 @@ namespace foundation {
         return std::make_shared<Direct3D11Texture>(texture, view, format, w, h, mipCount);
     }
 
+    auto Direct3D11Rendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) -> RenderTexturePtr {
+        HRESULT hresult;
+        ComPtr<ID3D11Texture2D> texture;
+        ComPtr<ID3D11ShaderResourceView> view;
+
+        if (faceData.size() != 0 && faceData.size() != 6) {
+            _platform->logError("[Direct3D11Rendering::createCubeTexture] face count must be 0 or 6");
+            return nullptr;
+        }
+
+        const auto &fmt = g_textureFormatTable[int(format)];
+
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Width = w;
+        desc.Height = h;
+        desc.MipLevels = 1;
+        desc.ArraySize = 6;
+        desc.Format = fmt.format;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = faceData.size() ? D3D11_USAGE_IMMUTABLE : D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+
+        std::vector<D3D11_SUBRESOURCE_DATA> subresources;
+        for (const void *item : faceData) {
+            subresources.emplace_back(D3D11_SUBRESOURCE_DATA{item, w * fmt.pixelSize, 0});
+        }
+
+        if ((hresult = _device->CreateTexture2D(&desc, subresources.empty() ? nullptr : subresources.data(), &texture)) != S_OK) {
+            _platform->logError("[Direct3D11Rendering::createCubeTexture] texture creation failed with result = %p", hresult);
+            return nullptr;
+        }
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
+        viewDesc.Format = fmt.format;
+        viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+        viewDesc.TextureCube.MipLevels = 1;
+        _device->CreateShaderResourceView(texture.Get(), &viewDesc, &view);
+
+        return std::make_shared<Direct3D11Texture>(texture, view, format, w, h, 1);
+    }
+
     auto Direct3D11Rendering::createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr {
         HRESULT hresult;
         RenderTexturePtr textures[RenderTarget::MAX_TEXTURE_COUNT];

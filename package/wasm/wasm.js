@@ -363,6 +363,23 @@ const imports = {
             gltextures[glTextureIDCounter] = texture;
             return glTextureIDCounter++;
         },
+        webgl_createCubeTexture(format, internal, type, size, w, h, faceAddresses, faceCount) {
+            const facePtrs = new Uint32Array(memory.buffer, faceAddresses, faceCount);
+            const texture = glcontext.createTexture();
+            glcontext.activeTexture(glcontext.TEXTURE0);
+            glcontext.bindTexture(glcontext.TEXTURE_CUBE_MAP, texture);
+            glcontext.texStorage2D(glcontext.TEXTURE_CUBE_MAP, 1, internal, w, h);
+
+            for (let i = 0; i < faceCount; i++) {
+                const faceData = new Uint8Array(memory.buffer, facePtrs[i], w * h * size);
+                glcontext.pixelStorei(glcontext.UNPACK_ALIGNMENT, 1);
+                glcontext.texSubImage2D(glcontext.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, w, h, format, type, faceData);
+            }
+
+            glcontext.bindTexture(glcontext.TEXTURE_CUBE_MAP, null);
+            gltextures[glTextureIDCounter] = texture;
+            return glTextureIDCounter++;
+        },
         webgl_createTarget(format, internal, type, w, h, count, enableDepth, textures) {
             const texarray = new Uint32Array(memory.buffer, textures, count + 1);
             const frameBuffer = glcontext.createFramebuffer();
@@ -483,10 +500,10 @@ const imports = {
             glcontext.bindBufferBase(glcontext.UNIFORM_BUFFER, index, shaderConstantBuffers[shaderConstantIndex]);
             shaderConstantIndex = (shaderConstantIndex + 1) % SHADER_CONST_BUFFERS_REUSE_MAX;
         },
-        webgl_applyTexture: function(index, textureID, samplingType) {
+        webgl_applyTexture: function(index, textureID, samplingType, cube) {
             const texture = gltextures[textureID];
             glcontext.activeTexture(glcontext.TEXTURE0 + index);
-            glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
+            glcontext.bindTexture(cube ? glcontext.TEXTURE_CUBE_MAP : glcontext.TEXTURE_2D, texture);
             glcontext.bindSampler(index, glsamplers[samplingType]);
         },
         webgl_drawDefault: function(buffer, vertexCount, instanceCount, topology) {

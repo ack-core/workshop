@@ -42,11 +42,12 @@ namespace foundation {
         WASMTexBase();
         ~WASMTexBase() override;
         virtual WebGLId getWebGLTexture() const = 0;
+        virtual bool isCube() const { return false; }
     };
 
     class WASMTexture : public WASMTexBase {
     public:
-        WASMTexture(WebGLId texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount);
+        WASMTexture(WebGLId texture, RenderTextureFormat fmt, std::uint32_t w, std::uint32_t h, std::uint32_t mipCount, bool cube = false);
         ~WASMTexture() override;
         
         auto getWidth() const -> std::uint32_t override;
@@ -54,13 +55,15 @@ namespace foundation {
         auto getMipCount() const -> std::uint32_t override;
         auto getFormat() const -> RenderTextureFormat override;
         auto getWebGLTexture() const -> WebGLId override;
-        
+        auto isCube() const -> bool override;
+
     private:
         const RenderTextureFormat _format;
         const WebGLId _texture;
         const std::uint32_t _width;
         const std::uint32_t _height;
         const std::uint32_t _mipCount;
+        const bool _cube;
     };
     
     class WASMTarget : public RenderTarget {
@@ -112,6 +115,7 @@ namespace foundation {
         
         auto createShader(const char *src, const InputLayout &layout, bool suppressErrors) -> RenderShaderPtr override;
         auto createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) -> RenderTexturePtr override;
+        auto createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) -> RenderTexturePtr override;
         auto createRenderTarget(RenderTextureFormat format, std::uint32_t textureCount, std::uint32_t w, std::uint32_t h, bool withZBuffer) -> RenderTargetPtr override;
         auto createData(const InputLayout &layout, const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) -> RenderDataPtr override;
         

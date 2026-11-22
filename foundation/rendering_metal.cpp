@@ -341,10 +341,8 @@ namespace foundation {
             MTLPixelFormatRGBA16Float,
             MTLPixelFormatRGBA32Float
         };
-    }
-        
-    RenderTexturePtr MetalRendering::createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) {
-        auto getTexture2DPitch = [](RenderTextureFormat fmt, std::size_t width) {
+
+        std::size_t getTexture2DPitch(RenderTextureFormat fmt, std::size_t width) {
             switch (fmt) {
             case RenderTextureFormat::R8UN:
                 return width;
@@ -367,8 +365,10 @@ namespace foundation {
             default:
                 return std::size_t(0);
             }
-        };
-        
+        }
+    }
+
+    RenderTexturePtr MetalRendering::createTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &mipsData) {
         @autoreleasepool {
             size_t mipmapLevelCount = std::max(size_t(1), mipsData.size());
             
@@ -390,6 +390,33 @@ namespace foundation {
             }
             
             return std::make_shared<MetalTexture>(texture, format, w, h, mipmapLevelCount);
+        }
+    }
+
+    RenderTexturePtr MetalRendering::createCubeTexture(RenderTextureFormat format, std::uint32_t w, std::uint32_t h, const std::initializer_list<const void *> &faceData) {
+        if (faceData.size() != 0 && faceData.size() != 6) {
+            _platform->logError("[MetalRendering::createCubeTexture] face count must be 0 or 6");
+            return nullptr;
+        }
+
+        @autoreleasepool {
+            MTLTextureDescriptor *desc = [MTLTextureDescriptor new];
+            desc.textureType = MTLTextureTypeCube;
+            desc.pixelFormat = nativeTextureFormat[int(format)];
+            desc.width = w;
+            desc.height = h;
+            desc.mipmapLevelCount = 1;
+            desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+            id<MTLTexture> texture = [_device newTextureWithDescriptor:desc];
+
+            unsigned face = 0;
+            for (auto &item : faceData) {
+                MTLRegion region = {{ 0, 0, 0 }, {w, h, 1}};
+                [texture replaceRegion:region mipmapLevel:0 slice:face withBytes:item bytesPerRow:getTexture2DPitch(format, w) bytesPerImage:0];
+                face++;
+            }
+
+            return std::make_shared<MetalTexture>(texture, format, w, h, 1);
         }
     }
     
