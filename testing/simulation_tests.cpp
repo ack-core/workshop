@@ -85,6 +85,32 @@ namespace test {
         EXPECT_EQ_F(fixedPos.z, 3.0f);
         return true;
     }
+
+    bool simulationCircleImpulseFades(const API &api) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
+        desc.setNumber("mass", 1.0);
+        desc.setNumber("radius", 0.5);
+
+        core::SimulationInterface::BodyPtr body = api.simulation->addBody(desc);
+        EXPECT_TRUE(body != nullptr);
+
+        body->addImpulse({1, 0, 0}, 1.0f);
+        api.simulation->update(0.1f);
+        const float step1 = body->getTransform().v3.x;
+        EXPECT_EQ_F(step1, 0.1f);
+        EXPECT_EQ_F(body->getVelocity().x, 0.0f);
+
+        api.simulation->update(0.1f);
+        const float step2 = body->getTransform().v3.x - step1;
+        EXPECT_TRUE(step2 > 0.0f && step2 < step1);
+
+        body->setVelocity({0, 0, 0});
+        api.simulation->update(0.1f);
+        const float step3 = body->getTransform().v3.x - step1 - step2;
+        EXPECT_TRUE(step3 > 0.0f && step3 < step2);
+        return true;
+    }
 }
 
 namespace test {
@@ -92,5 +118,6 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleMovesByVelocity);
         REGISTER_UNIT_TEST(simulationCircleObstacleStopAndSlide);
         REGISTER_UNIT_TEST(simulationCircleObstacleInactiveBodies);
+        REGISTER_UNIT_TEST(simulationCircleImpulseFades);
     }
 }
