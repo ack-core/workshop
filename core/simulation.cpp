@@ -146,7 +146,7 @@ namespace core {
     }
     void resolveCollisionCircleCircleXZ(const CollisionInfo &info, CircleXZImpl &a, CircleXZImpl &b) {
         const float invMassSumm = a.invMass + b.invMass;
-        const float aShare = invMassSumm > 0.0f ? a.invMass / invMassSumm : 0.5f;
+        const float aShare = !a.movable ? 0.0f : !b.movable ? 1.0f : invMassSumm > 0.0f ? a.invMass / invMassSumm : 0.5f;
         if (a.movable) {
             a.transform.v3.xyz = a.transform.v3.xyz - info.normal * info.penetration * aShare;
         }
