@@ -139,6 +139,30 @@ namespace test {
         EXPECT_TRUE(calls.empty());
         return true;
     }
+    bool platform_event_handlers_count_test(const API &api) {
+        const std::size_t initial = api.platform->getStatistics().eventHandlersCount;
+        const foundation::EventHandlerToken tokens[] = {
+            api.platform->addKeyboardEventHandler([](const foundation::PlatformKeyboardEventArgs &) { return false; }),
+            api.platform->addPointerEventHandler([](const foundation::PlatformPointerEventArgs &) { return false; }),
+            api.platform->addEditorEventHandler([](const std::string &, const std::string &) { return false; }),
+            api.platform->addInputEventHandler([](const char(&)[4]) { return false; }),
+            api.platform->addGamepadEventHandler([](const foundation::PlatformGamepadEventArgs &) { return false; }),
+            api.platform->addResizeHandler([] {}),
+        };
+        std::size_t expected = initial;
+        for (foundation::EventHandlerToken token : tokens) {
+            expected += token != foundation::INVALID_EVENT_TOKEN ? 1 : 0;
+        }
+
+        EXPECT_LT(initial + 2, expected);
+        EXPECT_EQ(api.platform->getStatistics().eventHandlersCount, expected);
+
+        for (foundation::EventHandlerToken token : tokens) {
+            api.platform->removeEventHandler(token);
+        }
+        EXPECT_EQ(api.platform->getStatistics().eventHandlersCount, initial);
+        return true;
+    }
 }
 
 namespace test {
@@ -270,6 +294,7 @@ namespace test {
         REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
         REGISTER_UNIT_TEST(platform_pointer_event_handlers_test);
         REGISTER_UNIT_TEST(platform_editor_event_handlers_test);
+        REGISTER_UNIT_TEST(platform_event_handlers_count_test);
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);
