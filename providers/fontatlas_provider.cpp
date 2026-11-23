@@ -258,7 +258,7 @@ namespace resource {
                             chInfo.advance = ceilfloat(scale * float(iadvance));
                             chInfo.lsb = floorfloat(scale * float(ilsb));
                             chInfo.pxSize = math::vector2f(float(ix1 - ix0), float(iy1 - iy0));
-                            chInfo.txLT = math::vector2f(float(suitable->offsetX - blur), suitable->offsetY + suitable->baseLine + iy0) / float(ATLAS_SIZE);
+                            chInfo.txLT = math::vector2f(float(suitable->offsetX), suitable->offsetY + suitable->baseLine + iy0) / float(ATLAS_SIZE);
                             chInfo.txRB = chInfo.txLT + chInfo.pxSize / float(ATLAS_SIZE);
                             chInfo.voffset = suitable->baseLine + float(iy0);
                             chInfo.u16ch = u16ch;
@@ -266,10 +266,23 @@ namespace resource {
 
                             if (ix1 > ix0 && iy1 > iy0) {
                                 int startY = suitable->offsetY + int(ceilfloat(suitable->baseLine)) + iy0;
-                                int startX = suitable->offsetX - blur;
-                                int offset = (startY + blur) * ATLAS_SIZE + startX;
-                                stbtt_MakeGlyphBitmap(ttf, suitable->txdata.get() + offset, ix1 - ix0, iy1 - iy0, ATLAS_SIZE, scale, scale, glyph);
-                                
+                                int startX = suitable->offsetX;
+                                int glyphW = ix1 - ix0 - 2 * blur;
+                                int glyphH = iy1 - iy0 - 2 * blur;
+                                std::vector<std::uint8_t> glyphData(glyphW * glyphH);
+                                stbtt_MakeGlyphBitmap(ttf, glyphData.data(), glyphW, glyphH, glyphW, scale, scale, glyph);
+
+                                auto stampGlyph = [&]() {
+                                    for (int gY = 0; gY < glyphH; gY++) {
+                                        for (int gX = 0; gX < glyphW; gX++) {
+                                            std::uint8_t &px = *(suitable->txdata.get() + (startY + blur + gY) * ATLAS_SIZE + (startX + blur + gX));
+                                            px = std::max(px, glyphData[gY * glyphW + gX]);
+                                        }
+                                    }
+                                };
+
+                                stampGlyph();
+
                                 for (int b = 0; b < blur; b++) {
                                     for (int bY = startY; bY < startY + iy1 - iy0; bY++) {
                                         for (int bX = startX; bX < startX + ix1 - ix0; bX++) {
@@ -286,6 +299,8 @@ namespace resource {
                                             bpx = std::max(bpx, std::uint8_t(sum >> 3));
                                         }
                                     }
+
+                                    stampGlyph();
                                 }
                                 
                                 suitable->offsetX += ix1 - ix0 + 1;
