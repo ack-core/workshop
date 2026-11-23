@@ -232,10 +232,11 @@ namespace test {
         void init(const API &api) override {
             _scene = api.scene;
             _scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
-            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {5.0f, 30.0f});
-            api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
-                _mesh = _scene->addVoxelMesh(frames, desc);
-            });
+            _scene->setEnvironment({1.0f, 1.0f, 0.0f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {10.0f, 50.0f});
+            _addMesh(api, "scene_tests/scene_environment_fog_test_voxplane", {-32.0f, -1.0f, -32.0f});
+            _addMesh(api, "scene_tests/scene_voxel_mesh_test", {-20.0f, 0.0f, -20.0f});
+            _addMesh(api, "scene_tests/scene_environment_fog_test_debris", {5.0f, 0.0f, 5.0f});
+            _addMesh(api, "scene_tests/scene_environment_fog_test_knight", {0.0f, 0.0f, 0.0f});
         }
         void updateAndDraw(const API &api) override {}
         std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
@@ -243,8 +244,14 @@ namespace test {
         }
 
     private:
+        void _addMesh(const API &api, const char *path, const math::vector3f &position) {
+            api.resourceProvider->getOrLoadVoxelMesh(path, [this, position](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
+                _meshes.emplace_back(_scene->addVoxelMesh(frames, desc))->setPosition(position);
+            });
+        }
+
         core::SceneInterfacePtr _scene;
-        core::SceneInterface::VoxelMeshPtr _mesh;
+        std::vector<core::SceneInterface::VoxelMeshPtr> _meshes;
     };
 }
 
