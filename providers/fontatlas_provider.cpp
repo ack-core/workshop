@@ -6,8 +6,6 @@
 #include <set>
 #include <unordered_map>
 
-// TODO: if requested with blur, precache with blur = 0 as well
-
 namespace {
     static const int ATLAS_SIZE = 512;
     static const int ATLAS_SPACE = 10;
@@ -223,7 +221,7 @@ namespace resource {
                 suitable = newAtlas;
             }
             
-            _platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak = weak_from_this(), toLoad = std::move(toLoad), suitable, fontSize, blur](AsyncContext &ctx) {
+            _platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<AsyncContext>>([weak = weak_from_this(), toLoad = std::move(toLoad), suitable, fontSize](AsyncContext &ctx) {
                 if (std::shared_ptr<FontAtlasProviderImpl> self = weak.lock()) {
                     //--- worker thread ---
                     const stbtt_fontinfo *ttf = &self->_ttfInfo;
@@ -235,6 +233,7 @@ namespace resource {
                     
                     for (std::uint64_t key : toLoad) {
                         const std::uint16_t u16ch = std::uint16_t(key);
+                        const std::uint8_t blur = getBlur(key);
                         int glyph = stbtt_FindGlyphIndex(ttf, u16ch);
                         if (glyph != 0) {
                             int ix0 = 0, ix1 = 0, iy0 = 0, iy1 = 0, iadvance, ilsb;
@@ -366,6 +365,10 @@ namespace resource {
             }
             else {
                 toLoad.emplace(makeKey(u16ch, blur));
+            }
+
+            if (blur && (suitable == nullptr || suitable->chars.count(makeKey(u16ch, 0)) == 0)) {
+                toLoad.emplace(makeKey(u16ch, 0));
             }
 
             src += len;

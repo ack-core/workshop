@@ -13,6 +13,36 @@ namespace test {
 }
 
 namespace test {
+    class fontatlas_provider_blur_precache_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<fontatlas_provider_blur_precache_test>();
+        }
+        void init(const API &api) override {
+            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 2, [this, provider = api.fontAtlasProvider]() {
+                _blurredTexture = provider->getTextFontAtlas(TEXT, FONT_SIZE, 2, _blurred);
+                _unblurredTexture = provider->getTextFontAtlas(TEXT, FONT_SIZE, 0, _unblurred);
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_NOT_EQ(_blurredTexture, nullptr);
+            EXPECT_NOT_EQ(_unblurredTexture, nullptr);
+            EXPECT_EQ(_blurred.size(), 4);
+            EXPECT_EQ(_unblurred.size(), 4);
+            EXPECT_LT(_unblurred[0].pxSize.x, _blurred[0].pxSize.x);
+            return true;
+        }
+
+    private:
+        static constexpr const char *TEXT = "Blur";
+        static constexpr std::uint8_t FONT_SIZE = 24;
+
+        foundation::RenderTexturePtr _blurredTexture, _unblurredTexture;
+        std::vector<resource::FontCharInfo> _blurred, _unblurred;
+    };
+}
+
+namespace test {
     class fontatlas_provider_atlas_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -68,6 +98,7 @@ namespace test {
 namespace test {
     void registerFontAtlasProviderTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(fontatlas_provider_non_uniquity_test);
+        REGISTER_STEP_TEST(fontatlas_provider_blur_precache_test);
         REGISTER_SCREENSHOT_TEST("fontatlas_provider_tests", fontatlas_provider_atlas_test);
     }
 }
