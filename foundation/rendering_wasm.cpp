@@ -249,13 +249,12 @@ namespace foundation {
     
     WASMRendering::~WASMRendering() {}
     
-    void WASMRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir, const math::vector3f &sunDir) {
+    void WASMRendering::updateFrameConstants(const math::transform3f &vp, const math::transform3f &svp, const math::transform3f &ivp, const math::vector3f &camPos, const math::vector3f &camDir) {
         _frameConstants->plmVPMatrix = vp;
         _frameConstants->stdVPMatrix = svp;
         _frameConstants->invVPMatrix = ivp;
         _frameConstants->cameraPosition.xyz = camPos;
         _frameConstants->cameraDirection.xyz = camDir;
-        _frameConstants->sunDirection.xyz = sunDir;
     }
         
     RenderShaderPtr WASMRendering::createShader(const char *src, const InputLayout &layout, bool suppressErrors) {
