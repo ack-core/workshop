@@ -20,6 +20,9 @@ namespace {
     bool near4(const math::vector4f &v, float x, float y, float z, float w) {
         return std::fabs(v.x - x) < 1.0e-5f && std::fabs(v.y - y) < 1.0e-5f && std::fabs(v.z - z) < 1.0e-5f && std::fabs(v.w - w) < 1.0e-5f;
     }
+    bool nearBound(const math::bound3f &b, float xmin, float ymin, float zmin, float xmax, float ymax, float zmax) {
+        return near3({b.xmin, b.ymin, b.zmin}, xmin, ymin, zmin) && near3({b.xmax, b.ymax, b.zmax}, xmax, ymax, zmax);
+    }
 }
 
 namespace test {
@@ -608,6 +611,25 @@ namespace test {
 
         return true;
     }
+
+    bool math_bound3f_world_bounds_test(const API &api) {
+        const math::transform3f id = math::transform3f::identity();
+        const math::transform3f t = id.translated({1.0f, 2.0f, 3.0f});
+        EXPECT_TRUE(nearBound(math::bound3f::getWorldBounds(t, 2.0f), -1.0f, 0.0f, 1.0f, 3.0f, 4.0f, 5.0f));
+        EXPECT_TRUE(nearBound(math::bound3f::getWorldBounds(id, 0.5f), -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f));
+
+        const math::bound3f bb = {1.0f, 3.0f, -2.0f, 2.0f, 5.0f, 4.0f};
+        EXPECT_TRUE(nearBound(math::bound3f::getWorldBounds(id, bb), 1.0f, 3.0f, -2.0f, 2.0f, 5.0f, 4.0f));
+        EXPECT_TRUE(nearBound(math::bound3f::getWorldBounds(t, bb), 2.0f, 5.0f, 1.0f, 3.0f, 7.0f, 7.0f));
+
+        const math::transform3f r({0, 0, 1}, MATH_PI * 0.5f);
+        EXPECT_TRUE(nearBound(math::bound3f::getWorldBounds(r, bb), 3.0f, -2.0f, -2.0f, 5.0f, -1.0f, 4.0f));
+
+        const math::transform3f s({2, 0, 0, 0}, {0, -3, 0, 0}, {0, 0, 0.5f, 0}, {1, 1, 1, 1});
+        EXPECT_TRUE(nearBound(math::bound3f::getWorldBounds(s, bb), 3.0f, -14.0f, 0.0f, 5.0f, -8.0f, 3.0f));
+
+        return true;
+    }
 }
 
 
@@ -627,5 +649,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector_rotated_angle_test);
         REGISTER_UNIT_TEST(math_color_conversion_test);
         REGISTER_UNIT_TEST(math_transform3f_camera_test);
+        REGISTER_UNIT_TEST(math_bound3f_world_bounds_test);
     }
 }
