@@ -184,6 +184,42 @@ namespace test {
     private:
         core::SceneInterface::VoxelMeshPtr _mesh;
     };
+
+    class scene_bounding_shapes_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_bounding_shapes_test>();
+        }
+        void init(const API &api) override {
+            api.scene->setLinesDrawingEnabled(true);
+            api.scene->setCameraLookAt({0.0f, 0.0f, 6.0f}, {0.0f, 0.0f, 0.0f});
+
+            _sphere = api.scene->addBoundingSphere({0.0f, 0.0f, 0.0f}, 0.2f, {1.0f, 1.0f, 1.0f, 1.0f});
+            _sphere->setRadius(1.0f);
+            _sphere->setColor({1.0f, 0.0f, 0.0f, 1.0f});
+            _sphere->setPosition({-1.5f, 0.0f, 0.0f});
+
+            _box = api.scene->addBoundingBox({0.0f, 0.0f, 0.0f}, {-0.1f, -0.1f, -0.1f, 0.1f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f, 1.0f});
+            _box->setBBox({-0.5f, -1.0f, -0.5f, 0.5f, 1.0f, 0.5f});
+            _box->setColor({0.0f, 1.0f, 0.0f, 1.0f});
+            _box->setPosition({1.5f, 0.0f, 0.0f});
+
+            _hiddenSphere = api.scene->addBoundingSphere({0.0f, 0.0f, 0.0f}, 0.5f, {0.0f, 0.0f, 1.0f, 1.0f});
+            _hiddenSphere->setEnabled(false);
+            _hiddenBox = api.scene->addBoundingBox({0.0f, 0.0f, 0.0f}, {-0.3f, -0.3f, -0.3f, 0.3f, 0.3f, 0.3f}, {0.0f, 0.0f, 1.0f, 1.0f});
+            _hiddenBox->setEnabled(false);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
+            return {4, 128};
+        }
+
+    private:
+        core::SceneInterface::BoundingSpherePtr _sphere;
+        core::SceneInterface::BoundingBoxPtr _box;
+        core::SceneInterface::BoundingSpherePtr _hiddenSphere;
+        core::SceneInterface::BoundingBoxPtr _hiddenBox;
+    };
 }
 
 namespace test {
@@ -194,5 +230,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
     }
 }
