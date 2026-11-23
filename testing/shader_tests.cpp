@@ -496,6 +496,61 @@ namespace test {
         EXPECT_NOT_EQ(shader, nullptr);
         return true;
     }
+
+    bool shader_block_errors_test(const API& api) {
+        // Ill-formed, misordered, missing or unknown blocks fail shader creation
+        //
+        const char* uncompletedVssrc = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+        )";
+        const char* uncompletedFssrc = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc {
+                output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+        )";
+        const char* fssrcBeforeVssrc = R"(
+            fssrc {
+                output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+            }
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+        )";
+        const char* missingVssrc = R"(
+            fssrc {
+                output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+            }
+        )";
+        const char* missingFssrc = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+        )";
+        const char* unknownBlock = R"(
+            unknown {
+                position : float4
+            }
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc {
+                output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+            }
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .repeat = 4
+        };
+        EXPECT_EQ(api.rendering->createShader(uncompletedVssrc, layout, true), nullptr);
+        EXPECT_EQ(api.rendering->createShader(uncompletedFssrc, layout, true), nullptr);
+        EXPECT_EQ(api.rendering->createShader(fssrcBeforeVssrc, layout, true), nullptr);
+        EXPECT_EQ(api.rendering->createShader(missingVssrc, layout, true), nullptr);
+        EXPECT_EQ(api.rendering->createShader(missingFssrc, layout, true), nullptr);
+        EXPECT_EQ(api.rendering->createShader(unknownBlock, layout, true), nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -512,5 +567,6 @@ namespace test {
         REGISTER_UNIT_TEST(shader_builtin_functions_test);
         REGISTER_UNIT_TEST(shader_texture_types_test);
         REGISTER_UNIT_TEST(shader_frame_data_test);
+        REGISTER_UNIT_TEST(shader_block_errors_test);
     }
 }
