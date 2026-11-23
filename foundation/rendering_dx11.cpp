@@ -481,7 +481,8 @@ namespace foundation {
         _frameConstants.stdVPMatrix = svp;
         _frameConstants.invVPMatrix = ivp;
         _frameConstants.cameraPosition.xyz = camPos;
-        _frameConstants.cameraDirection.xyz = camDir;        _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
+        _frameConstants.cameraDirection.xyz = camDir;
+        _context->UpdateSubresource(_frameConstantsBuffer.Get(), 0, nullptr, &_frameConstants, 0, 0);
     }
 
     auto Direct3D11Rendering::createShader(const char *src, const InputLayout &layout, bool suppressErrors) -> RenderShaderPtr {

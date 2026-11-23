@@ -284,7 +284,8 @@ namespace foundation {
         _frameConstants.stdVPMatrix = svp;
         _frameConstants.invVPMatrix = ivp;
         _frameConstants.cameraPosition.xyz = camPos;
-        _frameConstants.cameraDirection.xyz = camDir;    }
+        _frameConstants.cameraDirection.xyz = camDir;
+    }
     
     RenderShaderPtr MetalRendering::createShader(const char *shadersrc, const InputLayout &layout, bool suppressErrors) {
         std::shared_ptr<RenderShader> result;
