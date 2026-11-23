@@ -111,6 +111,29 @@ namespace test {
         EXPECT_TRUE(step3 > 0.0f && step3 < step2);
         return true;
     }
+
+    bool simulationCircleGravity(const API &api) {
+        core::SimulationInterface::BodyPtr falling = addTestCircle(api, {0, 0, 0}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr disabled = addTestCircle(api, {5, 0, 0}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr fixed = addTestCircle(api, {-5, 0, 0}, {0, 0, 0});
+        disabled->setEnabled(false);
+        fixed->setMovable(false);
+
+        api.simulation->setGravity({0, -5, 2});
+        api.simulation->update(0.1f);
+        EXPECT_EQ_F(falling->getTransform().v3.z, 0.02f);
+        api.simulation->update(0.1f);
+        api.simulation->setGravity({0, 0, 0});
+
+        const math::vector3f position = falling->getTransform().v3.xyz;
+        EXPECT_EQ_F(position.x, 0.0f);
+        EXPECT_EQ_F(position.y, 0.0f);
+        EXPECT_EQ_F(position.z, 0.06f);
+        EXPECT_EQ_F(falling->getVelocity().z, 0.4f);
+        EXPECT_EQ_F(disabled->getTransform().v3.z, 0.0f);
+        EXPECT_EQ_F(fixed->getTransform().v3.z, 0.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -119,5 +142,6 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleObstacleStopAndSlide);
         REGISTER_UNIT_TEST(simulationCircleObstacleInactiveBodies);
         REGISTER_UNIT_TEST(simulationCircleImpulseFades);
+        REGISTER_UNIT_TEST(simulationCircleGravity);
     }
 }
