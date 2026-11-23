@@ -85,8 +85,7 @@ def list_vxm(root: str, file: str, out: typing.BinaryIO) -> None:
             out.write(msg.encode("utf-8"))
 
         elif version == 0x7f:
-            data = f.read(12)
-            sx, sy, sz = struct.unpack("<iii", data)
+            sx, sy, sz = struct.unpack("<iii", header[12:20] + f.read(4))
             msg = "        {{\"{}\", {{ {}, {}, {} }}}},\r\n".format(file, sx, sy, sz)
             out.write(msg.encode("utf-8"))
 
