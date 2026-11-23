@@ -43,10 +43,10 @@ namespace test {
 }
 
 namespace test {
-    class fontatlas_provider_atlas_test : public ScreenshotTestInterface {
+    template<std::uint8_t BLUR> class fontatlas_provider_atlas_test_base : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
-            return std::make_unique<fontatlas_provider_atlas_test>();
+            return std::make_unique<fontatlas_provider_atlas_test_base<BLUR>>();
         }
         void init(const API &api) override {
             // Fullscreen quad sampling the font atlas texture
@@ -72,11 +72,11 @@ namespace test {
                 .repeat = 4
             };
             _shader = api.rendering->createShader(shaderSrc, layout);
-            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 0, {});
+            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, BLUR, {});
         }
         void updateAndDraw(const API &api) override {
             std::vector<resource::FontCharInfo> chars;
-            const foundation::RenderTexturePtr &texture = api.fontAtlasProvider->getTextFontAtlas(TEXT, FONT_SIZE, 0, chars);
+            const foundation::RenderTexturePtr &texture = api.fontAtlasProvider->getTextFontAtlas(TEXT, FONT_SIZE, BLUR, chars);
             api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
                 rendering.applyTextures({ { texture, foundation::SamplerType::NEAREST } });
@@ -93,6 +93,9 @@ namespace test {
 
         foundation::RenderShaderPtr _shader;
     };
+
+    using fontatlas_provider_atlas_test = fontatlas_provider_atlas_test_base<0>;
+    using fontatlas_provider_blur_atlas_test = fontatlas_provider_atlas_test_base<2>;
 }
 
 namespace test {
@@ -100,5 +103,6 @@ namespace test {
         REGISTER_UNIT_TEST(fontatlas_provider_non_uniquity_test);
         REGISTER_STEP_TEST(fontatlas_provider_blur_precache_test);
         REGISTER_SCREENSHOT_TEST("fontatlas_provider_tests", fontatlas_provider_atlas_test);
+        REGISTER_SCREENSHOT_TEST("fontatlas_provider_tests", fontatlas_provider_blur_atlas_test);
     }
 }
