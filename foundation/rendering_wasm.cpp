@@ -19,9 +19,9 @@ extern "C" {
     void webgl_applyShader(WebGLId shader, std::uint32_t ztype, std::uint32_t btype);
     void webgl_applyConstants(std::uint32_t index, const void *drawConstants, std::uint32_t byteLength);
     void webgl_applyTexture(std::uint32_t index, WebGLId texture, int samplingType, bool cube);
-    void webgl_drawDefault(WebGLId data, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
-    void webgl_drawIndexed(WebGLId data, std::uint32_t indexCount, std::uint32_t instanceCount, GLenum topology);
-    void webgl_drawWithRepeat(WebGLId data, std::uint32_t attrCount, std::uint32_t instanceCount, std::uint32_t vertexCount, std::uint32_t totalInstCount, GLenum topology);
+    void webgl_drawDefault(WebGLId data, std::uint32_t start, std::uint32_t vertexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_drawIndexed(WebGLId data, std::uint32_t start, std::uint32_t indexCount, std::uint32_t instanceCount, GLenum topology);
+    void webgl_drawWithRepeat(WebGLId data, std::uint32_t attrCount, std::uint32_t instanceCount, std::uint32_t vertexCount, std::uint32_t totalInstCount, std::uint32_t start, GLenum topology);
     void webgl_drawDynamic(const void *layout, std::uint32_t layoutLen, const void *data, std::uint32_t dataLen, std::uint32_t stride, const std::uint32_t *idx, std::uint32_t icount, std::uint32_t repeat, GLenum topology);
     void webgl_deleteProgram(WebGLId id);
     void webgl_deleteData(WebGLId id);
@@ -478,43 +478,39 @@ namespace foundation {
             const InputLayout &layout = _currentShader->getInputLayout();
             
             if (layout.repeat > 1) {
-                webgl_drawDefault(0, layout.repeat, vertexCount, g_topologies[int(_topology)]);
+                webgl_drawDefault(0, 0, layout.repeat, vertexCount, g_topologies[int(_topology)]);
                 g_frameVertexCount += layout.repeat * vertexCount;
             }
             else {
-                webgl_drawDefault(0, vertexCount, 1, g_topologies[int(_topology)]);
+                webgl_drawDefault(0, 0, vertexCount, 1, g_topologies[int(_topology)]);
                 g_frameVertexCount += vertexCount;
             }
         }
     }
     
-    void WASMRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
+    void WASMRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount, std::uint32_t start, std::uint32_t count) {
         const WASMData *platformData = static_cast<const WASMData *>(inputData.get());
-        
-        if (_currentShader) {
+
+        if (_currentShader && platformData) {
             const InputLayout &layout = _currentShader->getInputLayout();
-            WebGLId id = 0;
-            std::uint32_t vcount = 1;
-            
-            if (platformData) {
-                id = platformData->getWebGLData();
-                vcount = platformData->getVertexCount();
-            }
-            else return;
-            
+            const WebGLId id = platformData->getWebGLData();
+            const bool indexed = layout.repeat <= 1 && platformData->getIndexCount();
+            const std::uint32_t total = indexed ? platformData->getIndexCount() : platformData->getVertexCount();
+            start = std::min(start, total);
+            count = std::min(count, total - start);
+
             if (layout.repeat > 1) {
-                webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, vcount * instanceCount, g_topologies[int(_topology)]);
-                g_frameVertexCount += layout.repeat * vcount * instanceCount;
+                webgl_drawWithRepeat(id, std::uint32_t(layout.attributes.size()), instanceCount, layout.repeat, count * instanceCount, start, g_topologies[int(_topology)]);
+                g_frameVertexCount += layout.repeat * count * instanceCount;
             }
             else {
-                if (platformData->getIndexCount()) {
-                    webgl_drawIndexed(id, platformData->getIndexCount(), instanceCount, g_topologies[int(_topology)]);
-                    g_frameVertexCount += platformData->getIndexCount() * instanceCount;
+                if (indexed) {
+                    webgl_drawIndexed(id, start, count, instanceCount, g_topologies[int(_topology)]);
                 }
                 else {
-                    webgl_drawDefault(id, vcount, instanceCount, g_topologies[int(_topology)]);
-                    g_frameVertexCount += vcount * instanceCount;
+                    webgl_drawDefault(id, start, count, instanceCount, g_topologies[int(_topology)]);
                 }
+                g_frameVertexCount += count * instanceCount;
             }
         }
     }

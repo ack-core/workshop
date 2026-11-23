@@ -888,30 +888,35 @@ namespace foundation {
             }
         }
     }
-    void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
+    void Direct3D11Rendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount, std::uint32_t start, std::uint32_t count) {
         if (_currentShader && inputData) {
             const InputLayout &layout = _currentShader->getInputLayout();
             const Direct3D11Data *platformData = static_cast<const Direct3D11Data *>(inputData.get());
+            const bool indexed = layout.repeat <= 1 && platformData->getIndexes();
+            const std::uint32_t total = indexed ? platformData->getIndexCount() : platformData->getVertexCount();
+            start = std::min(start, total);
+            count = std::min(count, total - start);
+
             ID3D11Buffer *const vbuffer = platformData->getVertexes();
             const UINT stride = platformData->getStride();
-            const UINT offset = 0;
+            const UINT offset = layout.repeat > 1 ? start * stride : 0;
 
             _context->IASetVertexBuffers(0, 1, &vbuffer, &stride, &offset);
             _applyInputLayout(layout.repeat > 1 ? instanceCount : 0);
 
             if (layout.repeat > 1) {
                 _applyDrawConstants(instanceCount);
-                _context->DrawInstanced(layout.repeat, platformData->getVertexCount() * instanceCount, 0, 0);
-                g_frameVertexCount += layout.repeat * platformData->getVertexCount() * instanceCount;
+                _context->DrawInstanced(layout.repeat, count * instanceCount, 0, 0);
+                g_frameVertexCount += layout.repeat * count * instanceCount;
             }
-            else if (platformData->getIndexes()) {
+            else if (indexed) {
                 _context->IASetIndexBuffer(platformData->getIndexes(), DXGI_FORMAT_R32_UINT, 0);
-                _context->DrawIndexedInstanced(platformData->getIndexCount(), instanceCount, 0, 0, 0);
-                g_frameVertexCount += platformData->getIndexCount() * instanceCount;
+                _context->DrawIndexedInstanced(count, instanceCount, start, 0, 0);
+                g_frameVertexCount += count * instanceCount;
             }
             else {
-                _context->DrawInstanced(platformData->getVertexCount(), instanceCount, 0, 0);
-                g_frameVertexCount += platformData->getVertexCount() * instanceCount;
+                _context->DrawInstanced(count, instanceCount, start, 0);
+                g_frameVertexCount += count * instanceCount;
             }
         }
     }

@@ -135,7 +135,7 @@ namespace foundation {
         void applyShaderConstants(const void *constants) override;
 
         void draw(std::uint32_t vertexCount) override;
-        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
+        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount, std::uint32_t start, std::uint32_t count) override;
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes, std::uint32_t icnt) override;
 
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;

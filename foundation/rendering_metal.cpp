@@ -679,40 +679,34 @@ namespace foundation {
         }
     }
     
-    void MetalRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) {
+    void MetalRendering::draw(const RenderDataPtr &inputData, std::uint32_t instanceCount, std::uint32_t start, std::uint32_t count) {
         if (_currentRenderCommandEncoder && _currentShader && inputData) {
             const InputLayout &layout = _currentShader->getInputLayout();
             const MetalData *implData = static_cast<const MetalData *>(inputData.get());
             const MTLPrimitiveType topology = g_topologies[int(_currentTopology)];
-            
-            std::uint32_t vcnt = 1;
-            std::uint32_t icnt = 0;
-            id<MTLBuffer> vbuffer = nil;
-            id<MTLBuffer> ibuffer = nil;
-            
-            if (implData) {
-                vcnt = implData->getVertexCount();
-                icnt = implData->getIndexCount();
-                vbuffer = implData->getVertexes();
-                ibuffer = implData->getIndexes();
-            }
+
+            id<MTLBuffer> vbuffer = implData->getVertexes();
+            id<MTLBuffer> ibuffer = layout.repeat > 1 ? nil : implData->getIndexes();
+            const std::uint32_t total = ibuffer ? implData->getIndexCount() : implData->getVertexCount();
+            start = std::min(start, total);
+            count = std::min(count, total - start);
 
             //[_currentRenderCommandEncoder setTriangleFillMode:MTLTriangleFillModeLines];
-            [_currentRenderCommandEncoder setVertexBuffer:vbuffer offset:0 atIndex:VS_INPUT_BINDING_START];
+            [_currentRenderCommandEncoder setVertexBuffer:vbuffer offset:(layout.repeat > 1 ? start * implData->getStride() : 0) atIndex:VS_INPUT_BINDING_START];
 
             if (layout.repeat > 1) {
                 [_currentRenderCommandEncoder setVertexBytes:&instanceCount length:sizeof(std::uint32_t) atIndex:VS_INPUT_INSTANCE_COUNT];
-                [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:vcnt * instanceCount];
-                g_frameVertexCount += layout.repeat * vcnt * instanceCount;
+                [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:layout.repeat instanceCount:count * instanceCount];
+                g_frameVertexCount += layout.repeat * count * instanceCount;
             }
             else {
                 if (ibuffer) {
-                    [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:icnt indexType:MTLIndexTypeUInt32 indexBuffer:ibuffer indexBufferOffset:0 instanceCount:instanceCount];
-                    g_frameVertexCount += icnt * instanceCount;
+                    [_currentRenderCommandEncoder drawIndexedPrimitives:topology indexCount:count indexType:MTLIndexTypeUInt32 indexBuffer:ibuffer indexBufferOffset:start * sizeof(std::uint32_t) instanceCount:instanceCount];
+                    g_frameVertexCount += count * instanceCount;
                 }
                 else if (vbuffer) {
-                    [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:0 vertexCount:vcnt instanceCount:instanceCount];
-                    g_frameVertexCount += vcnt * instanceCount;
+                    [_currentRenderCommandEncoder drawPrimitives:topology vertexStart:start vertexCount:count instanceCount:instanceCount];
+                    g_frameVertexCount += count * instanceCount;
                 }
             }
         }

@@ -53,9 +53,9 @@ onmessage = (msg) => {
                 webgl_applyShader: (shaderID, ztype, btype) => { throw "can't access webgl from background" },
                 webgl_applyConstants: (index, ptr, len) => { throw "can't access webgl from background" },
                 webgl_applyTexture: (index, textureID, samplingType, cube) => { throw "can't access webgl from background" },
-                webgl_drawDefault: (buffer, vertexCount, instanceCount, topology) => { throw "can't access webgl from background" },
-                webgl_drawIndexed: (buffer, indexes, indexCount, topology) => { throw "can't access webgl from background" },
-                webgl_drawWithRepeat: (buffer, attrCount, instanceCount, vertexCount, totalInstCount, topology) => { throw "can't access webgl from background" },
+                webgl_drawDefault: (buffer, start, vertexCount, instanceCount, topology) => { throw "can't access webgl from background" },
+                webgl_drawIndexed: (buffer, start, indexCount, instanceCount, topology) => { throw "can't access webgl from background" },
+                webgl_drawWithRepeat: (buffer, attrCount, instanceCount, vertexCount, totalInstCount, start, topology) => { throw "can't access webgl from background" },
                 webgl_drawDynamic: (layout, layoutLen, ptr, dataLen, stride, idx, icount, repeat, topology) => { throw "can't access webgl from background" }
             }
         };

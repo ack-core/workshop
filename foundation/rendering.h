@@ -278,9 +278,12 @@ namespace foundation {
         virtual void draw(std::uint32_t vertexCount = 1) = 0;
         
         // Draw vertexes from RenderData
-        // @inputData layout has to match current shader's layout
+        // @inputData     - layout has to match current shader's layout
+        // @instanceCount - count of instances
+        // @start         - first index to draw if @inputData has indexes, otherwise first vertex (structure)
+        // @count         - count of indexes or vertexes to draw, limited to the data size after @start
         //
-        virtual void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1) = 0;
+        virtual void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount = 1, std::uint32_t start = 0, std::uint32_t count = 0xffffffff) = 0;
 
         // Draw dynamic data
         // @data        - pointer to data (array of structures). Layout should be compatible with current shader

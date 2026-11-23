@@ -129,7 +129,7 @@ namespace foundation {
         void applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
         
         void draw(std::uint32_t vertexCount) override;
-        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount) override;
+        void draw(const RenderDataPtr &inputData, std::uint32_t instanceCount, std::uint32_t start, std::uint32_t count) override;
         void draw(const void *data, std::uint32_t vcnt, const std::uint32_t *indexes = nullptr, std::uint32_t icnt = 0) override;
         auto presentFrame() -> std::unique_ptr<std::uint8_t[]> override;
         auto getStatistics() const -> const StatInfo & override;

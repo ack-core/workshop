@@ -1069,6 +1069,107 @@ namespace test {
 }
 
 namespace test {
+    class rendering_partial_data_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_partial_data_test>();
+        }
+        void init(const API &api) override {
+            // Four white triangles in a row drawn partially: top row by vertexes 3..8, middle row by reversed indexes from 6 to the end,
+            // four quads with repeat layout in the bottom row drawn partially from instance 1 to 2
+            //
+            const char *triangleSrc = R"(
+                vssrc {
+                    output_position = float4(vertex_position, 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+                }
+            )";
+            const char *quadSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][0.3, 0.0][0.0, -0.3][0.3, -0.3]
+                }
+                vssrc {
+                    output_position = float4(vertex_position + fixed_quad[repeat_ID], 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+                }
+            )";
+            const foundation::InputLayout triangleLayout = foundation::InputLayout {
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT2},
+                }
+            };
+            const foundation::InputLayout quadLayout = foundation::InputLayout {
+                .repeat = 4,
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT2},
+                }
+            };
+            const std::uint32_t indexes[] = { 9, 10, 11, 6, 7, 8, 3, 4, 5, 0, 1, 2 };
+            std::vector<math::vector2f> top, middle, origins;
+
+            for (std::uint32_t i = 0; i < 4; i++) {
+                const float x = -0.9f + 0.45f * float(i);
+                top.insert(top.end(), { {x, 0.9f}, {x + 0.3f, 0.9f}, {x, 0.6f} });
+                middle.insert(middle.end(), { {x, 0.3f}, {x + 0.3f, 0.3f}, {x, 0.0f} });
+                origins.emplace_back(x, -0.3f);
+            }
+
+            _triangleShader = api.rendering->createShader(triangleSrc, triangleLayout);
+            _quadShader = api.rendering->createShader(quadSrc, quadLayout);
+            _topData = api.rendering->createData(triangleLayout, top.data(), std::uint32_t(top.size()));
+            _middleData = api.rendering->createData(triangleLayout, middle.data(), std::uint32_t(middle.size()), indexes, 12);
+            _quadData = api.rendering->createData(quadLayout, origins.data(), std::uint32_t(origins.size()));
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_triangleShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(_topData, 1, 3, 6);
+                rendering.draw(_middleData, 1, 6);
+                rendering.applyShader(_quadShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(_quadData, 1, 1, 2);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_triangleShader, nullptr);
+            EXPECT_NOT_EQ(_quadShader, nullptr);
+            EXPECT_NOT_EQ(_topData, nullptr);
+            EXPECT_NOT_EQ(_middleData, nullptr);
+            EXPECT_NOT_EQ(_quadData, nullptr);
+
+            auto isWhite = [frame](std::size_t x, std::size_t y) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == 255 && p[1] == 255 && p[2] == 255;
+            };
+
+            EXPECT_FALSE(isWhite(46, 46));      // top triangle 0: before start
+            EXPECT_TRUE(isWhite(161, 46));      // top triangle 1
+            EXPECT_TRUE(isWhite(276, 46));      // top triangle 2
+            EXPECT_FALSE(isWhite(391, 46));     // top triangle 3: after count
+            EXPECT_TRUE(isWhite(46, 200));      // middle triangle 0: last indexes
+            EXPECT_TRUE(isWhite(161, 200));     // middle triangle 1
+            EXPECT_FALSE(isWhite(276, 200));    // middle triangle 2: before start
+            EXPECT_FALSE(isWhite(391, 200));    // middle triangle 3: before start
+            EXPECT_FALSE(isWhite(64, 371));     // quad 0: before start
+            EXPECT_TRUE(isWhite(179, 371));     // quad 1
+            EXPECT_TRUE(isWhite(294, 371));     // quad 2
+            EXPECT_FALSE(isWhite(410, 371));    // quad 3: after count
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _triangleShader;
+        foundation::RenderShaderPtr _quadShader;
+        foundation::RenderDataPtr _topData;
+        foundation::RenderDataPtr _middleData;
+        foundation::RenderDataPtr _quadData;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1086,6 +1187,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_blend_types_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_cube_texture_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_depth_behavior_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_partial_data_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
