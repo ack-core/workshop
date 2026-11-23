@@ -674,6 +674,65 @@ namespace test {
         return true;
     }
 
+    bool util_description_collections_test(const API &api) {
+        util::Description desc;
+        desc.setInteger("a", 1);
+        desc.setInteger("b", 2);
+        desc.setInteger("b", 3, false);
+        desc.setNumber("n", 1.5);
+        desc.setString("s", "x");
+        desc.setVector2f("v2f", math::vector2f(1.0f, 2.0f));
+        desc.setVector3f("v3f", math::vector3f(1.0f, 2.0f, 3.0f));
+        desc.setVector4f("v4f", math::vector4f(1.0f, 2.0f, 3.0f, 4.0f));
+        desc.setVector2i("v2i", math::vector2i(1, 2));
+        desc.setVector3i("v3i", math::vector3i(1, 2, 3));
+        desc.setVector4i("v4i", math::vector4i(1, 2, 3, 4));
+        desc.setDescription("d")->setInteger("x", 1);
+        desc.setDescription("e")->setInteger("x", 2);
+
+        // only values of requested type, first value for repeated name
+        const std::unordered_map<std::string, std::int64_t> ints = desc.getIntegers();
+        EXPECT_EQ(ints.size(), 2u);
+        EXPECT_EQ(ints.at("a"), 1);
+        EXPECT_EQ(ints.at("b"), 2);
+        EXPECT_EQ(desc.getNumbers().size(), 1u);
+        EXPECT_EQ_F(desc.getNumbers().at("n"), 1.5f);
+        EXPECT_EQ(desc.getStrings().size(), 1u);
+        EXPECT_EQ(desc.getStrings().at("s"), "x");
+        EXPECT_EQ_F(desc.getVector2fs().at("v2f").y, 2.0f);
+        EXPECT_EQ_F(desc.getVector3fs().at("v3f").z, 3.0f);
+        EXPECT_EQ_F(desc.getVector4fs().at("v4f").w, 4.0f);
+        EXPECT_EQ(desc.getVector2is().at("v2i").y, 2);
+        EXPECT_EQ(desc.getVector3is().at("v3i").z, 3);
+        EXPECT_EQ(desc.getVector4is().at("v4i").w, 4);
+        EXPECT_EQ(desc.getVector3fs().size(), 1u);
+        EXPECT_EQ(desc.getVector3is().size(), 1u);
+        EXPECT_TRUE(util::Description().getIntegers().empty());
+
+        const std::map<std::string, const util::Description *> descs = desc.getDescriptions();
+        EXPECT_EQ(descs.size(), 2u);
+        EXPECT_EQ(*descs.at("d")->getInteger("x"), 1);
+        EXPECT_EQ(*descs.at("e")->getInteger("x"), 2);
+
+        // all nested descriptions with the same name
+        const util::Description list = util::Description::parse(
+            "item { x : integer = 1 }\n"
+            "item { x : integer = 2 }\n"
+            "item : integer = 3\n"
+            "other { x : integer = 4 }\n"
+        );
+        EXPECT_EQ(list.size(), 4u);
+        const std::vector<const util::Description *> items = list.getDescriptions("item");
+        EXPECT_EQ(items.size(), 2u);
+        EXPECT_EQ(*items[0]->getInteger("x"), 1);
+        EXPECT_EQ(*items[1]->getInteger("x"), 2);
+        EXPECT_EQ(list.getDescriptions().size(), 2u);
+        EXPECT_EQ(*list.getDescriptions().at("item")->getInteger("x"), 1);
+        EXPECT_TRUE(list.getDescriptions("missing").empty());
+
+        return true;
+    }
+
     bool util_easing_test(const API &api) {
         util::Easing easing (util::Easing::Formula::INCUBIC, 2.0f);
 
@@ -850,6 +909,7 @@ namespace test {
         REGISTER_UNIT_TEST(util_description_default_values_test);
         REGISTER_UNIT_TEST(util_description_parse_test);
         REGISTER_UNIT_TEST(util_description_serialize_test);
+        REGISTER_UNIT_TEST(util_description_collections_test);
         REGISTER_UNIT_TEST(util_easing_test);
         REGISTER_UNIT_TEST(util_random_source_test);
         REGISTER_UNIT_TEST(util_cleanup_unused_test);
