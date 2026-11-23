@@ -70,6 +70,11 @@ namespace core {
         //
         virtual auto addBody(const util::Description &desc) -> BodyPtr = 0;
 
+        // Set global gravity applied to enabled movable bodies regardless of mass. Default is {0, 0, 0}
+        // @gravity - direction of gravity, length is velocity gained per second. Y is ignored by XZ bodies
+        //
+        virtual void setGravity(const math::vector3f &gravity) = 0;
+
         // Move bodies and resolve collisions
         //
         virtual void update(float dtSec) = 0;
