@@ -314,8 +314,12 @@ namespace test {
             _clearedLines->clear();
         }
         void updateAndDraw(const API &api) override {}
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {4, 128};
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 0;
         }
 
     private:
