@@ -630,6 +630,29 @@ namespace test {
 
         return true;
     }
+
+    bool math_ray_geometry_test(const API &api) {
+        math::vector3f out;
+        EXPECT_TRUE(math::intersectRayPlane({1, 5, 2}, {0, -1, 0}, {3, 1, -4}, {0, 1, 0}, out));
+        EXPECT_TRUE(near3(out, 1.0f, 1.0f, 2.0f));
+        EXPECT_TRUE(math::intersectRayPlane({0, 0, 0}, {0, 0, -1}, {3, 4, -5}, {0, 0, 1}, out));
+        EXPECT_TRUE(near3(out, 0.0f, 0.0f, -5.0f));
+        EXPECT_FALSE(math::intersectRayPlane({1, 5, 2}, {1, 0, 0}, {0, 1, 0}, {0, 1, 0}, out));
+        EXPECT_FALSE(math::intersectRayPlane({0, 0, 0}, {0, 1, 0}, {0, -2, 0}, {0, 1, 0}, out));
+
+        const math::vector3f o = {0, 0, 0};
+        const math::vector3f x = {1, 0, 0};
+        EXPECT_EQ_F(math::distanceRayLine(o, x, {2, -1, 0}, {2, 1, 0}), 0.0f);
+        EXPECT_EQ_F(math::distanceRayLine(o, x, {3, -1, 2}, {3, 1, 2}), 2.0f);
+        EXPECT_EQ_F(math::distanceRayLine(o, x, {2, 1, 0}, {2, 3, 0}), 1.0f);
+        EXPECT_EQ_F(math::distanceRayLine(o, x, {-3, -1, 1}, {-3, 1, 1}), std::sqrt(10.0f));
+
+        const float h = std::sqrt(0.5f);
+        EXPECT_TRUE(near2(math::nearestKoeffsRayRay(o, x, {3, -2, 4}, {0, 1, 0}), 3.0f, 2.0f));
+        EXPECT_TRUE(near2(math::nearestKoeffsRayRay(o, x, {5, -2, 0}, {-h, h, 0}), 3.0f, 2.0f / h));
+
+        return true;
+    }
 }
 
 
@@ -650,5 +673,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_color_conversion_test);
         REGISTER_UNIT_TEST(math_transform3f_camera_test);
         REGISTER_UNIT_TEST(math_bound3f_world_bounds_test);
+        REGISTER_UNIT_TEST(math_ray_geometry_test);
     }
 }
