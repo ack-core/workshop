@@ -40,8 +40,8 @@ namespace game {
             }
             math::vector3f camPosition;
             const math::vector3f dir = _api.scene->getWorldDirection({args.coordinateX, args.coordinateY}, &camPosition);
-            _result = _api.raycast->rayCast(camPosition, dir, 100.0f);
-            return true;
+            _result = _api.raycast->rayCast(camPosition, dir, 1000.0f);
+            return false;
         });
     }
 
@@ -57,6 +57,5 @@ namespace game {
         else {
             _normal->setEnabled(false);
         }
-        _api.scene->setCameraLookAt({8, 12, 12}, {0, 0, 0});
     }
 }

@@ -62,6 +62,7 @@ namespace game {
             &makeContext<CollisionContext>
         }},
         {"raycheck", {
+            &makeContext<RenderDevContext>,
             &makeContext<RaycheckContext>
         }}
     };
