@@ -134,6 +134,21 @@ namespace test {
         EXPECT_EQ_F(fixed->getTransform().v3.z, 0.0f);
         return true;
     }
+
+    bool simulationCircleGravityParabola(const API &api) {
+        core::SimulationInterface::BodyPtr body = addTestCircle(api, {0, 0, 0}, {10, 0, -10});
+        api.simulation->setGravity({0, 0, 10});
+
+        const float expectedZ[] = {-2.5f, -2.5f, 0.0f, 5.0f};
+        for (int i = 0; i < 4; i++) {
+            api.simulation->update(0.5f);
+            EXPECT_EQ_F(body->getTransform().v3.x, 5.0f * float(i + 1));
+            EXPECT_EQ_F(body->getTransform().v3.z, expectedZ[i]);
+        }
+
+        api.simulation->setGravity({0, 0, 0});
+        return true;
+    }
 }
 
 namespace test {
@@ -143,5 +158,6 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleObstacleInactiveBodies);
         REGISTER_UNIT_TEST(simulationCircleImpulseFades);
         REGISTER_UNIT_TEST(simulationCircleGravity);
+        REGISTER_UNIT_TEST(simulationCircleGravityParabola);
     }
 }
