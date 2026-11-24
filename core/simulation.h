@@ -55,6 +55,12 @@ namespace core {
         
         using BodyPtr = std::shared_ptr<Body>;
 
+        struct Constraint {
+            virtual ~Constraint() = default;
+        };
+
+        using ConstraintPtr = std::shared_ptr<Constraint>;
+
     public:
         // Create body. Body starts with identity transform, enabled and with zero velocity
         // @desc - body description:
@@ -69,6 +75,12 @@ namespace core {
         // @return nullptr if type is unknown
         //
         virtual auto addBody(const util::Description &desc) -> BodyPtr = 0;
+
+        // Create rigid constraint keeping two bodies at fixed XZ distance. Constraint lives while user holds its pointer
+        // Supported pairs: CircleXZ + CircleXZ, CircleXZ + ObstaclePolygonXZ (in any order). Obstacle is tied by its translation
+        // @return nullptr if a body is null, both bodies are obstacles or a and b are the same body
+        //
+        virtual auto addConstraint(const BodyPtr &a, const BodyPtr &b, float distance) -> ConstraintPtr = 0;
 
         // Set global gravity applied to enabled movable bodies regardless of mass. Default is {0, 0, 0}
         // @gravity - direction of gravity, length is velocity gained per second. Y is ignored by XZ bodies

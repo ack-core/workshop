@@ -205,6 +205,45 @@ namespace core {
 }
 
 namespace core {
+    class DistanceConstraintImpl : public SimulationInterface::Constraint {
+    public:
+        const std::weak_ptr<CircleXZImpl> a;
+        const std::weak_ptr<CollisionBodyBase> b;
+        const float distance;
+
+    public:
+        DistanceConstraintImpl(const std::shared_ptr<CircleXZImpl> &a, const std::shared_ptr<CollisionBodyBase> &b, float distance) : a(a), b(b), distance(distance) {}
+        ~DistanceConstraintImpl() override {}
+
+        bool isExpired() const {
+            return a.expired() || b.expired();
+        }
+        void resolve() {
+            const std::shared_ptr<CircleXZImpl> circle = a.lock();
+            const std::shared_ptr<CollisionBodyBase> other = b.lock();
+
+            if (circle->enabled && other->enabled) {
+                const math::vector3f d = other->getTransform().v3.xyz - circle->transform.v3.xyz;
+                const float current = d.xz.length();
+
+                if (current > std::numeric_limits<float>::epsilon()) {
+                    CollisionInfo info;
+                    info.normal = math::vector3f(d.x / current, 0.0f, d.z / current);
+                    info.penetration = distance - current;
+
+                    if (CircleXZImpl *otherCircle = dynamic_cast<CircleXZImpl *>(other.get())) {
+                        resolveCollisionCircleCircleXZ(info, *circle, *otherCircle);
+                    }
+                    else if (circle->movable) {
+                        circle->transform.v3.xyz -= info.normal * info.penetration;
+                    }
+                }
+            }
+        }
+    };
+}
+
+namespace core {
     class SimulationInterfaceImpl : public SimulationInterface {
     public:
         SimulationInterfaceImpl(const foundation::PlatformInterfacePtr &platform, const core::SceneInterfacePtr &scene) : _platform(platform), _scene(scene) {}
@@ -229,19 +268,39 @@ namespace core {
             }
             return result;
         }
+        auto addConstraint(const BodyPtr &a, const BodyPtr &b, float distance) -> ConstraintPtr override {
+            std::shared_ptr<CircleXZImpl> circle = std::dynamic_pointer_cast<CircleXZImpl>(a);
+            std::shared_ptr<CollisionBodyBase> other = std::dynamic_pointer_cast<CollisionBodyBase>(b);
+
+            if (circle == nullptr) {
+                circle = std::dynamic_pointer_cast<CircleXZImpl>(b);
+                other = std::dynamic_pointer_cast<CollisionBodyBase>(a);
+            }
+            if (circle == nullptr || other == nullptr || a == b) {
+                _platform->logError("[SimulationInterfaceImpl::addConstraint] Invalid bodies");
+                return nullptr;
+            }
+            return _constraints.emplace_back(std::make_shared<DistanceConstraintImpl>(circle, other, distance));
+        }
         void setGravity(const math::vector3f &gravity) override {
             _gravity = gravity;
         }
         void update(float dtSec) override {
             util::cleanupUnused(_circlesXZ);
             util::cleanupUnused(_obstaclesXZ);
-            
+            util::cleanupUnused(_constraints);
+            std::erase_if(_constraints, [](const std::shared_ptr<DistanceConstraintImpl> &constraint) { return constraint->isExpired(); });
+
             for (auto &obj : _circlesXZ) {
                 if (obj->enabled && obj->movable) {
                     obj->update(dtSec, _gravity);
                 }
             }
-            
+
+            for (auto &constraint : _constraints) {
+                constraint->resolve();
+            }
+
             CollisionInfo info;
             for (std::size_t i = 0; i < _circlesXZ.size(); i++) {
                 if (_circlesXZ[i]->enabled == false) {
@@ -277,6 +336,7 @@ namespace core {
         math::vector3f _gravity = {0.0f, 0.0f, 0.0f};
         std::vector<std::shared_ptr<CircleXZImpl>> _circlesXZ;
         std::vector<std::shared_ptr<ObstaclePolygonXZImpl>> _obstaclesXZ;
+        std::vector<std::shared_ptr<DistanceConstraintImpl>> _constraints;
     };
 }
 
