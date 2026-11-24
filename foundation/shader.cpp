@@ -406,7 +406,7 @@ namespace {
         
         for (const auto &item : desc) {
             const NativeVertexFormat &fmt = VTX_CONVERSION_TABLE[int(item.format)];
-            variables += indent + "const " + fmt.shaderTypeName + " " + prefix + item.name + " = " + std::string(assign) + item.name + ";\n";
+            variables += indent + "const " + fmt.shaderTypeName + " " + prefix + item.name + " = " + fmt.shaderTypeName + "(" + std::string(assign) + item.name + ");\n";
             output += indent + fmt.nativeTypeName + " " + item.name + ";\n";
             offset += fmt.size;
             index++;
