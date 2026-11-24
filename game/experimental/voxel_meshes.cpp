@@ -19,7 +19,6 @@ namespace game {
             _knight = _api.scene->addVoxelMesh(data, desc);
             _knight->setPosition({ 0, 1, 0 });
         });
-        _api.scene->setEnvironment({ 1, 1, 0 }, { 1, 1, 1, 1 }, { 0, 0, 0 }, { 0, 0, 0, 1 }, { 9000, 10000 });
     }
 }
 

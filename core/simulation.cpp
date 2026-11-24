@@ -218,7 +218,9 @@ namespace core {
         const float distance;
 
     public:
-        DistanceConstraintImpl(const std::shared_ptr<CircleXZImpl> &a, const std::shared_ptr<CollisionBodyBase> &b, float distance) : a(a), b(b), distance(distance) {}
+        DistanceConstraintImpl(const core::SceneInterfacePtr &scene, const std::shared_ptr<CircleXZImpl> &a, const std::shared_ptr<CollisionBodyBase> &b, float distance) : a(a), b(b), distance(distance) {
+            _visual = scene->addLineSet();
+        }
         ~DistanceConstraintImpl() override {}
 
         bool isExpired() const {
@@ -246,6 +248,16 @@ namespace core {
                 }
             }
         }
+        void updateVisual() {
+            const std::shared_ptr<CircleXZImpl> circle = a.lock();
+            const std::shared_ptr<CollisionBodyBase> other = b.lock();
+
+            _visual->setEnabled(circle->enabled && other->enabled);
+            _visual->setLine(0, circle->transform.v3.xyz, other->getTransform().v3.xyz, {0.0f, 0.5f, 1.0f, 0.7f});
+        }
+
+    private:
+        core::SceneInterface::LineSetPtr _visual;
     };
 }
 
@@ -282,7 +294,7 @@ namespace core {
             if (a->getType() != ShapeType::CircleXZ) {
                 return addConstraint(b, a, distance);
             }
-            return _constraints.emplace_back(std::make_shared<DistanceConstraintImpl>(std::static_pointer_cast<CircleXZImpl>(a), std::static_pointer_cast<CollisionBodyBase>(b), distance));
+            return _constraints.emplace_back(std::make_shared<DistanceConstraintImpl>(_scene, std::static_pointer_cast<CircleXZImpl>(a), std::static_pointer_cast<CollisionBodyBase>(b), distance));
         }
         void setGravity(const math::vector3f &gravity) override {
             _gravity = gravity;
@@ -328,6 +340,9 @@ namespace core {
                 if (obj->enabled) {
                     obj->updateVisual();
                 }
+            }
+            for (auto &constraint : _constraints) {
+                constraint->updateVisual();
             }
         }
 

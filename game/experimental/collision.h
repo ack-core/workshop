@@ -17,6 +17,8 @@ namespace game {
         foundation::EventHandlerToken _pointerToken = foundation::INVALID_EVENT_TOKEN;
         math::vector3f _direction = {0, 0, 0};
         core::SimulationInterface::BodyPtr _player;
+        core::SimulationInterface::BodyPtr _tied;
+        core::SimulationInterface::ConstraintPtr _tie;
         std::vector<core::SimulationInterface::BodyPtr> _circles;
         std::vector<core::SimulationInterface::BodyPtr> _obstacles;
     };
