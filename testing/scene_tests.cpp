@@ -216,6 +216,7 @@ namespace test {
             };
             api.scene->setCameraLookAt({10.0f, 10.0f, 10.0f}, {0.0f, 0.0f, 0.0f});
             _mesh = api.scene->addVoxelMesh({api.rendering->createData(layouts::VTXMVOX, voxels, 4)}, {});
+            _mesh->setTransform(math::transform3f({0.0f, 1.0f, 0.0f}, 0.6f).scaled({1.2f, 0.8f, 1.0f}).translated({0.0f, 1.0f, -1.0f}));
         }
         void updateAndDraw(const API &api) override {}
         std::uint8_t getThreshold() const override {
