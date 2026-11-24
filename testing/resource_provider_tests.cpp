@@ -180,8 +180,42 @@ namespace test {
 }
 
 namespace test {
+    bool resource_provider_prefabs_test(const API &api) {
+        const resource::ResourceProviderPtr provider = resource::ResourceProvider::instance(api.platform, api.rendering);
+        std::vector<std::uint8_t> data = {'P', 'R', 'E', 'F', 'A', 'B', 'S', '!', 2, 0, 0, 0};
+
+        auto putString = [&data](const std::string &str) {
+            const std::uint32_t size = std::uint32_t(str.length() + 5);
+            data.insert(data.end(), reinterpret_cast<const std::uint8_t *>(&size), reinterpret_cast<const std::uint8_t *>(&size) + 4);
+            data.insert(data.end(), str.begin(), str.end());
+            data.push_back(0);
+        };
+
+        putString("prefabs/first");
+        putString("i : integer = 7");
+        putString("prefabs/second");
+        putString("s : string = \"abc\"");
+
+        EXPECT_TRUE(provider->setPrefabsData(data.data(), data.size()));
+        EXPECT_NOT_EQ(provider->getPrefab("prefabs/first"), nullptr);
+        EXPECT_EQ(provider->getPrefab("prefabs/first")->getInteger("i", 0), 7);
+        EXPECT_NOT_EQ(provider->getPrefab("prefabs/second"), nullptr);
+        EXPECT_EQ(provider->getPrefab("prefabs/second")->getString("s", ""), "abc");
+        EXPECT_EQ(provider->getPrefab("prefabs/unknown"), nullptr);
+
+        EXPECT_FALSE(provider->setPrefabsData(data.data(), 11));
+        EXPECT_FALSE(provider->setPrefabsData(nullptr, data.size()));
+        data[0] = 'X';
+        EXPECT_FALSE(provider->setPrefabsData(data.data(), data.size()));
+        EXPECT_NOT_EQ(provider->getPrefab("prefabs/first"), nullptr);
+        return true;
+    }
+}
+
+namespace test {
     void registerResourceProviderTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(resource_provider_non_uniquity_test);
+        REGISTER_UNIT_TEST(resource_provider_prefabs_test);
         REGISTER_STEP_TEST(resource_provider_texture_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_reload_test);
