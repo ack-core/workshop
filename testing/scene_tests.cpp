@@ -99,8 +99,12 @@ namespace test {
             _square->fillAsClosedPolygon({{-1.0f, -1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}}, {1.0f, 0.0f, 0.0f, 1.0f});
         }
         void updateAndDraw(const API &api) override {}
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {4, 0};
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 0;
         }
 
     private:
@@ -156,8 +160,12 @@ namespace test {
             _screenMesh->setShaderConstants(math::transform3f::identity().translated({1.0f, 0.0f, 0.0f}).flat);
         }
         void updateAndDraw(const API &api) override {}
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {4, 0};
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 0;
         }
 
     private:
@@ -177,8 +185,12 @@ namespace test {
             });
         }
         void updateAndDraw(const API &api) override {}
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {16, 1024};
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 1024;
         }
 
     private:
@@ -210,8 +222,12 @@ namespace test {
             _hiddenBox->setEnabled(false);
         }
         void updateAndDraw(const API &api) override {}
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {4, 128};
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
         }
 
     private:
@@ -239,8 +255,12 @@ namespace test {
             _addMesh(api, "scene_tests/scene_environment_fog_test_knight", {0.0f, 0.0f, 0.0f});
         }
         void updateAndDraw(const API &api) override {}
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {16, 1024};
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 1024;
         }
 
     private:
