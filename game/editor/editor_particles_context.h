@@ -1,7 +1,7 @@
 
 #pragma once
 #include <game/context.h>
-#include <core/particles.h>
+#include <core/emitter_baker.h>
 #include <unordered_map>
 #include "node_access_interface.h"
 #include "camera_access_interface.h"

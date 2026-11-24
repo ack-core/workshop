@@ -12,8 +12,8 @@ set(
 	"${m_source_root}/raycast.cpp"
 	"${m_source_root}/simulation.h"
 	"${m_source_root}/simulation.cpp"
-	"${m_source_root}/particles.h"
-	"${m_source_root}/particles.cpp"
+	"${m_source_root}/emitter_baker.h"
+	"${m_source_root}/emitter_baker.cpp"
 )
 source_group("" FILES ${m_sources_list})
 add_library(core ${m_sources_list})

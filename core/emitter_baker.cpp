@@ -1,5 +1,5 @@
 
-#include "particles.h"
+#include "emitter_baker.h"
 #include "scene.h"
 #include <list>
 
