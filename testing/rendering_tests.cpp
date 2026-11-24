@@ -1250,6 +1250,118 @@ namespace test {
 }
 
 namespace test {
+    class rendering_points_and_line_strip_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_points_and_line_strip_test>();
+        }
+        void init(const API &api) override {
+            // White strip 'Г' in the top-left quarter
+            //
+            const char *stripSrc = R"(
+                fixed {
+                    strip[3] : float2 = [-0.9, 0.7][-0.3, 0.7][-0.3, 0.1]
+                }
+                vssrc {
+                    output_position = float4(fixed_strip[repeat_ID], 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+                }
+            )";
+            // White points at pixel centers (320, 64), (384, 64), (448, 64)
+            //
+            const char *pointsSrc = R"(
+                fixed {
+                    points[3] : float2 = [0.251953125, 0.748046875][0.501953125, 0.748046875][0.751953125, 0.748046875]
+                }
+                vssrc {
+                    output_position = float4(fixed_points[vertex_ID], 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = float4(1.0, 1.0, 1.0, 1.0);
+                }
+            )";
+            const char *dynamicSrc = R"(
+                const {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(vertex_position, 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = const_color;
+                }
+            )";
+            _stripShader = api.rendering->createShader(stripSrc, foundation::InputLayout { .repeat = 3 });
+            _pointsShader = api.rendering->createShader(pointsSrc, foundation::InputLayout {});
+            _dynamicShader = api.rendering->createShader(dynamicSrc, _layout);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                const math::vector4f red = { 1.0f, 0.0f, 0.0f, 1.0f };
+                const math::vector4f green = { 0.0f, 1.0f, 0.0f, 1.0f };
+                const float strip[] = { -0.9f, -0.3f, -0.3f, -0.3f, -0.3f, -0.9f };
+                const float points[] = { 0.251953125f, -0.751953125f, 0.501953125f, -0.751953125f, 0.751953125f, -0.751953125f };
+
+                rendering.applyShader(_stripShader, foundation::RenderTopology::LINESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(1);
+                rendering.applyShader(_pointsShader, foundation::RenderTopology::POINTS, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(3);
+                rendering.applyShader(_dynamicShader, foundation::RenderTopology::LINESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyShaderConstants(&red);
+                rendering.draw(strip, 3);
+                rendering.applyShader(_dynamicShader, foundation::RenderTopology::POINTS, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyShaderConstants(&green);
+                rendering.draw(points, 3);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_stripShader, nullptr);
+            EXPECT_NOT_EQ(_pointsShader, nullptr);
+            EXPECT_NOT_EQ(_dynamicShader, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(100, 76, 255, 255, 255));   // fixed strip: 1st segment
+            EXPECT_TRUE(pixelIs(179, 150, 255, 255, 255));  // fixed strip: 2nd segment
+            EXPECT_TRUE(pixelIs(102, 153, 0, 0, 0));        // fixed strip: no closing segment
+            EXPECT_TRUE(pixelIs(100, 90, 0, 0, 0));         // fixed strip: below 1st segment
+            EXPECT_TRUE(pixelIs(320, 64, 255, 255, 255));   // fixed points: 1st
+            EXPECT_TRUE(pixelIs(384, 64, 255, 255, 255));   // fixed points: 2nd
+            EXPECT_TRUE(pixelIs(448, 64, 255, 255, 255));   // fixed points: 3rd
+            EXPECT_TRUE(pixelIs(321, 64, 0, 0, 0));         // fixed points: right of 1st
+            EXPECT_TRUE(pixelIs(384, 65, 0, 0, 0));         // fixed points: below 2nd
+            EXPECT_TRUE(pixelIs(416, 64, 0, 0, 0));         // fixed points: between 2nd and 3rd
+            EXPECT_TRUE(pixelIs(100, 332, 255, 0, 0));      // dynamic strip: 1st segment
+            EXPECT_TRUE(pixelIs(179, 410, 255, 0, 0));      // dynamic strip: 2nd segment
+            EXPECT_TRUE(pixelIs(102, 409, 0, 0, 0));        // dynamic strip: no closing segment
+            EXPECT_TRUE(pixelIs(320, 448, 0, 255, 0));      // dynamic points: 1st
+            EXPECT_TRUE(pixelIs(384, 448, 0, 255, 0));      // dynamic points: 2nd
+            EXPECT_TRUE(pixelIs(448, 448, 0, 255, 0));      // dynamic points: 3rd
+            EXPECT_TRUE(pixelIs(447, 448, 0, 0, 0));        // dynamic points: left of 3rd
+            EXPECT_TRUE(pixelIs(320, 447, 0, 0, 0));        // dynamic points: above 1st
+            EXPECT_TRUE(pixelIs(352, 448, 0, 0, 0));        // dynamic points: between 1st and 2nd
+            return true;
+        }
+
+    private:
+        const foundation::InputLayout _layout = foundation::InputLayout {
+            .attributes = {
+                {"position", foundation::InputAttributeFormat::FLOAT2},
+            }
+        };
+
+        foundation::RenderShaderPtr _stripShader;
+        foundation::RenderShaderPtr _pointsShader;
+        foundation::RenderShaderPtr _dynamicShader;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1269,6 +1381,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_depth_behavior_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_partial_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_indexed_data_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_points_and_line_strip_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
