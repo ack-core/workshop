@@ -56,8 +56,8 @@ namespace core {
             _impulse = _impulse + math::vector3f(impulse.x, 0.0f, impulse.z);
             _impulseFade = std::log(100.0f) / std::max(timeSec, std::numeric_limits<float>::epsilon());
         }
-        void update(float dtSec) {
-            const math::vector3f v = getVelocity();
+        void update(float dtSec, const math::vector3f &gravity) {
+            const math::vector3f v = getVelocity() + gravity * dtSec;
             const math::vector3f impulseOffset = _impulse * dtSec;
             _prevpos = transform.v3.xyz + impulseOffset;
             _lastDt = std::max(dtSec, std::numeric_limits<float>::epsilon());
@@ -224,13 +224,16 @@ namespace core {
             }
             return result;
         }
+        void setGravity(const math::vector3f &gravity) override {
+            _gravity = gravity;
+        }
         void update(float dtSec) override {
             util::cleanupUnused(_circlesXZ);
             util::cleanupUnused(_obstaclesXZ);
             
             for (auto &obj : _circlesXZ) {
                 if (obj->enabled && obj->movable) {
-                    obj->update(dtSec);
+                    obj->update(dtSec, _gravity);
                 }
             }
             
@@ -265,7 +268,8 @@ namespace core {
     private:
         const foundation::PlatformInterfacePtr _platform;
         const core::SceneInterfacePtr _scene;
-        
+
+        math::vector3f _gravity = {0.0f, 0.0f, 0.0f};
         std::vector<std::shared_ptr<CircleXZImpl>> _circlesXZ;
         std::vector<std::shared_ptr<ObstaclePolygonXZImpl>> _obstaclesXZ;
     };
