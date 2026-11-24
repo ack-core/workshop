@@ -21,7 +21,9 @@ Areas:
 - 'resource_provider' is testing everything declared/defined by resource_provider.h and that different resource types can be loaded
 - 'raycast' is testing everything declared/defined by raycast.h and that rays hit or miss differently oriented shapes with correct results
 - 'simulation' is testing everything declared/defined by simulation.h and how transforms and velocities of bodies with different descriptions change after one or more update steps
+- 'emitter_baker' is testing everything declared/defined by emitter_baker.h and how particles baked from different descriptions are rendered by scene. 
 - 'scene' is testing everything declared/defined by scene.h and how scene objects are rendered
+- 'stage' is testing everything declared/defined by stage.h and how ui elements are rendered and react to input
 
 We are adding untested capabilities (candidates) to the file `tmp/tests-coverage-report.txt`.
 The file contains exactly one `Candidates:` block with the list of untested capabilities (candidates).

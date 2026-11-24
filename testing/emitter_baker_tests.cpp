@@ -107,8 +107,69 @@ namespace test {
 }
 
 namespace test {
+    class emitter_baker_rising_from_square_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<emitter_baker_rising_from_square_test>();
+        }
+        void init(const API &api) override {
+            // Looped emitter: particles rise from filled 10x10 square to the same square 10 units above and fade out
+            //
+            util::Description desc;
+            desc.setInteger("emissionTimeMs", 1000);
+            desc.setInteger("particleLifeTimeMs", 1000);
+            desc.setInteger("bakingFrameType", std::int64_t(core::EmitterBaker::BakingTime::BAKE20));
+            desc.setInteger("particlesToEmit", 200);
+            desc.setBool("looped", true);
+            desc.setInteger("randomSeed", 1);
+            desc.setInteger("startShapeType", std::int64_t(core::EmitterBaker::ShapeType::BOX));
+            desc.setBool("startShapeFill", true);
+            desc.setVector3f("startShapeArgs", math::vector3f(10.0f, 0.0f, 10.0f));
+            desc.setInteger("endShapeType", std::int64_t(core::EmitterBaker::ShapeType::BOX));
+            desc.setBool("endShapeFill", true);
+            desc.setVector3f("endShapeArgs", math::vector3f(10.0f, 0.0f, 10.0f));
+            desc.setVector3f("endShapeOffset", math::vector3f(0.0f, 10.0f, 0.0f));
+            desc.setInteger("shapeDistributionType", std::int64_t(core::EmitterBaker::ShapeDistribution::SHUFFLED));
+            desc.setInteger("particleOrientation", 1);
+            desc.setString("emissionGraphData", "0 1 0");
+            desc.setString("widthGraphData", "0 0.5 0 1 0.2 0");
+            desc.setString("heightGraphData", "0 0.5 0 1 0.2 0");
+            desc.setString("speedGraphData", "0 10 0");
+            desc.setString("alphaGraphData", "0 1 0 1 0 0");
+
+            core::EmitterBakerPtr baker = core::makeEmitterBaker();
+            baker->setParameters(desc);
+            baker->refresh();
+            desc.setVector3f("minXYZ", baker->getMinXYZ());
+            desc.setVector3f("maxXYZ", baker->getMaxXYZ());
+            desc.setVector2f("maxSize", baker->getMaxSize());
+
+            const std::uint32_t white = 0xffffffff;
+            const foundation::RenderTexturePtr texture = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 1, 1, { &white });
+
+            api.scene->setCameraLookAt({20.0f, 20.0f, 20.0f}, {0.0f, 5.0f, 0.0f});
+            _particles = api.scene->addParticles(texture, baker->getMap(api.rendering), desc);
+            _particles->setTime(0.5f, 0.0f);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::ParticlesPtr _particles;
+    };
+}
+
+// Screenshot tests are named by visual effect: emitter_baker_<motion>_from_<start shape>_test
+//
+namespace test {
     void registerEmitterBakerTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(emitter_baker_map_test);
         REGISTER_UNIT_TEST(emitter_baker_baking_test);
+        REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_rising_from_square_test);
     }
 }
