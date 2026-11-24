@@ -286,12 +286,12 @@ namespace test {
             _arrows = api.scene->addArrows();
             _arrows->setArrow(0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
             _arrows->setArrow(1, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f});
-            _arrows->setPosition({-2.0f, 0.5f, 0.0f});
+            _arrows->setPosition({-1.97f, 0.53f, 0.0f});
 
             _lines = api.scene->addLineSet();
-            _lines->setLine(0, {-0.5f, -0.5f, 0.0f}, {0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 0.0f, 1.0f});
-            _lines->setLine(1, {-0.5f, 0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
-            _lines->setPosition({0.0f, -1.0f, 0.0f});
+            _lines->setLine(0, {-0.5f, -0.3f, 0.0f}, {0.5f, 0.3f, 0.0f}, {1.0f, 1.0f, 0.0f, 1.0f});
+            _lines->setLine(1, {-0.3f, 0.5f, 0.0f}, {0.3f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
+            _lines->setPosition({0.03f, -0.97f, 0.0f});
 
             _circle = api.scene->addLineSet();
             _circle->fillAsCircle(32, 0.5f, {1.0f, 0.0f, 1.0f, 1.0f});
