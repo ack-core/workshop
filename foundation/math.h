@@ -837,6 +837,14 @@ namespace math {
             vector4f(m41 + v.x, m42 + v.y, m43 + v.z, m44)
         };
     }
+    inline transform3f transform3f::scaled(const vector3f &v) const {
+        return {
+            vector4f(m11 * v.x, m12 * v.y, m13 * v.z, m14),
+            vector4f(m21 * v.x, m22 * v.y, m23 * v.z, m24),
+            vector4f(m31 * v.x, m32 * v.y, m33 * v.z, m34),
+            vector4f(m41 * v.x, m42 * v.y, m43 * v.z, m44)
+        };
+    }
     inline transform3f transform3f::inverted() const {
         scalar a2323 = row2[2] * row3[3] - row2[3] * row3[2];
         scalar a1323 = row2[1] * row3[3] - row2[3] * row3[1];
