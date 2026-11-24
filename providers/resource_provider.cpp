@@ -5,6 +5,7 @@
 
 #include "thirdparty/upng/upng.h"
 
+#include <algorithm>
 #include <list>
 #include <memory>
 
@@ -23,7 +24,7 @@ namespace {
         };
         struct VTXMVOX {
             std::int16_t positionX, positionY, positionZ;
-            std::uint8_t colorIndex, mask;
+            std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
         };
         util::Description description;
         std::vector<std::vector<VTXMVOX>> voxels;
@@ -58,7 +59,7 @@ namespace {
         std::vector<VGEntry> vg;
     };
 
-    static_assert(sizeof(MeshAsyncContext::VTXMVOX) == 8, "");
+    static_assert(sizeof(MeshAsyncContext::VTXMVOX) == 12, "");
     
     bool readEmitter(const std::uint8_t *data, util::Description &desc, size_t &read) {
         const std::uint8_t *origin = data;
@@ -100,6 +101,9 @@ namespace {
                         voxel.positionZ = src.positionZ - std::int16_t(originOffset.z);
                         voxel.colorIndex = src.colorIndex;
                         voxel.mask = src.mask;
+                        voxel.scaleX = std::max(std::uint8_t(1), src.scaleX);
+                        voxel.scaleY = std::max(std::uint8_t(1), src.scaleY);
+                        voxel.scaleZ = std::max(std::uint8_t(1), src.scaleZ);
 
                         data += sizeof(MeshAsyncContext::Voxel);
                     }
@@ -214,6 +218,9 @@ namespace {
                                     voxels[c].positionZ = src[c].positionZ;
                                     voxels[c].colorIndex = src[c].colorIndex;
                                     voxels[c].mask = src[c].mask;
+                                    voxels[c].scaleX = std::max(std::uint8_t(1), src[c].scaleX);
+                                    voxels[c].scaleY = std::max(std::uint8_t(1), src[c].scaleY);
+                                    voxels[c].scaleZ = std::max(std::uint8_t(1), src[c].scaleZ);
                                 }
                                 
                                 voxptr += sizeof(MeshAsyncContext::Voxel) * voxelCount + 4;

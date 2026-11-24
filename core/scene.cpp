@@ -341,9 +341,9 @@ namespace core {
         };
         struct VTXMVOX {
             std::int16_t positionX, positionY, positionZ;
-            std::uint8_t colorIndex, mask;
+            std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
         };
-        
+
     public:
         bool enabled = true;
         bool isVoxelMesh = false;
@@ -900,7 +900,8 @@ namespace {
             normalc : float4
         }
         vssrc {
-            float3 cubeCenter = float3(vertex_position_color_mask.xyz);
+            float3 cubeScale = float3(vertex_scale.xyz);
+            float3 cubeCenter = float3(vertex_position_color_mask.xyz) + (cubeScale - 1.0) * 0.5;
             float3 worldCubePos = _transform(float4(cubeCenter, 1.0), const_modelTransform).xyz;
             float3 toCamSign = _sign(_transform(const_modelTransform, float4(frame_cameraPosition.xyz - worldCubePos, 0.0)).xyz);
             
@@ -908,7 +909,7 @@ namespace {
             uint colorIndex = uint(vertex_position_color_mask.w & 0xff);
             uint mask = uint((vertex_position_color_mask.w >> (uint(8) + faceIndex)) & 1);
             
-            float4 relVertexPos = float4(toCamSign, 1.0) * float4(_lerp(float3(0.5, 0.5, 0.5), fixed_cube[repeat_ID].xyz, float(mask)), 1.0);
+            float4 relVertexPos = float4(toCamSign * cubeScale, 1.0) *float4(_lerp(float3(0.5, 0.5, 0.5), fixed_cube[repeat_ID].xyz, float(mask)), 1.0);
             float4 absVertexPos = float4(cubeCenter, 0.0) + relVertexPos;
             
             output_normalc = float4(_transform(float4(fixed_normal[faceIndex], 0.0), const_modelTransform).xyz * 0.5 + 0.5, float(colorIndex) / 255.0); //
