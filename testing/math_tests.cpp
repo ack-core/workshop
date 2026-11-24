@@ -653,6 +653,48 @@ namespace test {
 
         return true;
     }
+
+    bool math_quaternion_axis_rotation_test(const API &api) {
+        const float h = std::sqrt(0.5f);
+        const float hpi = MATH_PI * 0.5f;
+        const math::vector4f id = {0.0f, 0.0f, 0.0f, 1.0f};
+        const math::vector4f q = {0.1f, 0.2f, 0.3f, 0.4f};
+        EXPECT_TRUE(near4(q.quaternionMultiply(id), 0.1f, 0.2f, 0.3f, 0.4f));
+        EXPECT_TRUE(near4(id.quaternionMultiply(q), 0.1f, 0.2f, 0.3f, 0.4f));
+
+        const math::vector4f qz30 = {0.0f, 0.0f, std::sin(MATH_PI / 12.0f), std::cos(MATH_PI / 12.0f)};
+        const math::vector4f qz60 = {0.0f, 0.0f, std::sin(MATH_PI / 6.0f), std::cos(MATH_PI / 6.0f)};
+        EXPECT_TRUE(near4(qz30.quaternionMultiply(qz60), 0.0f, 0.0f, h, h));
+        EXPECT_TRUE(near4(qz60.quaternionMultiply(qz30), 0.0f, 0.0f, h, h));
+
+        const math::transform3f rx({1, 0, 0}, hpi);
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(rx), 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).transformed(rx), 0.0f, 0.0f, -1.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 1.0f).transformed(rx), 0.0f, 1.0f, 0.0f));
+
+        const math::transform3f ry({0, 1, 0}, hpi);
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(ry), 0.0f, 0.0f, 1.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).transformed(ry), 0.0f, 1.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 1.0f).transformed(ry), -1.0f, 0.0f, 0.0f));
+
+        const math::transform3f rz({0, 0, 1}, hpi);
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(rz), 0.0f, -1.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).transformed(rz), 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(2.0f, 3.0f, 4.0f).transformed(rz, true), 3.0f, -2.0f, 4.0f));
+
+        const math::transform3f rd(math::vector3f(1.0f, 1.0f, 1.0f).normalized(1.0f), MATH_PI * 2.0f / 3.0f);
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 0.0f, 0.0f).transformed(rd), 0.0f, 0.0f, 1.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 1.0f, 0.0f).transformed(rd), 1.0f, 0.0f, 0.0f));
+        EXPECT_TRUE(near3(math::vector3f(0.0f, 0.0f, 1.0f).transformed(rd), 0.0f, 1.0f, 0.0f));
+
+        const math::vector3f axis = math::vector3f(1.0f, -2.0f, 0.5f).normalized(1.0f);
+        const math::vector3f v = {1.0f, 2.0f, 3.0f};
+        const math::vector3f expected = v.rotated(axis, 0.7f);
+        EXPECT_TRUE(near3(v.transformed(math::transform3f(axis, 0.7f)), expected.x, expected.y, expected.z));
+        EXPECT_TRUE(near3(axis.transformed(math::transform3f(axis, 0.7f)), axis.x, axis.y, axis.z));
+
+        return true;
+    }
 }
 
 
@@ -674,5 +716,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_transform3f_camera_test);
         REGISTER_UNIT_TEST(math_bound3f_world_bounds_test);
         REGISTER_UNIT_TEST(math_ray_geometry_test);
+        REGISTER_UNIT_TEST(math_quaternion_axis_rotation_test);
     }
 }
