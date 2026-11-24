@@ -145,13 +145,18 @@ namespace core {
         return false;
     }
     void resolveCollisionCircleCircleXZ(const CollisionInfo &info, CircleXZImpl &a, CircleXZImpl &b) {
-        const float invMassSumm = a.invMass + b.invMass;
-        const float aShare = !a.movable ? 0.0f : !b.movable ? 1.0f : invMassSumm > 0.0f ? a.invMass / invMassSumm : 0.5f;
-        if (a.movable) {
-            a.transform.v3.xyz = a.transform.v3.xyz - info.normal * info.penetration * aShare;
+        const math::vector3f push = info.normal * info.penetration;
+        if (a.movable && b.movable) {
+            const float invMassSumm = a.invMass + b.invMass;
+            const float aShare = invMassSumm > 0.0f ? a.invMass / invMassSumm : 0.5f;
+            a.transform.v3.xyz = a.transform.v3.xyz - push * aShare;
+            b.transform.v3.xyz = b.transform.v3.xyz + push * (1.0f - aShare);
         }
-        if (b.movable) {
-            b.transform.v3.xyz = b.transform.v3.xyz + info.normal * info.penetration * (1.0f - aShare);
+        else if (a.movable) {
+            a.transform.v3.xyz = a.transform.v3.xyz - push;
+        }
+        else if (b.movable) {
+            b.transform.v3.xyz = b.transform.v3.xyz + push;
         }
     }
 
