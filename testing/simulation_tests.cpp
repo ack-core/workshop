@@ -149,6 +149,27 @@ namespace test {
         api.simulation->setGravity({0, 0, 0});
         return true;
     }
+
+    bool simulationCirclesCollision(const API &api) {
+        core::SimulationInterface::BodyPtr movableA = addTestCircle(api, {0, 0, 0}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr movableB = addTestCircle(api, {0.6f, 0, 0}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr fixed = addTestCircle(api, {0, 0, 10}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr pushed = addTestCircle(api, {0.6f, 0, 10}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr disabled = addTestCircle(api, {0, 0, 20}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr untouched = addTestCircle(api, {0.6f, 0, 20}, {0, 0, 0});
+        fixed->setMovable(false);
+        disabled->setEnabled(false);
+
+        api.simulation->update(0.1f);
+
+        EXPECT_EQ_F(movableA->getTransform().v3.x, -0.2f);
+        EXPECT_EQ_F(movableB->getTransform().v3.x, 0.8f);
+        EXPECT_EQ_F(fixed->getTransform().v3.x, 0.0f);
+        EXPECT_EQ_F(pushed->getTransform().v3.x, 1.0f);
+        EXPECT_EQ_F(disabled->getTransform().v3.x, 0.0f);
+        EXPECT_EQ_F(untouched->getTransform().v3.x, 0.6f);
+        return true;
+    }
 }
 
 namespace test {
@@ -159,5 +180,6 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleImpulseFades);
         REGISTER_UNIT_TEST(simulationCircleGravity);
         REGISTER_UNIT_TEST(simulationCircleGravityParabola);
+        REGISTER_UNIT_TEST(simulationCirclesCollision);
     }
 }
