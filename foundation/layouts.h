@@ -7,6 +7,7 @@ namespace layouts {
             .repeat = 12,
             .attributes = {
                 {"position_color_mask", foundation::InputAttributeFormat::SHORT4},
+                {"scale", foundation::InputAttributeFormat::BYTE4},
             }
         };
         const foundation::InputLayout VTXVEG = foundation::InputLayout {

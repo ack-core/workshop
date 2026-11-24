@@ -1,5 +1,6 @@
 
 #include "runner.h"
+#include "foundation/layouts.h"
 
 namespace test {
     bool scene_statistics_test(const API &api) {
@@ -197,6 +198,39 @@ namespace test {
         core::SceneInterface::VoxelMeshPtr _mesh;
     };
 
+    class scene_voxel_mesh_scale_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_voxel_mesh_scale_test>();
+        }
+        void init(const API &api) override {
+            struct Voxel {
+                std::int16_t positionX, positionY, positionZ;
+                std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
+            };
+            const Voxel voxels[] = {
+                {0, 0, 0, 10, 0x3f, 1, 1, 1, 0},
+                {2, 0, 0, 10, 0x3f, 3, 1, 1, 0},
+                {0, 0, 2, 10, 0x3f, 1, 3, 1, 0},
+                {-4, 0, -4, 10, 0x3f, 2, 2, 2, 0},
+            };
+            api.scene->setCameraLookAt({10.0f, 10.0f, 10.0f}, {0.0f, 0.0f, 0.0f});
+            _mesh = api.scene->addVoxelMesh({api.rendering->createData(layouts::VTXMVOX, voxels, 4)}, {});
+            _mesh->setTransform(math::transform3f({0.0f, 1.0f, 0.0f}, 0.6f).scaled({1.2f, 0.8f, 1.0f}).translated({0.0f, 1.0f, -1.0f}));
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::VoxelMeshPtr _mesh;
+    };
+
     class scene_bounding_shapes_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -341,6 +375,7 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_scale_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
