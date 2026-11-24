@@ -286,6 +286,48 @@ namespace test {
     };
 }
 
+namespace test {
+    class platform_async_work_in_progress_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<platform_async_work_in_progress_test>();
+        }
+        void init(const API &api) override {
+            struct Context {
+                int result = 0;
+            };
+            _progressBefore = api.platform->isAsyncWorkInProgress();
+            for (int i = 0; i < TASKS_COUNT; i++) {
+                api.platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<Context>>([i](Context &ctx) {
+                    ctx.result = i + 1;
+                },
+                [this, i, platform = api.platform](Context &ctx) {
+                    _results[i] = ctx.result;
+                    _progressInMain[i] = platform->isAsyncWorkInProgress();
+                }));
+            }
+            _progressAfter = api.platform->isAsyncWorkInProgress();
+        }
+        bool testResult(const API &api) override {
+            EXPECT_FALSE(_progressBefore);
+            EXPECT_TRUE(_progressAfter);
+            EXPECT_FALSE(api.platform->isAsyncWorkInProgress());
+            for (int i = 0; i < TASKS_COUNT; i++) {
+                EXPECT_EQ(_results[i], i + 1);
+                EXPECT_TRUE(_progressInMain[i]);
+            }
+            return true;
+        }
+
+    private:
+        static constexpr int TASKS_COUNT = 3;
+        bool _progressBefore = true;
+        bool _progressAfter = false;
+        int _results[TASKS_COUNT] = {};
+        bool _progressInMain[TASKS_COUNT] = {};
+    };
+}
+
 
 namespace test {
     void registerPlatformTests(TestRunner& runner) {
@@ -299,5 +341,6 @@ namespace test {
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
         REGISTER_STEP_TEST(platform_file_delete_and_loading_fail_test);
         REGISTER_STEP_TEST(platform_execute_async_test);
+        REGISTER_STEP_TEST(platform_async_work_in_progress_test);
     }
 }
