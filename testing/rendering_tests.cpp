@@ -791,8 +791,12 @@ namespace test {
                 rendering.draw(1);
             });
         }
-        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
-            return {4, 0};
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 0;
         }
 
     private:
