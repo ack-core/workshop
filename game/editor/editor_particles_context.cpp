@@ -9,6 +9,44 @@ namespace game {
         const std::uint64_t RND_SHAPE_GET = 200;
         const std::uint64_t RND_BORN_PARTICLE = 300;
         const std::uint64_t RND_GRAPH_SPREAD = 400;
+
+        auto getEmitterDir(const math::vector3f &endShapeOffset) -> math::vector3f {
+            return endShapeOffset.lengthSq() > 0.1f ? endShapeOffset.normalized() : math::vector3f{0, 1, 0};
+        }
+        auto getDirRotation(const math::vector3f &dir) -> math::transform3f {
+            const float a = math::vector3f(0, 1, 0).angleTo(dir);
+            const math::vector3f axis = math::vector3f(0, 1, 0).cross(dir.normalized()).normalized();
+            return math::transform3f(axis, -a);
+        }
+        void fillShapeLineset(const core::SceneInterface::LineSetPtr &lineSet, Shape::Type type, const math::vector3f &args, const math::vector3f &dir) {
+            if (type == Shape::Type::DISK) {
+                lineSet->fillAsCircle(36, 0.5f * args.x, {0.7f, 0.7f, 0.0f, 0.6f});
+                lineSet->setTransform(getDirRotation(dir));
+            }
+            else if (type == Shape::Type::BOX) {
+                int dimCount = 0;
+                for (int i = 0; i < 3; i++) {
+                    dimCount += args.flat[i] > std::numeric_limits<float>::epsilon() ? 1 : 0;
+                }
+
+                const math::vector3f bbmin = -0.5f * args;
+                const math::vector3f bbmax = 0.5f * args;
+                const float alpha = 0.3f + 0.1f * float(std::max(dimCount, 1));
+                lineSet->clear();
+                lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(3,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(4,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(5,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(6,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(7,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(8,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+                lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
+            }
+        }
     }
     
     Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
@@ -97,15 +135,11 @@ namespace game {
         
         return 0.0f;
     }
-    void Shape::generate(const core::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
+    void Shape::generate(const math::vector3f &dir, std::size_t randomSeed, std::size_t amount) {
         util::RandomSource rnd = util::RandomSource(randomSeed, RND_SHAPE_FILL);
         if (type == Type::DISK) {
             points.clear();
-            std::size_t random = randomSeed;
-
-            const float a = math::vector3f(0, 1, 0).angleTo(dir);
-            const math::vector3f axis = math::vector3f(0, 1, 0).cross(dir.normalized()).normalized();
-            const math::transform3f rotation (axis, -a);
+            const math::transform3f rotation = getDirRotation(dir);
 
             // points
             for (std::size_t i = 0; i < amount; i++) {
@@ -119,10 +153,6 @@ namespace game {
                 const math::vector3f poff (r * std::cosf(koeff), 0.0f, r * std::sinf(koeff));
                 points.emplace_back(poff.transformed(rotation)); //
             }
-            
-            // lineset
-            lineSet->fillAsCircle(36, 0.5f * args.x, {0.7f, 0.7f, 0.0f, 0.6f});
-            lineSet->setTransform(rotation);
         }
         else if (type == Type::BOX) {
             points.clear();
@@ -206,24 +236,6 @@ namespace game {
                 }
 
             }
-            
-            // lineset
-            const math::vector3f bbmin = -0.5f * args;
-            const math::vector3f bbmax = 0.5f * args;
-            const float alpha = 0.3f + 0.1f * float(std::max(dimCount, 1));
-            lineSet->clear();
-            lineSet->setLine(0,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(1,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(2,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmin.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(3,  math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmin.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(4,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(5,  math::vector3f(bbmin.x, bbmax.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(6,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(7,  math::vector3f(bbmax.x, bbmax.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(8,  math::vector3f(bbmin.x, bbmin.y, bbmin.z), math::vector3f(bbmin.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(9,  math::vector3f(bbmax.x, bbmin.y, bbmin.z), math::vector3f(bbmax.x, bbmax.y, bbmin.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(10, math::vector3f(bbmax.x, bbmin.y, bbmax.z), math::vector3f(bbmax.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
-            lineSet->setLine(11, math::vector3f(bbmin.x, bbmin.y, bbmax.z), math::vector3f(bbmin.x, bbmax.y, bbmax.z), {0.7f, 0.7f, 0.0f, alpha});
         }
     }
     
@@ -264,19 +276,20 @@ namespace game {
     
     void Emitter::setEndShapeOffset(const math::vector3f &offset) {
         _endShapeOffset = offset;
+        _description.setVector3f("endShapeOffset", offset);
     }
-    
-    void Emitter::refresh(const core::SceneInterface::LineSetPtr &shapeStart, const core::SceneInterface::LineSetPtr &shapeEnd) {
+
+    void Emitter::refresh() {
         // WARNING: editor can only be single-threaded
         foundation::RenderingInterfacePtr rendering = foundation::RenderingInterface::instance(foundation::PlatformInterface::instance());
         _shapeGetRandom = util::RandomSource(_randomSeed, RND_SHAPE_GET);
-        
-        const math::vector3f emitterDir = _endShapeOffset.lengthSq() > 0.1f ? _endShapeOffset.normalized() : math::vector3f{0, 1, 0};
+
+        const math::vector3f emitterDir = getEmitterDir(_endShapeOffset);
         const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
         const std::size_t cyclesInRow = std::size_t(std::ceil((_isLooped ? std::max(_emissionTimeMs, _particleLifeTimeMs) : _emissionTimeMs + _particleLifeTimeMs) / _emissionTimeMs));
         
-        _startShape.generate(shapeStart, emitterDir.normalized(), _randomSeed, 1024);
-        _endShape.generate(shapeEnd, emitterDir.normalized(), _randomSeed, 1024);
+        _startShape.generate(emitterDir, _randomSeed, 1024);
+        _endShape.generate(emitterDir, _randomSeed, 1024);
         
         const std::uint32_t mapTextureWidth = std::uint32_t(cyclesInRow * cycleLength);
         const std::uint32_t mapVerticalCount = std::uint32_t(_particlesToEmit * (_isLooped ? cyclesInRow : 1));
@@ -559,10 +572,18 @@ namespace game {
             math::vector3f off = _endShapeTool->getPosition();
             node->currentDesc->setVector3f("endShapeOffset", off);
             node->emitter.setEndShapeOffset(off);
-            node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
+            node->emitter.refresh();
+            _refreshShapeLinesets(node->emitter);
             _recreateParticles(*node, true);
             _api.platform->sendEditorMsg("engine.ptcEndOffset", util::strstream::ftos(off.x) + " " + util::strstream::ftos(off.y) + " " + util::strstream::ftos(off.z));
         }
+    }
+
+    void EditorParticlesContext::_refreshShapeLinesets(const Emitter &emitter) {
+        const util::Description &desc = emitter.getDescription();
+        const math::vector3f dir = getEmitterDir(desc.getVector3f("endShapeOffset", {}));
+        fillShapeLineset(_shapeStartLineset, static_cast<Shape::Type>(desc.getInteger("startShapeType", 0)), desc.getVector3f("startShapeArgs", {}), dir);
+        fillShapeLineset(_shapeEndLineset, static_cast<Shape::Type>(desc.getInteger("endShapeType", 0)), desc.getVector3f("endShapeArgs", {}), dir);
     }
 
     void EditorParticlesContext::_recreateParticles(EditorNodeParticles &node, bool editing) {
@@ -613,9 +634,10 @@ namespace game {
 
                 node->emitter.setParameters(node->currentDesc.value());
                 node->emitter.setEndShapeOffset(_endShapeTool->getPosition());
-                node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
+                node->emitter.refresh();
+                _refreshShapeLinesets(node->emitter);
                 _recreateParticles(*node, true);
-                
+
                 std::string args = util::Description::serialize(*node->currentDesc);
                 _api.platform->sendEditorMsg("engine.particles.editing", args);
                 return true;
@@ -710,7 +732,8 @@ namespace game {
                 desc.setInteger("particlesToEmit", particlesToEmit);
                 desc.setInteger("randomSeed", rndSeed);
                 node->emitter.setParameters(*node->currentDesc);
-                node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
+                node->emitter.refresh();
+                _refreshShapeLinesets(node->emitter);
                 desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
                 desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
                 desc.setVector2f("maxSize", node->emitter.getMaxSize());
@@ -750,7 +773,8 @@ namespace game {
                 desc.setString("texture", ptcTexture);
                 node->endShapeOffset = endShapeOffset;
                 node->emitter.setParameters(*node->currentDesc);
-                node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
+                node->emitter.refresh();
+                _refreshShapeLinesets(node->emitter);
                 desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
                 desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
                 desc.setVector2f("maxSize", node->emitter.getMaxSize());
@@ -768,7 +792,8 @@ namespace game {
             util::Description &desc = node->currentDesc.value();
             desc.setString(name.c_str(), data);
             node->emitter.setParameters(*node->currentDesc);
-            node->emitter.refresh(_shapeStartLineset, _shapeEndLineset);
+            node->emitter.refresh();
+            _refreshShapeLinesets(node->emitter);
             desc.setVector3f("minXYZ", node->emitter.getMinXYZ());
             desc.setVector3f("maxXYZ", node->emitter.getMaxXYZ());
             desc.setVector2f("maxSize", node->emitter.getMaxSize());

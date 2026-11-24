@@ -56,7 +56,7 @@ namespace game {
         std::vector<math::vector3f> points;
         
         float getMaxSize() const;
-        void generate(const core::SceneInterface::LineSetPtr &lineSet, const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
+        void generate(const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
     };
     
     class Emitter {
@@ -66,7 +66,7 @@ namespace game {
         
         void setParameters(const util::Description &desc);
         void setEndShapeOffset(const math::vector3f &offset);
-        void refresh(const core::SceneInterface::LineSetPtr &shapeStart, const core::SceneInterface::LineSetPtr &shapeEnd);
+        void refresh();
         
         auto getMap() const -> const foundation::RenderTexturePtr & { return _mapTexture; }
         auto getMapRaw() const -> const std::uint8_t * { return _mapData.data(); }
@@ -168,6 +168,7 @@ namespace game {
     private:
         void _clearEditingTools();
         void _endShapeDragFinished();
+        void _refreshShapeLinesets(const Emitter &emitter);
         void _recreateParticles(EditorNodeParticles &node, bool editing);
         bool _selectNode(const std::string &data);
         bool _clearNodeSelection(const std::string &data);
