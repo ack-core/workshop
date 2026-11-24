@@ -39,6 +39,7 @@ namespace game {
 #include "experimental/voxel_meshes.h"
 #include "experimental/uielements.h"
 #include "experimental/collision.h"
+#include "experimental/raycheck.h"
 
 namespace game {
     inline const State STATES[] = {
@@ -59,6 +60,9 @@ namespace game {
         }},
         {"collision", {
             &makeContext<CollisionContext>
+        }},
+        {"raycheck", {
+            &makeContext<RaycheckContext>
         }}
     };
 }
