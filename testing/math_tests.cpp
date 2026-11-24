@@ -282,6 +282,55 @@ namespace test {
         return true;
     }
 
+    bool math_vector_compound_assignment_test(const API &api) {
+        // vector2f
+        math::vector2f v2(8.0f, 6.0f);
+        EXPECT_TRUE(eq2(v2 += {2.0f, 3.0f}, 10.0f, 9.0f));
+        EXPECT_TRUE(eq2(v2 -= 1.0f, 9.0f, 8.0f));
+        EXPECT_TRUE(eq2(v2 *= {2.0f, 0.5f}, 18.0f, 4.0f));
+        EXPECT_TRUE(eq2(v2 /= 2.0f, 9.0f, 2.0f));
+        v2.yx += {1.0f, 2.0f};
+        EXPECT_TRUE(eq2(v2, 11.0f, 3.0f));
+        v2.yx -= v2;
+        EXPECT_TRUE(eq2(v2, 8.0f, -8.0f));
+        v2.yx *= {2.0f, 3.0f};
+        EXPECT_TRUE(eq2(v2, 24.0f, -16.0f));
+        v2.yx /= {4.0f, 8.0f};
+        EXPECT_TRUE(eq2(v2, 3.0f, -4.0f));
+
+        // vector3f
+        math::vector3f v3(8.0f, 6.0f, 4.0f);
+        EXPECT_TRUE(eq3(v3 += {2.0f, 3.0f, 4.0f}, 10.0f, 9.0f, 8.0f));
+        EXPECT_TRUE(eq3(v3 -= 1.0f, 9.0f, 8.0f, 7.0f));
+        EXPECT_TRUE(eq3(v3 *= {2.0f, 0.5f, 2.0f}, 18.0f, 4.0f, 14.0f));
+        EXPECT_TRUE(eq3(v3 /= 2.0f, 9.0f, 2.0f, 7.0f));
+        v3.zx += {1.0f, 2.0f};
+        EXPECT_TRUE(eq3(v3, 11.0f, 2.0f, 8.0f));
+        v3.zyx -= 1.0f;
+        EXPECT_TRUE(eq3(v3, 10.0f, 1.0f, 7.0f));
+        v3.xz *= 2.0f;
+        EXPECT_TRUE(eq3(v3, 20.0f, 1.0f, 14.0f));
+        v3.zx /= {7.0f, 4.0f};
+        EXPECT_TRUE(eq3(v3, 5.0f, 1.0f, 2.0f));
+
+        // vector4f
+        math::vector4f v4(8.0f, 6.0f, 4.0f, 2.0f);
+        EXPECT_TRUE(eq4(v4 += {2.0f, 3.0f, 4.0f, 1.0f}, 10.0f, 9.0f, 8.0f, 3.0f));
+        EXPECT_TRUE(eq4(v4 -= 1.0f, 9.0f, 8.0f, 7.0f, 2.0f));
+        EXPECT_TRUE(eq4(v4 *= {2.0f, 0.5f, 2.0f, 3.0f}, 18.0f, 4.0f, 14.0f, 6.0f));
+        EXPECT_TRUE(eq4(v4 /= 2.0f, 9.0f, 2.0f, 7.0f, 3.0f));
+        v4.wzyx += {1.0f, 2.0f, 3.0f, 4.0f};
+        EXPECT_TRUE(eq4(v4, 13.0f, 5.0f, 9.0f, 4.0f));
+        v4.xyz -= v4.wzy;
+        EXPECT_TRUE(eq4(v4, 9.0f, -4.0f, 4.0f, 4.0f));
+        v4.yw *= -1.0f;
+        EXPECT_TRUE(eq4(v4, 9.0f, 4.0f, 4.0f, -4.0f));
+        v4.wx /= {2.0f, 3.0f};
+        EXPECT_TRUE(eq4(v4, 3.0f, 4.0f, 4.0f, -2.0f));
+
+        return true;
+    }
+
     bool math_vector_dot_cross_test(const API &api) {
         const math::vector2f a2(1.0f, 2.0f);
         const math::vector2f b2(3.0f, 4.0f);
@@ -705,6 +754,7 @@ namespace test {
         REGISTER_UNIT_TEST(math_vector3f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector4f_ctor_assignment_test);
         REGISTER_UNIT_TEST(math_vector_arithmetic_test);
+        REGISTER_UNIT_TEST(math_vector_compound_assignment_test);
         REGISTER_UNIT_TEST(math_vector_dot_cross_test);
         REGISTER_UNIT_TEST(math_vector_length_normalize_test);
         REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
