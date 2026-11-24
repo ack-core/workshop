@@ -1170,6 +1170,82 @@ namespace test {
 }
 
 namespace test {
+    class rendering_indexed_data_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_indexed_data_test>();
+        }
+        void init(const API &api) override {
+            // Two indexed quads from 4 vertexes and 6 indexes: red in the top-left from data, green in the bottom-right from dynamic draw
+            //
+            const char *shaderSrc = R"(
+                const {
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(vertex_position, 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = const_color;
+                }
+            )";
+            const float red[] = { -0.9f, 0.9f, -0.1f, 0.9f, -0.9f, 0.1f, -0.1f, 0.1f };
+            _shader = api.rendering->createShader(shaderSrc, _layout);
+            _data = api.rendering->createData(_layout, red, 4, _indexes, 6);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                const math::vector4f redColor = { 1.0f, 0.0f, 0.0f, 1.0f };
+                const math::vector4f greenColor = { 0.0f, 1.0f, 0.0f, 1.0f };
+                const float green[] = { 0.1f, -0.1f, 0.9f, -0.1f, 0.1f, -0.9f, 0.9f, -0.9f };
+
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.applyShaderConstants(&redColor);
+                rendering.draw(_data);
+                rendering.applyShaderConstants(&greenColor);
+                rendering.draw(green, 4, _indexes, 6);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_data, nullptr);
+            EXPECT_EQ(_data->getVertexCount(), 4);
+            EXPECT_EQ(_data->getIndexCount(), 6);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == 0 && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(35, 35, 255, 0));    // red quad: top-left (1st triangle)
+            EXPECT_TRUE(pixelIs(220, 35, 255, 0));   // red quad: top-right
+            EXPECT_TRUE(pixelIs(35, 220, 255, 0));   // red quad: bottom-left
+            EXPECT_TRUE(pixelIs(220, 220, 255, 0));  // red quad: bottom-right (2nd triangle)
+            EXPECT_TRUE(pixelIs(291, 291, 0, 255));  // green quad: top-left (1st triangle)
+            EXPECT_TRUE(pixelIs(476, 291, 0, 255));  // green quad: top-right
+            EXPECT_TRUE(pixelIs(291, 476, 0, 255));  // green quad: bottom-left
+            EXPECT_TRUE(pixelIs(476, 476, 0, 255));  // green quad: bottom-right (2nd triangle)
+            EXPECT_TRUE(pixelIs(240, 128, 0, 0));    // outside red quad: right
+            EXPECT_TRUE(pixelIs(384, 496, 0, 0));    // outside green quad: bottom
+            EXPECT_TRUE(pixelIs(384, 128, 0, 0));    // empty top-right corner
+            EXPECT_TRUE(pixelIs(128, 384, 0, 0));    // empty bottom-left corner
+            return true;
+        }
+
+    private:
+        const foundation::InputLayout _layout = foundation::InputLayout {
+            .attributes = {
+                {"position", foundation::InputAttributeFormat::FLOAT2},
+            }
+        };
+        const std::uint32_t _indexes[6] = { 0, 1, 2, 2, 1, 3 };
+
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderDataPtr _data;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1188,6 +1264,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_cube_texture_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_depth_behavior_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_partial_data_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_indexed_data_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
