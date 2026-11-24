@@ -12,6 +12,16 @@
 #include <list>
 
 namespace core {
+    struct Environment {
+        math::vector4f sunDirection = math::vector4f(math::vector3f(0.5f, 1.0f, 0.3f).normalized(), 0.0f);
+        math::vector4f sunColor = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+        math::vector4f fogCenter = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+        math::vector4f fogColor = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+        math::vector4f fogRadius = math::vector4f(1000.0f, 2000.0f, 0.0f, 0.0f);
+    };
+}
+
+namespace core {
     class ArrowsImpl : public SceneInterface::Arrows {
     public:
         struct Arrow {
@@ -515,14 +525,6 @@ namespace core {
     };
 
     //---
-
-    struct Environment {
-        math::vector4f sunDirection = math::vector4f(math::vector3f(0.5f, 1.0f, 0.3f).normalized(), 0.0f);
-        math::vector4f sunColor = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
-        math::vector4f fogCenter = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
-        math::vector4f fogColor = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
-        math::vector4f fogRadius = math::vector4f(9000.0f, 10000.0f, 0.0f, 0.0f);
-    };
 
     class ParticleEmitterImpl : public SceneInterface::Particles {
         static constexpr float TYPE_MASK_NEWBORN = 1.0f;
@@ -1088,7 +1090,7 @@ namespace {
             float3 normal = _norm(float3(2.0, 2.0, 2.0) * gbuffer.rgb - float3(1.0, 1.0, 1.0));
             float3 color = _tex2d(0, float2(gbuffer.w, 0)).rgb;
             float3 wpos = getWPos(input_uv, gdepth);
-            float3 wnpos = wpos + 0.1 * normal;
+            float3 wnpos = wpos + 0.05 * normal;
             float  lit = 0.0;
             int3   cell = int3(_floor(wpos * 32.0)) & 15;
             int    offset = 12 * ((fixed_rndo[cell.x].x + fixed_rndo[cell.y].y + fixed_rndo[cell.z].z) % 24);
@@ -1102,7 +1104,7 @@ namespace {
                 lit += _step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z));
             }
 
-            lit = _step(0.0000001, gdepth) * lit / 12.0;
+            lit = lit / 12.0;
             float  t = _sat((_len(wpos - const_fogCenter.xyz) - const_fogRadius.x) / (const_fogRadius.y - const_fogRadius.x));
             float  fog = _select(t * (2.0 - t), 1.0, gdepth < 0.0000001);
             output_color[0] = float4(_lerp(lit * color * const_sunColor.rgb, const_fogColor.rgb, fog), 1);

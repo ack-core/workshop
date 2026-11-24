@@ -985,6 +985,9 @@ namespace math {
         
         return transform3f(r0, r1, r2, r3);
     }
+    inline transform3f transform3f::rotated(const vector3f &axis, scalar radians) const {
+        return *this * transform3f(axis, radians);
+    }
 
     //---
 

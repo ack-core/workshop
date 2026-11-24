@@ -35,6 +35,17 @@ namespace core {
         using ShapePtr = std::shared_ptr<Shape>;
         
     public:
+        // Create shape from a set of elements. Shape lives while user holds its pointer
+        // @desc     - shape description:
+        //             type     : integer, ShapeType value
+        //             points   : vector3f, repeated, element positions in local space
+        //   SPHERES:  radiuses : number, repeated, radius of each sphere with center at points[i]
+        //   BOXES:    sizes    : vector3f, repeated, box with min corner at points[i] - 0.5 and max corner at points[i] + sizes[i] - 0.5
+        // 
+        // @uniqueId - returned in RaycastResult on hit
+        // @mask     - shape is checked only if (mask & rayCast mask) != 0
+        // @return nullptr if type is unknown
+        //
         virtual auto addShape(const util::Description &desc, std::uint64_t uniqueId, std::uint64_t mask = MASK_ALL) -> ShapePtr = 0;
         
         // Check the ray for intersections

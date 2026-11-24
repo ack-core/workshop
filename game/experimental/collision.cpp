@@ -4,15 +4,22 @@ namespace game {
     CollisionContext::CollisionContext(API &&api) : _api(std::move(api)) {
         util::Description playerDesc;
         playerDesc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
-        playerDesc.setNumber("mass", 1.0);
+        playerDesc.setNumber("mass", 3.0);
         playerDesc.setNumber("radius", 0.5);
         _player = _api.simulation->addBody(playerDesc);
+
+        util::Description smallDesc = playerDesc;
+        smallDesc.setNumber("mass", 1.0);
+        smallDesc.setNumber("radius", 0.2);
+        _tied = _api.simulation->addBody(smallDesc);
+        _tied->setTransform(math::transform3f::identity().translated({1, 0, 0}));
+        _tie = _api.simulation->addConstraint(_player, _tied, 1.0f);
 
         _circles.emplace_back(_api.simulation->addBody(playerDesc));
         _circles.back()->setTransform(math::transform3f::identity().translated({-2, 0, 1}));
 
         util::Description bigDesc = playerDesc;
-        bigDesc.setNumber("mass", 4.0);
+        bigDesc.setNumber("mass", 12.0);
         bigDesc.setNumber("radius", 1.0);
         _circles.emplace_back(_api.simulation->addBody(bigDesc));
         _circles.back()->setTransform(math::transform3f::identity().translated({1, 0, -3}));

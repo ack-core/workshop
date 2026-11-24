@@ -54,12 +54,11 @@ namespace core {
             virtual ~Body() = default;
         };
         
-        using BodyPtr = std::shared_ptr<Body>;
-
         struct Constraint {
             virtual ~Constraint() = default;
         };
 
+        using BodyPtr = std::shared_ptr<Body>;
         using ConstraintPtr = std::shared_ptr<Constraint>;
 
     public:

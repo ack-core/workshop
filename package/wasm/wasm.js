@@ -118,6 +118,12 @@ const vertexAttribFunctions = [
     (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 3, glcontext.UNSIGNED_INT, stride, offset); return 12; },
     (index, stride, offset) => { glcontext.vertexAttribIPointer(index, 4, glcontext.UNSIGNED_INT, stride, offset); return 16; },
 ];
+function fixedArraysToUniforms(src, fixedArrays) {
+    return src.replace(/const mediump (\w+) (fixed_\w+)\[(\d+)\] = \w+\[\]\(([\s\S]*?)\);/g, (match, type, name, count, body) => {
+        fixedArrays[name] = { type, data: body.replace(/\/\*.*?\*\/|\w+\(/g, '').match(/-?[\d.]+(e-?\d+)?/g).map(Number) };
+        return `uniform mediump ${type} ${name}[${count}];`;
+    });
+}
 const dtypes = {
     0: function() {},
     1: function() {
@@ -257,8 +263,9 @@ const imports = {
             throw "aborted";
         },
         webgl_createProgram: function(vsrc, vlen, fsrc, flen, suppressErrors) {
-            const vsstr = String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen));
-            const fsstr = String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen));
+            const fixedArrays = {};
+            const vsstr = fixedArraysToUniforms(String.fromCharCode(...new Uint16Array(memory.buffer, vsrc, vlen)), fixedArrays);
+            const fsstr = fixedArraysToUniforms(String.fromCharCode(...new Uint16Array(memory.buffer, fsrc, flen)), fixedArrays);
             const vshader = glcontext.createShader(glcontext.VERTEX_SHADER);
             const fshader = glcontext.createShader(glcontext.FRAGMENT_SHADER);
             const program = glcontext.createProgram();
@@ -284,6 +291,13 @@ const imports = {
                     program.uniformSamplersLocation = glcontext.getUniformLocation(program, "_samplers");
                     program.uniformSamplerLocations = [0, 1, 2, 3].map(i => glcontext.getUniformLocation(program, "_sampler" + i));
                     program.uniformInstanceCountLocation = glcontext.getUniformLocation(program, "_instance_count");
+
+                    glcontext.useProgram(program);
+                    for (const [name, {type, data}] of Object.entries(fixedArrays)) {
+                        const kind = type[0] == 'i' ? 'iv' : type[0] == 'u' ? 'uiv' : 'fv';
+                        const uniformFunction = glcontext['uniform' + (type.match(/\d$/)?.[0] ?? '1') + kind].bind(glcontext);
+                        uniformFunction(glcontext.getUniformLocation(program, name), data);
+                    }
 
                     if (glcontext.getProgramParameter(program, glcontext.LINK_STATUS)) {
                         glcontext.deleteShader(vshader);

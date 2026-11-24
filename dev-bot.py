@@ -8,8 +8,8 @@ import sys
 import time
 
 LOOP_WAIT_MAX_SEC = 120
-OPEN_PR_MAX = 3
-CANDIDATES_MIN = 10
+OPEN_PR_MAX = 6
+CANDIDATES_MIN = 20
 USAGE_LIMIT_MAX = 0.75
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_PATH = os.path.join(REPO_ROOT, "tmp", "tests-coverage-report.txt")
