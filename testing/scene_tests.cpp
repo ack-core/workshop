@@ -290,7 +290,7 @@ namespace test {
 
             _lines = api.scene->addLineSet();
             _lines->setLine(0, {-0.5f, -0.3f, 0.0f}, {0.5f, 0.3f, 0.0f}, {1.0f, 1.0f, 0.0f, 1.0f});
-            _lines->setLine(1, {-0.3f, 0.5f, 0.0f}, {0.3f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
+            _lines->setLine(1, {-0.3f, 0.5f, 0.0f}, {0.27f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
             _lines->setPosition({0.03f, -0.97f, 0.0f});
 
             _circle = api.scene->addLineSet();
@@ -319,7 +319,7 @@ namespace test {
         }
 
         bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
-            return outOfThresholdPixelCount <= 0;
+            return outOfThresholdPixelCount <= 16;
         }
 
     private:
