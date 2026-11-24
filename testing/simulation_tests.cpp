@@ -204,6 +204,32 @@ namespace test {
         EXPECT_TRUE(circle->getTransform().v3.z > 0.0f);
         return true;
     }
+
+    bool simulationBodyProperties(const API &api) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
+        core::SimulationInterface::BodyPtr defaultCircle = api.simulation->addBody(desc);
+        core::SimulationInterface::BodyPtr circle = addTestCircle(api, {0, 0, 0}, {2, 3, -1});
+        core::SimulationInterface::BodyPtr wall = addTestWall(api);
+        EXPECT_EQ_F(defaultCircle->getRadius(), 1.0f);
+        EXPECT_EQ_F(circle->getRadius(), 0.5f);
+
+        EXPECT_EQ_F(circle->getVelocity().x, 2.0f);
+        EXPECT_EQ_F(circle->getVelocity().y, 0.0f);
+        EXPECT_EQ_F(circle->getVelocity().z, -1.0f);
+
+        defaultCircle->setEnabled(false);
+        api.simulation->update(0.5f);
+        EXPECT_EQ_F(circle->getVelocity().x, 2.0f);
+        EXPECT_EQ_F(circle->getVelocity().y, 0.0f);
+        EXPECT_EQ_F(circle->getVelocity().z, -1.0f);
+
+        wall->setVelocity({1, 0, 1});
+        EXPECT_EQ_F(wall->getVelocity().x, 0.0f);
+        EXPECT_EQ_F(wall->getVelocity().y, 0.0f);
+        EXPECT_EQ_F(wall->getVelocity().z, 0.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -217,5 +243,6 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCirclesCollision);
         REGISTER_UNIT_TEST(simulationCirclesDistanceConstraint);
         REGISTER_UNIT_TEST(simulationCircleObstacleDistanceConstraint);
+        REGISTER_UNIT_TEST(simulationBodyProperties);
     }
 }
