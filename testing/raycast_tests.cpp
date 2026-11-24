@@ -148,6 +148,29 @@ namespace test {
         EXPECT_EQ_F(right.normal.x, 1.0f);
         return true;
     }
+
+    bool raycast_shape_lifetime_test(const API &api) {
+        util::Description desc;
+        desc.setVector3f("points", math::vector3f(60.0f, 0.0f, 5.0f));
+        desc.setNumber("radiuses", 1.0);
+        EXPECT_EQ(api.raycast->addShape(desc, 31), nullptr);
+
+        desc.setInteger("type", std::int64_t(core::RaycastInterface::ShapeType::SPHERES));
+        core::RaycastInterface::ShapePtr released = api.raycast->addShape(desc, 31);
+        desc.setVector3f("points", math::vector3f(60.0f, 0.0f, 10.0f));
+        const core::RaycastInterface::ShapePtr kept = api.raycast->addShape(desc, 32);
+        released = nullptr;
+
+        const math::vector3f start = math::vector3f(60.0f, 0.0f, 0.0f);
+        const math::vector3f dir = math::vector3f(0.0f, 0.0f, 1.0f);
+        EXPECT_EQ(api.raycast->rayCast(start, dir, 20.0f).uniqueId, 31u);
+
+        api.raycast->update(0.0f);
+        const core::RaycastInterface::RaycastResult hit = api.raycast->rayCast(start, dir, 20.0f);
+        EXPECT_EQ(hit.uniqueId, 32u);
+        EXPECT_EQ_F(hit.point.z, 9.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -157,5 +180,6 @@ namespace test {
         REGISTER_UNIT_TEST(raycast_mask_and_enabled_test);
         REGISTER_UNIT_TEST(raycast_compound_spheres_test);
         REGISTER_UNIT_TEST(raycast_compound_boxes_test);
+        REGISTER_UNIT_TEST(raycast_shape_lifetime_test);
     }
 }
