@@ -1,6 +1,5 @@
 
 // TODO: + default transform enum constant
-//       + +=, *=, etc
 //       + xOz
 
 // Basic math for games
@@ -34,6 +33,10 @@ namespace math {
     template<int Ix, int Iy> struct swizzle2f {
         vector2f &operator=(const swizzle2f &other);
         template<int Ox, int Oy> vector2f &operator=(const swizzle2f<Ox, Oy> &other);
+        vector2f &operator+=(vector2f other);
+        vector2f &operator-=(vector2f other);
+        vector2f &operator*=(vector2f other);
+        vector2f &operator/=(vector2f other);
         operator vector2f() const;
         
         scalar (&asFlat())[4] {
@@ -64,6 +67,10 @@ namespace math {
     template<int Ix, int Iy, int Iz> struct swizzle3f {
         vector3f &operator=(const swizzle3f &other);
         template<int Ox, int Oy, int Oz> vector3f &operator=(const swizzle3f<Ox, Oy, Oz> &other);
+        vector3f &operator+=(vector3f other);
+        vector3f &operator-=(vector3f other);
+        vector3f &operator*=(vector3f other);
+        vector3f &operator/=(vector3f other);
         operator vector3f() const;
 
         scalar (&asFlat())[4] {
@@ -94,6 +101,10 @@ namespace math {
     template<int Ix, int Iy, int Iz, int Iw> struct swizzle4f {
         vector4f &operator=(const swizzle4f &other);
         template<int Ox, int Oy, int Oz, int Ow> vector4f &operator=(const swizzle4f<Ox, Oy, Oz, Ow> &other);
+        vector4f &operator+=(vector4f other);
+        vector4f &operator-=(vector4f other);
+        vector4f &operator*=(vector4f other);
+        vector4f &operator/=(vector4f other);
         operator vector4f() const;
 
         scalar (&asFlat())[4] {
@@ -424,7 +435,80 @@ namespace math {
         flat[Ix] = other[Ox]; flat[Iy] = other[Oy]; flat[Iz] = other[Oz]; flat[Iw] = other[Ow];
         return *reinterpret_cast<vector4f *>(this);
     }
-    
+
+    template<int Ix, int Iy>
+    inline vector2f &swizzle2f<Ix, Iy>::operator+=(vector2f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] += other.x; flat[Iy] += other.y;
+        return *reinterpret_cast<vector2f *>(this);
+    }
+    template<int Ix, int Iy>
+    inline vector2f &swizzle2f<Ix, Iy>::operator-=(vector2f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] -= other.x; flat[Iy] -= other.y;
+        return *reinterpret_cast<vector2f *>(this);
+    }
+    template<int Ix, int Iy>
+    inline vector2f &swizzle2f<Ix, Iy>::operator*=(vector2f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] *= other.x; flat[Iy] *= other.y;
+        return *reinterpret_cast<vector2f *>(this);
+    }
+    template<int Ix, int Iy>
+    inline vector2f &swizzle2f<Ix, Iy>::operator/=(vector2f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] /= other.x; flat[Iy] /= other.y;
+        return *reinterpret_cast<vector2f *>(this);
+    }
+    template<int Ix, int Iy, int Iz>
+    inline vector3f &swizzle3f<Ix, Iy, Iz>::operator+=(vector3f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] += other.x; flat[Iy] += other.y; flat[Iz] += other.z;
+        return *reinterpret_cast<vector3f *>(this);
+    }
+    template<int Ix, int Iy, int Iz>
+    inline vector3f &swizzle3f<Ix, Iy, Iz>::operator-=(vector3f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] -= other.x; flat[Iy] -= other.y; flat[Iz] -= other.z;
+        return *reinterpret_cast<vector3f *>(this);
+    }
+    template<int Ix, int Iy, int Iz>
+    inline vector3f &swizzle3f<Ix, Iy, Iz>::operator*=(vector3f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] *= other.x; flat[Iy] *= other.y; flat[Iz] *= other.z;
+        return *reinterpret_cast<vector3f *>(this);
+    }
+    template<int Ix, int Iy, int Iz>
+    inline vector3f &swizzle3f<Ix, Iy, Iz>::operator/=(vector3f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] /= other.x; flat[Iy] /= other.y; flat[Iz] /= other.z;
+        return *reinterpret_cast<vector3f *>(this);
+    }
+    template<int Ix, int Iy, int Iz, int Iw>
+    inline vector4f &swizzle4f<Ix, Iy, Iz, Iw>::operator+=(vector4f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] += other.x; flat[Iy] += other.y; flat[Iz] += other.z; flat[Iw] += other.w;
+        return *reinterpret_cast<vector4f *>(this);
+    }
+    template<int Ix, int Iy, int Iz, int Iw>
+    inline vector4f &swizzle4f<Ix, Iy, Iz, Iw>::operator-=(vector4f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] -= other.x; flat[Iy] -= other.y; flat[Iz] -= other.z; flat[Iw] -= other.w;
+        return *reinterpret_cast<vector4f *>(this);
+    }
+    template<int Ix, int Iy, int Iz, int Iw>
+    inline vector4f &swizzle4f<Ix, Iy, Iz, Iw>::operator*=(vector4f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] *= other.x; flat[Iy] *= other.y; flat[Iz] *= other.z; flat[Iw] *= other.w;
+        return *reinterpret_cast<vector4f *>(this);
+    }
+    template<int Ix, int Iy, int Iz, int Iw>
+    inline vector4f &swizzle4f<Ix, Iy, Iz, Iw>::operator/=(vector4f other) {
+        scalar (&flat)[4] = asFlat();
+        flat[Ix] /= other.x; flat[Iy] /= other.y; flat[Iz] /= other.z; flat[Iw] /= other.w;
+        return *reinterpret_cast<vector4f *>(this);
+    }
+
     template<int Ix, int Iy>
     inline swizzle2f<Ix, Iy>::operator vector2f() const {
         const scalar (&flat)[4] = asFlat();
