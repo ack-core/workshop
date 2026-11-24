@@ -34,6 +34,9 @@ namespace core {
         void setMovable(bool value) override {
             movable = value;
         }
+        SimulationInterface::ShapeType getType() const override {
+            return SimulationInterface::ShapeType::CircleXZ;
+        }
         float getRadius() const override {
             return radius;
         }
@@ -93,6 +96,9 @@ namespace core {
             enabled = value;
         }
         void setMovable(bool value) override {}
+        SimulationInterface::ShapeType getType() const override {
+            return SimulationInterface::ShapeType::ObstaclePolygonXZ;
+        }
         float getRadius() const override {
             return 0.0f;
         }
@@ -231,8 +237,8 @@ namespace core {
                     info.normal = math::vector3f(d.x / current, 0.0f, d.z / current);
                     info.penetration = distance - current;
 
-                    if (CircleXZImpl *otherCircle = dynamic_cast<CircleXZImpl *>(other.get())) {
-                        resolveCollisionCircleCircleXZ(info, *circle, *otherCircle);
+                    if (other->getType() == SimulationInterface::ShapeType::CircleXZ) {
+                        resolveCollisionCircleCircleXZ(info, *circle, static_cast<CircleXZImpl &>(*other));
                     }
                     else if (circle->movable) {
                         circle->transform.v3.xyz -= info.normal * info.penetration;
@@ -269,18 +275,14 @@ namespace core {
             return result;
         }
         auto addConstraint(const BodyPtr &a, const BodyPtr &b, float distance) -> ConstraintPtr override {
-            std::shared_ptr<CircleXZImpl> circle = std::dynamic_pointer_cast<CircleXZImpl>(a);
-            std::shared_ptr<CollisionBodyBase> other = std::dynamic_pointer_cast<CollisionBodyBase>(b);
-
-            if (circle == nullptr) {
-                circle = std::dynamic_pointer_cast<CircleXZImpl>(b);
-                other = std::dynamic_pointer_cast<CollisionBodyBase>(a);
-            }
-            if (circle == nullptr || other == nullptr || a == b) {
+            if (a == nullptr || b == nullptr || a == b || (a->getType() != ShapeType::CircleXZ && b->getType() != ShapeType::CircleXZ)) {
                 _platform->logError("[SimulationInterfaceImpl::addConstraint] Invalid bodies");
                 return nullptr;
             }
-            return _constraints.emplace_back(std::make_shared<DistanceConstraintImpl>(circle, other, distance));
+            if (a->getType() != ShapeType::CircleXZ) {
+                return addConstraint(b, a, distance);
+            }
+            return _constraints.emplace_back(std::make_shared<DistanceConstraintImpl>(std::static_pointer_cast<CircleXZImpl>(a), std::static_pointer_cast<CollisionBodyBase>(b), distance));
         }
         void setGravity(const math::vector3f &gravity) override {
             _gravity = gravity;

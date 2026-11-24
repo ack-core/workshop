@@ -29,6 +29,7 @@ namespace core {
             //
             virtual void setMovable(bool movable) = 0;
 
+            virtual auto getType() const -> ShapeType = 0;
             virtual auto getRadius() const -> float = 0;
             virtual auto getTransform() const -> const math::transform3f = 0;
 
@@ -77,8 +78,6 @@ namespace core {
         virtual auto addBody(const util::Description &desc) -> BodyPtr = 0;
 
         // Create rigid constraint keeping two bodies at fixed XZ distance. Constraint lives while user holds its pointer
-        // Supported pairs: CircleXZ + CircleXZ, CircleXZ + ObstaclePolygonXZ (in any order). Obstacle is tied by its translation
-        // @return nullptr if a body is null, both bodies are obstacles or a and b are the same body
         //
         virtual auto addConstraint(const BodyPtr &a, const BodyPtr &b, float distance) -> ConstraintPtr = 0;
 
