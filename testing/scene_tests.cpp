@@ -273,6 +273,60 @@ namespace test {
         core::SceneInterfacePtr _scene;
         std::vector<core::SceneInterface::VoxelMeshPtr> _meshes;
     };
+
+    class scene_arrows_and_line_set_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_arrows_and_line_set_test>();
+        }
+        void init(const API &api) override {
+            api.scene->setLinesDrawingEnabled(true);
+            api.scene->setCameraLookAt({0.0f, 0.0f, 6.0f}, {0.0f, 0.0f, 0.0f});
+
+            _arrows = api.scene->addArrows();
+            _arrows->setArrow(0, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
+            _arrows->setArrow(1, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f});
+            _arrows->setPosition({-2.0f, 0.5f, 0.0f});
+
+            _lines = api.scene->addLineSet();
+            _lines->setLine(0, {-0.5f, -0.5f, 0.0f}, {0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 0.0f, 1.0f});
+            _lines->setLine(1, {-0.5f, 0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
+            _lines->setPosition({0.0f, -1.0f, 0.0f});
+
+            _circle = api.scene->addLineSet();
+            _circle->fillAsCircle(32, 0.5f, {1.0f, 0.0f, 1.0f, 1.0f});
+            _circle->setTransform(math::transform3f::identity().scaled({2.0f, 1.0f, 1.0f}).translated({1.5f, 1.0f, 0.0f}));
+
+            _hiddenArrows = api.scene->addArrows();
+            _hiddenArrows->setArrow(0, {0.0f, -2.0f, 0.0f}, {0.0f, 2.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f});
+            _hiddenArrows->setEnabled(false);
+
+            _clearedArrows = api.scene->addArrows();
+            _clearedArrows->setArrow(0, {-2.0f, -2.0f, 0.0f}, {2.0f, 2.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f});
+            _clearedArrows->clear();
+
+            _hiddenLines = api.scene->addLineSet();
+            _hiddenLines->fillAsCircle(16, 1.5f, {1.0f, 1.0f, 1.0f, 1.0f});
+            _hiddenLines->setEnabled(false);
+
+            _clearedLines = api.scene->addLineSet();
+            _clearedLines->setLine(0, {-2.0f, 2.0f, 0.0f}, {2.0f, -2.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f});
+            _clearedLines->clear();
+        }
+        void updateAndDraw(const API &api) override {}
+        std::pair<std::uint8_t, std::uint16_t> getThresholdAndMaxDiff() const override {
+            return {4, 128};
+        }
+
+    private:
+        core::SceneInterface::ArrowsPtr _arrows;
+        core::SceneInterface::LineSetPtr _lines;
+        core::SceneInterface::LineSetPtr _circle;
+        core::SceneInterface::ArrowsPtr _hiddenArrows;
+        core::SceneInterface::ArrowsPtr _clearedArrows;
+        core::SceneInterface::LineSetPtr _hiddenLines;
+        core::SceneInterface::LineSetPtr _clearedLines;
+    };
 }
 
 namespace test {
@@ -285,5 +339,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
     }
 }
