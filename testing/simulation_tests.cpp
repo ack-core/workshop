@@ -170,6 +170,40 @@ namespace test {
         EXPECT_EQ_F(untouched->getTransform().v3.x, 0.6f);
         return true;
     }
+
+    bool simulationCirclesDistanceConstraint(const API &api) {
+        core::SimulationInterface::BodyPtr pushed = addTestCircle(api, {0, 0, 0}, {1, 0, 0});
+        core::SimulationInterface::BodyPtr follower = addTestCircle(api, {2, 0, 0}, {0, 0, 0});
+        core::SimulationInterface::ConstraintPtr constraint = api.simulation->addConstraint(pushed, follower, 2.0f);
+        EXPECT_TRUE(constraint != nullptr);
+        EXPECT_TRUE(api.simulation->addConstraint(pushed, pushed, 2.0f) == nullptr);
+
+        for (int i = 0; i < 10; i++) {
+            api.simulation->update(0.1f);
+            const math::vector3f d = follower->getTransform().v3.xyz - pushed->getTransform().v3.xyz;
+            EXPECT_LT(std::fabs(d.xz.length() - 2.0f), 1.0e-4f);
+        }
+
+        EXPECT_TRUE(follower->getTransform().v3.x > 2.0f);
+        return true;
+    }
+
+    bool simulationCircleObstacleDistanceConstraint(const API &api) {
+        core::SimulationInterface::BodyPtr wall = addTestWall(api);
+        core::SimulationInterface::BodyPtr circle = addTestCircle(api, {-2, 0, 0}, {0, 0, 1});
+        wall->setTransform(math::transform3f::identity());
+        core::SimulationInterface::ConstraintPtr constraint = api.simulation->addConstraint(wall, circle, 2.0f);
+        EXPECT_TRUE(constraint != nullptr);
+        EXPECT_TRUE(api.simulation->addConstraint(wall, addTestWall(api), 2.0f) == nullptr);
+
+        for (int i = 0; i < 10; i++) {
+            api.simulation->update(0.1f);
+            EXPECT_LT(std::fabs(circle->getTransform().v3.xz.length() - 2.0f), 1.0e-4f);
+        }
+
+        EXPECT_TRUE(circle->getTransform().v3.z > 0.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -181,5 +215,7 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleGravity);
         REGISTER_UNIT_TEST(simulationCircleGravityParabola);
         REGISTER_UNIT_TEST(simulationCirclesCollision);
+        REGISTER_UNIT_TEST(simulationCirclesDistanceConstraint);
+        REGISTER_UNIT_TEST(simulationCircleObstacleDistanceConstraint);
     }
 }
