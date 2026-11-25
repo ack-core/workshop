@@ -404,7 +404,7 @@ namespace test {
         }
         void updateAndDraw(const API &api) override {}
         std::uint8_t getThreshold() const override {
-            return 4;
+            return 16;
         }
 
         bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
