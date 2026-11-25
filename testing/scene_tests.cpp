@@ -85,6 +85,37 @@ namespace test {
         EXPECT_LT(std::fabs(shiftedDir.z - expectedDir.z), 1.0e-4f);
         return true;
     }
+
+    bool scene_voxel_mesh_frames_test(const API &api) {
+        struct Voxel {
+            std::int16_t positionX, positionY, positionZ;
+            std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
+        };
+        const Voxel voxel = {0, 0, 0, 10, 0x3f, 1, 1, 1, 0};
+        const util::Description desc = util::Description::parse("offset : vector3f = 1 2 3\nname : string = \"box\"");
+        core::SceneInterface::VoxelMeshPtr mesh = api.scene->addVoxelMesh({
+            api.rendering->createData(layouts::VTXMVOX, &voxel, 1),
+            api.rendering->createData(layouts::VTXMVOX, &voxel, 1),
+            api.rendering->createData(layouts::VTXMVOX, &voxel, 1),
+        }, desc);
+
+        EXPECT_EQ(mesh->getFrameCount(), 3u);
+        EXPECT_EQ(*mesh->getDescription().getString("name"), "box");
+        EXPECT_EQ_F(mesh->getCenterOffset().x, 1.0f);
+        EXPECT_EQ_F(mesh->getCenterOffset().y, 2.0f);
+        EXPECT_EQ_F(mesh->getCenterOffset().z, 3.0f);
+
+        mesh->setCenterOffset({4.0f, -5.0f, 6.0f});
+        EXPECT_EQ_F(mesh->getCenterOffset().x, 4.0f);
+        EXPECT_EQ_F(mesh->getCenterOffset().y, -5.0f);
+        EXPECT_EQ_F(mesh->getCenterOffset().z, 6.0f);
+
+        mesh->resetOffset();
+        EXPECT_EQ_F(mesh->getCenterOffset().x, 1.0f);
+        EXPECT_EQ_F(mesh->getCenterOffset().y, 2.0f);
+        EXPECT_EQ_F(mesh->getCenterOffset().z, 3.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -231,6 +262,47 @@ namespace test {
         core::SceneInterface::VoxelMeshPtr _mesh;
     };
 
+    class scene_voxel_mesh_set_frame_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_voxel_mesh_set_frame_test>();
+        }
+        void init(const API &api) override {
+            struct Voxel {
+                std::int16_t positionX, positionY, positionZ;
+                std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
+            };
+            const Voxel frame0[] = {
+                {0, 0, 0, 10, 0x3f, 1, 1, 1, 0},
+            };
+            const Voxel frame1[] = {
+                {0, 0, 0, 40, 0x3f, 1, 1, 1, 0},
+                {0, 1, 0, 40, 0x3f, 1, 1, 1, 0},
+            };
+            api.scene->setCameraLookAt({10.0f, 10.0f, 10.0f}, {0.0f, 0.0f, 0.0f});
+            for (int i = 0; i < 3; i++) {
+                _meshes[i] = api.scene->addVoxelMesh({
+                    api.rendering->createData(layouts::VTXMVOX, frame0, 1),
+                    api.rendering->createData(layouts::VTXMVOX, frame1, 2),
+                }, {});
+                _meshes[i]->setPosition({float(i * 3 - 3), 0.0f, float(3 - i * 3)});
+            }
+            _meshes[1]->setFrame(1);
+            _meshes[2]->setFrame(5);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::VoxelMeshPtr _meshes[3];
+    };
+
     class scene_bounding_shapes_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -372,10 +444,12 @@ namespace test {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
         REGISTER_UNIT_TEST(scene_screen_world_projection_test);
+        REGISTER_UNIT_TEST(scene_voxel_mesh_frames_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_scale_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_set_frame_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
