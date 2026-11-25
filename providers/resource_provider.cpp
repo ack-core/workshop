@@ -14,7 +14,7 @@ namespace {
 
     struct TextureAsyncContext {
         ByteDataPtr data;
-        std::uint32_t w, h;
+        std::uint32_t w, h, bytesPerPixel;
         foundation::RenderTextureFormat format;
     };
     struct MeshAsyncContext {
@@ -61,6 +61,36 @@ namespace {
 
     static_assert(sizeof(MeshAsyncContext::VTXMVOX) == 12, "");
     
+    const char *readTexture(TextureAsyncContext &ctx, const std::uint8_t *data, std::size_t len) {
+        const char *error = "is not a valid png file";
+        upng_t *upng = upng_new_from_bytes(data, (unsigned long)(len));
+        if (upng != nullptr && *reinterpret_cast<const unsigned *>(data) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
+            error = "must have a valid format (rgba8, lum8)";
+            ctx.format = foundation::RenderTextureFormat::UNKNOWN;
+
+            if (upng_get_format(upng) == UPNG_RGBA8) {
+                ctx.format = foundation::RenderTextureFormat::RGBA8UN;
+                ctx.bytesPerPixel = 4;
+            }
+            else if (upng_get_format(upng) == UPNG_LUMINANCE8) {
+                ctx.format = foundation::RenderTextureFormat::R8UN;
+                ctx.bytesPerPixel = 1;
+            }
+
+            if (ctx.format != foundation::RenderTextureFormat::UNKNOWN) {
+                ctx.w = upng_get_width(upng);
+                ctx.h = upng_get_height(upng);
+                ctx.data = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h * ctx.bytesPerPixel);
+                std::memcpy(ctx.data.get(), upng_get_buffer(upng), ctx.w * ctx.h * ctx.bytesPerPixel);
+                error = nullptr;
+            }
+        }
+        if (upng != nullptr) {
+            upng_free(upng);
+        }
+        return error;
+    }
+
     bool readEmitter(const std::uint8_t *data, util::Description &desc, size_t &read) {
         const std::uint8_t *origin = data;
         if (memcmp(data, "EMTR", 4) == 0) {
@@ -273,6 +303,7 @@ namespace resource {
         auto getGroundInfo(const char *groundPath) -> const GroundInfo * override;
         
         void getOrLoadTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
+        void getOrLoadCubeTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) override;
         void getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) override;
         void getOrLoadGround(const char *groundPath, util::callback<void(const foundation::RenderDataPtr &, const foundation::RenderTexturePtr &, const GroundMapDescription &)> &&completion) override;
         void getOrLoadEmitter(const char *descPath, util::callback<void(const util::Description &, const foundation::RenderTexturePtr &, const foundation::RenderTexturePtr &)> &&completion) override;
@@ -282,6 +313,7 @@ namespace resource {
         auto getPrefab(const char *prefabPath) -> const std::unique_ptr<util::Description> & override;
         
         void removeTexture(const char *texturePath) override;
+        void removeCubeTexture(const char *texturePath) override;
         void removeMesh(const char *meshPath) override;
         void removeGround(const char *groundPath) override;
         void removeEmitter(const char *configPath) override;
@@ -320,6 +352,7 @@ namespace resource {
         };
         
         std::unordered_map<std::string, TextureData> _textures;
+        std::unordered_map<std::string, TextureData> _cubeTextures;
         std::unordered_map<std::string, VoxelMesh> _meshes;
         std::unordered_map<std::string, GroundMesh> _grounds;
         std::unordered_map<std::string, Emitter> _emitters;
@@ -349,6 +382,7 @@ namespace resource {
         };
 
         std::list<QueueEntryTexture> _callsQueueTexture;
+        std::list<QueueEntryTexture> _callsQueueCubeTexture;
         std::list<QueueEntryMesh> _callsQueueMesh;
         std::list<QueueEntryGround> _callsQueueGround;
         std::list<QueueEntryEmitter> _callsQueueEmitter;
@@ -409,35 +443,8 @@ namespace resource {
                         self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<TextureAsyncContext>>([weak, path, mem = std::move(mem), len](TextureAsyncContext &ctx) {
                             //--- worker thread ---
                             if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
-                                upng_t *upng = upng_new_from_bytes(mem.get(), (unsigned long)(len));
-                                if (upng != nullptr && *reinterpret_cast<const unsigned *>(mem.get()) == UPNG_HEAD && upng_decode(upng) == UPNG_EOK) {
-                                    foundation::RenderTextureFormat format = foundation::RenderTextureFormat::UNKNOWN;
-                                    std::uint32_t bytesPerPixel = 0;
-                                    
-                                    if (upng_get_format(upng) == UPNG_RGBA8) {
-                                        format = foundation::RenderTextureFormat::RGBA8UN;
-                                        bytesPerPixel = 4;
-                                    }
-                                    else if (upng_get_format(upng) == UPNG_LUMINANCE8) {
-                                        format = foundation::RenderTextureFormat::R8UN;
-                                        bytesPerPixel = 1;
-                                    }
-                                    
-                                    if (format != foundation::RenderTextureFormat::UNKNOWN) {
-                                        ctx.format = format;
-                                        ctx.w = upng_get_width(upng);
-                                        ctx.h = upng_get_height(upng);
-                                        ctx.data = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h * bytesPerPixel);
-                                        std::memcpy(ctx.data.get(), upng_get_buffer(upng), ctx.w * ctx.h * bytesPerPixel);
-                                    }
-                                    else {
-                                        self->_platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' must have a valid format (rgba8, lum8)", path.data());
-                                    }
-                                    
-                                    upng_free(upng);
-                                }
-                                else {
-                                    self->_platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' is not a valid png file", path.data());
+                                if (const char *error = readTexture(ctx, mem.get(), len)) {
+                                    self->_platform->logError("[TextureProviderImpl::getOrLoadTexture] '%s' %s", path.data(), error);
                                 }
                             }
                             //--- worker thread ---
@@ -468,7 +475,87 @@ namespace resource {
             });
         }
     }
-        
+
+    void ResourceProviderImpl::getOrLoadCubeTexture(const char *texPath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) {
+        if (_asyncInProgress) {
+            _callsQueueCubeTexture.emplace_back(QueueEntryTexture {
+                .texPath = texPath,
+                .callbackPtr = std::move(completion)
+            });
+
+            return;
+        }
+
+        std::string path = std::string(texPath);
+
+        auto index = _cubeTextures.find(path);
+        if (index != _cubeTextures.end() && index->second.outdated == false) {
+            completion(index->second.ptr);
+        }
+        else {
+            _asyncInProgress = true;
+            _platform->loadFile((path + ".png").data(), [weak = weak_from_this(), path, completion = std::move(completion)](ByteDataPtr &&mem, std::size_t len) mutable {
+                if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                    if (len) {
+                        self->_platform->executeAsync(std::make_unique<foundation::CommonAsyncTask<TextureAsyncContext>>([weak, path, mem = std::move(mem), len](TextureAsyncContext &ctx) {
+                            //--- worker thread ---
+                            if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                if (const char *error = readTexture(ctx, mem.get(), len)) {
+                                    self->_platform->logError("[TextureProviderImpl::getOrLoadCubeTexture] '%s' %s", path.data(), error);
+                                }
+                                else if (ctx.w != 6 * ctx.h) {
+                                    self->_platform->logError("[TextureProviderImpl::getOrLoadCubeTexture] '%s' width must be 6 times its height", path.data());
+                                    ctx.data = nullptr;
+                                }
+                                else {
+                                    const std::uint32_t faceRowSize = ctx.h * ctx.bytesPerPixel;
+                                    ByteDataPtr faces = std::make_unique<std::uint8_t[]>(ctx.w * ctx.h * ctx.bytesPerPixel);
+
+                                    for (std::uint32_t f = 0; f < 6; f++) {
+                                        for (std::uint32_t y = 0; y < ctx.h; y++) {
+                                            std::memcpy(faces.get() + (f * ctx.h + y) * faceRowSize, ctx.data.get() + (y * 6 + f) * faceRowSize, faceRowSize);
+                                        }
+                                    }
+
+                                    ctx.data = std::move(faces);
+                                    ctx.w = ctx.h;
+                                }
+                            }
+                            //--- worker thread ---
+                        },
+                        [weak, path, completion = std::move(completion)](TextureAsyncContext &ctx) {
+                            if (std::shared_ptr<ResourceProviderImpl> self = weak.lock()) {
+                                self->_asyncInProgress = false;
+
+                                if (ctx.data) {
+                                    const std::uint32_t faceSize = ctx.w * ctx.h * ctx.bytesPerPixel;
+                                    const void *faces[6];
+                                    for (std::uint32_t f = 0; f < 6; f++) {
+                                        faces[f] = ctx.data.get() + f * faceSize;
+                                    }
+
+                                    self->_cubeTextures.erase(path);
+                                    TextureData &texture = self->_cubeTextures.emplace(path, TextureData{ctx.w, ctx.h, ctx.format}).first->second;
+                                    texture.ptr = self->_rendering->createCubeTexture(ctx.format, ctx.w, ctx.h, faces);
+                                    completion(texture.ptr);
+                                }
+                                else {
+                                    self->_platform->logError("[TextureProviderImpl::getOrLoadCubeTexture] Async operation has failed for file '%s'", path.data());
+                                    completion(nullptr);
+                                }
+                            }
+                        }));
+                    }
+                    else {
+                        self->_asyncInProgress = false;
+                        self->_platform->logError("[TextureProviderImpl::getOrLoadCubeTexture] Unable to find file '%s'", path.data());
+                        completion(nullptr);
+                    }
+                }
+            });
+        }
+    }
+
     void ResourceProviderImpl::getOrLoadVoxelMesh(const char *meshPath, util::callback<void(const std::vector<foundation::RenderDataPtr> &, const util::Description &)> &&completion) {
         if (_asyncInProgress) {
             _callsQueueMesh.emplace_back(QueueEntryMesh {
@@ -740,6 +827,12 @@ namespace resource {
             index->second.outdated = true;
         }
     }
+    void ResourceProviderImpl::removeCubeTexture(const char *texturePath) {
+        auto index = _cubeTextures.find(texturePath);
+        if (index != _cubeTextures.end()) {
+            index->second.outdated = true;
+        }
+    }
     void ResourceProviderImpl::removeMesh(const char *meshPath) {
         auto index = _meshes.find(meshPath);
         if (index != _meshes.end()) {
@@ -770,6 +863,11 @@ namespace resource {
             QueueEntryTexture &entry = _callsQueueTexture.front();
             getOrLoadTexture(entry.texPath.data(), std::move(entry.callbackPtr));
             _callsQueueTexture.pop_front();
+        }
+        while (_asyncInProgress == false && _callsQueueCubeTexture.size()) {
+            QueueEntryTexture &entry = _callsQueueCubeTexture.front();
+            getOrLoadCubeTexture(entry.texPath.data(), std::move(entry.callbackPtr));
+            _callsQueueCubeTexture.pop_front();
         }
         while (_asyncInProgress == false && _callsQueueMesh.size()) {
             QueueEntryMesh &entry = _callsQueueMesh.front();
