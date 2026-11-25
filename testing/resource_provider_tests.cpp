@@ -43,7 +43,53 @@ namespace test {
 }
 
 namespace test {
-    class resource_provider_description_loading_test : public StepTestInterface {
+    class resource_provider_cube_texture_loading_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<resource_provider_cube_texture_loading_test>();
+        }
+        void init(const API &api) override {
+            api.resourceProvider->getOrLoadCubeTexture(PATH, [this, provider = api.resourceProvider](const foundation::RenderTexturePtr &first) {
+                _first = first;
+                provider->getOrLoadCubeTexture(PATH, [this, provider](const foundation::RenderTexturePtr &second) {
+                    _second = second;
+                    provider->getOrLoadCubeTexture("resource_provider_tests/resource_provider_texture_loading_test", [this, provider](const foundation::RenderTexturePtr &invalid) {
+                        _invalidLoaded = true;
+                        _invalid = invalid;
+                        provider->removeCubeTexture(PATH);
+                        provider->getOrLoadCubeTexture(PATH, [this](const foundation::RenderTexturePtr &reloaded) {
+                            _reloaded = reloaded;
+                        });
+                    });
+                });
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_NOT_EQ(_first, nullptr);
+            EXPECT_EQ(_first, _second);
+            EXPECT_EQ(_first->getWidth(), 4);
+            EXPECT_EQ(_first->getHeight(), 4);
+            EXPECT_EQ(_first->getFormat(), foundation::RenderTextureFormat::RGBA8UN);
+            EXPECT_TRUE(_invalidLoaded);
+            EXPECT_EQ(_invalid, nullptr);
+            EXPECT_NOT_EQ(_reloaded, nullptr);
+            EXPECT_NOT_EQ(_reloaded, _first);
+            return true;
+        }
+
+    private:
+        static constexpr const char *PATH = "resource_provider_tests/resource_provider_cube_texture_loading_test";
+
+        foundation::RenderTexturePtr _first;
+        foundation::RenderTexturePtr _second;
+        foundation::RenderTexturePtr _invalid;
+        foundation::RenderTexturePtr _reloaded;
+        bool _invalidLoaded = false;
+    };
+}
+
+namespace test {
+    class resource_provider_description_loading_test: public StepTestInterface {
     public:
         static auto make() -> std::unique_ptr<StepTestInterface> {
             return std::make_unique<resource_provider_description_loading_test>();
@@ -217,6 +263,7 @@ namespace test {
         REGISTER_UNIT_TEST(resource_provider_non_uniquity_test);
         REGISTER_UNIT_TEST(resource_provider_prefabs_test);
         REGISTER_STEP_TEST(resource_provider_texture_loading_test);
+        REGISTER_STEP_TEST(resource_provider_cube_texture_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_reload_test);
         REGISTER_STEP_TEST(resource_provider_voxel_mesh_loading_test);

@@ -75,7 +75,13 @@ namespace resource {
         // @return - texture object or nullptr
         //
         virtual void getOrLoadTexture(const char *texturePath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) = 0;
-        
+
+        // Asynchronously Load cube texture from file if it isn't loaded yet
+        // @texturePath - path to file without extension. Image width must be 6 times its height. Faces from left to right: +x, -x, +y, -y, +z, -z
+        // @return - texture object or nullptr
+        //
+        virtual void getOrLoadCubeTexture(const char *texturePath, util::callback<void(const foundation::RenderTexturePtr &)> &&completion) = 0;
+
         // Asynchronously load voxels with VTXMVOX layout from file if they aren't loaded yet
         // @meshPath - path to file without extension
         // @return - mesh frames (zero size if not loaded)
@@ -116,6 +122,7 @@ namespace resource {
         // Force removing resources from internal storages
         //
         virtual void removeTexture(const char *texturePath) = 0;
+        virtual void removeCubeTexture(const char *texturePath) = 0;
         virtual void removeMesh(const char *meshPath) = 0;
         virtual void removeGround(const char *groundPath) = 0;
         virtual void removeEmitter(const char *configPath) = 0;
