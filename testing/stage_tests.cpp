@@ -127,8 +127,8 @@ namespace test {
         foundation::PlatformPointerEventArgs args {};
         args.type = type;
         args.pointerID = 0;
-        args.coordinateX = std::round(x * scale);
-        args.coordinateY = std::round(y * scale);
+        args.coordinateX = std::floor(x * scale + 0.5f);
+        args.coordinateY = std::floor(y * scale + 0.5f);
         api.platform->sendPointerEvent(args);
         return {args.coordinateX / scale, args.coordinateY / scale};
     }
