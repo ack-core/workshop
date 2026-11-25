@@ -230,6 +230,34 @@ namespace test {
         EXPECT_EQ_F(wall->getVelocity().z, 0.0f);
         return true;
     }
+
+    bool simulationObstacleTransform(const API &api) {
+        core::SimulationInterface::BodyPtr moved = addTestWall(api);
+        core::SimulationInterface::BodyPtr tiltedX = addTestWall(api);
+        core::SimulationInterface::BodyPtr tiltedZ = addTestWall(api);
+        moved->setTransform(math::transform3f({0, 1, 0}, float(M_PI / 2)).translated({0, 0, 1}));
+        tiltedX->setTransform(math::transform3f({1, 0, 0}, float(M_PI / 4)).translated({0, 0, 20}));
+        tiltedZ->setTransform(math::transform3f({0, 0, 1}, float(M_PI / 4)).translated({0, 0, 40}));
+
+        core::SimulationInterface::BodyPtr blocked = addTestCircle(api, {0, 0, 0}, {0, 0, 1});
+        core::SimulationInterface::BodyPtr passing = addTestCircle(api, {0, 0, -5}, {1, 0, 0});
+        core::SimulationInterface::BodyPtr stoppedX = addTestCircle(api, {0, 0, 20}, {1, 0, 0});
+        core::SimulationInterface::BodyPtr stoppedZ = addTestCircle(api, {0, 0, 40}, {1, 0, 0});
+
+        for (int i = 0; i < 30; i++) {
+            api.simulation->update(0.1f);
+        }
+
+        EXPECT_LT(std::fabs(blocked->getTransform().v3.z - 2.5f), 1.0e-4f);
+        EXPECT_LT(std::fabs(passing->getTransform().v3.x - 3.0f), 1.0e-4f);
+        EXPECT_LT(std::fabs(stoppedX->getTransform().v3.x - 1.5f), 1.0e-4f);
+        EXPECT_LT(std::fabs(stoppedZ->getTransform().v3.x - 1.5f), 1.0e-4f);
+
+        util::Description desc;
+        desc.setInteger("type", 100);
+        EXPECT_TRUE(api.simulation->addBody(desc) == nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -244,5 +272,6 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCirclesDistanceConstraint);
         REGISTER_UNIT_TEST(simulationCircleObstacleDistanceConstraint);
         REGISTER_UNIT_TEST(simulationBodyProperties);
+        REGISTER_UNIT_TEST(simulationObstacleTransform);
     }
 }
