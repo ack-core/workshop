@@ -387,8 +387,8 @@ namespace test {
             const std::uint8_t indexes[] = {
                 10, 10, 40, 40,
                 10, 10, 40, 40,
-                80, 80, 120, 120,
-                80, 80, 120, 120,
+                57, 57, 120, 120,
+                57, 57, 120, 120,
             };
             const foundation::RenderDataPtr mesh = api.rendering->createData(layouts::VTXNRMUV, vertexes, 6);
             const foundation::RenderTexturePtr texture = api.rendering->createTexture(foundation::RenderTextureFormat::R8UN, 4, 4, {indexes});
