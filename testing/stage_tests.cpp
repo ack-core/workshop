@@ -188,10 +188,11 @@ namespace test {
 
     bool stage_interactor_active_area_test(const API &api) {
         using EventType = foundation::PlatformPointerEventArgs::EventType;
+        const float u = 1.0f / api.platform->getScreenScale();
         std::string calls;
 
         ui::Img9SlicePtr slice = api.stage->addImg9Slice(std::nullopt, nullptr, {
-            .anchorOffset = {10.0f, 20.0f}, .size = {40.0f, 20.0f}, .texture = "stage_tests/stage_texture", .activeAreaOffset = 5.0f, .activeAreaRadius = 3.0f
+            .anchorOffset = {10.0f * u, 20.0f * u}, .size = {40.0f * u, 20.0f * u}, .texture = "stage_tests/stage_texture", .activeAreaOffset = 5.0f * u, .activeAreaRadius = 3.0f * u
         });
         slice->setActionHandler([&](ui::Action action, float x, float y) {
             calls += action == ui::Action::PRESS ? "P" : "R";
@@ -200,8 +201,8 @@ namespace test {
 
         const auto tap = [&](float x, float y) {
             calls.clear();
-            stage_send_pointer(api, EventType::START, x, y);
-            stage_send_pointer(api, EventType::FINISH, x, y);
+            stage_send_pointer(api, EventType::START, x * u, y * u);
+            stage_send_pointer(api, EventType::FINISH, x * u, y * u);
             return calls;
         };
 
