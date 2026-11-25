@@ -235,9 +235,9 @@ namespace test {
         core::SimulationInterface::BodyPtr moved = addTestWall(api);
         core::SimulationInterface::BodyPtr tiltedX = addTestWall(api);
         core::SimulationInterface::BodyPtr tiltedZ = addTestWall(api);
-        moved->setTransform(math::transform3f({0, 1, 0}, float(M_PI / 2)).translated({0, 0, 1}));
-        tiltedX->setTransform(math::transform3f({1, 0, 0}, float(M_PI / 4)).translated({0, 0, 20}));
-        tiltedZ->setTransform(math::transform3f({0, 0, 1}, float(M_PI / 4)).translated({0, 0, 40}));
+        moved->setTransform(math::transform3f({0, 1, 0}, 1.5707963f).translated({0, 0, 1}));
+        tiltedX->setTransform(math::transform3f({1, 0, 0}, 0.7853982f).translated({0, 0, 20}));
+        tiltedZ->setTransform(math::transform3f({0, 0, 1}, 0.7853982f).translated({0, 0, 40}));
 
         core::SimulationInterface::BodyPtr blocked = addTestCircle(api, {0, 0, 0}, {0, 0, 1});
         core::SimulationInterface::BodyPtr passing = addTestCircle(api, {0, 0, -5}, {1, 0, 0});
