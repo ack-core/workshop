@@ -19,6 +19,14 @@ namespace core {
         math::vector4f fogColor = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
         math::vector4f fogRadius = math::vector4f(1000.0f, 2000.0f, 0.0f, 0.0f);
     };
+
+    static const std::size_t MAX_LIGHT_SOURCES = 16;
+
+    struct LightingConstants {
+        Environment environment;
+        math::vector4f lightPositionRadius[MAX_LIGHT_SOURCES];
+        math::vector4f lightColor[MAX_LIGHT_SOURCES];
+    };
 }
 
 namespace core {
@@ -330,14 +338,19 @@ namespace core {
     
     class LightSourceImpl : public SceneInterface::LightSource {
     public:
-        LightSourceImpl() {}
+        bool enabled = true;
+        math::vector4f positionRadius;
+        math::vector4f color;
+
+    public:
+        LightSourceImpl(float r, float g, float b, float radius) : positionRadius(0.0f, 0.0f, 0.0f, radius), color(r, g, b, 1.0f) {}
         ~LightSourceImpl() override {}
-        
+
         void setEnabled(bool value) override {
-            
+            enabled = value;
         }
         void setPosition(const math::vector3f &position) override {
-
+            positionRadius.xyz = position;
         }
     };
 
@@ -765,6 +778,7 @@ namespace core {
         std::vector<std::shared_ptr<VegetationImpl>> _vegetations;
         std::vector<std::shared_ptr<ParticleEmitterImpl>> _particleEmitters;
         std::vector<std::shared_ptr<CustomMeshImpl>> _customMeshes;
+        std::vector<std::shared_ptr<LightSourceImpl>> _lightSources;
 
         std::unordered_map<std::string, foundation::RenderShaderPtr> _customShaders;
 
@@ -1067,6 +1081,8 @@ namespace {
             fogCenter : float4
             fogColor : float4
             fogRadius : float4
+            lightPositionRadius[16] : float4
+            lightColor[16] : float4
         }
         inout {
             uv : float2
@@ -1104,10 +1120,17 @@ namespace {
                 lit += _step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z));
             }
 
-            lit = lit / 12.0;
+            float3 light = lit / 12.0 * const_sunColor.rgb;
+            for (int i = 0; i < 16; i++) {
+                float3 toLight = const_lightPositionRadius[i].xyz - wpos;
+                float  dist = _len(toLight);
+                float  att = _sat(1.0 - dist / const_lightPositionRadius[i].w);
+                light += const_lightColor[i].rgb * att * att * _sat(_dot(normal, toLight) / (dist + 0.0001));
+            }
+
             float  t = _sat((_len(wpos - const_fogCenter.xyz) - const_fogRadius.x) / (const_fogRadius.y - const_fogRadius.x));
             float  fog = _select(t * (2.0 - t), 1.0, gdepth < 0.0000001);
-            output_color[0] = float4(_lerp(lit * color * const_sunColor.rgb, const_fogColor.rgb, fog), 1);
+            output_color[0] = float4(_lerp(light * color, const_fogColor.rgb, fog), 1);
 
         }
     )";
@@ -1227,7 +1250,7 @@ namespace core {
     }
 
     SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(float r, float g, float b, float radius) {
-        return nullptr;
+        return _lightSources.emplace_back(std::make_shared<LightSourceImpl>(r, g, b, radius));
     }
     
     math::vector3f SceneInterfaceImpl::getCameraPosition() const {
@@ -1285,6 +1308,7 @@ namespace core {
         util::cleanupUnused(_vegetations);
         util::cleanupUnused(_particleEmitters);
         util::cleanupUnused(_customMeshes);
+        util::cleanupUnused(_lightSources);
 
         if (_initialized == false) {
             _initialized = true;
@@ -1378,9 +1402,21 @@ namespace core {
                 }
                 drawCustomMeshes(rendering, true, foundation::BlendType::DISABLED);
             });
+            LightingConstants lighting = {_environment};
+            std::size_t lightCount = 0;
+            for (const auto &light : _lightSources) {
+                if (light->enabled && lightCount < MAX_LIGHT_SOURCES) {
+                    lighting.lightPositionRadius[lightCount] = light->positionRadius;
+                    lighting.lightColor[lightCount++] = light->color;
+                }
+            }
+            for (std::size_t i = lightCount; i < MAX_LIGHT_SOURCES; i++) {
+                lighting.lightPositionRadius[i] = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+                lighting.lightColor[i] = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+            }
             _rendering->forTarget(_img, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_gbufferToImgShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
-                rendering.applyShaderConstants(&_environment);
+                rendering.applyShaderConstants(&lighting);
                 rendering.applyTextures({
                     {_palette, foundation::SamplerType::NEAREST},
                     {_gbuffer->getTexture(0), foundation::SamplerType::NEAREST},
