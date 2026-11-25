@@ -20,6 +20,15 @@ namespace {
     bool near4(const math::vector4f &v, float x, float y, float z, float w) {
         return std::fabs(v.x - x) < 1.0e-5f && std::fabs(v.y - y) < 1.0e-5f && std::fabs(v.z - z) < 1.0e-5f && std::fabs(v.w - w) < 1.0e-5f;
     }
+    bool eq2i(const math::vector2i &v, int x, int y) {
+        return v.x == x && v.y == y;
+    }
+    bool eq3i(const math::vector3i &v, int x, int y, int z) {
+        return v.x == x && v.y == y && v.z == z;
+    }
+    bool eq4i(const math::vector4i &v, int x, int y, int z, int w) {
+        return v.x == x && v.y == y && v.z == z && v.w == w;
+    }
     bool nearBound(const math::bound3f &b, float xmin, float ymin, float zmin, float xmax, float ymax, float zmax) {
         return near3({b.xmin, b.ymin, b.zmin}, xmin, ymin, zmin) && near3({b.xmax, b.ymax, b.zmax}, xmax, ymax, zmax);
     }
@@ -771,6 +780,35 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_int_ctors_test(const API &api) {
+        EXPECT_TRUE(eq2i(math::vector2i(-3), -3, -3));
+        EXPECT_TRUE(eq3i(math::vector3i(7), 7, 7, 7));
+        EXPECT_TRUE(eq4i(math::vector4i(0), 0, 0, 0, 0));
+
+        const int a2[2] = {1, -2};
+        const int a3[3] = {1, -2, 3};
+        const int a4[4] = {1, -2, 3, -4};
+        EXPECT_TRUE(eq2i(math::vector2i(a2), 1, -2));
+        EXPECT_TRUE(eq3i(math::vector3i(a3), 1, -2, 3));
+        EXPECT_TRUE(eq4i(math::vector4i(a4), 1, -2, 3, -4));
+
+        const math::vector2i v2(5, 6);
+        const math::vector3i v3(5, 6, 7);
+        const math::vector4i v4(5, 6, 7, 8);
+        EXPECT_TRUE(eq2i(v2, 5, 6));
+        EXPECT_TRUE(eq3i(v3, 5, 6, 7));
+        EXPECT_TRUE(eq4i(v4, 5, 6, 7, 8));
+
+        const math::vector2i c2(v2);
+        const math::vector3i c3(v3);
+        const math::vector4i c4(v4);
+        EXPECT_TRUE(eq2i(c2, 5, 6));
+        EXPECT_TRUE(eq3i(c3, 5, 6, 7));
+        EXPECT_TRUE(eq4i(c4, 5, 6, 7, 8));
+
+        return true;
+    }
 }
 
 
@@ -795,5 +833,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_ray_geometry_test);
         REGISTER_UNIT_TEST(math_quaternion_axis_rotation_test);
         REGISTER_UNIT_TEST(math_swizzle_atv4_test);
+        REGISTER_UNIT_TEST(math_vector_int_ctors_test);
     }
 }
