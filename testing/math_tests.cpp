@@ -744,6 +744,33 @@ namespace test {
 
         return true;
     }
+
+    bool math_swizzle_atv4_test(const API &api) {
+        const math::vector2f v2 = {1.0f, 2.0f};
+        EXPECT_TRUE(eq4(v2.atv4start(3.0f, 4.0f), 1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq4(v2.atv4middle(3.0f, 4.0f), 3.0f, 1.0f, 2.0f, 4.0f));
+        EXPECT_TRUE(eq4(v2.atv4end(3.0f, 4.0f), 3.0f, 4.0f, 1.0f, 2.0f));
+        EXPECT_TRUE(eq4(v2.yx.atv4start(3.0f, 4.0f), 2.0f, 1.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq4(v2.yx.atv4middle(3.0f, 4.0f), 3.0f, 2.0f, 1.0f, 4.0f));
+        EXPECT_TRUE(eq4(v2.yx.atv4end(3.0f, 4.0f), 3.0f, 4.0f, 2.0f, 1.0f));
+        EXPECT_TRUE(eq4(v2.yy.atv4start(3.0f, 4.0f), 2.0f, 2.0f, 3.0f, 4.0f));
+
+        const math::vector3f v3 = {1.0f, 2.0f, 3.0f};
+        EXPECT_TRUE(eq4(v3.atv4start(4.0f), 1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(eq4(v3.atv4end(4.0f), 4.0f, 1.0f, 2.0f, 3.0f));
+        EXPECT_TRUE(eq4(v3.zyx.atv4start(4.0f), 3.0f, 2.0f, 1.0f, 4.0f));
+        EXPECT_TRUE(eq4(v3.zyx.atv4end(4.0f), 4.0f, 3.0f, 2.0f, 1.0f));
+        EXPECT_TRUE(eq4(v3.zx.atv4middle(4.0f, 5.0f), 4.0f, 3.0f, 1.0f, 5.0f));
+        EXPECT_TRUE(eq4(v3.yz.atv4end(4.0f, 5.0f), 4.0f, 5.0f, 2.0f, 3.0f));
+
+        const math::vector4f v4 = {1.0f, 2.0f, 3.0f, 4.0f};
+        EXPECT_TRUE(eq4(v4.wzy.atv4start(5.0f), 4.0f, 3.0f, 2.0f, 5.0f));
+        EXPECT_TRUE(eq4(v4.xwz.atv4end(5.0f), 5.0f, 1.0f, 4.0f, 3.0f));
+        EXPECT_TRUE(eq4(v4.wx.atv4middle(5.0f, 6.0f), 5.0f, 4.0f, 1.0f, 6.0f));
+        EXPECT_TRUE(eq4(v4.zw.atv4start(5.0f, 6.0f), 3.0f, 4.0f, 5.0f, 6.0f));
+
+        return true;
+    }
 }
 
 
@@ -767,5 +794,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_bound3f_world_bounds_test);
         REGISTER_UNIT_TEST(math_ray_geometry_test);
         REGISTER_UNIT_TEST(math_quaternion_axis_rotation_test);
+        REGISTER_UNIT_TEST(math_swizzle_atv4_test);
     }
 }
