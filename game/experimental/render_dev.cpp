@@ -54,7 +54,7 @@ namespace game {
         _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-        api.stateManager->switchToState("collision");
+        api.stateManager->switchToState("vegetation");
     }
     
     RenderDevContext::~RenderDevContext() {

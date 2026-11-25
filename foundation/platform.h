@@ -61,8 +61,8 @@ namespace foundation {
         
         struct {
             std::int32_t wheel : 16;
-            std::int32_t isLeftButton : 1;
-            std::int32_t isRightButton : 1;
+            std::uint32_t isLeftButton : 1;
+            std::uint32_t isRightButton : 1;
         }
         flags;
     };

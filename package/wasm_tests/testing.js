@@ -59,7 +59,7 @@ https.createServer({
         console.log(msg.text());
     });
     page.on('pageerror', err => {
-        console.log(err.message);
+        console.log(err.stack);
         process.exit(1); // uncaught error stops the tests, they never report the result
     });
 
