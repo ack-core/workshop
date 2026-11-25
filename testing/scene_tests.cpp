@@ -365,6 +365,57 @@ namespace test {
         core::SceneInterface::LineSetPtr _hiddenLines;
         core::SceneInterface::LineSetPtr _clearedLines;
     };
+
+    class scene_ground_mesh_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_ground_mesh_test>();
+        }
+        void init(const API &api) override {
+            struct Vertex {
+                math::vector3f position, normal;
+                math::vector2f uv;
+            };
+            const Vertex vertexes[] = {
+                {{-1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+                {{-1.0f, 0.0f,  1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+                {{ 1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                {{ 1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                {{-1.0f, 0.0f,  1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+                {{ 1.0f, 0.0f,  1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+            };
+            const std::uint8_t indexes[] = {
+                10, 10, 40, 40,
+                10, 10, 40, 40,
+                80, 80, 120, 120,
+                80, 80, 120, 120,
+            };
+            const foundation::RenderDataPtr mesh = api.rendering->createData(layouts::VTXNRMUV, vertexes, 6);
+            const foundation::RenderTexturePtr texture = api.rendering->createTexture(foundation::RenderTextureFormat::R8UN, 4, 4, {indexes});
+
+            api.scene->setCameraLookAt({0.0f, 8.0f, 4.0f}, {0.0f, 0.0f, 0.0f});
+            _positioned = api.scene->addGroundMesh(mesh, texture);
+            _positioned->setPosition({-2.0f, 0.0f, 0.0f});
+            _transformed = api.scene->addGroundMesh(mesh, texture);
+            _transformed->setTransform(math::transform3f({0.0f, 1.0f, 0.0f}, 0.6f).translated({2.0f, 0.0f, 0.0f}));
+            _hidden = api.scene->addGroundMesh(mesh, texture);
+            _hidden->setPosition({0.0f, 0.0f, 2.0f});
+            _hidden->setEnabled(false);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::GroundMeshPtr _positioned;
+        core::SceneInterface::GroundMeshPtr _transformed;
+        core::SceneInterface::GroundMeshPtr _hidden;
+    };
 }
 
 namespace test {
@@ -379,5 +430,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_ground_mesh_test);
     }
 }
