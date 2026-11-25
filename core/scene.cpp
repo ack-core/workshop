@@ -983,9 +983,9 @@ namespace {
             float  ptcvbase = 4.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
             float4 ptcv = float4(ptcvbase, ptcvbase, ptcvbase, ptcvbase) + float4(0.0f, 1.0f, 2.0f, 3.0f) * const_maxXYZ_vpix.w;
 
-            float  t0 = _floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) * const_minXYZ_hpix.w;
-            float  t1 = const_t0_t1_mask_cap.y;
-            float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w;
+            float  t0 = (_floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) + 0.5) * const_minXYZ_hpix.w;
+            float  t1 = const_t0_t1_mask_cap.y + 0.5 * const_minXYZ_hpix.w;
+            float  tf = (const_t0_t1_mask_cap.x - t0) / const_minXYZ_hpix.w + 0.5;
 
             float4 m0t0 = _tex2d(0, float2(t0, ptcv.x));
             float4 m0t1 = _tex2d(0, float2(t1, ptcv.x));
