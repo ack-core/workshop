@@ -139,6 +139,37 @@ namespace test {
         EXPECT_TRUE(calls.empty());
         return true;
     }
+    bool platform_handlers_bottom_order_test(const API &api) {
+        using Args = foundation::PlatformKeyboardEventArgs;
+        std::string calls;
+        bool consume = false;
+
+        const foundation::EventHandlerToken existing = api.platform->addKeyboardEventHandler([&](const Args &) {
+            calls += "E";
+            return consume;
+        }, true);
+        const foundation::EventHandlerToken first = api.platform->addKeyboardEventHandler([&](const Args &) {
+            calls += "1";
+            return false;
+        });
+        const foundation::EventHandlerToken second = api.platform->addKeyboardEventHandler([&](const Args &) {
+            calls += "2";
+            return false;
+        }, false);
+
+        api.platform->sendKeyboardEvent(Args { Args::EventType::PRESS, foundation::Key::K });
+        EXPECT_EQ(calls, "E12");
+
+        calls.clear();
+        consume = true;
+        api.platform->sendKeyboardEvent(Args { Args::EventType::RELEASE, foundation::Key::K });
+        EXPECT_EQ(calls, "E");
+
+        api.platform->removeEventHandler(existing);
+        api.platform->removeEventHandler(first);
+        api.platform->removeEventHandler(second);
+        return true;
+    }
     bool platform_event_handlers_count_test(const API &api) {
         const std::size_t initial = api.platform->getStatistics().eventHandlersCount;
         const foundation::EventHandlerToken tokens[] = {
@@ -336,6 +367,7 @@ namespace test {
         REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
         REGISTER_UNIT_TEST(platform_pointer_event_handlers_test);
         REGISTER_UNIT_TEST(platform_editor_event_handlers_test);
+        REGISTER_UNIT_TEST(platform_handlers_bottom_order_test);
         REGISTER_UNIT_TEST(platform_event_handlers_count_test);
         REGISTER_STEP_TEST(platform_file_loading_test);
         REGISTER_STEP_TEST(platform_file_save_and_loading_chain_test);
