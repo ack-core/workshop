@@ -454,6 +454,10 @@ namespace test {
         bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
             EXPECT_NOT_EQ(_shader, nullptr);
             EXPECT_NOT_EQ(_texture, nullptr);
+            EXPECT_EQ_F(_texture->getUVStart().x, 0.0f);
+            EXPECT_EQ_F(_texture->getUVStart().y, 0.0f);
+            EXPECT_EQ_F(_texture->getUVSize().x, 1.0f);
+            EXPECT_EQ_F(_texture->getUVSize().y, 1.0f);
 
             auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
                 const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
@@ -534,6 +538,10 @@ namespace test {
             EXPECT_EQ(_target->getWidth(), 64);
             EXPECT_EQ(_target->getHeight(), 64);
             EXPECT_EQ(_target->getTextureCount(), 1);
+            EXPECT_EQ_F(_target->getTexture(0)->getUVStart().x, 0.0f);
+            EXPECT_EQ_F(_target->getTexture(0)->getUVStart().y, 0.0f);
+            EXPECT_EQ_F(_target->getTexture(0)->getUVSize().x, 1.0f);
+            EXPECT_EQ_F(_target->getTexture(0)->getUVSize().y, 1.0f);
 
             auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int b) {
                 const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
