@@ -329,7 +329,7 @@ namespace {
         output = "struct _Constants {\n};\n\n";
     }
     void formEmptyInoutBlock(std::string &outputVS, std::string &outputFS) {
-        outputVS = "struct _InOut {\n    float4 position [[position]];\n};\n\n";
+        outputVS = "struct _InOut {\n    float4 position [[position]];\n    float pointSize [[point_size]];\n};\n\n";
         outputFS.clear();
     }
     bool formFixedBlock(util::strstream &stream, std::string &output) {
@@ -383,7 +383,7 @@ namespace {
         return constBlockLength;
     }
     bool formInoutBlock(util::strstream &stream, std::string &outputVS, std::string &outputFS) {
-        outputVS += "struct _InOut {\n    float4 position [[position]];\n";
+        outputVS += "struct _InOut {\n    float4 position [[position]];\n    float pointSize [[point_size]];\n";
         
         if (formVarsBlock(stream, outputVS, TYPES_COUNT) == 0) {
             return false;
@@ -507,7 +507,7 @@ namespace {
         }
         
         vsout += variables;
-        vsout += "    _FN<texture2d<float>, texture2d<float>, texture2d<float>, texture2d<float>> _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n    _InOut output;\n\n";
+        vsout += "    _FN<texture2d<float>, texture2d<float>, texture2d<float>, texture2d<float>> _fn {framedata, constants, _texture0, _texture1, _texture2, _texture3, _sampler};\n    _InOut output;\n    output.pointSize = 1.0;\n\n";
         vsout += transformCode(cb);
         vsout += "\n    (void)repeat_ID; (void)vertex_ID; (void)instance_ID;(void)_fn;\n";
         vsout += "    return output;\n}\n\n";
