@@ -365,6 +365,48 @@ namespace test {
         core::SceneInterface::LineSetPtr _hiddenLines;
         core::SceneInterface::LineSetPtr _clearedLines;
     };
+
+    class scene_light_source_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_light_source_test>();
+        }
+        ~scene_light_source_test() override {
+            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {9000.0f, 10000.0f});
+        }
+        void init(const API &api) override {
+            _scene = api.scene;
+            _scene->setCameraLookAt({0.0f, 30.0f, 20.0f}, {0.0f, 0.0f, 0.0f});
+            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {0.2f, 0.2f, 0.2f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {9000.0f, 10000.0f});
+            api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_environment_fog_test_voxplane", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
+                _plane = _scene->addVoxelMesh(frames, desc);
+                _plane->setPosition({-32.0f, -1.0f, -32.0f});
+            });
+
+            _red = _scene->addLightSource(1.0f, 0.0f, 0.0f, 6.0f);
+            _red->setPosition({-8.0f, 1.0f, 0.0f});
+            _green = _scene->addLightSource(0.0f, 1.0f, 0.0f, 12.0f);
+            _green->setPosition({8.0f, 1.0f, 0.0f});
+            _disabled = _scene->addLightSource(0.0f, 0.0f, 1.0f, 40.0f);
+            _disabled->setPosition({0.0f, 1.0f, 0.0f});
+            _disabled->setEnabled(false);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 1024;
+        }
+
+    private:
+        core::SceneInterfacePtr _scene;
+        core::SceneInterface::VoxelMeshPtr _plane;
+        core::SceneInterface::LightSourcePtr _red;
+        core::SceneInterface::LightSourcePtr _green;
+        core::SceneInterface::LightSourcePtr _disabled;
+    };
 }
 
 namespace test {
@@ -379,5 +421,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_light_source_test);
     }
 }
