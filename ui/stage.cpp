@@ -139,12 +139,19 @@ namespace ui {
             
             return false;
         }
+        virtual void invalidate() {
+            _positionChanged = true;
+
+            for (auto &item : _attachedElements) {
+                item->invalidate();
+            }
+        }
         virtual void draw() {
             for (auto &item : _attachedElements) {
                 item->draw();
             }
         }
-        
+
     protected:
         const StageFacility &_facility;
         const std::weak_ptr<ElementImpl> _parent;
@@ -672,7 +679,7 @@ namespace ui {
         std::vector<resource::FontCharInfo> _chars;
         std::vector<resource::FontCharInfo> _shadow;
         std::vector<DrawingInstance> _instances;
-        std::uint32_t _instanceCount;
+        std::uint32_t _instanceCount = 0;
     };
 }
 
@@ -775,6 +782,7 @@ namespace ui {
                     
                     if (_positionChanged) {
                         _positionChanged = false;
+                        _instanceCount = 0;
 
                         fillInstances(_shadow, _shadowColor, _shadowOffset, _instanceCount);
                         fillInstances(_chars, _fontColor, {}, _instanceCount);
@@ -840,6 +848,7 @@ namespace ui {
         const resource::FontAtlasProviderPtr _fontAtlasProvider;
         
         foundation::EventHandlerToken _touchEventsToken;
+        foundation::EventHandlerToken _resizeToken;
         foundation::RenderShaderPtr _uiShader;
         std::vector<std::shared_ptr<ElementImpl>> _topLevelElements;
         std::unordered_map<std::string, std::weak_ptr<ElementImpl>> _namedElements;
@@ -892,7 +901,14 @@ namespace ui {
     , _resourceProvider(resourceProvider)
     , _fontAtlasProvider(fontAtlasProvider)
     , _touchEventsToken(nullptr)
+    , _resizeToken(nullptr)
     {
+        _resizeToken = _platform->addResizeHandler([this]() {
+            for (const auto &topLevelElement : _topLevelElements) {
+                topLevelElement->invalidate();
+            }
+        });
+
         _touchEventsToken = _platform->addPointerEventHandler([this](const foundation::PlatformPointerEventArgs &args) {
             ui::Action action = ui::Action::RELEASE;
             
@@ -915,6 +931,7 @@ namespace ui {
     
     StageInterfaceImpl::~StageInterfaceImpl() {
         _platform->removeEventHandler(_touchEventsToken);
+        _platform->removeEventHandler(_resizeToken);
     }
     
     std::shared_ptr<StageInterface::Element> StageInterfaceImpl::getNamedElement(const std::string &name) {
