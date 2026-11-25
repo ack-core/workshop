@@ -121,6 +121,101 @@ namespace test {
         EXPECT_EQ(api.stage->getNamedElement("stage_clear_pivot"), nullptr);
         return true;
     }
+
+    static void stage_send_pointer(const API &api, foundation::PlatformPointerEventArgs::EventType type, float x, float y) {
+        foundation::PlatformPointerEventArgs args {};
+        args.type = type;
+        args.pointerID = 0;
+        args.coordinateX = x * api.platform->getScreenScale();
+        args.coordinateY = y * api.platform->getScreenScale();
+        api.platform->sendPointerEvent(args);
+    }
+
+    bool stage_interactor_action_handler_test(const API &api) {
+        using EventType = foundation::PlatformPointerEventArgs::EventType;
+        std::string calls, states;
+        math::vector2f point = {0.0f, 0.0f};
+
+        ui::ImagePtr image = api.stage->addImage(std::nullopt, nullptr, {.anchorOffset = {10.0f, 20.0f}, .texture = "stage_tests/stage_texture"});
+        image->setActionHandler([&](ui::Action action, float x, float y) {
+            calls += action == ui::Action::PRESS ? "P" : action == ui::Action::MOVE ? "M" : "R";
+            point = {x, y};
+        });
+        image->setStateHandler([&](bool locked) {
+            states += locked ? "L" : "U";
+        });
+        api.stage->updateAndDraw(0.0f);
+
+        const float cx = 10.0f + 0.5f * image->getSize().x;
+        const float cy = 20.0f + 0.5f * image->getSize().y;
+
+        stage_send_pointer(api, EventType::START, cx, cy);
+        EXPECT_EQ(calls, "P");
+        EXPECT_EQ_F(point.x, cx);
+        EXPECT_EQ_F(point.y, cy);
+        stage_send_pointer(api, EventType::MOVE, 2.0f, 3.0f);
+        EXPECT_EQ(calls, "PM");
+        EXPECT_EQ_F(point.x, 2.0f);
+        EXPECT_EQ_F(point.y, 3.0f);
+        stage_send_pointer(api, EventType::FINISH, 4.0f, 5.0f);
+        EXPECT_EQ(calls, "PMR");
+        EXPECT_EQ_F(point.x, 4.0f);
+        EXPECT_EQ_F(point.y, 5.0f);
+
+        calls.clear();
+        stage_send_pointer(api, EventType::START, 9.0f, cy);
+        stage_send_pointer(api, EventType::MOVE, cx, cy);
+        stage_send_pointer(api, EventType::FINISH, cx, cy);
+        EXPECT_TRUE(calls.empty());
+
+        image->setLocked(true);
+        image->setLocked(true);
+        EXPECT_EQ(states, "L");
+        stage_send_pointer(api, EventType::START, cx, cy);
+        stage_send_pointer(api, EventType::MOVE, cx, cy);
+        stage_send_pointer(api, EventType::FINISH, cx, cy);
+        EXPECT_TRUE(calls.empty());
+
+        image->setLocked(false);
+        EXPECT_EQ(states, "LU");
+        stage_send_pointer(api, EventType::START, cx, cy);
+        stage_send_pointer(api, EventType::FINISH, cx, cy);
+        EXPECT_EQ(calls, "PR");
+        return true;
+    }
+
+    bool stage_interactor_active_area_test(const API &api) {
+        using EventType = foundation::PlatformPointerEventArgs::EventType;
+        std::string calls;
+
+        ui::Img9SlicePtr slice = api.stage->addImg9Slice(std::nullopt, nullptr, {
+            .anchorOffset = {10.0f, 20.0f}, .size = {40.0f, 20.0f}, .texture = "stage_tests/stage_texture", .activeAreaOffset = 5.0f, .activeAreaRadius = 3.0f
+        });
+        slice->setActionHandler([&](ui::Action action, float x, float y) {
+            calls += action == ui::Action::PRESS ? "P" : "R";
+        });
+        api.stage->updateAndDraw(0.0f);
+
+        const auto tap = [&](float x, float y) {
+            calls.clear();
+            stage_send_pointer(api, EventType::START, x, y);
+            stage_send_pointer(api, EventType::FINISH, x, y);
+            return calls;
+        };
+
+        EXPECT_EQ(tap(30.0f, 30.0f), "PR");
+        EXPECT_EQ(tap(13.0f, 30.0f), "PR");
+        EXPECT_EQ(tap(11.0f, 30.0f), "");
+        EXPECT_EQ(tap(47.0f, 30.0f), "PR");
+        EXPECT_EQ(tap(49.0f, 30.0f), "");
+        EXPECT_EQ(tap(30.0f, 37.0f), "PR");
+        EXPECT_EQ(tap(30.0f, 39.0f), "");
+        EXPECT_EQ(tap(13.0f, 23.0f), "PR");
+        EXPECT_EQ(tap(12.0f, 22.0f), "");
+        EXPECT_EQ(tap(47.0f, 37.0f), "PR");
+        EXPECT_EQ(tap(48.0f, 38.0f), "");
+        return true;
+    }
 }
 
 namespace test {
@@ -130,5 +225,7 @@ namespace test {
         REGISTER_UNIT_TEST(stage_child_lifetime_test);
         REGISTER_UNIT_TEST(stage_anchor_test);
         REGISTER_UNIT_TEST(stage_clear_test);
+        REGISTER_UNIT_TEST(stage_interactor_action_handler_test);
+        REGISTER_UNIT_TEST(stage_interactor_active_area_test);
     }
 }
