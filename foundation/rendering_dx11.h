@@ -43,6 +43,8 @@ namespace foundation {
         auto getHeight() const -> std::uint32_t override;
         auto getMipCount() const -> std::uint32_t override;
         auto getFormat() const -> RenderTextureFormat override;
+        auto getUVStart() const -> math::vector2f override;
+        auto getUVSize() const -> math::vector2f override;
 
         auto getShaderResourceView() const -> ID3D11ShaderResourceView *;
 

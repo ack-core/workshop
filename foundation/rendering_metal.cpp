@@ -145,6 +145,14 @@ namespace foundation {
         return _format;
     }
 
+    math::vector2f MetalTexture::getUVStart() const {
+        return math::vector2f(0.0f, 0.0f);
+    }
+
+    math::vector2f MetalTexture::getUVSize() const {
+        return math::vector2f(1.0f, 1.0f);
+    }
+
     id<MTLTexture> MetalTexture::getNativeTexture() const {
         return _texture;
     }

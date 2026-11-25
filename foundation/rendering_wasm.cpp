@@ -185,6 +185,12 @@ namespace foundation {
     RenderTextureFormat WASMTexture::getFormat() const {
         return _format;
     }
+    math::vector2f WASMTexture::getUVStart() const {
+        return math::vector2f(0.0f, 0.0f);
+    }
+    math::vector2f WASMTexture::getUVSize() const {
+        return math::vector2f(1.0f, 1.0f);
+    }
     WebGLId WASMTexture::getWebGLTexture() const {
         return _texture;
     }

@@ -430,6 +430,7 @@ namespace core {
                 }
             }
             if (indexes.size()) {
+                mapToTextureRegion(vertices);
                 mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
             }
         }
@@ -483,7 +484,16 @@ namespace core {
                 }
             }
             if (indexes.size()) {
+                mapToTextureRegion(vertices);
                 mesh = rendering->createData(layouts::VTXVEG, vertices.data(), std::uint32_t(vertices.size()), indexes.data(), std::uint32_t(indexes.size()));
+            }
+        }
+        void mapToTextureRegion(std::vector<VTXVEG> &vertices) {
+            const math::vector2f uvStart = texture->getUVStart();
+            const math::vector2f uvSize = texture->getUVSize();
+
+            for (VTXVEG &vertex : vertices) {
+                vertex.uv = uvStart + vertex.uv * uvSize;
             }
         }
         void fillGeometryMeshes(const foundation::RenderingInterfacePtr &rendering, const ByteDataPtr &map, const math::vector3i &margs, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) {
@@ -584,6 +594,7 @@ namespace core {
             _constants.maxXYZ = desc.getVector3f("maxXYZ", {});
             _constants.maxW = maxSize.x;
             _constants.maxH = maxSize.y;
+            _constants.uvStartSize = math::vector4f(texture->getUVStart(), texture->getUVSize());
         }
         ~ParticleEmitterImpl() override {}
         
@@ -637,6 +648,7 @@ namespace core {
             math::vector4f fogCenter;
             math::vector4f fogColor;
             math::vector4f fogRadius;
+            math::vector4f uvStartSize;
         }
         _constants;
         
@@ -974,6 +986,7 @@ namespace {
             fogCenter : float4
             fogColor : float4
             fogRadius : float4
+            uvStartSize : float4
         }
         inout {
             uv_alpha : float3
@@ -1020,7 +1033,7 @@ namespace {
             
             float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
             output_position = _transform(float4(ptcpos + relVertexPos, 1.0), frame_plmVPMatrix);
-            output_uv_alpha = float3(fixed_uv[repeat_ID], map3.x);
+            output_uv_alpha = float3(const_uvStartSize.xy + fixed_uv[repeat_ID] * const_uvStartSize.zw, map3.x);
             output_wpos = ptcpos + relVertexPos;
         }
         fssrc {

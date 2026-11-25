@@ -43,8 +43,10 @@ namespace foundation {
         std::uint32_t getMipCount() const override;
         
         RenderTextureFormat getFormat() const override;
+        math::vector2f getUVStart() const override;
+        math::vector2f getUVSize() const override;
         id<MTLTexture> getNativeTexture() const override;
-        
+
     private:
         RenderTextureFormat _format;
         id<MTLTexture> _texture;
@@ -65,6 +67,8 @@ namespace foundation {
             std::uint32_t getHeight() const override { return _target._height; }
             std::uint32_t getMipCount() const override { return 1; }
             RenderTextureFormat getFormat() const override { return _format; }
+            math::vector2f getUVStart() const override { return math::vector2f(0.0f, 0.0f); }
+            math::vector2f getUVSize() const override { return math::vector2f(1.0f, 1.0f); }
             id<MTLTexture> getNativeTexture() const override { return _texture; }
 
         private:
