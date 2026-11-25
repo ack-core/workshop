@@ -1362,10 +1362,148 @@ namespace test {
 }
 
 namespace test {
+    bool rendering_vertex_attribute_stride_test(const API &api) {
+        using F = foundation::InputAttributeFormat;
+        auto stride = [](std::initializer_list<F> formats) {
+            foundation::InputLayout layout;
+            for (F format : formats) {
+                layout.attributes.push_back({"attribute", format});
+            }
+            return layout.getStride();
+        };
+
+        EXPECT_EQ(stride({}), 0);
+        EXPECT_EQ(stride({F::HALF2, F::HALF4}), 12);
+        EXPECT_EQ(stride({F::FLOAT1, F::FLOAT2, F::FLOAT3, F::FLOAT4}), 40);
+        EXPECT_EQ(stride({F::SHORT2, F::SHORT4, F::USHORT2, F::USHORT4}), 24);
+        EXPECT_EQ(stride({F::SHORT2_NRM, F::SHORT4_NRM, F::USHORT2_NRM, F::USHORT4_NRM}), 24);
+        EXPECT_EQ(stride({F::BYTE4, F::BYTE4_NRM}), 8);
+        EXPECT_EQ(stride({F::INT1, F::INT2, F::INT3, F::INT4}), 40);
+        EXPECT_EQ(stride({F::UINT1, F::UINT2, F::UINT3, F::UINT4}), 40);
+        return true;
+    }
+}
+
+namespace test {
+    class rendering_vertex_attribute_formats_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_vertex_attribute_formats_test>();
+        }
+        void init(const API &api) override {
+            // 3x3 grid of quads, each instance checks one non-float attribute of a single vertex: green if decoded value is expected, red otherwise
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][0.5, 0.0][0.0, -0.5][0.5, -0.5]
+                    offset[9] : float2 = [-0.9, 0.9][-0.3, 0.9][0.3, 0.9][-0.9, 0.3][-0.3, 0.3][0.3, 0.3][-0.9, -0.3][-0.3, -0.3][0.3, -0.3]
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    int index = int(instance_ID);
+                    float4 diff = float4(0.0, 0.0, 0.0, 0.0);
+                    if (index == 0) { diff = vertex_h4 - float4(0.5, -0.25, 2.0, -8.0); }
+                    if (index == 1) { diff = float4(float2(vertex_s2) - float2(-300.0, 200.0), 0.0, 0.0); }
+                    if (index == 2) { diff = float4(vertex_us4) - float4(1.0, 1000.0, 40000.0, 65535.0); }
+                    if (index == 3) { diff = vertex_s4n - float4(1.0, -1.0, 0.0, 0.5); }
+                    if (index == 4) { diff = float4(vertex_us2n - float2(1.0, 0.2), 0.0, 0.0); }
+                    if (index == 5) { diff = float4(vertex_b4) - float4(1.0, 2.0, 128.0, 255.0); }
+                    if (index == 6) { diff = vertex_b4n - float4(1.0, 0.0, 0.2, 0.8); }
+                    if (index == 7) { diff = float4(float(vertex_i1) + 100000.0, 0.0, 0.0, 0.0); }
+                    if (index == 8) { diff = float4(float2(vertex_u2) - float2(3000000000.0, 7.0), 0.0, 0.0); }
+                    float err = _dot(_abs(diff), float4(1.0, 1.0, 1.0, 1.0));
+                    output_position = float4(fixed_quad[repeat_ID] + fixed_offset[instance_ID], 0.5, 1.0);
+                    output_color = _select(float4(1.0, 0.0, 0.0, 1.0), float4(0.0, 1.0, 0.0, 1.0), err < 0.01);
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const Vertex vertex = {
+                { 0x3800, 0xB400, 0x4000, 0xC800 },
+                { -300, 200 },
+                { 1, 1000, 40000, 65535 },
+                { 32767, -32767, 0, 16384 },
+                { 65535, 13107 },
+                { 1, 2, 128, 255 },
+                { 255, 0, 51, 204 },
+                -100000,
+                { 3000000000u, 7 },
+            };
+            _shader = api.rendering->createShader(shaderSrc, _layout);
+            _data = api.rendering->createData(_layout, &vertex, 1);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(_data, 9);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_data, nullptr);
+            EXPECT_EQ(_layout.getStride(), sizeof(Vertex));
+            EXPECT_EQ(_data->getStride(), sizeof(Vertex));
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == 0 && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(90, 90, 0, 255));     // HALF4
+            EXPECT_TRUE(pixelIs(243, 90, 0, 255));    // SHORT2
+            EXPECT_TRUE(pixelIs(397, 90, 0, 255));    // USHORT4
+            EXPECT_TRUE(pixelIs(90, 243, 0, 255));    // SHORT4_NRM
+            EXPECT_TRUE(pixelIs(243, 243, 0, 255));   // USHORT2_NRM
+            EXPECT_TRUE(pixelIs(397, 243, 0, 255));   // BYTE4
+            EXPECT_TRUE(pixelIs(90, 397, 0, 255));    // BYTE4_NRM
+            EXPECT_TRUE(pixelIs(243, 397, 0, 255));   // INT1
+            EXPECT_TRUE(pixelIs(397, 397, 0, 255));   // UINT2
+            EXPECT_TRUE(pixelIs(490, 490, 0, 0));     // empty
+            return true;
+        }
+
+    private:
+        struct Vertex {
+            std::uint16_t h4[4];
+            std::int16_t s2[2];
+            std::uint16_t us4[4];
+            std::int16_t s4n[4];
+            std::uint16_t us2n[2];
+            std::uint8_t b4[4];
+            std::uint8_t b4n[4];
+            std::int32_t i1;
+            std::uint32_t u2[2];
+        };
+
+        const foundation::InputLayout _layout = foundation::InputLayout {
+            .repeat = 4,
+            .attributes = {
+                {"h4", foundation::InputAttributeFormat::HALF4},
+                {"s2", foundation::InputAttributeFormat::SHORT2},
+                {"us4", foundation::InputAttributeFormat::USHORT4},
+                {"s4n", foundation::InputAttributeFormat::SHORT4_NRM},
+                {"us2n", foundation::InputAttributeFormat::USHORT2_NRM},
+                {"b4", foundation::InputAttributeFormat::BYTE4},
+                {"b4n", foundation::InputAttributeFormat::BYTE4_NRM},
+                {"i1", foundation::InputAttributeFormat::INT1},
+                {"u2", foundation::InputAttributeFormat::UINT2},
+            }
+        };
+
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderDataPtr _data;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
         REGISTER_UNIT_TEST(rendering_statistics_test);
+        REGISTER_UNIT_TEST(rendering_vertex_attribute_stride_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_fill_green_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_white_line_on_black_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_red_triangle_on_black_test);
@@ -1382,6 +1520,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_partial_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_indexed_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_points_and_line_strip_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_vertex_attribute_formats_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }

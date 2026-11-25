@@ -306,7 +306,11 @@ namespace foundation {
                 @autoreleasepool {
                     NSError *nsError = nil;
                     MTLCompileOptions* compileOptions = [MTLCompileOptions new];
+#if PLATFORM_MAC
+                    compileOptions.languageVersion = MTLLanguageVersion2_3;
+#else
                     compileOptions.languageVersion = MTLLanguageVersion2_0;
+#endif
                     
                     id<MTLLibrary> library = [_device newLibraryWithSource:[NSString stringWithUTF8String:nativeShader.data()] options:compileOptions error:&nsError];
                     

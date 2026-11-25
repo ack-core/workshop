@@ -90,7 +90,7 @@ namespace {
     const NativeVertexFormat VTX_CONVERSION_TABLE[] = { // index is InputAttributeFormat value
         {"float2",  "packed_half2",          4, 2},
         {"float4",  "packed_half4",          8, 4},
-        {"float",   "packed_float",          4, 1},
+        {"float",   "float",                 4, 1},
         {"float2",  "packed_float2",         8, 2},
         {"float3",  "packed_float3",        12, 3},
         {"float4",  "packed_float4",        16, 4},
@@ -104,11 +104,11 @@ namespace {
         {"float4",  "rgba16unorm<float4>",   8, 4},
         {"uchar4",  "packed_uchar4",         4, 4},
         {"float4",  "rgba8unorm<float4>",    4, 4},
-        {"int",     "packed_int",            4, 1},
+        {"int",     "int",                   4, 1},
         {"int2",    "packed_int2",           8, 2},
         {"int3",    "packed_int3",          12, 3},
         {"int4",    "packed_int4",          16, 4},
-        {"uint",    "packed_uint",           4, 1},
+        {"uint",    "uint",                  4, 1},
         {"uint2",   "packed_uint2",          8, 2},
         {"uint3",   "packed_uint3",         12, 3},
         {"uint4",   "packed_uint4",         16, 4}
@@ -406,7 +406,7 @@ namespace {
         
         for (const auto &item : desc) {
             const NativeVertexFormat &fmt = VTX_CONVERSION_TABLE[int(item.format)];
-            variables += indent + "const " + fmt.shaderTypeName + " " + prefix + item.name + " = " + std::string(assign) + item.name + ";\n";
+            variables += indent + "const " + fmt.shaderTypeName + " " + prefix + item.name + " = " + fmt.shaderTypeName + "(" + std::string(assign) + item.name + ");\n";
             output += indent + fmt.nativeTypeName + " " + item.name + ";\n";
             offset += fmt.size;
             index++;
