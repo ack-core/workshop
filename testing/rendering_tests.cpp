@@ -1499,6 +1499,91 @@ namespace test {
 }
 
 namespace test {
+    class rendering_multiple_render_targets_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_multiple_render_targets_test>();
+        }
+        void init(const API &api) override {
+            // Fullscreen quad writes red, green, blue, white into four target textures, then each texture drawn into its own screen quarter
+            //
+            const char *fillSrc = R"(
+                fixed {
+                    quad[4] : float2 = [-1.0, 1.0][1.0, 1.0][-1.0, -1.0][1.0, -1.0]
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID], 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = float4(1.0, 0.0, 0.0, 1.0);
+                    output_color[1] = float4(0.0, 1.0, 0.0, 1.0);
+                    output_color[2] = float4(0.0, 0.0, 1.0, 1.0);
+                    output_color[3] = float4(1.0, 1.0, 1.0, 1.0);
+                }
+            )";
+            const char *quarterSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, -1.0][1.0, -1.0]
+                }
+                const {
+                    offset : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] + const_offset.xy, 0.5, 1.0);
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, fragment_coord);
+                }
+            )";
+            _fillShader = api.rendering->createShader(fillSrc, foundation::InputLayout { .repeat = 4 });
+            _quarterShader = api.rendering->createShader(quarterSrc, foundation::InputLayout { .repeat = 4 });
+            _target = api.rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 4, 64, 64, false);
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(_target, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_fillShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(1);
+            });
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                const math::vector4f offsets[4] = { { -1.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f, 0.0f } };
+                rendering.applyShader(_quarterShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+
+                for (std::uint32_t i = 0; i < 4; i++) {
+                    rendering.applyShaderConstants(&offsets[i]);
+                    rendering.applyTextures({ { _target->getTexture(i), foundation::SamplerType::NEAREST } });
+                    rendering.draw(1);
+                }
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_fillShader, nullptr);
+            EXPECT_NOT_EQ(_quarterShader, nullptr);
+            EXPECT_NOT_EQ(_target, nullptr);
+            EXPECT_EQ(_target->getTextureCount(), 4);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            const std::size_t w = foundation::TESTING_RENDER_WIDTH;
+            const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
+
+            EXPECT_TRUE(pixelIs(w / 4, h / 4, 255, 0, 0));              // texture 0: red
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h / 4, 0, 255, 0));          // texture 1: green
+            EXPECT_TRUE(pixelIs(w / 4, h * 3 / 4, 0, 0, 255));          // texture 2: blue
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h * 3 / 4, 255, 255, 255));  // texture 3: white
+            return true;
+        }
+
+    private:
+        foundation::RenderShaderPtr _fillShader;
+        foundation::RenderShaderPtr _quarterShader;
+        foundation::RenderTargetPtr _target;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1521,6 +1606,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_indexed_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_points_and_line_strip_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_vertex_attribute_formats_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_multiple_render_targets_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
