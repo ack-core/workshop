@@ -1,6 +1,5 @@
 
 #include "emitter_baker.h"
-#include "scene.h"
 #include <list>
 
 namespace {
@@ -488,7 +487,7 @@ namespace core {
                     element.angle = 0.0f;
                     element.alpha = _alphaGraph.getValue(lifeKoeff, ptc->spreadKoeffAlpha);
                     element.mask = std::uint8_t(loop + 1); // Mask: 1 - newborn, 2 - old
-                    element.history = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 255 = 255 * BakingTimeSec)
+                    element.history = std::uint8_t(std::min(float(core::MAX_PARTICLES_POSITION_HISTORY - 1), ptcAbsTimeMs / bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 254 = 254 * BakingTimeSec)
                     
                     if (lifeKoeff < std::numeric_limits<float>::epsilon()) { // mark where the particle starts
                         element.mask |= 128;

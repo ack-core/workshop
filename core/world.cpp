@@ -328,7 +328,7 @@ namespace core {
         void update(ObjectImpl &obj, float dtSec) override {
             if (_enabled && _particles) {
                 _particles->setTransform(worldTransform);
-                _particles->setTime(_t, 0.0f);
+                _particles->setTimings(_t, 0.0f, {});
                 _t += dtSec;
             }
         }

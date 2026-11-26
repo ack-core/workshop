@@ -149,7 +149,7 @@ namespace test {
 
             api.scene->setCameraLookAt({20.0f, 20.0f, 20.0f}, {0.0f, 5.0f, 0.0f});
             _particles = api.scene->addParticles(texture, baker->getMap(api.rendering), desc);
-            _particles->setTime(0.5f, 0.0f);
+            _particles->setTimings(0.5f, 0.0f, {});
         }
         void updateAndDraw(const API &api) override {}
         std::uint8_t getThreshold() const override {
@@ -203,7 +203,7 @@ namespace test {
 
             api.scene->setCameraLookAt({15.0f, 20.0f, 15.0f}, {0.0f, 2.5f, 0.0f});
             _particles = api.scene->addParticles(texture, baker->getMap(api.rendering), desc);
-            _particles->setTime(0.875f, 0.0f);
+            _particles->setTimings(0.875f, 0.0f, {});
         }
         void updateAndDraw(const API &api) override {}
         std::uint8_t getThreshold() const override {
