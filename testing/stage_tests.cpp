@@ -1,6 +1,19 @@
 
 #include "runner.h"
 
+namespace {
+    math::vector2f stage_send_pointer(const test::API &api, foundation::PlatformPointerEventArgs::EventType type, float x, float y) {
+        const float scale = api.platform->getScreenScale();
+        foundation::PlatformPointerEventArgs args {};
+        args.type = type;
+        args.pointerID = 0;
+        args.coordinateX = std::floor(x * scale + 0.5f);
+        args.coordinateY = std::floor(y * scale + 0.5f);
+        api.platform->sendPointerEvent(args);
+        return {args.coordinateX / scale, args.coordinateY / scale};
+    }
+}
+
 namespace test {
     bool stage_statistics_test(const API &api) {
         const char *STAGE_TEXTURE = "stage_tests/stage_texture";
@@ -120,17 +133,6 @@ namespace test {
         EXPECT_EQ(stats.textBlocksCount, 0);
         EXPECT_EQ(api.stage->getNamedElement("stage_clear_pivot"), nullptr);
         return true;
-    }
-
-    static math::vector2f stage_send_pointer(const API &api, foundation::PlatformPointerEventArgs::EventType type, float x, float y) {
-        const float scale = api.platform->getScreenScale();
-        foundation::PlatformPointerEventArgs args {};
-        args.type = type;
-        args.pointerID = 0;
-        args.coordinateX = std::floor(x * scale + 0.5f);
-        args.coordinateY = std::floor(y * scale + 0.5f);
-        api.platform->sendPointerEvent(args);
-        return {args.coordinateX / scale, args.coordinateY / scale};
     }
 
     bool stage_interactor_action_handler_test(const API &api) {
