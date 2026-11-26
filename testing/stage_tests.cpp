@@ -224,6 +224,43 @@ namespace test {
 }
 
 namespace test {
+    class stage_pivot_screen_world_position_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<stage_pivot_screen_world_position_test>();
+        }
+        void init(const API &api) override {
+            api.scene->setCameraLookAt({45.0f, 45.0f, 45.0f}, {0.0f, 0.0f, 0.0f});
+            _screen = api.stage->addPivot(std::nullopt, nullptr, {.anchorOffset = {7.0f, 8.0f}});
+            _screen->setWorldPosition(WORLD_POSITION);
+            _screen->setScreenPosition({30.0f, 40.0f});
+            _world = api.stage->addPivot(std::nullopt, nullptr, {});
+            _world->setScreenPosition({30.0f, 40.0f});
+            _world->setWorldPosition(WORLD_POSITION);
+            _screenChild = api.stage->addPivot(std::nullopt, _screen, {.anchorOffset = {1.0f, 2.0f}});
+            _worldChild = api.stage->addPivot(std::nullopt, _world, {.anchorOffset = {1.0f, 2.0f}});
+        }
+        bool testResult(const API &api) override {
+            const math::vector2f expected = api.scene->getScreenCoordinates(WORLD_POSITION) / api.platform->getScreenScale();
+
+            EXPECT_EQ_F(_screen->getPosition().x, 30.0f);
+            EXPECT_EQ_F(_screen->getPosition().y, 40.0f);
+            EXPECT_EQ_F(_screenChild->getPosition().x, 31.0f);
+            EXPECT_EQ_F(_screenChild->getPosition().y, 42.0f);
+            EXPECT_LT(std::fabs(_world->getPosition().x - expected.x), 0.01f);
+            EXPECT_LT(std::fabs(_world->getPosition().y - expected.y), 0.01f);
+            EXPECT_LT(std::fabs(_worldChild->getPosition().x - expected.x - 1.0f), 0.01f);
+            EXPECT_LT(std::fabs(_worldChild->getPosition().y - expected.y - 2.0f), 0.01f);
+            return true;
+        }
+
+    private:
+        const math::vector3f WORLD_POSITION = {3.0f, 2.0f, -1.0f};
+        ui::PivotPtr _screen, _world, _screenChild, _worldChild;
+    };
+}
+
+namespace test {
     void registerStageTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(stage_statistics_test);
         REGISTER_UNIT_TEST(stage_named_element_test);
@@ -232,5 +269,6 @@ namespace test {
         REGISTER_UNIT_TEST(stage_clear_test);
         REGISTER_UNIT_TEST(stage_interactor_action_handler_test);
         REGISTER_UNIT_TEST(stage_interactor_active_area_test);
+        REGISTER_STEP_TEST(stage_pivot_screen_world_position_test);
     }
 }
