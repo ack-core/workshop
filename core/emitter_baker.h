@@ -28,7 +28,7 @@ namespace core {
         };
 
     public:
-        // Set emitter parameters. Missing values are zero/false/empty
+        // Set emitter parameters. 
         // @desc - emitter description:
         //         emissionTimeMs        : integer, duration of one emission cycle
         //         particleLifeTimeMs    : integer
