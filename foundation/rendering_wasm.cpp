@@ -447,7 +447,9 @@ namespace foundation {
             webgl_applyShader(_currentShader->getWebGLShader(), std::uint32_t(depthBehavior), std::uint32_t(blendType));
         }
     }
-    
+
+    void WASMRendering::setWireframeEnabled(bool enabled) {}
+
     void WASMRendering::applyShaderConstants(const void *constants) {
         if (_currentShader) {
             const std::uint32_t requiredLength = _currentShader->getConstBufferLength();

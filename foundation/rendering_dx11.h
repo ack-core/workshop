@@ -132,6 +132,7 @@ namespace foundation {
 
         void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
+        void setWireframeEnabled(bool enabled) override;
         void applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
         void applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
         void applyShaderConstants(const void *constants) override;
@@ -181,7 +182,7 @@ namespace foundation {
         static const std::uint32_t DYNAMIC_BUFFER_LENGTH = 1024 * 1024;
         std::uint32_t _dynamicBufferOffset = DYNAMIC_BUFFER_LENGTH; // forces discard on the first use
 
-        ComPtr<ID3D11RasterizerState> _rasterState;
+        ComPtr<ID3D11RasterizerState> _rasterStates[2];         // index is wireframe flag
         ComPtr<ID3D11BlendState> _blendStates[4];               // index is BlendType value
         ComPtr<ID3D11DepthStencilState> _depthStates[4];        // index is DepthBehavior value
         ComPtr<ID3D11SamplerState> _samplerStates[2];           // index is SamplerType value

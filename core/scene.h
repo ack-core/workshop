@@ -217,6 +217,10 @@ namespace core {
         //
         virtual void setAOEnabled(bool enabled) = 0;
 
+        // Draw gbuffer geometry as triangle edges
+        //
+        virtual void setWireframeEnabled(bool enabled) = 0;
+
         // Returns counters usable in statistics and testing. Released objects are counted until next updateAndDraw
         //
         virtual auto getStatistics() const -> StatInfo = 0;

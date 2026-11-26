@@ -545,7 +545,8 @@ namespace foundation {
             
             _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
             [_currentRenderCommandEncoder setViewport:viewPort];
-            
+            setWireframeEnabled(_isWireframe);
+
             pass(*this);
             
             [_currentRenderCommandEncoder endEncoding];
@@ -576,6 +577,7 @@ namespace foundation {
                 viewPort.height = _frameConstants.rtBounds.y = _platform->getScreenHeight();
                 _appendConstantBuffer(&_frameConstants, sizeof(FrameConstants), FRAME_CONST_BINDING_INDEX);
                 [_currentRenderCommandEncoder setViewport:viewPort];
+                setWireframeEnabled(_isWireframe);
             }
             
             const MetalShader *platformShader = static_cast<const MetalShader *>(shader.get());
@@ -628,7 +630,12 @@ namespace foundation {
             }
         }
     }
-        
+
+    void MetalRendering::setWireframeEnabled(bool enabled) {
+        _isWireframe = enabled;
+        [_currentRenderCommandEncoder setTriangleFillMode:enabled ? MTLTriangleFillModeLines : MTLTriangleFillModeFill];
+    }
+
     void MetalRendering::applyShaderConstants(const void *constants) {
         if (_currentRenderCommandEncoder) {
             const MetalShader *platformShader = static_cast<const MetalShader *>(_currentShader.get());
