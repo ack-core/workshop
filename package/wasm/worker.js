@@ -66,7 +66,6 @@ onmessage = (msg) => {
         });
     }
     if (msg.data.type == EventType.BTASK) {
-        instance.exports.taskExecute(msg.data.task);
         postMessage({type: EventType.FTASK, task: msg.data.task});
     }
 };
