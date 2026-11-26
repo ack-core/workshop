@@ -551,6 +551,42 @@ namespace test {
         EXPECT_EQ(api.rendering->createShader(unknownBlock, layout, true), nullptr);
         return true;
     }
+
+    bool shader_multiple_output_colors_test(const API& api) {
+        // 'fssrc' can write all four 'output_color' targets as whole values and by swizzled components
+        //
+        const char* wholeSrc = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc {
+                output_color[0] = float4(1.0, 0.0, 0.0, 1.0);
+                output_color[1] = float4(0.0, 1.0, 0.0, 1.0);
+                output_color[2] = float4(fragment_coord, 0.0, 1.0);
+                output_color[3] = output_color[0] + output_color[1];
+            }
+        )";
+        const char* swizzledSrc = R"(
+            vssrc {
+                output_position = float4(0.0, 0.0, 0.5, 1.0);
+            }
+            fssrc {
+                output_color[0].rgb = float3(1.0, 0.5, 0.25);
+                output_color[0].a = 1.0;
+                output_color[1].xy = fragment_coord;
+                output_color[1].zw = float2(0.0, 1.0);
+                output_color[2].r = output_color[0].g;
+                output_color[2].gba = output_color[1].xzw;
+                output_color[3] = output_color[2].wzyx;
+            }
+        )";
+        const foundation::InputLayout layout = foundation::InputLayout {
+            .repeat = 4
+        };
+        EXPECT_NOT_EQ(api.rendering->createShader(wholeSrc, layout), nullptr);
+        EXPECT_NOT_EQ(api.rendering->createShader(swizzledSrc, layout), nullptr);
+        return true;
+    }
 }
 
 namespace test {
@@ -568,5 +604,6 @@ namespace test {
         REGISTER_UNIT_TEST(shader_texture_types_test);
         REGISTER_UNIT_TEST(shader_frame_data_test);
         REGISTER_UNIT_TEST(shader_block_errors_test);
+        REGISTER_UNIT_TEST(shader_multiple_output_colors_test);
     }
 }
