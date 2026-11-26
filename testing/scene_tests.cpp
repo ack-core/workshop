@@ -544,6 +544,50 @@ namespace test {
         core::SceneInterface::GroundMeshPtr _transformed;
         core::SceneInterface::GroundMeshPtr _hidden;
     };
+
+    class scene_textured_vegetation_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_textured_vegetation_test>();
+        }
+        void init(const API &api) override {
+            const std::uint8_t cells[] = {
+                1, 1, 0, 0,   255, 255, 0, 0,   1, 1, 0, 0,
+                255, 255, 0, 0,   1, 2, 0, 0,   255, 255, 0, 0,
+                1, 1, 0, 0,   255, 255, 0, 0,   1, 2, 0, 0,
+            };
+            const std::uint8_t indexes[] = {
+                10, 0,
+                40, 120,
+            };
+            ByteDataPtr map = std::make_unique<std::uint8_t[]>(sizeof(cells));
+            std::memcpy(map.get(), cells, sizeof(cells));
+            const foundation::RenderTexturePtr texture = api.rendering->createTexture(foundation::RenderTextureFormat::R8UN, 2, 2, {indexes});
+            const util::Description desc = util::Description::parse("textureRowSize : integer = 2");
+
+            api.scene->setCameraLookAt({4.0f, 6.0f, 10.0f}, {1.0f, 0.0f, 1.0f});
+            _positioned = api.scene->addVegetation(map, {3, 3, 1}, desc, texture);
+            _positioned->setPosition({-2.0f, 0.0f, 0.0f});
+            _other = api.scene->addVegetation(map, {3, 3, 2}, desc, texture);
+            _other->setPosition({2.0f, 0.0f, 0.0f});
+            _hidden = api.scene->addVegetation(map, {3, 3, 1}, desc, texture);
+            _hidden->setPosition({2.0f, 0.0f, 0.0f});
+            _hidden->setEnabled(false);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::VegetationPtr _positioned;
+        core::SceneInterface::VegetationPtr _other;
+        core::SceneInterface::VegetationPtr _hidden;
+    };
 }
 
 namespace test {
@@ -666,5 +710,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_ao_enabled_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_ao_disabled_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_vegetation_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_textured_vegetation_test);
     }
 }
