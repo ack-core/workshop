@@ -442,7 +442,7 @@ namespace core {
                 
                 if (loop == 0) {
                     float emissinGraphFilling = _emissionGraph.getFilling(nextEmissionTimeKoeff);
-                    const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling));
+                    const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling - 0.001f));
                     const std::size_t nextParticleCount = std::min(i / cycleLength * _particlesToEmit + nextEmissionGraphValue, _isLooped ? std::size_t(-1) : _particlesToEmit);
                     
                     for (std::size_t c = bornParticleCount; c < nextParticleCount; c++) {
