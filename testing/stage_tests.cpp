@@ -261,6 +261,44 @@ namespace test {
 }
 
 namespace test {
+    class stage_text_line_size_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<stage_text_line_size_test>();
+        }
+        void init(const API &api) override {
+            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 0, {});
+        }
+        bool testResult(const API &api) override {
+            ui::TextLinePtr line = api.stage->addTextLine(std::nullopt, nullptr, {.anchorOffset = {3.0f, 4.0f}, .fontSize = FONT_SIZE});
+            ui::TextBlockPtr next = api.stage->addTextBlock(std::nullopt, nullptr, {.anchorTarget = line, .anchorH = ui::HorizontalAnchor::RIGHTSIDE});
+
+            line->setText("");
+            api.stage->updateAndDraw(0.0f);
+
+            EXPECT_EQ_F(line->getSize().x, 0.0f);
+            EXPECT_EQ_F(line->getSize().y, float(FONT_SIZE));
+            EXPECT_EQ_F(next->getPosition().x, 3.0f);
+
+            const math::vector2f expected = api.fontAtlasProvider->getTextWidth(TEXT, FONT_SIZE);
+            line->setText(TEXT);
+            api.stage->updateAndDraw(0.0f);
+
+            EXPECT_LT(0.0f, expected.x);
+            EXPECT_EQ_F(line->getSize().x, expected.x);
+            EXPECT_EQ_F(line->getSize().y, float(FONT_SIZE));
+            EXPECT_EQ_F(next->getPosition().x, 3.0f + expected.x);
+            EXPECT_NOT_EQ(line->getTexture(), nullptr);
+            return true;
+        }
+
+    private:
+        static constexpr const char *TEXT = "Size";
+        static constexpr std::uint8_t FONT_SIZE = 16;
+    };
+}
+
+namespace test {
     void registerStageTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(stage_statistics_test);
         REGISTER_UNIT_TEST(stage_named_element_test);
@@ -270,5 +308,6 @@ namespace test {
         REGISTER_UNIT_TEST(stage_interactor_action_handler_test);
         REGISTER_UNIT_TEST(stage_interactor_active_area_test);
         REGISTER_STEP_TEST(stage_pivot_screen_world_position_test);
+        REGISTER_STEP_TEST(stage_text_line_size_test);
     }
 }
