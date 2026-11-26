@@ -124,6 +124,11 @@ function fixedArraysToUniforms(src, fixedArrays) {
         return `uniform mediump ${type} ${name}[${count}];`;
     });
 }
+function texelArray(type, offset, length) {
+    if (type == glcontext.FLOAT) return new Float32Array(memory.buffer, offset, length / 4);
+    if (type == glcontext.HALF_FLOAT) return new Uint16Array(memory.buffer, offset, length / 2);
+    return new Uint8Array(memory.buffer, offset, length);
+}
 const dtypes = {
     0: function() {},
     1: function() {
@@ -371,7 +376,7 @@ const imports = {
             for (let i = 0; i < mipCount; i++) {
                 const mw = w >> i;
                 const mh = h >> i;
-                const mipData = new Uint8Array(memory.buffer, mipPtrs[i], mw * mh * size);
+                const mipData = texelArray(type, mipPtrs[i], mw * mh * size);
                 glcontext.pixelStorei(glcontext.UNPACK_ALIGNMENT, 1);
                 glcontext.texSubImage2D(glcontext.TEXTURE_2D, i, 0, 0, mw, mh, format, type, mipData);
             }
@@ -388,7 +393,7 @@ const imports = {
             glcontext.texStorage2D(glcontext.TEXTURE_CUBE_MAP, 1, internal, w, h);
 
             for (let i = 0; i < 6; i++) {
-                const faceData = new Uint8Array(memory.buffer, faces + i * faceLength, faceLength);
+                const faceData = texelArray(type, faces + i * faceLength, faceLength);
                 glcontext.pixelStorei(glcontext.UNPACK_ALIGNMENT, 1);
                 glcontext.texSubImage2D(glcontext.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, 0, w, h, format, type, faceData);
             }
