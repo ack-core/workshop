@@ -1592,6 +1592,115 @@ namespace test {
 }
 
 namespace test {
+    class rendering_texture_formats_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_texture_formats_test>();
+        }
+        void init(const API &api) override {
+            // 3x3 grid of quads, each samples 1x1 texture of one format: green if sampled components match uploaded data, red otherwise
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][0.5, 0.0][0.0, -0.5][0.5, -0.5]
+                }
+                const {
+                    offset : float4
+                    expected : float4
+                    mask : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] + const_offset.xy, 0.5, 1.0);
+                }
+                fssrc {
+                    float err = _dot(_abs(_tex2d(0, float2(0.5, 0.5)) - const_expected), const_mask);
+                    output_color[0] = _select(float4(1.0, 0.0, 0.0, 1.0), float4(0.0, 1.0, 0.0, 1.0), err < 0.01);
+                }
+            )";
+            const std::uint8_t r8[] = { 51 };
+            const std::uint16_t r16[] = { 0xC000 };
+            const float r32[] = { 3.5f };
+            const std::uint8_t rg8[] = { 255, 102 };
+            const std::uint16_t rg16[] = { 0x3800, 0x4400 };
+            const float rg32[] = { -1.5f, 100.0f };
+            const std::uint16_t rgba16[] = { 0x3C00, 0xBC00, 0x4900, 0x3400 };
+            const float rgba32[] = { 0.125f, 2.0f, -3.0f, 1000.0f };
+
+            _shader = api.rendering->createShader(shaderSrc, foundation::InputLayout { .repeat = 4 });
+            _textures[0] = api.rendering->createTexture(foundation::RenderTextureFormat::R8UN, 1, 1, { r8 });
+            _textures[1] = api.rendering->createTexture(foundation::RenderTextureFormat::R16F, 1, 1, { r16 });
+            _textures[2] = api.rendering->createTexture(foundation::RenderTextureFormat::R32F, 1, 1, { r32 });
+            _textures[3] = api.rendering->createTexture(foundation::RenderTextureFormat::RG8UN, 1, 1, { rg8 });
+            _textures[4] = api.rendering->createTexture(foundation::RenderTextureFormat::RG16F, 1, 1, { rg16 });
+            _textures[5] = api.rendering->createTexture(foundation::RenderTextureFormat::RG32F, 1, 1, { rg32 });
+            _textures[6] = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA16F, 1, 1, { rgba16 });
+            _textures[7] = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA32F, 1, 1, { rgba32 });
+        }
+        void updateAndDraw(const API &api) override {
+            const math::vector4f r = { 1.0f, 0.0f, 0.0f, 0.0f };
+            const math::vector4f rg = { 1.0f, 1.0f, 0.0f, 0.0f };
+            const math::vector4f rgba = { 1.0f, 1.0f, 1.0f, 1.0f };
+            const Constants constants[8] = {
+                { { -0.9f, 0.9f, 0.0f, 0.0f }, { 0.2f, 0.0f, 0.0f, 0.0f }, r },
+                { { -0.3f, 0.9f, 0.0f, 0.0f }, { -2.0f, 0.0f, 0.0f, 0.0f }, r },
+                { { 0.3f, 0.9f, 0.0f, 0.0f }, { 3.5f, 0.0f, 0.0f, 0.0f }, r },
+                { { -0.9f, 0.3f, 0.0f, 0.0f }, { 1.0f, 0.4f, 0.0f, 0.0f }, rg },
+                { { -0.3f, 0.3f, 0.0f, 0.0f }, { 0.5f, 4.0f, 0.0f, 0.0f }, rg },
+                { { 0.3f, 0.3f, 0.0f, 0.0f }, { -1.5f, 100.0f, 0.0f, 0.0f }, rg },
+                { { -0.9f, -0.3f, 0.0f, 0.0f }, { 1.0f, -1.0f, 10.0f, 0.25f }, rgba },
+                { { -0.3f, -0.3f, 0.0f, 0.0f }, { 0.125f, 2.0f, -3.0f, 1000.0f }, rgba },
+            };
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+
+                for (std::uint32_t i = 0; i < 8; i++) {
+                    rendering.applyShaderConstants(&constants[i]);
+                    rendering.applyTextures({ { _textures[i], foundation::SamplerType::NEAREST } });
+                    rendering.draw(1);
+                }
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_EQ(_textures[0]->getFormat(), foundation::RenderTextureFormat::R8UN);
+            EXPECT_EQ(_textures[1]->getFormat(), foundation::RenderTextureFormat::R16F);
+            EXPECT_EQ(_textures[2]->getFormat(), foundation::RenderTextureFormat::R32F);
+            EXPECT_EQ(_textures[3]->getFormat(), foundation::RenderTextureFormat::RG8UN);
+            EXPECT_EQ(_textures[4]->getFormat(), foundation::RenderTextureFormat::RG16F);
+            EXPECT_EQ(_textures[5]->getFormat(), foundation::RenderTextureFormat::RG32F);
+            EXPECT_EQ(_textures[6]->getFormat(), foundation::RenderTextureFormat::RGBA16F);
+            EXPECT_EQ(_textures[7]->getFormat(), foundation::RenderTextureFormat::RGBA32F);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == 0 && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(90, 90, 0, 255));     // R8UN
+            EXPECT_TRUE(pixelIs(243, 90, 0, 255));    // R16F
+            EXPECT_TRUE(pixelIs(397, 90, 0, 255));    // R32F
+            EXPECT_TRUE(pixelIs(90, 243, 0, 255));    // RG8UN
+            EXPECT_TRUE(pixelIs(243, 243, 0, 255));   // RG16F
+            EXPECT_TRUE(pixelIs(397, 243, 0, 255));   // RG32F
+            EXPECT_TRUE(pixelIs(90, 397, 0, 255));    // RGBA16F
+            EXPECT_TRUE(pixelIs(243, 397, 0, 255));   // RGBA32F
+            EXPECT_TRUE(pixelIs(397, 397, 0, 0));     // empty
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f offset;
+            math::vector4f expected;
+            math::vector4f mask;
+        };
+
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderTexturePtr _textures[8];
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1615,6 +1724,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_points_and_line_strip_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_vertex_attribute_formats_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_multiple_render_targets_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_texture_formats_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
