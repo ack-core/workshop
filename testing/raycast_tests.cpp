@@ -171,6 +171,34 @@ namespace test {
         EXPECT_EQ_F(hit.point.z, 9.0f);
         return true;
     }
+
+    bool raycast_nearest_of_several_shapes_test(const API &api) {
+        util::Description desc;
+        desc.setInteger("type", std::int64_t(core::RaycastInterface::ShapeType::SPHERES));
+        desc.setNumber("radiuses", 1.0);
+        desc.setVector3f("points", math::vector3f(80.0f, 0.0f, 15.0f));
+        const core::RaycastInterface::ShapePtr farthest =api.raycast->addShape(desc, 41);
+        desc.setVector3f("points", math::vector3f(80.0f, 0.0f, 5.0f));
+        const core::RaycastInterface::ShapePtr nearest = api.raycast->addShape(desc, 42);
+        desc.setVector3f("points", math::vector3f(80.0f, 0.0f, 10.0f));
+        const core::RaycastInterface::ShapePtr middle = api.raycast->addShape(desc, 43);
+
+        const math::vector3f start = math::vector3f(80.0f, 0.0f, 0.0f);
+        const math::vector3f dir = math::vector3f(0.0f, 0.0f, 1.0f);
+        const core::RaycastInterface::RaycastResult first = api.raycast->rayCast(start, dir, 20.0f);
+        EXPECT_EQ(first.uniqueId, 42u);
+        EXPECT_EQ_F(first.point.z, 4.0f);
+
+        nearest->setEnabled(false);
+        const core::RaycastInterface::RaycastResult second = api.raycast->rayCast(start, dir, 20.0f);
+        EXPECT_EQ(second.uniqueId, 43u);
+        EXPECT_EQ_F(second.point.z, 9.0f);
+
+        const core::RaycastInterface::RaycastResult back = api.raycast->rayCast(math::vector3f(80.0f, 0.0f, 20.0f), math::vector3f(0.0f, 0.0f, -1.0f), 20.0f);
+        EXPECT_EQ(back.uniqueId, 41u);
+        EXPECT_EQ_F(back.point.z, 16.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -181,5 +209,6 @@ namespace test {
         REGISTER_UNIT_TEST(raycast_compound_spheres_test);
         REGISTER_UNIT_TEST(raycast_compound_boxes_test);
         REGISTER_UNIT_TEST(raycast_shape_lifetime_test);
+        REGISTER_UNIT_TEST(raycast_nearest_of_several_shapes_test);
     }
 }
