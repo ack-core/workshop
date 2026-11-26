@@ -809,6 +809,51 @@ namespace test {
 
         return true;
     }
+
+    bool math_vector_comparison_test(const API &api) {
+        const float half = math::EPSILON * 0.5f;
+        const float twice = math::EPSILON * 2.0f;
+
+        const math::vector2f a2(1.0f, 2.0f);
+        EXPECT_TRUE(a2 == math::vector2f(1.0f, 2.0f));
+        EXPECT_TRUE(a2 == math::vector2f(1.0f, 2.0f) + math::vector2f(half, 0.0f));
+        EXPECT_TRUE(math::vector2f(0.0f, half) == math::vector2f(0.0f));
+        EXPECT_FALSE(math::vector2f(0.0f, twice) == math::vector2f(0.0f));
+        EXPECT_TRUE(a2 != math::vector2f(2.0f, 1.0f));
+        EXPECT_FALSE(a2 != math::vector2f(1.0f, 2.0f));
+        EXPECT_TRUE(a2.yx == math::vector2f(2.0f, 1.0f));
+
+        const math::vector3f a3(1.0f, 2.0f, 3.0f);
+        EXPECT_TRUE(a3 == math::vector3f(1.0f, 2.0f, 3.0f));
+        EXPECT_TRUE(math::vector3f(half, 0.0f, half) == math::vector3f(0.0f));
+        EXPECT_TRUE(math::vector3f(0.0f, 0.0f, twice) != math::vector3f(0.0f));
+        EXPECT_FALSE(a3 != math::vector3f(1.0f, 2.0f, 3.0f));
+        EXPECT_TRUE(a3.zyx == math::vector3f(3.0f, 2.0f, 1.0f));
+        EXPECT_TRUE(a3.xy != a3.yx);
+
+        const math::vector4f a4(1.0f, 2.0f, 3.0f, 4.0f);
+        const math::vector4f b4(3.0f, 4.0f, 1.0f, 2.0f);
+        EXPECT_TRUE(a4 == math::vector4f(1.0f, 2.0f, 3.0f, 4.0f));
+        EXPECT_TRUE(math::vector4f(0.0f, 0.0f, 0.0f, half) == math::vector4f(0.0f));
+        EXPECT_TRUE(math::vector4f(twice, 0.0f, 0.0f, 0.0f) != math::vector4f(0.0f));
+        EXPECT_TRUE(a4 != b4);
+        EXPECT_TRUE(a4.xy == b4.zw);
+        EXPECT_TRUE(a4.zw == b4.xy);
+        EXPECT_FALSE(a4.xyz == b4.xyz);
+        EXPECT_TRUE(a4.zwxy == b4);
+
+        EXPECT_TRUE(math::vector2i(1, 2) == math::vector2i(1, 2));
+        EXPECT_TRUE(math::vector2i(1, 2) != math::vector2i(2, 1));
+        EXPECT_FALSE(math::vector2i(1, 2) != math::vector2i(1, 2));
+        EXPECT_TRUE(math::vector3i(1, 2, 3) == math::vector3i(1, 2, 3));
+        EXPECT_TRUE(math::vector3i(1, 2, 3) != math::vector3i(1, 2, 4));
+        EXPECT_FALSE(math::vector3i(1, 2, 3) == math::vector3i(0, 2, 3));
+        EXPECT_TRUE(math::vector4i(1, 2, 3, 4) == math::vector4i(1, 2, 3, 4));
+        EXPECT_TRUE(math::vector4i(1, 2, 3, 4) != math::vector4i(1, 2, 3, 5));
+        EXPECT_FALSE(math::vector4i(1, 2, 3, 4) != math::vector4i(1, 2, 3, 4));
+
+        return true;
+    }
 }
 
 
@@ -834,5 +879,6 @@ namespace test {
         REGISTER_UNIT_TEST(math_quaternion_axis_rotation_test);
         REGISTER_UNIT_TEST(math_swizzle_atv4_test);
         REGISTER_UNIT_TEST(math_vector_int_ctors_test);
+        REGISTER_UNIT_TEST(math_vector_comparison_test);
     }
 }
