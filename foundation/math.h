@@ -16,6 +16,8 @@ static const float MATH_PI = 3.14159265f;
 namespace math {
     using scalar = float;
     using integer = int;
+
+    static const scalar EPSILON = std::numeric_limits<scalar>::epsilon();
     
     struct vector2f;
     struct vector3f;
@@ -603,6 +605,32 @@ namespace math {
         return {v0[X0] - v1[X1], v0[Y0] - v1[Y1]};
     }
 
+    template<int X0, int Y0, int Z0, int W0, int X1, int Y1, int Z1, int W1>
+    inline bool operator ==(const swizzle4f<X0, Y0, Z0, W0> &v0, const swizzle4f<X1, Y1, Z1, W1> &v1) {
+        return std::fabs(v0[X0] - v1[X1]) <= EPSILON && std::fabs(v0[Y0] - v1[Y1]) <= EPSILON && std::fabs(v0[Z0] - v1[Z1]) <= EPSILON && std::fabs(v0[W0] - v1[W1]) <= EPSILON;
+    }
+    template<int X0, int Y0, int Z0, int X1, int Y1, int Z1>
+    inline bool operator ==(const swizzle3f<X0, Y0, Z0> &v0, const swizzle3f<X1, Y1, Z1> &v1) {
+        return std::fabs(v0[X0] - v1[X1]) <= EPSILON && std::fabs(v0[Y0] - v1[Y1]) <= EPSILON && std::fabs(v0[Z0] - v1[Z1]) <= EPSILON;
+    }
+    template<int X0, int Y0, int X1, int Y1>
+    inline bool operator ==(const swizzle2f<X0, Y0> &v0, const swizzle2f<X1, Y1> &v1) {
+        return std::fabs(v0[X0] - v1[X1]) <= EPSILON && std::fabs(v0[Y0] - v1[Y1]) <= EPSILON;
+    }
+
+    template<int X0, int Y0, int Z0, int W0, int X1, int Y1, int Z1, int W1>
+    inline bool operator !=(const swizzle4f<X0, Y0, Z0, W0> &v0, const swizzle4f<X1, Y1, Z1, W1> &v1) {
+        return !(v0 == v1);
+    }
+    template<int X0, int Y0, int Z0, int X1, int Y1, int Z1>
+    inline bool operator !=(const swizzle3f<X0, Y0, Z0> &v0, const swizzle3f<X1, Y1, Z1> &v1) {
+        return !(v0 == v1);
+    }
+    template<int X0, int Y0, int X1, int Y1>
+    inline bool operator !=(const swizzle2f<X0, Y0> &v0, const swizzle2f<X1, Y1> &v1) {
+        return !(v0 == v1);
+    }
+
     //---
 
     template<int Ix, int Iy>
@@ -1065,6 +1093,25 @@ namespace math {
         vector4i(const integer (&xyzw)[4]) : x(xyzw[0]), y(xyzw[1]), z(xyzw[2]), w(xyzw[3]) {}
         vector4i(integer x, integer y, integer z, integer w) : x(x), y(y), z(z), w(w) {}
     };
+
+    inline bool operator ==(const vector2i &v0, const vector2i &v1) {
+        return v0.x == v1.x && v0.y == v1.y;
+    }
+    inline bool operator ==(const vector3i &v0, const vector3i &v1) {
+        return v0.x == v1.x && v0.y == v1.y && v0.z == v1.z;
+    }
+    inline bool operator ==(const vector4i &v0, const vector4i &v1) {
+        return v0.x == v1.x && v0.y == v1.y && v0.z == v1.z && v0.w == v1.w;
+    }
+    inline bool operator !=(const vector2i &v0, const vector2i &v1) {
+        return !(v0 == v1);
+    }
+    inline bool operator !=(const vector3i &v0, const vector3i &v1) {
+        return !(v0 == v1);
+    }
+    inline bool operator !=(const vector4i &v0, const vector4i &v1) {
+        return !(v0 == v1);
+    }
 }
 
 namespace math {
