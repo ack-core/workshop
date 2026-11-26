@@ -599,7 +599,9 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_scale_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_set_frame_test);
+#ifndef PLATFORM_WASM
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_wireframe_test);
+#endif
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_bounding_shapes_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
