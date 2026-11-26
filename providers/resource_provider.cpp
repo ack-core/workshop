@@ -5,7 +5,6 @@
 
 #include "thirdparty/upng/upng.h"
 
-#include <algorithm>
 #include <list>
 #include <memory>
 
@@ -122,21 +121,26 @@ namespace {
                     const std::uint32_t voxelCount = *(std::uint32_t *)data;
                     data += sizeof(std::uint32_t);
                     ctx.voxels[f].resize(voxelCount);
-                    
+                    std::uint32_t kept = 0;
+
                     for (std::uint32_t i = 0; i < voxelCount; i++) {
                         const MeshAsyncContext::Voxel &src = *(MeshAsyncContext::Voxel *)data;
-                        MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][i];
-                        voxel.positionX = src.positionX - std::int16_t(originOffset.x);
-                        voxel.positionY = src.positionY - std::int16_t(originOffset.y);
-                        voxel.positionZ = src.positionZ - std::int16_t(originOffset.z);
-                        voxel.colorIndex = src.colorIndex;
-                        voxel.mask = src.mask;
-                        voxel.scaleX = std::max(std::uint8_t(1), src.scaleX);
-                        voxel.scaleY = std::max(std::uint8_t(1), src.scaleY);
-                        voxel.scaleZ = std::max(std::uint8_t(1), src.scaleZ);
-
                         data += sizeof(MeshAsyncContext::Voxel);
+
+                        if (src.scaleX && src.scaleY && src.scaleZ) {
+                            MeshAsyncContext::VTXMVOX &voxel = ctx.voxels[f][kept++];
+                            voxel.positionX = src.positionX - std::int16_t(originOffset.x);
+                            voxel.positionY = src.positionY - std::int16_t(originOffset.y);
+                            voxel.positionZ = src.positionZ - std::int16_t(originOffset.z);
+                            voxel.colorIndex = src.colorIndex;
+                            voxel.mask = src.mask;
+                            voxel.scaleX = src.scaleX;
+                            voxel.scaleY = src.scaleY;
+                            voxel.scaleZ = src.scaleZ;
+                        }
                     }
+
+                    ctx.voxels[f].resize(kept);
                 }
             }
         }
@@ -238,21 +242,24 @@ namespace {
                             
                             for (std::uint32_t frame = 0; frame < frameCount; frame++) {
                                 const std::uint32_t voxelCount = *(std::uint32_t *)voxptr;
-                                const std::unique_ptr<std::uint8_t[]> &ptr = ctx.vg[i].sourceData.emplace_back(std::make_pair(math::vector2i(voxelCount, 0), std::make_unique<std::uint8_t[]>(sizeof(MeshAsyncContext::VTXMVOX) * voxelCount))).second;
+                                std::pair<math::vector2i, ByteDataPtr> &entry = ctx.vg[i].sourceData.emplace_back(std::make_pair(math::vector2i(0, 0), std::make_unique<std::uint8_t[]>(sizeof(MeshAsyncContext::VTXMVOX) * voxelCount)));
+                                const MeshAsyncContext::Voxel *src = (const MeshAsyncContext::Voxel *)(voxptr + 4);
+                                MeshAsyncContext::VTXMVOX *voxels = reinterpret_cast<MeshAsyncContext::VTXMVOX *>(entry.second.get());
 
                                 for (std::uint32_t c = 0; c < voxelCount; c++) {
-                                    const MeshAsyncContext::Voxel *src = (const MeshAsyncContext::Voxel *)(voxptr + 4);
-                                    MeshAsyncContext::VTXMVOX *voxels = reinterpret_cast<MeshAsyncContext::VTXMVOX *>(ptr.get());
-                                    voxels[c].positionX = src[c].positionX;
-                                    voxels[c].positionY = src[c].positionY;
-                                    voxels[c].positionZ = src[c].positionZ;
-                                    voxels[c].colorIndex = src[c].colorIndex;
-                                    voxels[c].mask = src[c].mask;
-                                    voxels[c].scaleX = std::max(std::uint8_t(1), src[c].scaleX);
-                                    voxels[c].scaleY = std::max(std::uint8_t(1), src[c].scaleY);
-                                    voxels[c].scaleZ = std::max(std::uint8_t(1), src[c].scaleZ);
+                                    if (src[c].scaleX && src[c].scaleY && src[c].scaleZ) {
+                                        MeshAsyncContext::VTXMVOX &voxel = voxels[entry.first.x++];
+                                        voxel.positionX = src[c].positionX;
+                                        voxel.positionY = src[c].positionY;
+                                        voxel.positionZ = src[c].positionZ;
+                                        voxel.colorIndex = src[c].colorIndex;
+                                        voxel.mask = src[c].mask;
+                                        voxel.scaleX = src[c].scaleX;
+                                        voxel.scaleY = src[c].scaleY;
+                                        voxel.scaleZ = src[c].scaleZ;
+                                    }
                                 }
-                                
+
                                 voxptr += sizeof(MeshAsyncContext::Voxel) * voxelCount + 4;
                             }
                         }
