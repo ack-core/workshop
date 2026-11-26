@@ -226,6 +226,29 @@ namespace test {
 }
 
 namespace test {
+    class resource_provider_voxel_mesh_scale_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<resource_provider_voxel_mesh_scale_test>();
+        }
+        void init(const API &api) override {
+            api.resourceProvider->getOrLoadVoxelMesh("resource_provider_tests/resource_provider_voxel_mesh_scale_test", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &) {
+                _frames = frames;
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_EQ(_frames.size(), 2);
+            EXPECT_EQ(_frames[0]->getVertexCount(), 1);
+            EXPECT_EQ(_frames[1]->getVertexCount(), 1);
+            return true;
+        }
+
+    private:
+        std::vector<foundation::RenderDataPtr> _frames;
+    };
+}
+
+namespace test {
     bool resource_provider_prefabs_test(const API &api) {
         const resource::ResourceProviderPtr provider = resource::ResourceProvider::instance(api.platform, api.rendering);
         std::vector<std::uint8_t> data = {'P', 'R', 'E', 'F', 'A', 'B', 'S', '!', 2, 0, 0, 0};
@@ -267,5 +290,6 @@ namespace test {
         REGISTER_STEP_TEST(resource_provider_description_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_reload_test);
         REGISTER_STEP_TEST(resource_provider_voxel_mesh_loading_test);
+        REGISTER_STEP_TEST(resource_provider_voxel_mesh_scale_test);
     }
 }
