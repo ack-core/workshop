@@ -328,21 +328,6 @@ namespace core {
     
     //---
     
-    class LightSourceImpl : public SceneInterface::LightSource {
-    public:
-        LightSourceImpl() {}
-        ~LightSourceImpl() override {}
-        
-        void setEnabled(bool value) override {
-            
-        }
-        void setPosition(const math::vector3f &position) override {
-
-        }
-    };
-
-    //---
-    
     class VegetationImpl : public SceneInterface::Vegetation {
     private:
         struct VTXVEG {
@@ -707,7 +692,6 @@ namespace core {
         auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) -> VegetationPtr override;
         auto addParticles(const foundation::RenderTexturePtr &tx, const foundation::RenderTexturePtr &map, const util::Description &description) -> ParticlesPtr override;
         auto addCustomMesh(const foundation::InputLayout &layout, const char *shaderSource, bool renderToGBuffer) -> CustomMeshPtr override;
-        auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr override;
         auto getCameraPosition() const -> math::vector3f override;
         auto getCameraDirection() const -> math::vector3f override;
         auto getCameraRight() const -> math::vector3f override;
@@ -1226,10 +1210,6 @@ namespace core {
         return _customMeshes.emplace_back(result);
     }
 
-    SceneInterface::LightSourcePtr SceneInterfaceImpl::addLightSource(float r, float g, float b, float radius) {
-        return nullptr;
-    }
-    
     math::vector3f SceneInterfaceImpl::getCameraPosition() const {
         return _camera.position;
     }

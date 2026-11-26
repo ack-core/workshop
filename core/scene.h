@@ -94,19 +94,13 @@ namespace core {
             virtual void setShaderConstants(const void *constants) = 0;
             virtual ~CustomMesh() = default;
         };
-        struct LightSource {
-            virtual void setEnabled(bool enabled) = 0;
-            virtual void setPosition(const math::vector3f &position) = 0;
-            virtual ~LightSource() = default;
-        };
-        
+
         using ArrowsPtr = std::shared_ptr<Arrows>;
         using LineSetPtr = std::shared_ptr<LineSet>;
         using BoundingSpherePtr = std::shared_ptr<BoundingSphere>;
         using BoundingBoxPtr = std::shared_ptr<BoundingBox>;
         using VoxelMeshPtr = std::shared_ptr<VoxelMesh>;
         using GroundMeshPtr = std::shared_ptr<GroundMesh>;
-        using LightSourcePtr = std::shared_ptr<LightSource>;
         using VegetationPtr = std::shared_ptr<Vegetation>;
         using ParticlesPtr = std::shared_ptr<Particles>;
         using CustomMeshPtr = std::shared_ptr<CustomMesh>;
@@ -194,10 +188,6 @@ namespace core {
         //                    false: drawn straight to the screen with alpha blending and gbuffer depth
         //
         virtual auto addCustomMesh(const foundation::InputLayout &layout, const char *shaderSource, bool renderToGBuffer) -> CustomMeshPtr = 0;
-
-        // Point light
-        //
-        virtual auto addLightSource(float r, float g, float b, float radius) -> LightSourcePtr = 0;
 
         // Camera properties in world space
         //
