@@ -72,7 +72,7 @@ def optimize(data: [(int, int, int, int)], sx: int, sy: int, sz: int, opt: int) 
             for z in range(1, sz + 1):
                 e = matrix[x][y][z]
                 if e.exist:
-                    voxel = struct.pack("<hhhBBBBBB", x - 1, y - 1, z - 1, e.color, e.mask, 0, 0, 0, 0)
+                    voxel = struct.pack("<hhhBBBBBB", x - 1, y - 1, z - 1, e.color, e.mask, 1, 1, 1, 0)
                     output += voxel
                     count = count + 1
 
