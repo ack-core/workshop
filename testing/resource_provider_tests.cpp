@@ -249,6 +249,65 @@ namespace test {
 }
 
 namespace test {
+    class resource_provider_emitter_loading_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<resource_provider_emitter_loading_test>();
+        }
+        void init(const API &api) override {
+            using Texture = foundation::RenderTexturePtr;
+            api.resourceProvider->getOrLoadEmitter(PATH, [this, provider = api.resourceProvider](const util::Description &desc, const Texture &map, const Texture &texture) {
+                _value = desc.getInteger("v", 0);
+                _map = map;
+                _texture = texture;
+                provider->getOrLoadEmitter(PATH, [this, provider](const util::Description &, const Texture &map, const Texture &) {
+                    _cachedMap = map;
+                    provider->getOrLoadEmitter("resource_provider_tests/missing", [this, provider](const util::Description &desc, const Texture &map, const Texture &texture) {
+                        _missingLoaded = true;
+                        _missingEmpty = desc.empty();
+                        _missingMap = map;
+                        _missingTexture = texture;
+                        provider->removeEmitter(PATH);
+                        provider->getOrLoadEmitter(PATH, [this](const util::Description &, const Texture &map, const Texture &) {
+                            _reloadedMap = map;
+                        });
+                    });
+                });
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_EQ(_value, 5);
+            EXPECT_NOT_EQ(_map, nullptr);
+            EXPECT_EQ(_map->getWidth(), 2);
+            EXPECT_EQ(_map->getHeight(), 1);
+            EXPECT_NOT_EQ(_texture, nullptr);
+            EXPECT_EQ(_texture->getWidth(), 32);
+            EXPECT_EQ(_cachedMap, _map);
+            EXPECT_TRUE(_missingLoaded);
+            EXPECT_TRUE(_missingEmpty);
+            EXPECT_EQ(_missingMap, nullptr);
+            EXPECT_EQ(_missingTexture, nullptr);
+            EXPECT_NOT_EQ(_reloadedMap, nullptr);
+            EXPECT_NOT_EQ(_reloadedMap, _map);
+            return true;
+        }
+
+    private:
+        static constexpr const char *PATH = "resource_provider_tests/resource_provider_emitter_loading_test";
+
+        foundation::RenderTexturePtr _map;
+        foundation::RenderTexturePtr _texture;
+        foundation::RenderTexturePtr _cachedMap;
+        foundation::RenderTexturePtr _missingMap;
+        foundation::RenderTexturePtr _missingTexture;
+        foundation::RenderTexturePtr _reloadedMap;
+        std::int64_t _value = 0;
+        bool _missingLoaded = false;
+        bool _missingEmpty = false;
+    };
+}
+
+namespace test {
     bool resource_provider_prefabs_test(const API &api) {
         const resource::ResourceProviderPtr provider = resource::ResourceProvider::instance(api.platform, api.rendering);
         std::vector<std::uint8_t> data = {'P', 'R', 'E', 'F', 'A', 'B', 'S', '!', 2, 0, 0, 0};
@@ -291,5 +350,6 @@ namespace test {
         REGISTER_STEP_TEST(resource_provider_description_reload_test);
         REGISTER_STEP_TEST(resource_provider_voxel_mesh_loading_test);
         REGISTER_STEP_TEST(resource_provider_voxel_mesh_scale_test);
+        REGISTER_STEP_TEST(resource_provider_emitter_loading_test);
     }
 }
