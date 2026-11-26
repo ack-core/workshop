@@ -3,25 +3,24 @@
 #include "scene.h"
 #include <list>
 
-namespace core {
-    namespace {
-        const std::uint64_t RND_SHAPE_FILL = 100;
-        const std::uint64_t RND_SHAPE_GET = 200;
-        const std::uint64_t RND_BORN_PARTICLE = 300;
-        const std::uint64_t RND_GRAPH_SPREAD = 400;
+namespace {
+    const std::uint64_t RND_SHAPE_FILL = 100;
+    const std::uint64_t RND_SHAPE_GET = 200;
+    const std::uint64_t RND_BORN_PARTICLE = 300;
+    const std::uint64_t RND_GRAPH_SPREAD = 400;
 
-        auto getEmitterDir(const math::vector3f &endShapeOffset) -> math::vector3f {
-            return endShapeOffset.lengthSq() > 0.1f ? endShapeOffset.normalized() : math::vector3f{0, 1, 0};
-        }
-        auto getDirRotation(const math::vector3f &dir) -> math::transform3f {
-            const float a = math::vector3f(0, 1, 0).angleTo(dir);
-            const math::vector3f axis = math::vector3f(0, 1, 0).cross(dir.normalized()).normalized();
-            return math::transform3f(axis, -a);
-        }
+    auto getEmitterDir(const math::vector3f &endShapeOffset) -> math::vector3f {
+        return endShapeOffset.lengthSq() > 0.1f ? endShapeOffset.normalized() : math::vector3f{0, 1, 0};
     }
+    auto getDirRotation(const math::vector3f &dir) -> math::transform3f {
+        const float a = math::vector3f(0, 1, 0).angleTo(dir);
+        const math::vector3f axis = math::vector3f(0, 1, 0).cross(dir.normalized()).normalized();
+        return math::transform3f(axis, -a);
+    }
+}
 
-    using ShapeType = EmitterBaker::ShapeType;
-    using ShapeDistribution = EmitterBaker::ShapeDistribution;
+namespace {
+    using ShapeType = core::EmitterBaker::ShapeType;
 
     struct Graph {
         Graph(float absMin, float absMax, float maxSpread, float defaultValue);
@@ -50,71 +49,6 @@ namespace core {
 
         float getMaxSize() const;
         void generate(const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
-    };
-
-    class EmitterBakerImpl : public EmitterBaker {
-    public:
-        void setParameters(const util::Description &desc) override;
-        void setEndShapeOffset(const math::vector3f &offset) override;
-        void refresh() override;
-
-        auto getMap(const foundation::RenderingInterfacePtr &rendering) -> const foundation::RenderTexturePtr & override;
-        auto getMapRaw() const -> const std::uint8_t * override { return _mapData.data(); }
-        auto getMapWidth() const -> std::uint32_t override { return _mapWidth; }
-        auto getMapHeight() const -> std::uint32_t override { return _mapHeight; }
-        auto getDescription() const -> const util::Description & override { return _description; }
-
-        auto getMinXYZ() const -> const math::vector3f & override { return _minXYZ; }
-        auto getMaxXYZ() const -> const math::vector3f & override { return _maxXYZ; }
-        auto getMaxSize() const -> const math::vector2f & override { return _maxSize; }
-
-    private:
-        struct ActiveParticle {
-            const std::size_t index;
-            const float bornTimeMs;
-            const float lifeTimeMs;
-            const math::vector3f start;
-            const math::vector3f end;
-            math::vector3f currentPosition;
-            const float spreadKoeffSize;
-            const float spreadKoeffSpeed;
-            const float spreadKoeffAlpha;
-        };
-
-        bool _isLooped = true;
-
-        std::size_t _randomSeed = 0;
-        util::RandomSource _shapeGetRandom;
-
-        ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
-        Shape _startShape = {ShapeType::DISK, false, {0.0f, 0.0f, 0.0f}};
-        Shape _endShape = {ShapeType::DISK, false, {5.0f, 0.0f, 0.0f}};
-        math::vector3f _endShapeOffset = {0, 10.0f, 0};
-
-        std::size_t _bakingFrameTimeMs = 10;
-        std::size_t _particlesToEmit = 100;
-
-        Graph _emissionGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
-        float _emissionTimeMs = 1000.0f;
-        float _particleLifeTimeMs = 1000.0f; // real lifetime is less by '_bakingFrameTimeMs'
-
-        Graph _widthGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
-        Graph _heightGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
-        Graph _speedGraph = Graph(-999.0f, +999.0f, 999.0f, 10.0f);
-        Graph _alphaGraph = Graph(0.0f, 1.0f, 1.0f, 1.0f);
-
-        std::vector<std::uint8_t> _mapData;
-        std::uint32_t _mapWidth = 0;
-        std::uint32_t _mapHeight = 0;
-        foundation::RenderTexturePtr _mapTexture;
-        util::Description _description;
-
-        math::vector3f _minXYZ = {0, 0, 0};
-        math::vector3f _maxXYZ = {0, 0, 0};
-        math::vector2f _maxSize = {0, 0};
-
-    private:
-        auto _getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) -> std::pair<math::vector3f, math::vector3f>;
     };
 
     Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
@@ -306,7 +240,76 @@ namespace core {
             }
         }
     }
-    
+}
+
+namespace core {
+    using ShapeDistribution = EmitterBaker::ShapeDistribution;
+
+    class EmitterBakerImpl : public EmitterBaker {
+    public:
+        void setParameters(const util::Description &desc) override;
+        void setEndShapeOffset(const math::vector3f &offset) override;
+        void refresh() override;
+
+        auto getMap(const foundation::RenderingInterfacePtr &rendering) -> const foundation::RenderTexturePtr & override;
+        auto getMapRaw() const -> const std::uint8_t * override { return _mapData.data(); }
+        auto getMapWidth() const -> std::uint32_t override { return _mapWidth; }
+        auto getMapHeight() const -> std::uint32_t override { return _mapHeight; }
+        auto getDescription() const -> const util::Description & override { return _description; }
+
+        auto getMinXYZ() const -> const math::vector3f & override { return _minXYZ; }
+        auto getMaxXYZ() const -> const math::vector3f & override { return _maxXYZ; }
+        auto getMaxSize() const -> const math::vector2f & override { return _maxSize; }
+
+    private:
+        struct ActiveParticle {
+            const std::size_t index;
+            const float bornTimeMs;
+            const float lifeTimeMs;
+            const math::vector3f start;
+            const math::vector3f end;
+            math::vector3f currentPosition;
+            const float spreadKoeffSize;
+            const float spreadKoeffSpeed;
+            const float spreadKoeffAlpha;
+        };
+
+        bool _isLooped = true;
+
+        std::size_t _randomSeed = 0;
+        util::RandomSource _shapeGetRandom;
+
+        ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
+        Shape _startShape = {ShapeType::DISK, false, {0.0f, 0.0f, 0.0f}};
+        Shape _endShape = {ShapeType::DISK, false, {5.0f, 0.0f, 0.0f}};
+        math::vector3f _endShapeOffset = {0, 10.0f, 0};
+
+        std::size_t _bakingFrameTimeMs = 10;
+        std::size_t _particlesToEmit = 100;
+
+        Graph _emissionGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
+        float _emissionTimeMs = 1000.0f;
+        float _particleLifeTimeMs = 1000.0f; // real lifetime is less by '_bakingFrameTimeMs'
+
+        Graph _widthGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
+        Graph _heightGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
+        Graph _speedGraph = Graph(-999.0f, +999.0f, 999.0f, 10.0f);
+        Graph _alphaGraph = Graph(0.0f, 1.0f, 1.0f, 1.0f);
+
+        std::vector<std::uint8_t> _mapData;
+        std::uint32_t _mapWidth = 0;
+        std::uint32_t _mapHeight = 0;
+        foundation::RenderTexturePtr _mapTexture;
+        util::Description _description;
+
+        math::vector3f _minXYZ = {0, 0, 0};
+        math::vector3f _maxXYZ = {0, 0, 0};
+        math::vector2f _maxSize = {0, 0};
+
+    private:
+        auto _getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) -> std::pair<math::vector3f, math::vector3f>;
+    };
+
     void EmitterBakerImpl::setParameters(const util::Description &params) {
         std::size_t bakingTimeTable[] = {
             0, 10, 20, 50, 100
