@@ -85,6 +85,11 @@ namespace core {
         //
         virtual void setGravity(const math::vector3f &gravity) = 0;
 
+        // Set global damping of body velocity. Impulses are not affected. Default is 100
+        // @percent - how much of velocity is left after 1 second
+        //
+        virtual void setDamping(float percent) = 0;
+
         // Move bodies and resolve collisions
         //
         virtual void update(float dtSec) = 0;

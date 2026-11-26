@@ -150,6 +150,21 @@ namespace test {
         return true;
     }
 
+    bool simulationCircleDamping(const API &api) {
+        core::SimulationInterface::BodyPtr damped = addTestCircle(api, {0, 0, 0}, {10, 0, 0});
+        core::SimulationInterface::BodyPtr pushed = addTestCircle(api, {0, 0, 10}, {0, 0, 0});
+        pushed->addImpulse({1, 0, 0}, 1.0f);
+
+        api.simulation->setDamping(50.0f);
+        api.simulation->update(0.1f);
+        api.simulation->setDamping(100.0f);
+
+        EXPECT_EQ_F(damped->getTransform().v3.x, 0.95f);
+        EXPECT_EQ_F(damped->getVelocity().x, 9.5f);
+        EXPECT_EQ_F(pushed->getTransform().v3.x, 0.1f);
+        return true;
+    }
+
     bool simulationCirclesCollision(const API &api) {
         core::SimulationInterface::BodyPtr movableA = addTestCircle(api, {0, 0, 0}, {0, 0, 0});
         core::SimulationInterface::BodyPtr movableB = addTestCircle(api, {0.6f, 0, 0}, {0, 0, 0});
@@ -268,6 +283,7 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleImpulseFades);
         REGISTER_UNIT_TEST(simulationCircleGravity);
         REGISTER_UNIT_TEST(simulationCircleGravityParabola);
+        REGISTER_UNIT_TEST(simulationCircleDamping);
         REGISTER_UNIT_TEST(simulationCirclesCollision);
         REGISTER_UNIT_TEST(simulationCirclesDistanceConstraint);
         REGISTER_UNIT_TEST(simulationCircleObstacleDistanceConstraint);
