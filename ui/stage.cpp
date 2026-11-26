@@ -385,7 +385,7 @@ namespace ui {
             if (_texture) {
                 DrawingInstance instance;
                 instance.positionAndSize = math::vector4f(_globalPosition, _size) * _facility.getPlatform()->getScreenScale();
-                instance.uvCoords = math::vector4f(0, 0, _size.x / float(_texture->getWidth()), _size.y / float(_texture->getHeight()));
+                instance.uvCoords = math::vector4f(_texture->getUVStart(), _texture->getUVStart() + _texture->getUVSize() * _size / math::vector2f(float(_texture->getWidth()), float(_texture->getHeight())));
                 instance.color = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
                 instance.args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
                 
@@ -554,8 +554,12 @@ namespace ui {
                     edgeLeft.y -= _sliceArgs.y;
                     edgeOffset.y += _sliceArgs.y;
                 }
+                const math::vector4f uvStart = math::vector4f(_texture->getUVStart(), _texture->getUVStart());
+                const math::vector4f uvSize = math::vector4f(_texture->getUVSize(), _texture->getUVSize());
+
                 for (int i = 0; i < index; i++) {
                     instances[i].positionAndSize = instances[i].positionAndSize * _facility.getPlatform()->getScreenScale();
+                    instances[i].uvCoords = uvStart + instances[i].uvCoords * uvSize;
                     instances[i].color = math::color(1.0f, 1.0f, 1.0f, 1.0f);
                     instances[i].args = math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
                 }

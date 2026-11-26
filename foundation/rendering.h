@@ -87,7 +87,9 @@ namespace foundation {
         virtual auto getHeight() const -> std::uint32_t = 0;
         virtual auto getMipCount() const -> std::uint32_t = 0;
         virtual auto getFormat() const -> RenderTextureFormat = 0;
-        
+        virtual auto getUVStart() const -> math::vector2f = 0;
+        virtual auto getUVSize() const -> math::vector2f = 0;
+
     public:
         virtual ~RenderTexture() = default;
     };

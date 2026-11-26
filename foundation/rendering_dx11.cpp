@@ -154,6 +154,14 @@ namespace foundation {
         return _format;
     }
 
+    auto Direct3D11Texture::getUVStart() const -> math::vector2f {
+        return math::vector2f(0.0f, 0.0f);
+    }
+
+    auto Direct3D11Texture::getUVSize() const -> math::vector2f {
+        return math::vector2f(1.0f, 1.0f);
+    }
+
     auto Direct3D11Texture::getShaderResourceView() const -> ID3D11ShaderResourceView * {
         return _view.Get();
     }

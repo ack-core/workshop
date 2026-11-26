@@ -54,6 +54,8 @@ namespace foundation {
         auto getHeight() const -> std::uint32_t override;
         auto getMipCount() const -> std::uint32_t override;
         auto getFormat() const -> RenderTextureFormat override;
+        auto getUVStart() const -> math::vector2f override;
+        auto getUVSize() const -> math::vector2f override;
         auto getWebGLTexture() const -> WebGLId override;
         auto isCube() const -> bool override;
 
@@ -77,6 +79,8 @@ namespace foundation {
             auto getHeight() const -> std::uint32_t override { return _target._height; }
             auto getMipCount() const -> std::uint32_t override { return 1; }
             auto getFormat() const -> RenderTextureFormat override { return _format; }
+            auto getUVStart() const -> math::vector2f override { return math::vector2f(0.0f, 0.0f); }
+            auto getUVSize() const -> math::vector2f override { return math::vector2f(1.0f, 1.0f); }
             auto getWebGLTexture() const -> WebGLId override { return _texture; }
             
         private:
