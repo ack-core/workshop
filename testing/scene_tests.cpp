@@ -588,7 +588,6 @@ namespace test {
             _hidden = api.scene->addVegetation(map, {3, 3, 3}, desc, vxm);
             _hidden->setPosition({-4.0f, 0.0f, 2.0f});
             _hidden->setEnabled(false);
->>>>>>> d5cf415 (Scene voxel vegetation test)
         }
         void updateAndDraw(const API &api) override {}
         std::uint8_t getThreshold() const override {
