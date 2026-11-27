@@ -10,8 +10,6 @@
 #include <memory>
 
 namespace core {
-    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 4;
-
     // Interface provides 3D-scene with camera and drawable objects. Scene keeps objects alive while user holds their pointers. 
     //
     class SceneInterface {
@@ -84,7 +82,7 @@ namespace core {
             virtual void setEnabled(bool enabled) = 0;
             virtual void setTransform(const math::transform3f &trfm) = 0;
             virtual void setPosition(const math::vector3f &pos) = 0;
-            virtual void setTime(float totalTimeSec, float fadingTimeSec) = 0;
+            virtual void setTimings(float totalTimeSec, float fadingTimeSec, const std::vector<math::vector3f> &positionHistory) = 0;
             virtual ~Particles() = default;
         };
         struct CustomMesh {
@@ -174,7 +172,7 @@ namespace core {
         //
         virtual auto addVegetation(const ByteDataPtr &map, const math::vector3i &margs, const util::Description &desc, const std::vector<std::pair<std::uint32_t, ByteDataPtr>> &vxm) -> VegetationPtr = 0;
 
-        // Particles emitter. Use Particles::setTime(time since start, time since stop) to animate
+        // Particles emitter. 
         // @tx          - particle texture
         // @map         - baked particles map, VERTICAL_PIXELS_PER_PARTICLE rows per particle
         // @desc        - emitter description

@@ -46,7 +46,7 @@ namespace game {
         globalPosition = localPosition + (parent ? parent->globalPosition : math::vector3f(0, 0, 0));
         if (particles) {
             particles->setTransform(math::transform3f::identity().translated(globalPosition));
-            particles->setTime(currentTime, 0.0f);
+            particles->setTimings(currentTime, 0.0f, {});
             currentTime += dtSec;
         }
     }

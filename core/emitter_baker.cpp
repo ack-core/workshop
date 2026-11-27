@@ -1,6 +1,5 @@
 
 #include "emitter_baker.h"
-#include "scene.h"
 #include <list>
 
 namespace {
@@ -33,6 +32,7 @@ namespace {
         const float _absMin;
         const float _absMax;
         const float _maxSpread;
+        const float _defaultValue;
 
         struct Point {
             float x, lower, upper;
@@ -51,9 +51,8 @@ namespace {
         void generate(const math::vector3f &dir, std::size_t randomSeed, std::size_t amount);
     };
 
-    Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread) {
-        _points.emplace_back(Point { 0.0f, defaultValue, defaultValue });
-        _maxVolume = defaultValue;
+    Graph::Graph(float absMin, float absMax, float maxSpread, float defaultValue) : _absMin(absMin), _absMax(absMax), _maxSpread(maxSpread), _defaultValue(defaultValue) {
+        setPointsFromString({});
     }
     void Graph::setPointsFromString(const std::string &data) {
         util::strstream input(data.c_str(), data.length());
@@ -70,7 +69,11 @@ namespace {
                 _points.emplace_back(Point { std::max(0.0f, std::min(x, 1.0f)), lower, upper });
             }
         }
-        
+        if (_points.empty()) {
+            _points.emplace_back(Point { 0.0f, _defaultValue, _defaultValue });
+            _maxValue = _defaultValue;
+        }
+
         if (_absMin >= 0.0f) {
             _maxVolume = 0.0f;
             for (std::size_t i = 0; i < _points.size() - 1; i++) {
@@ -126,7 +129,9 @@ namespace {
         
         return _points.back().lower + (_points.back().upper - _points.back().lower) * spreadKoeff;
     }
+}
 
+namespace {
     float Shape::getMaxSize() const {
         if (type == ShapeType::DISK) {
             return 2.0f * args.x;
@@ -247,6 +252,23 @@ namespace core {
 
     class EmitterBakerImpl : public EmitterBaker {
     public:
+        EmitterBakerImpl() {
+            _description.setInteger("emissionTimeMs", std::int64_t(_emissionTimeMs));
+            _description.setInteger("particleLifeTimeMs", std::int64_t(_particleLifeTimeMs));
+            _description.setInteger("bakingFrameType", std::int64_t(_bakingFrameType));
+            _description.setInteger("particlesToEmit", std::int64_t(_particlesToEmit));
+            _description.setBool("looped", _isLooped);
+            _description.setInteger("randomSeed", std::int64_t(_randomSeed));
+            _description.setInteger("startShapeType", std::int64_t(_startShape.type));
+            _description.setBool("startShapeFill", _startShape.fill);
+            _description.setVector3f("startShapeArgs", _startShape.args);
+            _description.setInteger("endShapeType", std::int64_t(_endShape.type));
+            _description.setBool("endShapeFill", _endShape.fill);
+            _description.setVector3f("endShapeArgs", _endShape.args);
+            _description.setVector3f("endShapeOffset", _endShapeOffset);
+            _description.setInteger("shapeDistributionType", std::int64_t(_shapeDistribution));
+        }
+
         void setParameters(const util::Description &desc) override;
         void setEndShapeOffset(const math::vector3f &offset) override;
         void refresh() override;
@@ -279,17 +301,17 @@ namespace core {
         std::size_t _randomSeed = 0;
         util::RandomSource _shapeGetRandom;
 
-        ShapeDistribution _shapeDistribution = ShapeDistribution::SHUFFLED;
+        ShapeDistribution _shapeDistribution = ShapeDistribution::RANDOM;
         Shape _startShape = {ShapeType::DISK, false, {0.0f, 0.0f, 0.0f}};
-        Shape _endShape = {ShapeType::DISK, false, {5.0f, 0.0f, 0.0f}};
+        Shape _endShape = {ShapeType::DISK, false, {0.0f, 0.0f, 0.0f}};
         math::vector3f _endShapeOffset = {0, 10.0f, 0};
 
-        std::size_t _bakingFrameTimeMs = 10;
-        std::size_t _particlesToEmit = 100;
+        BakingTime _bakingFrameType = BakingTime::BAKE10;
+        std::size_t _particlesToEmit = 5;
 
         Graph _emissionGraph = Graph(0.0f, 1.0f, 0.0f, 1.0f);
         float _emissionTimeMs = 1000.0f;
-        float _particleLifeTimeMs = 1000.0f; // real lifetime is less by '_bakingFrameTimeMs'
+        float _particleLifeTimeMs = 1000.0f; // real lifetime is less by baking frame time
 
         Graph _widthGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
         Graph _heightGraph = Graph(0.0f, 99.0f, 99.0f, 1.0f);
@@ -311,31 +333,48 @@ namespace core {
     };
 
     void EmitterBakerImpl::setParameters(const util::Description &params) {
-        std::size_t bakingTimeTable[] = {
-            0, 10, 20, 50, 100
-        };
-        
-        _emissionTimeMs = static_cast<float>(params.getInteger("emissionTimeMs", 0));
-        _particleLifeTimeMs = static_cast<float>(params.getInteger("particleLifeTimeMs", 0));
-        _bakingFrameTimeMs = bakingTimeTable[static_cast<std::size_t>(params.getInteger("bakingFrameType", 0))];
-        _particlesToEmit = static_cast<std::size_t>(params.getInteger("particlesToEmit", 0));
-        _isLooped = params.getBool("looped", false);
-        _randomSeed = static_cast<std::size_t>(params.getInteger("randomSeed", 0));
-        _startShape.type = static_cast<ShapeType>(params.getInteger("startShapeType", 0));
-        _startShape.fill = params.getBool("startShapeFill", false);
-        _startShape.args = params.getVector3f("startShapeArgs", {});
-        _endShape.type = static_cast<ShapeType>(params.getInteger("endShapeType", 0));
-        _endShape.fill = params.getBool("endShapeFill", false);
-        _endShape.args = params.getVector3f("endShapeArgs", {});
-        _endShapeOffset = params.getVector3f("endShapeOffset", {});
-        _shapeDistribution = static_cast<ShapeDistribution>(params.getInteger("shapeDistributionType", 0));
-        
-        _emissionGraph.setPointsFromString(params.getString("emissionGraphData", ""));
-        _widthGraph.setPointsFromString(params.getString("widthGraphData", ""));
-        _heightGraph.setPointsFromString(params.getString("heightGraphData", ""));
-        _speedGraph.setPointsFromString(params.getString("speedGraphData", ""));
-        _alphaGraph.setPointsFromString(params.getString("alphaGraphData", ""));
-        _description = params;
+        _description.setInteger("emissionTimeMs", params.getInteger("emissionTimeMs", std::int64_t(_emissionTimeMs)));
+        _description.setInteger("particleLifeTimeMs", params.getInteger("particleLifeTimeMs", std::int64_t(_particleLifeTimeMs)));
+        _description.setInteger("bakingFrameType", params.getInteger("bakingFrameType", std::int64_t(_bakingFrameType)));
+        _description.setInteger("particlesToEmit", params.getInteger("particlesToEmit", std::int64_t(_particlesToEmit)));
+        _description.setBool("looped", params.getBool("looped", _isLooped));
+        _description.setInteger("randomSeed", params.getInteger("randomSeed", std::int64_t(_randomSeed)));
+        _description.setInteger("startShapeType", params.getInteger("startShapeType", std::int64_t(_startShape.type)));
+        _description.setBool("startShapeFill", params.getBool("startShapeFill", _startShape.fill));
+        _description.setVector3f("startShapeArgs", params.getVector3f("startShapeArgs", _startShape.args));
+        _description.setInteger("endShapeType", params.getInteger("endShapeType", std::int64_t(_endShape.type)));
+        _description.setBool("endShapeFill", params.getBool("endShapeFill", _endShape.fill));
+        _description.setVector3f("endShapeArgs", params.getVector3f("endShapeArgs", _endShape.args));
+        _description.setVector3f("endShapeOffset", params.getVector3f("endShapeOffset", _endShapeOffset));
+        _description.setInteger("shapeDistributionType", params.getInteger("shapeDistributionType", std::int64_t(_shapeDistribution)));
+        _description.setString("emissionGraphData", params.getString("emissionGraphData", _description.getString("emissionGraphData", "")));
+        _description.setString("widthGraphData", params.getString("widthGraphData", _description.getString("widthGraphData", "")));
+        _description.setString("heightGraphData", params.getString("heightGraphData", _description.getString("heightGraphData", "")));
+        _description.setString("speedGraphData", params.getString("speedGraphData", _description.getString("speedGraphData", "")));
+        _description.setString("alphaGraphData", params.getString("alphaGraphData", _description.getString("alphaGraphData", "")));
+        _description.setInteger("particleOrientation", params.getInteger("particleOrientation", _description.getInteger("particleOrientation", 0)));
+        _description.setBool("additiveBlend", params.getBool("additiveBlend", _description.getBool("additiveBlend", false)));
+        _description.setString("texture", params.getString("texture", _description.getString("texture", "")));
+
+        _emissionTimeMs = float(_description.getInteger("emissionTimeMs", 0));
+        _particleLifeTimeMs = float(_description.getInteger("particleLifeTimeMs", 0));
+        _bakingFrameType = BakingTime(_description.getInteger("bakingFrameType", 0));
+        _particlesToEmit = std::size_t(_description.getInteger("particlesToEmit", 0));
+        _isLooped = _description.getBool("looped", false);
+        _randomSeed = std::size_t(_description.getInteger("randomSeed", 0));
+        _startShape.type = ShapeType(_description.getInteger("startShapeType", 0));
+        _startShape.fill = _description.getBool("startShapeFill", false);
+        _startShape.args = _description.getVector3f("startShapeArgs", {});
+        _endShape.type = ShapeType(_description.getInteger("endShapeType", 0));
+        _endShape.fill = _description.getBool("endShapeFill", false);
+        _endShape.args = _description.getVector3f("endShapeArgs", {});
+        _endShapeOffset = _description.getVector3f("endShapeOffset", {});
+        _shapeDistribution = ShapeDistribution(_description.getInteger("shapeDistributionType", 0));
+        _emissionGraph.setPointsFromString(_description.getString("emissionGraphData", ""));
+        _widthGraph.setPointsFromString(_description.getString("widthGraphData", ""));
+        _heightGraph.setPointsFromString(_description.getString("heightGraphData", ""));
+        _speedGraph.setPointsFromString(_description.getString("speedGraphData", ""));
+        _alphaGraph.setPointsFromString(_description.getString("alphaGraphData", ""));
     }
     
     void EmitterBakerImpl::setEndShapeOffset(const math::vector3f &offset) {
@@ -344,10 +383,15 @@ namespace core {
     }
 
     void EmitterBakerImpl::refresh() {
+        const std::size_t bakingTimeTable[] = {
+            10, 10, 20, 50, 100
+        };
+        const std::size_t bakingFrameTimeMs = bakingTimeTable[std::size_t(_bakingFrameType)];
+
         _shapeGetRandom = util::RandomSource(_randomSeed, RND_SHAPE_GET);
 
         const math::vector3f emitterDir = getEmitterDir(_endShapeOffset);
-        const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(_bakingFrameTimeMs)));
+        const std::size_t cycleLength = std::size_t(std::ceil(_emissionTimeMs / float(bakingFrameTimeMs)));
         const std::size_t cyclesInRow = std::size_t(std::ceil((_isLooped ? std::max(_emissionTimeMs, _particleLifeTimeMs) : _emissionTimeMs + _particleLifeTimeMs) / _emissionTimeMs));
         
         _startShape.generate(emitterDir, _randomSeed, 1024);
@@ -382,10 +426,10 @@ namespace core {
         for (std::size_t loop = 0; loop < std::size_t(_isLooped) + 1; loop++) { //
             for (std::size_t i = 0; i < mapTextureWidth; i++) {
                 const std::size_t timeIndex = i + loop * mapTextureWidth;
-                const float currAbsTimeMs = float((timeIndex + 0) * _bakingFrameTimeMs);
-                const float nextAbsTimeMs = float((timeIndex + 1) * _bakingFrameTimeMs);
-                const float currEmissionTimeKoeff = float(((timeIndex % cycleLength) + 0) * _bakingFrameTimeMs) / float(_emissionTimeMs);
-                const float nextEmissionTimeKoeff = float(((timeIndex % cycleLength) + 1) * _bakingFrameTimeMs) / float(_emissionTimeMs);
+                const float currAbsTimeMs = float((timeIndex + 0) * bakingFrameTimeMs);
+                const float nextAbsTimeMs = float((timeIndex + 1) * bakingFrameTimeMs);
+                const float currEmissionTimeKoeff = float(((timeIndex % cycleLength) + 0) * bakingFrameTimeMs) / float(_emissionTimeMs);
+                const float nextEmissionTimeKoeff = float(((timeIndex % cycleLength) + 1) * bakingFrameTimeMs) / float(_emissionTimeMs);
                                 
                 for (auto ptc = activeParticles.begin(); ptc != activeParticles.end(); ) {
                     if (nextAbsTimeMs - ptc->bornTimeMs > ptc->lifeTimeMs) {
@@ -398,7 +442,7 @@ namespace core {
                 
                 if (loop == 0) {
                     float emissinGraphFilling = _emissionGraph.getFilling(nextEmissionTimeKoeff);
-                    const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling));
+                    const std::size_t nextEmissionGraphValue = std::size_t(std::ceil(float(_particlesToEmit) * emissinGraphFilling - 0.001f));
                     const std::size_t nextParticleCount = std::min(i / cycleLength * _particlesToEmit + nextEmissionGraphValue, _isLooped ? std::size_t(-1) : _particlesToEmit);
                     
                     for (std::size_t c = bornParticleCount; c < nextParticleCount; c++) {
@@ -433,7 +477,7 @@ namespace core {
                     
                     const math::vector3f direction = (ptc->end - ptc->start).normalized();
                     const float speed = _speedGraph.getValue(lifeKoeff, ptc->spreadKoeffSpeed);
-                    ptc->currentPosition = ptc->currentPosition + direction * speed * (_bakingFrameTimeMs / 1000.0f);
+                    ptc->currentPosition = ptc->currentPosition + direction * speed * (bakingFrameTimeMs / 1000.0f);
                     
                     // TODO: ptc position modificators
                     
@@ -443,7 +487,7 @@ namespace core {
                     element.angle = 0.0f;
                     element.alpha = _alphaGraph.getValue(lifeKoeff, ptc->spreadKoeffAlpha);
                     element.mask = std::uint8_t(loop + 1); // Mask: 1 - newborn, 2 - old
-                    element.history = std::uint8_t(std::min(255.0f, ptcAbsTimeMs / _bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 255 = 255 * BakingTimeSec)
+                    element.history = std::uint8_t(std::min(float(core::MAX_PARTICLES_POSITION_HISTORY - 1), ptcAbsTimeMs / bakingFrameTimeMs));  // How old the particle is (f.e. 0 = just born, 254 = 254 * BakingTimeSec)
                     
                     if (lifeKoeff < std::numeric_limits<float>::epsilon()) { // mark where the particle starts
                         element.mask |= 128;
@@ -456,20 +500,26 @@ namespace core {
         auto fract = [](float v) {
             return v - floor(v);
         };
-        
+        auto safeRange = [](float range) {
+            return std::max(range, std::numeric_limits<float>::epsilon());
+        };
+
+        const math::vector3f positionRange = {safeRange(_maxXYZ.x - _minXYZ.x), safeRange(_maxXYZ.y - _minXYZ.y), safeRange(_maxXYZ.z - _minXYZ.z)};
+        const math::vector2f sizeRange = {safeRange(_maxSize.x), safeRange(_maxSize.y)};
+
         for (std::uint32_t c = 0; c < mapVerticalCount; c++) {
             for (std::uint32_t i = 0; i < mapTextureWidth; i++) {
                 const MapElement &element = tmpMap[c * mapTextureWidth + i];
                 const std::size_t tvoff = c * core::VERTICAL_PIXELS_PER_PARTICLE;
-                const math::vector3f positionKoeff = 255.0f * (element.position - _minXYZ) / (_maxXYZ - _minXYZ);
+                const math::vector3f positionKoeff = 255.0f * (element.position - _minXYZ) / positionRange;
                 
                 std::uint8_t *m0 = &_mapData[(tvoff + 0) * mapTextureWidth * 4 + i * 4];
                 std::uint8_t *m1 = &_mapData[(tvoff + 1) * mapTextureWidth * 4 + i * 4];
                 std::uint8_t *m2 = &_mapData[(tvoff + 2) * mapTextureWidth * 4 + i * 4];
                 std::uint8_t *m3 = &_mapData[(tvoff + 3) * mapTextureWidth * 4 + i * 4];
                 
-                const float widthKoeff = 255.0f * element.width / _maxSize.x;
-                const float heightKoeff = 255.0f * element.height / _maxSize.y;
+                const float widthKoeff = 255.0f * element.width / sizeRange.x;
+                const float heightKoeff = 255.0f * element.height / sizeRange.y;
 
                 m0[0] = std::uint8_t(positionKoeff.x);                  // X hi
                 m0[1] = std::uint8_t(255.0f * fract(positionKoeff.x));  // X low
@@ -503,6 +553,9 @@ namespace core {
         _mapWidth = mapTextureWidth;
         _mapHeight = mapTextureHeight;
         _mapTexture = nullptr;
+        _description.setVector3f("minXYZ", _minXYZ);
+        _description.setVector3f("maxXYZ", _maxXYZ);
+        _description.setVector2f("maxSize", _maxSize);
     }
 
     std::pair<math::vector3f, math::vector3f> EmitterBakerImpl::_getShapePoints(float cycleOffset, const math::vector3f &shapeOffset) {

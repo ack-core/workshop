@@ -6,6 +6,9 @@
 #include "foundation/rendering.h"
 
 namespace core {
+    const std::uint32_t VERTICAL_PIXELS_PER_PARTICLE = 4;
+    const std::uint32_t MAX_PARTICLES_POSITION_HISTORY = 255;
+
     // Bakes particles emitter description into a map texture consumed by SceneInterface::addParticles
     //
     class EmitterBaker {
@@ -28,7 +31,7 @@ namespace core {
         };
 
     public:
-        // Set emitter parameters. Missing values are zero/false/empty
+        // Set emitter parameters. 
         // @desc - emitter description:
         //         emissionTimeMs        : integer, duration of one emission cycle
         //         particleLifeTimeMs    : integer

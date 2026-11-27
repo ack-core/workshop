@@ -142,7 +142,9 @@ namespace test {
     private:
         core::SceneInterface::LineSetPtr _square;
     };
+}
 
+namespace test {
     class scene_custom_mesh_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -204,7 +206,9 @@ namespace test {
         core::SceneInterface::CustomMeshPtr _gbufferMesh;
         core::SceneInterface::CustomMeshPtr _screenMesh;
     };
+}
 
+namespace test {
     class scene_voxel_mesh_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -228,7 +232,9 @@ namespace test {
     private:
         core::SceneInterface::VoxelMeshPtr _mesh;
     };
+}
 
+namespace test {
     class scene_voxel_mesh_scale_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -261,7 +267,9 @@ namespace test {
     private:
         core::SceneInterface::VoxelMeshPtr _mesh;
     };
+}
 
+namespace test {
     class scene_voxel_mesh_set_frame_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -302,7 +310,9 @@ namespace test {
     private:
         core::SceneInterface::VoxelMeshPtr _meshes[3];
     };
+}
 
+namespace test {
     class scene_bounding_shapes_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -342,7 +352,9 @@ namespace test {
         core::SceneInterface::BoundingSpherePtr _hiddenSphere;
         core::SceneInterface::BoundingBoxPtr _hiddenBox;
     };
+}
 
+namespace test {
     class scene_environment_fog_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -379,7 +391,9 @@ namespace test {
         core::SceneInterfacePtr _scene;
         std::vector<core::SceneInterface::VoxelMeshPtr> _meshes;
     };
+}
 
+namespace test {
     class scene_arrows_and_line_set_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -437,7 +451,9 @@ namespace test {
         core::SceneInterface::LineSetPtr _hiddenLines;
         core::SceneInterface::LineSetPtr _clearedLines;
     };
+}
 
+namespace test {
     class scene_ground_mesh_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {

@@ -1,5 +1,6 @@
 
 #include "scene.h"
+#include "emitter_baker.h"
 #include "palette.h"
 #include "foundation/layouts.h"
 
@@ -601,7 +602,15 @@ namespace core {
             _constants.transform.m42 = pos.y;
             _constants.transform.m43 = pos.z;
         }
-        void setTime(float totalTimeSec, float fadingTimeSec) override {
+        void setTimings(float totalTimeSec, float fadingTimeSec, const std::vector<math::vector3f> &positionHistory) override {
+            const math::vector3f current = {_constants.transform.m41, _constants.transform.m42, _constants.transform.m43};
+            const math::vector3f &last = positionHistory.empty() ? current : positionHistory.back();
+
+            _constants.offsetsHistory[0] =math::vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+            for (std::size_t i = 1; i < MAX_PARTICLES_POSITION_HISTORY; i++) {
+                _constants.offsetsHistory[i] =math::vector4f((i <= positionHistory.size() ? positionHistory[i - 1] : last) - current, 0.0f);
+            }
+
             float koeff = std::max(totalTimeSec, 0.0f) / _secondsPerTextureWidth;
             if (koeff >= 1.0f) {
                 koeff = koeff - float(int(koeff));
@@ -634,6 +643,7 @@ namespace core {
             math::vector4f fogColor;
             math::vector4f fogRadius;
             math::vector4f uvStartSize;
+            math::vector4f offsetsHistory[MAX_PARTICLES_POSITION_HISTORY];
         }
         _constants;
         
@@ -971,14 +981,14 @@ namespace {
             fogColor : float4
             fogRadius : float4
             uvStartSize : float4
+            offsetsHistory[255] : float4
         }
         inout {
             uv_alpha : float3
             wpos : float3
         }
         vssrc {
-            float  ptcvbase = 4.0 * const_maxXYZ_vpix.w * float(vertex_ID) + 0.25 * const_maxXYZ_vpix.w;
-            float4 ptcv = float4(ptcvbase, ptcvbase, ptcvbase, ptcvbase) + float4(0.0f, 1.0f, 2.0f, 3.0f) * const_maxXYZ_vpix.w;
+            float4 ptcv = (4.0 * float(vertex_ID) + float4(0.25, 1.25, 2.25, 3.25)) * const_maxXYZ_vpix.w;
 
             float  t0 = (_floor(const_t0_t1_mask_cap.x / const_minXYZ_hpix.w) + 0.5) * const_minXYZ_hpix.w;
             float  t1 = const_t0_t1_mask_cap.y + 0.5 * const_minXYZ_hpix.w;
@@ -993,26 +1003,28 @@ namespace {
             float3 posKoeffT1 = float3(m0t1.x + m0t1.y / 255.0f, m0t1.z + m0t1.w / 255.0f, m1t1.x + m1t1.y / 255.0f);
             float2 angleSrc = _lerp(m1t0.zw, m1t1.zw, tf);
             float  angle = angleSrc.x + angleSrc.y / 255.0f;
-            float3 ptcposT0 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT0, 1.0), const_modelTransform).xyz;
-            float3 ptcposT1 = _transform(float4(const_minXYZ_hpix.xyz + (const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz) * posKoeffT1, 1.0), const_modelTransform).xyz;
+
+            float4 m3t0 = _tex2d(0, float2(t0, ptcv.w));
+            float4 m3t1 = _tex2d(0, float2(t1, ptcv.w));
+            float3 bornOffset = const_offsetsHistory[int(m3t0.z * 255.0)].xyz;
+            float3 posRange = const_maxXYZ_vpix.xyz - const_minXYZ_hpix.xyz;
+            float3 posKoeff = _lerp(posKoeffT0, posKoeffT1, tf);
+            float3 ptcpos = bornOffset + _transform(float4(const_minXYZ_hpix.xyz + posRange * posKoeff, 1.0), const_modelTransform).xyz;
+            float3 ptcdir = _transform(float4(posRange * (posKoeffT1 - posKoeffT0), 0.0), const_modelTransform).xyz;
 
             float4 m2t0 = _tex2d(0, float2(t0, ptcv.z));
             float4 m2t1 = _tex2d(0, float2(t1, ptcv.z));
             float4 map2 = _lerp(m2t0, m2t1, tf);
             float2 psize = float2(map2.x + map2.y / 255.0f, map2.z + map2.w / 255.0f);
-            
-            float4 m3t0 = _tex2d(0, float2(t0, ptcv.w));
-            float4 m3t1 = _tex2d(0, float2(t1, ptcv.w));
             float3 map3 = _lerp(m3t0.xyz, m3t1.xyz, tf);                         // alpha, reserved, history, mask
             float  fading = float(255.0f * map3.z > const_t0_t1_mask_cap.w);
             float  isAlive = _step(0.5, float(uint(m3t0.w * 255.0f) & uint(const_t0_t1_mask_cap.z))) * float(m3t1.w < 0.5) * fading;
 
-            float3 ptcpos = _lerp(ptcposT0, ptcposT1, tf);
             float2 wh = psize.xy * float2(const_normal_mw.w, const_right_mh.w) * isAlive;
 
             bool camSwitch = const_reserved_swtch.w > 0.0;
             float3 normal = _select(const_normal_mw.xyz, _norm(frame_cameraPosition.xyz - ptcpos), camSwitch);
-            float3 up = _select(_cross(const_normal_mw.xyz, const_right_mh.xyz), _norm(ptcposT1 - ptcposT0), camSwitch);
+            float3 up = _select(_cross(const_normal_mw.xyz, const_right_mh.xyz), _norm(ptcdir), camSwitch);
             float3 right = _norm(_cross(up, normal));
             
             float3 relVertexPos = right * fixed_quad[repeat_ID].x * wh.x + up * fixed_quad[repeat_ID].y * wh.y;
