@@ -507,6 +507,50 @@ namespace test {
 }
 
 namespace test {
+    class scene_ao_disabled_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_ao_disabled_test>();
+        }
+        void init(const API &api) override {
+            api.scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
+            api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this, scene = api.scene](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
+                _mesh = scene->addVoxelMesh(frames, desc);
+            });
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 1024;
+        }
+
+    private:
+        core::SceneInterface::VoxelMeshPtr _mesh;
+    };
+
+    class scene_ao_enabled_test : public scene_ao_disabled_test {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_ao_enabled_test>();
+        }
+        ~scene_ao_enabled_test() override {
+            _scene->setAOEnabled(false);
+        }
+        void init(const API &api) override {
+            _scene = api.scene;
+            _scene->setAOEnabled(true);
+            scene_ao_disabled_test::init(api);
+        }
+
+    private:
+        core::SceneInterfacePtr _scene;
+    };
+}
+
+namespace test {
     void registerSceneTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
@@ -521,5 +565,7 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_environment_fog_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_arrows_and_line_set_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_ground_mesh_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_ao_enabled_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_ao_disabled_test);
     }
 }
