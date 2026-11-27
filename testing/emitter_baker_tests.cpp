@@ -195,6 +195,34 @@ namespace test {
         EXPECT_FALSE(sameMaps(baker0, baker1));
         return true;
     }
+
+    bool emitter_baker_baking_time_test(const API &api) {
+        // Map width is frames count of the baked time: lifetime if looped, emission + lifetime otherwise
+        // Map texture has the same size
+        //
+        util::Description desc = makeEmitterDesc();
+        desc.setInteger("emissionTimeMs", 500);
+        core::EmitterBakerPtr baker = core::makeEmitterBaker();
+
+        auto bakeWidth = [&](core::EmitterBaker::BakingTime type, bool looped) {
+            desc.setInteger("bakingFrameType", std::int64_t(type));
+            desc.setBool("looped", looped);
+            baker->setParameters(desc);
+            baker->refresh();
+            const foundation::RenderTexturePtr &map = baker->getMap(api.rendering);
+            return map->getWidth() == baker->getMapWidth() && map->getHeight() == baker->getMapHeight() ? map->getWidth() : 0;
+        };
+
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE10, false), 150u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE20, false), 75u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE50, false), 30u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE100, false), 15u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE10, true), 100u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE20, true), 50u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE50, true), 20u);
+        EXPECT_EQ(bakeWidth(core::EmitterBaker::BakingTime::BAKE100, true), 10u);
+        return true;
+    }
 }
 
 namespace test {
@@ -392,6 +420,7 @@ namespace test {
     void registerEmitterBakerTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(emitter_baker_map_test);
         REGISTER_UNIT_TEST(emitter_baker_baking_test);
+        REGISTER_UNIT_TEST(emitter_baker_baking_time_test);
         REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_rising_from_square_test);
         REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_expanding_from_disk_test);
         REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_trailing_from_point_test);
