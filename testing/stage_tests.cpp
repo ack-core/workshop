@@ -309,11 +309,11 @@ namespace test {
             //
             api.resourceProvider->getOrLoadTexture(TEXTURE, [this, stage = api.stage](const foundation::RenderTexturePtr &) {
                 const math::vector3f sliceArgs = {12.0f, 12.0f, 16.0f};
-                _grown = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 16.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
-                _grown->setSize({160.0f, 88.0f});
-                _clamped = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {200.0f, 16.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
+                _grown = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {8.0f, 8.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
+                _grown->setSize({136.0f, 72.0f});
+                _clamped = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {8.0f, 88.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
                 _clamped->setSize({8.0f, 8.0f});
-                _hollow = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 128.0f}, .size = {96.0f, 96.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs, .fill = false});
+                _hollow = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {56.0f, 88.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs, .fill = false});
             });
         }
         void updateAndDraw(const API &api) override {}
@@ -328,29 +328,32 @@ namespace test {
                 return std::abs(p[0] - color[0]) <= 16 && std::abs(p[1] - color[1]) <= 16 && std::abs(p[2] - color[2]) <= 16;
             };
 
-            EXPECT_TRUE(is(24.0f, 24.0f, RED));
-            EXPECT_TRUE(is(168.0f, 24.0f, GREEN));
-            EXPECT_TRUE(is(24.0f, 96.0f, BLUE));
-            EXPECT_TRUE(is(168.0f, 96.0f, YELLOW));
-            EXPECT_TRUE(is(96.0f, 60.0f, ORANGE));
-            EXPECT_TRUE(is(36.0f, 20.0f, WHITE));
-            EXPECT_TRUE(is(42.0f, 20.0f, GRAY));
-            EXPECT_TRUE(is(74.0f, 100.0f, WHITE));
-            EXPECT_TRUE(is(78.0f, 100.0f, GRAY));
-            EXPECT_TRUE(is(162.0f, 20.0f, GREEN));
-            EXPECT_TRUE(is(20.0f, 36.0f, CYAN));
-            EXPECT_TRUE(is(20.0f, 42.0f, DARK_CYAN));
-            EXPECT_TRUE(is(20.0f, 74.0f, CYAN));
-            EXPECT_TRUE(is(20.0f, 90.0f, BLUE));
+            EXPECT_TRUE(is(16.0f, 16.0f, RED));
+            EXPECT_TRUE(is(136.0f, 16.0f, GREEN));
+            EXPECT_TRUE(is(16.0f, 72.0f, BLUE));
+            EXPECT_TRUE(is(136.0f, 72.0f, YELLOW));
+            EXPECT_TRUE(is(76.0f, 44.0f, ORANGE));
 
-            EXPECT_TRUE(is(208.0f, 24.0f, RED));
-            EXPECT_TRUE(is(224.0f, 40.0f, YELLOW));
-            EXPECT_TRUE(is(236.0f, 24.0f, bg));
-            EXPECT_TRUE(is(208.0f, 52.0f, bg));
+            EXPECT_TRUE(is(16.0f, 96.0f, RED));
+            EXPECT_TRUE(is(32.0f, 112.0f, YELLOW));
+            EXPECT_TRUE(is(44.0f, 96.0f, bg));
+            EXPECT_TRUE(is(16.0f, 124.0f, bg));
 
-            EXPECT_TRUE(is(24.0f, 136.0f, RED));
-            EXPECT_TRUE(is(36.0f, 132.0f, WHITE));
-            EXPECT_TRUE(is(64.0f, 176.0f, bg));
+            EXPECT_TRUE(is(64.0f, 96.0f, RED));
+            EXPECT_TRUE(is(88.0f, 120.0f, bg));
+
+            if (s >= 0.5f) {
+                EXPECT_TRUE(is(28.0f, 12.0f, WHITE));
+                EXPECT_TRUE(is(34.0f, 12.0f, GRAY));
+                EXPECT_TRUE(is(66.0f, 76.0f, WHITE));
+                EXPECT_TRUE(is(70.0f, 76.0f, GRAY));
+                EXPECT_TRUE(is(130.0f, 12.0f, GREEN));
+                EXPECT_TRUE(is(12.0f, 28.0f, CYAN));
+                EXPECT_TRUE(is(12.0f, 34.0f, DARK_CYAN));
+                EXPECT_TRUE(is(12.0f, 52.0f, CYAN));
+                EXPECT_TRUE(is(12.0f, 66.0f, BLUE));
+                EXPECT_TRUE(is(76.0f, 92.0f, WHITE));
+            }
             return true;
         }
 
