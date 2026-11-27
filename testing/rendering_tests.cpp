@@ -1701,6 +1701,98 @@ namespace test {
 }
 
 namespace test {
+    class rendering_mipmapped_texture_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_mipmapped_texture_test>();
+        }
+        void init(const API &api) override {
+            // 64x64 px quads sampling 4x4 texture with mips: red 4x4, green 2x2, blue 1x1
+            // UV scale defines texels per pixel: 1 -> magnified (mip 0), 32 -> mip 1, 64 -> mip 2
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][0.25, 0.0][0.0, -0.25][0.25, -0.25]
+                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+                }
+                const {
+                    offset : float4
+                    uvScale : float4
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] + const_offset.xy, 0.5, 1.0);
+                    output_uv = fixed_uv[repeat_ID] * const_uvScale.x;
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 4
+            };
+            const std::vector<std::uint32_t> mip0(16, 0xff0000ff);
+            const std::vector<std::uint32_t> mip1(4, 0xff00ff00);
+            const std::vector<std::uint32_t> mip2(1, 0xffff0000);
+            _shader = api.rendering->createShader(shaderSrc, layout);
+            _texture = api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 4, 4, { mip0.data(), mip1.data(), mip2.data() });
+        }
+        void updateAndDraw(const API &api) override {
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                drawRow(rendering, foundation::SamplerType::NEAREST, 0.75f, { 1.0f, 32.0f, 64.0f });
+                drawRow(rendering, foundation::SamplerType::LINEAR, -0.25f, { 1.0f, 45.2548f, 128.0f });
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+            EXPECT_NOT_EQ(_texture, nullptr);
+            EXPECT_EQ(_texture->getMipCount(), 3);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+            auto pixelIsHalfGreenBlue = [frame](std::size_t x, std::size_t y) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == 0 && p[1] > 96 && p[1] < 160 && p[2] > 96 && p[2] < 160;
+            };
+
+            EXPECT_TRUE(pixelIs(96, 96, 255, 0, 0));        // NEAREST, magnified: mip 0
+            EXPECT_TRUE(pixelIs(224, 96, 0, 255, 0));       // NEAREST, 2 texels per pixel: mip 1
+            EXPECT_TRUE(pixelIs(352, 96, 0, 0, 255));       // NEAREST, 4 texels per pixel: mip 2
+            EXPECT_TRUE(pixelIs(96, 352, 255, 0, 0));       // LINEAR, magnified: mip 0
+            EXPECT_TRUE(pixelIsHalfGreenBlue(224, 352));    // LINEAR, lod 1.5: mip 1 and mip 2 blended
+            EXPECT_TRUE(pixelIs(352, 352, 0, 0, 255));      // LINEAR, lod above mip count: mip 2
+            EXPECT_TRUE(pixelIs(480, 96, 0, 0, 0));         // outside quads
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f offset;
+            math::vector4f uvScale;
+        };
+
+        void drawRow(foundation::RenderingInterface &rendering, foundation::SamplerType sampler, float y, const std::initializer_list<float> &uvScales) {
+            rendering.applyTextures({ { _texture, sampler } });
+            float x = -0.75f;
+            for (float uvScale : uvScales) {
+                const Constants constants = { { x, y, 0.0f, 0.0f }, { uvScale, 0.0f, 0.0f, 0.0f } };
+                rendering.applyShaderConstants(&constants);
+                rendering.draw(1);
+                x += 0.5f;
+            }
+        }
+
+        foundation::RenderShaderPtr _shader;
+        foundation::RenderTexturePtr _texture;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1725,6 +1817,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_vertex_attribute_formats_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_multiple_render_targets_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_texture_formats_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_mipmapped_texture_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
