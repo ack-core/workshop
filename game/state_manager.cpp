@@ -34,7 +34,7 @@ namespace game {
     };
 }
 #else
-#include "experimental/render_dev.h"
+#include "experimental/debug_context.h"
 #include "experimental/vegetation.h"
 #include "experimental/particle_dev.h"
 #include "experimental/voxel_meshes.h"
@@ -45,10 +45,10 @@ namespace game {
 namespace game {
     inline const State STATES[] = {
         {"default", {
-            &makeContext<RenderDevContext>
+            &makeContext<DebugContext>
         }},
         {"vegetation", {
-            &makeContext<RenderDevContext>,
+            &makeContext<DebugContext>,
             &makeContext<VegetationContext>
         }},
         {"particles", {
@@ -56,18 +56,18 @@ namespace game {
             &makeContext<ParticleDevContext>
         }},
         {"voxelmeshes", {
-            &makeContext<RenderDevContext>,
+            &makeContext<DebugContext>,
             &makeContext<VoxelMeshesContext>
         }},
         {"uielements", {
-            &makeContext<RenderDevContext>,
+            &makeContext<DebugContext>,
             &makeContext<UIElementsContext>
         }},
         {"collision", {
             &makeContext<CollisionContext>
         }},
         {"raycheck", {
-            &makeContext<RenderDevContext>,
+            &makeContext<DebugContext>,
             &makeContext<RaycheckContext>
         }}
     };

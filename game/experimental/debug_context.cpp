@@ -3,9 +3,6 @@
 #include "ui/extensions.h"
 #include <list>
 
-bool dbg_switch = false;
-float dbg_rot = 0;
-
 namespace game {
     DebugContext::DebugContext(API &&api) : _api(std::move(api)) {
         _token = _api.platform->addPointerEventHandler(
@@ -33,41 +30,23 @@ namespace game {
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::FINISH) {
                     _pointerId = foundation::INVALID_POINTER_ID;
-                    
-                    const math::vector2f screenCoord = math::vector2f(args.coordinateX, args.coordinateY);
-                    math::vector3f camPos;
-                    math::vector3f worldDir = _api.scene->getWorldDirection(screenCoord, &camPos);
-                    auto result = _api.raycast->rayCast(camPos, worldDir, 100.0f);
-                    if (result.uniqueId != core::RaycastInterface::INVALID_UNIQUE_ID) {
-                        _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
-                    }
-//                    {
-//                        math::transform3f sphereTransform = math::transform3f::identity().translated({10, 0, 0});
-//                        math::IntersectResult result = math::intersectRaySphere(camPos, worldDir, 100.0f, sphereTransform, 7);
-//                        if (result.intersected) {
-//                            _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
-//                        }
-//                    }
-//                    {
-//                        const math::vector3f bmin = {-1.5f, -1.5f, -1.5f};
-//                        const math::vector3f bmax = {3.0f +0.5f, 5.0 +0.5f, 7.0 +0.5f};
-//                        math::transform3f boxTransform = math::transform3f(math::vector3f(2, 1, 4).normalized(), M_PI - M_PI / 6.0f).translated({0, 0, 10});
-//                        math::IntersectResult result = math::intersectRayBox(camPos, worldDir, 100.0f, boxTransform, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z});
-//                        if (result.intersected) {
-//                            _rayOut->setLine(0, result.point, result.point + 2.0f * result.normal, {1, 1, 0, 1});
-//                        }
-//                    }
                 }
                 if (args.type == foundation::PlatformPointerEventArgs::EventType::CANCEL) {
                     _pointerId = foundation::INVALID_POINTER_ID;
+                }
+                if (args.type == foundation::PlatformPointerEventArgs::EventType::WHEEL) {
+                    const float percent = std::max(1000.0f + float(args.flags.wheel), 900.0f) / 1000.0f;
+                    const float orbitLength = _orbit.length();
+
+                    if ((orbitLength >= 50.0f || percent > 1.0f) && (orbitLength <= 1000.0f || percent < 1.0f)) {
+                        _orbit = _orbit * percent;
+                    }
                 }
 
                 return true;
             }
         );
 
-        //_emitter.refresh(_api.rendering, _shapeStart, _shapeEnd);
-        
         _axis = _api.scene->addLineSet();
         _axis->setLine(0, {0, 0, 0}, {1000, 0, 0}, {1, 0, 0, 0.9});
         _axis->setLine(1, {0, 0, 0}, {0, 1000, 0}, {0, 1, 0, 0.9});
@@ -75,55 +54,7 @@ namespace game {
         _axis->setLine(3, {0, 0, 0}, {-1000, 0, 0}, {0.5, 0.5, 0.5, 0.9});
         _axis->setLine(4, {0, 0, 0}, {0, 0, -1000}, {0.5, 0.5, 0.5, 0.9});
 
-        _rayOut = _api.scene->addLineSet();
-        _knight = _api.world->createObject("prefabs/knight_red", core::RaycastInterface::MASK_ALL);
-        _knight->setPosition({0, 0, 0});
-        _knight->loadResources([this](core::WorldInterface::Object &obj) {
-            //printf("!!! completed !!!\n");
-            _knight->play("root.mdl:attack", false, [this](core::WorldInterface::Object &obj) {
-                //printf("!!! attack !!!\n");
-                _knight->play("root.mdl:idle", true);
-            });
-        });
-        _other = _api.world->createObject("prefabs/knight_blue", core::RaycastInterface::MASK_ALL);
-        _other->setPosition({20.01f, 0, 0});
-        _other->loadResources([](core::WorldInterface::Object &obj) {
-            //printf("!!! completed !!!\n");
-        });
-        
-
-        
-        const math::transform3f t1 = math::transform3f::identity().translated({0, 0, -20.01});
-//        
-        _pilon = _api.world->createObject("prefabs/coltest", core::RaycastInterface::MASK_ALL);
-        _pilon->setTransform(t1);
-        _pilon->loadResources([](core::WorldInterface::Object &) {
-            //printf("!!! completed !!!\n");
-        });
-
-        
-        //        const math::transform3f trfm = math::transform3f({0, 1, 0}, M_PI_4);
-//        _object->setTransform(trfm);
-
-//        const math::vector3f bmin = {-1.5f, -1.5f, -1.5f};
-//        const math::vector3f bmax = {3.0f +0.5f, 5.0 +0.5f, 7.0 +0.5f};
-//        const math::transform3f rotation = math::transform3f(math::vector3f(2, 1, 4).normalized(), M_PI - M_PI / 6.0f).translated({0, 0, 10});
-//        _bbox = _api.scene->addBoundingBox({0, 0, 10}, {bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z}, {1, 0, 1, 1});
-//        _bbox->setTransform(rotation);
-//        _bsphere = _api.scene->addBoundingSphere({10, 0, 0}, 7, {1, 0, 1, 1});
-        
-        _joystick = _api.ui->addExtensionElement(std::nullopt, nullptr, ui::extensions::JoystickParams {
-            .anchorH = ui::HorizontalAnchor::RIGHT,
-            .anchorV = ui::VerticalAnchor::BOTTOM,
-            .anchorOffset = math::vector2f(50.0f, 50.0f),
-            .textureBackground = "textures/ui/joystick_bg_00",
-            .textureThumb = "textures/ui/joystick_thumb",
-            .maxThumbOffset = 100.0f,
-            .onChange = [this](const math::vector2f &direction) {
-                _knightVelocity = {12.0f * direction.y, 0.0f, 12.0f * direction.x};
-                //printf("%f %f\n", direction.x, direction.y);
-            }
-        });
+        api.stateManager->switchToState("particles");
     }
     
     DebugContext::~DebugContext() {
@@ -131,31 +62,6 @@ namespace game {
     }
     
     void DebugContext::update(float dtSec) {
-//        if (!dbg_switch && _object) {
-//            _object->unloadResources();
-//            _object = nullptr;
-//        }
-//        if (dbg_switch && !_object) {
-//            _object = _api.world->createObject("player", "prefabs/ship");
-//            _object->loadResources([](core::WorldInterface::Object &) {
-//                printf("!!! completed !!!\n");
-//            });
-//        }
-//        const math::transform3f trfm = math::transform3f({0, 1, 0}, dbg_rot);
-//        if (_object) {
-//            _object->setTransform(trfm);
-//        }
-//
-        auto v = _knight->getVelocity();
-        //printf("--->>> %f %f\n", v.x, v.z);
-        _knight->setPosition(_knight->getWorldPosition());
-        _knight->setVelocity(_knightVelocity);
-        _other->setVelocity({0, 0, 0});
-        _api.scene->setCameraLookAt(_orbit + _knight->getWorldPosition(), _knight->getWorldPosition());
-        
-        
-        
-//        dbg_rot += dtSec;
-        //printf("--->>> %f %f\n", _screenCoord.x, _screenCoord.y);
+        _api.scene->setCameraLookAt(_orbit, math::vector3f{0, 0, 0});
     }
 }
