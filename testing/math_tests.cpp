@@ -557,10 +557,10 @@ namespace test {
         const math::vector3f axis = math::vector3f(1.0f, -2.0f, 0.5f).normalized(1.0f);
         const math::transform3f ar = ts.rotated(axis, 0.7f);
         const math::transform3f expected = ts * math::transform3f(axis, 0.7f);
-        EXPECT_TRUE(near4(ar.row0, expected.row0.x, expected.row0.y, expected.row0.z, expected.row0.w));
-        EXPECT_TRUE(near4(ar.row1, expected.row1.x, expected.row1.y, expected.row1.z, expected.row1.w));
-        EXPECT_TRUE(near4(ar.row2, expected.row2.x, expected.row2.y, expected.row2.z, expected.row2.w));
-        EXPECT_TRUE(near4(ar.row3, expected.row3.x, expected.row3.y, expected.row3.z, expected.row3.w));
+        EXPECT_TRUE(near4(ar.row0, expected.row0[0], expected.row0[1], expected.row0[2], expected.row0[3]));
+        EXPECT_TRUE(near4(ar.row1, expected.row1[0], expected.row1[1], expected.row1[2], expected.row1[3]));
+        EXPECT_TRUE(near4(ar.row2, expected.row2[0], expected.row2[1], expected.row2[2], expected.row2[3]));
+        EXPECT_TRUE(near4(ar.row3, expected.row3[0], expected.row3[1], expected.row3[2], expected.row3[3]));
 
         const math::vector3f p = math::vector3f(1.0f, 2.0f, 3.0f).transformed(ts, true).rotated(axis, 0.7f);
         EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).transformed(ar, true), p.x, p.y, p.z));
