@@ -589,6 +589,60 @@ namespace test {
 }
 
 namespace test {
+    class scene_voxel_vegetation_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_voxel_vegetation_test>();
+        }
+        void init(const API &api) override {
+            struct Voxel {
+                std::int16_t positionX, positionY, positionZ;
+                std::uint8_t colorIndex, mask, scaleX, scaleY, scaleZ, reserved;
+            };
+            const Voxel stone[] = {
+                {0, 0, 0, 10, 0x3f, 1, 1, 1, 0},
+            };
+            const Voxel trunk[] = {
+                {0, 0, 0, 40, 0x3f, 1, 1, 1, 0},
+                {0, 1, 0, 40, 0x3f, 1, 1, 1, 0},
+            };
+            const std::uint8_t cells[] = {
+                0, 3, 0, 0,   0, 255, 0, 0,   0, 3, 1, 0,
+                0, 7, 0, 0,   0, 3, 3, 0,     0, 7, 1, 0,
+                0, 3, 1, 0,   0, 255, 1, 0,   0, 3, 2, 0,
+            };
+            std::vector<std::pair<std::uint32_t, ByteDataPtr>> vxm;
+            vxm.emplace_back(1, std::make_unique<std::uint8_t[]>(sizeof(stone)));
+            vxm.emplace_back(2, std::make_unique<std::uint8_t[]>(sizeof(trunk)));
+            std::memcpy(vxm[0].second.get(), stone, sizeof(stone));
+            std::memcpy(vxm[1].second.get(), trunk, sizeof(trunk));
+            ByteDataPtr map = std::make_unique<std::uint8_t[]>(sizeof(cells));
+            std::memcpy(map.get(), cells, sizeof(cells));
+            const util::Description desc = util::Description::parse("geometry : integer = 2");
+
+            api.scene->setCameraLookAt({10.0f, 10.0f, 10.0f}, {0.0f, 0.0f, 0.0f});
+            _vegetation = api.scene->addVegetation(map, {3, 3, 3}, desc, vxm);
+            _vegetation->setPosition({-1.0f, 0.0f, -1.0f});
+            _hidden = api.scene->addVegetation(map, {3, 3, 3}, desc, vxm);
+            _hidden->setPosition({-4.0f, 0.0f, 2.0f});
+            _hidden->setEnabled(false);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::VegetationPtr _vegetation;
+        core::SceneInterface::VegetationPtr _hidden;
+    };
+}
+
+namespace test {
     void registerSceneTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(scene_statistics_test);
         REGISTER_UNIT_TEST(scene_camera_look_at_test);
@@ -608,5 +662,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_ground_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_ao_enabled_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_ao_disabled_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_vegetation_test);
     }
 }
