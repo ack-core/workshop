@@ -43,6 +43,45 @@ namespace test {
 }
 
 namespace test {
+    class resource_provider_texture_info_and_remove_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<resource_provider_texture_info_and_remove_test>();
+        }
+        void init(const API &api) override {
+            _info = api.resourceProvider->getTextureInfo(PATH);
+            _unknownInfo = api.resourceProvider->getTextureInfo("resource_provider_tests/missing");
+            api.resourceProvider->getOrLoadTexture(PATH, [this, provider = api.resourceProvider](const foundation::RenderTexturePtr &first) {
+                _first = first;
+                provider->removeTexture(PATH);
+                provider->getOrLoadTexture(PATH, [this](const foundation::RenderTexturePtr &reloaded) {
+                    _reloaded = reloaded;
+                });
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_NOT_EQ(_info, nullptr);
+            EXPECT_EQ(_info->width, 32);
+            EXPECT_EQ(_info->height, 32);
+            EXPECT_EQ(_info->format, foundation::RenderTextureFormat::RGBA8UN);
+            EXPECT_EQ(_unknownInfo, nullptr);
+            EXPECT_NOT_EQ(_first, nullptr);
+            EXPECT_NOT_EQ(_reloaded, nullptr);
+            EXPECT_NOT_EQ(_reloaded, _first);
+            return true;
+        }
+
+    private:
+        static constexpr const char *PATH = "resource_provider_tests/resource_provider_texture_loading_test";
+
+        const resource::TextureInfo *_info = nullptr;
+        const resource::TextureInfo *_unknownInfo = nullptr;
+        foundation::RenderTexturePtr _first;
+        foundation::RenderTexturePtr _reloaded;
+    };
+}
+
+namespace test {
     class resource_provider_cube_texture_loading_test : public StepTestInterface {
     public:
         static auto make() -> std::unique_ptr<StepTestInterface> {
@@ -345,6 +384,7 @@ namespace test {
         REGISTER_UNIT_TEST(resource_provider_non_uniquity_test);
         REGISTER_UNIT_TEST(resource_provider_prefabs_test);
         REGISTER_STEP_TEST(resource_provider_texture_loading_test);
+        REGISTER_STEP_TEST(resource_provider_texture_info_and_remove_test);
         REGISTER_STEP_TEST(resource_provider_cube_texture_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_loading_test);
         REGISTER_STEP_TEST(resource_provider_description_reload_test);
