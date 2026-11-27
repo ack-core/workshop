@@ -261,7 +261,11 @@ namespace foundation {
         // @topology    - geometry type
         //
         virtual void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, foundation::BlendType blendType, foundation::DepthBehavior depthBehavior) = 0;
-        
+
+        // Draw triangle topologies as edges. Affects all next draw calls until it is changed
+        //
+        virtual void setWireframeEnabled(bool enabled) = 0;
+
         // Apply textures and their sampling type
         // @textures    - texture can be nullptr (texture at i-th position will not be set)
         // @count       - number of textures

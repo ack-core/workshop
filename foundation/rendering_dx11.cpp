@@ -337,7 +337,10 @@ namespace foundation {
         rasterDesc.CullMode = D3D11_CULL_NONE;
         rasterDesc.DepthClipEnable = TRUE;
 
-        _device->CreateRasterizerState(&rasterDesc, &_rasterState);
+        _device->CreateRasterizerState(&rasterDesc, &_rasterStates[0]);
+
+        rasterDesc.FillMode = D3D11_FILL_WIREFRAME;
+        _device->CreateRasterizerState(&rasterDesc, &_rasterStates[1]);
 
         // blend states
 
@@ -413,7 +416,7 @@ namespace foundation {
         const D3D11_VIEWPORT viewport = {0.0f, 0.0f, float(width), float(height), 0.0f, 1.0f};
 
         _context->RSSetViewports(1, &viewport);
-        _context->RSSetState(_rasterState.Get());
+        _context->RSSetState(_rasterStates[0].Get());
         _context->OMSetBlendState(_blendStates[int(BlendType::DISABLED)].Get(), nullptr, 0xffffffff);
         _context->OMSetDepthStencilState(_depthStates[int(DepthBehavior::DISABLED)].Get(), 0);
         _context->VSSetConstantBuffers(0, 1, _frameConstantsBuffer.GetAddressOf());
@@ -816,6 +819,10 @@ namespace foundation {
             _context->OMSetBlendState(_blendStates[int(blendType)].Get(), nullptr, 0xffffffff);
             _context->OMSetDepthStencilState(_depthStates[int(depthBehavior)].Get(), 0);
         }
+    }
+
+    void Direct3D11Rendering::setWireframeEnabled(bool enabled) {
+        _context->RSSetState(_rasterStates[int(enabled)].Get());
     }
 
     void Direct3D11Rendering::_applyDrawConstants(std::uint32_t instanceCount) {

@@ -724,6 +724,7 @@ namespace core {
         
         void setLinesDrawingEnabled(bool enabled) override;
         void setAOEnabled(bool enabled) override;
+        void setWireframeEnabled(bool enabled) override;
         auto getStatistics() const -> StatInfo override;
 
     private:
@@ -778,6 +779,7 @@ namespace core {
 
         bool _initialized = false;
         bool _lineDrawingEnabled = true;
+        bool _wireframeEnabled = false;
     };
     
     std::shared_ptr<SceneInterface> SceneInterface::instance(const foundation::PlatformInterfacePtr &platform, const foundation::RenderingInterfacePtr &rendering) {
@@ -1354,6 +1356,7 @@ namespace core {
                 }
             };
             _rendering->forTarget(_gbuffer, nullptr, math::color{0.0, 0.0, 0.0, 1.0}, [&](foundation::RenderingInterface &rendering) {
+                rendering.setWireframeEnabled(_wireframeEnabled);
                 rendering.applyShader(_groundMeshShader, foundation::RenderTopology::TRIANGLES, foundation::BlendType::DISABLED, foundation::DepthBehavior::TEST_AND_WRITE);
                 for (const auto &groundMesh : _groundMeshes) {
                     if (groundMesh->enabled) {
@@ -1390,6 +1393,7 @@ namespace core {
                     }
                 }
                 drawCustomMeshes(rendering, true, foundation::BlendType::DISABLED);
+                rendering.setWireframeEnabled(false);
             });
             _rendering->forTarget(_img, nullptr, math::color{0.0, 0.0, 0.0, 0.0}, [&](foundation::RenderingInterface &rendering) {
                 rendering.applyShader(_gbufferToImgShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
@@ -1467,6 +1471,10 @@ namespace core {
 
     void SceneInterfaceImpl::setAOEnabled(bool enabled) {
         _environment.aoParams.x = enabled ? 1.0f : 0.0f;
+    }
+
+    void SceneInterfaceImpl::setWireframeEnabled(bool enabled) {
+        _wireframeEnabled = enabled;
     }
 
     auto SceneInterfaceImpl::getStatistics() const -> StatInfo {

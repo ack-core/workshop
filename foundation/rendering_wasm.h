@@ -128,6 +128,7 @@ namespace foundation {
         
         void forTarget(const RenderTargetPtr &target, const RenderTexturePtr &depth, const std::optional<math::color> &rgba, util::callback<void(RenderingInterface &)> &&pass) override;
         void applyShader(const RenderShaderPtr &shader, foundation::RenderTopology topology, BlendType blendType, DepthBehavior depthBehavior) override;
+        void setWireframeEnabled(bool enabled) override;
         void applyShaderConstants(const void *constants) override;
         void applyTextures(const std::initializer_list<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
         void applyTextures(const std::vector<std::pair<RenderTexturePtr, SamplerType>> &textures) override;
