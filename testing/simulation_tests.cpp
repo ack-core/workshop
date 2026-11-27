@@ -2,10 +2,10 @@
 #include "runner.h"
 
 namespace {
-    core::SimulationInterface::BodyPtr addTestCircle(const test::API &api, const math::vector3f &position, const math::vector3f &velocity) {
+    core::SimulationInterface::BodyPtr addTestCircle(const test::API &api, const math::vector3f &position, const math::vector3f &velocity, float mass = 1.0f) {
         util::Description desc;
         desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
-        desc.setNumber("mass", 1.0);
+        desc.setNumber("mass", mass);
         desc.setNumber("radius", 0.5);
 
         core::SimulationInterface::BodyPtr body = api.simulation->addBody(desc);
@@ -186,6 +186,25 @@ namespace test {
         return true;
     }
 
+    bool simulationCirclesMassResponse(const API &api) {
+        core::SimulationInterface::BodyPtr light = addTestCircle(api, {0, 0, 0}, {0, 0, 0}, 1.0f);
+        core::SimulationInterface::BodyPtr heavy = addTestCircle(api, {0.6f, 0, 0}, {0, 0, 0}, 3.0f);
+        core::SimulationInterface::BodyPtr infinite = addTestCircle(api, {0, 0, 10}, {0, 0, 0}, 0.5f);
+        core::SimulationInterface::BodyPtr finite = addTestCircle(api, {0.6f, 0, 10}, {0, 0, 0}, 100.0f);
+        core::SimulationInterface::BodyPtr infiniteA = addTestCircle(api, {0, 0, 20}, {0, 0, 0}, 0.0f);
+        core::SimulationInterface::BodyPtr infiniteB = addTestCircle(api, {0.6f, 0, 20}, {0, 0, 0}, 0.9f);
+
+        api.simulation->update(0.1f);
+
+        EXPECT_EQ_F(light->getTransform().v3.x, -0.3f);
+        EXPECT_EQ_F(heavy->getTransform().v3.x, 0.7f);
+        EXPECT_EQ_F(infinite->getTransform().v3.x, 0.0f);
+        EXPECT_EQ_F(finite->getTransform().v3.x, 1.0f);
+        EXPECT_EQ_F(infiniteA->getTransform().v3.x, -0.2f);
+        EXPECT_EQ_F(infiniteB->getTransform().v3.x, 0.8f);
+        return true;
+    }
+
     bool simulationCirclesDistanceConstraint(const API &api) {
         core::SimulationInterface::BodyPtr pushed = addTestCircle(api, {0, 0, 0}, {1, 0, 0});
         core::SimulationInterface::BodyPtr follower = addTestCircle(api, {2, 0, 0}, {0, 0, 0});
@@ -285,6 +304,7 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleGravityParabola);
         REGISTER_UNIT_TEST(simulationCircleDamping);
         REGISTER_UNIT_TEST(simulationCirclesCollision);
+        REGISTER_UNIT_TEST(simulationCirclesMassResponse);
         REGISTER_UNIT_TEST(simulationCirclesDistanceConstraint);
         REGISTER_UNIT_TEST(simulationCircleObstacleDistanceConstraint);
         REGISTER_UNIT_TEST(simulationBodyProperties);
