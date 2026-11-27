@@ -104,6 +104,40 @@ namespace test {
         EXPECT_TRUE(calls.empty());
         return true;
     }
+    bool platform_pointer_coordinates_override_test(const API &api) {
+        using Args = foundation::PlatformPointerEventArgs;
+        float receivedX = 0.0f;
+        float receivedY = 0.0f;
+
+        const foundation::EventHandlerToken receiver = api.platform->addPointerEventHandler([&](const Args &args) {
+            receivedX = args.coordinateX;
+            receivedY = args.coordinateY;
+            return false;
+        }, true);
+        const foundation::EventHandlerToken overrider = api.platform->addPointerEventHandler([&](const Args &args) {
+            args.coordinateX = 30.0f;
+            args.coordinateY = 40.0f;
+            return false;
+        }, true);
+
+        Args args {};
+        args.type = Args::EventType::START;
+        args.coordinateX = 10.0f;
+        args.coordinateY = 20.0f;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(receivedX, 30.0f);
+        EXPECT_EQ(receivedY, 40.0f);
+
+        api.platform->removeEventHandler(overrider);
+        args.coordinateX = 10.0f;
+        args.coordinateY = 20.0f;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(receivedX, 10.0f);
+        EXPECT_EQ(receivedY, 20.0f);
+
+        api.platform->removeEventHandler(receiver);
+        return true;
+    }
     bool platform_editor_event_handlers_test(const API &api) {
         std::string calls;
         bool consume = false;
@@ -366,6 +400,7 @@ namespace test {
         REGISTER_UNIT_TEST(platform_screen_scale_test);
         REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
         REGISTER_UNIT_TEST(platform_pointer_event_handlers_test);
+        REGISTER_UNIT_TEST(platform_pointer_coordinates_override_test);
         REGISTER_UNIT_TEST(platform_editor_event_handlers_test);
         REGISTER_UNIT_TEST(platform_handlers_bottom_order_test);
         REGISTER_UNIT_TEST(platform_event_handlers_count_test);
