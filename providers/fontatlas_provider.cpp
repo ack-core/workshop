@@ -338,7 +338,7 @@ namespace resource {
         FontAtlas *suitable = _collectChars(text, fontSize, blur, readyChars, toLoad);
         if (toLoad.empty()) {
             outInfo = std::move(readyChars);
-            return suitable->texture;
+            return suitable ? suitable->texture : g_empty;
         }
         else {
             _platform->logError("[FontAtlasProviderImpl::getTextFontAtlas] Missing pre-cached entries for the text '%s'", text);
