@@ -299,32 +299,63 @@ namespace test {
 }
 
 namespace test {
-    class stage_img9slice_rendering_test : public ScreenshotTestInterface {
+    class stage_img9slice_rendering_test : public PixelTestInterface {
     public:
-        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
             return std::make_unique<stage_img9slice_rendering_test>();
         }
         void init(const API &api) override {
+            // 48x48 texture of 16x16 cells, edge cells are 8 bright + 8 dark stripes along the repeat direction
+            //
             api.resourceProvider->getOrLoadTexture(TEXTURE, [this, stage = api.stage](const foundation::RenderTexturePtr &) {
-                _grown = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 16.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = SLICE_ARGS});
+                const math::vector3f sliceArgs = {12.0f, 12.0f, 16.0f};
+                _grown = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 16.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
                 _grown->setSize({160.0f, 88.0f});
-                _clamped = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {200.0f, 16.0f}, .texture = TEXTURE, .sliceArgs = SLICE_ARGS});
+                _clamped = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {200.0f, 16.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
                 _clamped->setSize({8.0f, 8.0f});
-                _hollow = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 128.0f}, .size = {96.0f, 96.0f}, .texture = TEXTURE, .sliceArgs = SLICE_ARGS, .fill = false});
+                _hollow = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 128.0f}, .size = {96.0f, 96.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs, .fill = false});
             });
         }
         void updateAndDraw(const API &api) override {}
-        std::uint8_t getThreshold() const override {
-            return 4;
-        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            const float s = api.platform->getScreenScale();
+            const std::uint8_t *bg = frame + (foundation::TESTING_RENDER_WIDTH * foundation::TESTING_RENDER_HEIGHT - 1) * 4;
+            const std::uint8_t RED[] = {255, 0, 0}, GREEN[] = {0, 255, 0}, BLUE[] = {0, 0, 255}, YELLOW[] = {255, 255, 0}, ORANGE[] = {255, 128, 0};
+            const std::uint8_t WHITE[] = {255, 255, 255}, GRAY[] = {128, 128, 128}, CYAN[] = {0, 255, 255}, DARK_CYAN[] = {0, 128, 128};
 
-        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
-            return outOfThresholdPixelCount <= 0;
+            auto is = [&](float x, float y, const std::uint8_t *color) {
+                const std::uint8_t *p = frame + (std::size_t(y * s) * foundation::TESTING_RENDER_WIDTH + std::size_t(x * s)) * 4;
+                return std::abs(p[0] - color[0]) <= 16 && std::abs(p[1] - color[1]) <= 16 && std::abs(p[2] - color[2]) <= 16;
+            };
+
+            EXPECT_TRUE(is(24.0f, 24.0f, RED));
+            EXPECT_TRUE(is(168.0f, 24.0f, GREEN));
+            EXPECT_TRUE(is(24.0f, 96.0f, BLUE));
+            EXPECT_TRUE(is(168.0f, 96.0f, YELLOW));
+            EXPECT_TRUE(is(96.0f, 60.0f, ORANGE));
+            EXPECT_TRUE(is(36.0f, 20.0f, WHITE));
+            EXPECT_TRUE(is(42.0f, 20.0f, GRAY));
+            EXPECT_TRUE(is(74.0f, 100.0f, WHITE));
+            EXPECT_TRUE(is(78.0f, 100.0f, GRAY));
+            EXPECT_TRUE(is(162.0f, 20.0f, GREEN));
+            EXPECT_TRUE(is(20.0f, 36.0f, CYAN));
+            EXPECT_TRUE(is(20.0f, 42.0f, DARK_CYAN));
+            EXPECT_TRUE(is(20.0f, 74.0f, CYAN));
+            EXPECT_TRUE(is(20.0f, 90.0f, BLUE));
+
+            EXPECT_TRUE(is(208.0f, 24.0f, RED));
+            EXPECT_TRUE(is(224.0f, 40.0f, YELLOW));
+            EXPECT_TRUE(is(236.0f, 24.0f, bg));
+            EXPECT_TRUE(is(208.0f, 52.0f, bg));
+
+            EXPECT_TRUE(is(24.0f, 136.0f, RED));
+            EXPECT_TRUE(is(36.0f, 132.0f, WHITE));
+            EXPECT_TRUE(is(64.0f, 176.0f, bg));
+            return true;
         }
 
     private:
         static constexpr const char *TEXTURE = "stage_tests/stage_img9slice_rendering_test";
-        const math::vector3f SLICE_ARGS = {12.0f, 12.0f, 16.0f};
         ui::Img9SlicePtr _grown, _clamped, _hollow;
     };
 }
@@ -341,6 +372,6 @@ namespace test {
         REGISTER_STEP_TEST(stage_pivot_screen_world_position_test);
         REGISTER_STEP_TEST(stage_text_line_empty_size_test);
         REGISTER_STEP_TEST(stage_text_line_size_test);
-        REGISTER_SCREENSHOT_TEST("stage_tests", stage_img9slice_rendering_test);
+        REGISTER_PIXEL_TEST("stage_tests", stage_img9slice_rendering_test);
     }
 }
