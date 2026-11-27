@@ -414,7 +414,7 @@ const imports = {
             if (enableDepth) {
                 const texture = glcontext.createTexture();
                 glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
-                glcontext.texImage2D(glcontext.TEXTURE_2D, 0, glcontext.DEPTH_COMPONENT32F, w, h, 0, glcontext.DEPTH_COMPONENT, glcontext.FLOAT, null);
+                glcontext.texStorage2D(glcontext.TEXTURE_2D, 1, glcontext.DEPTH_COMPONENT32F, w, h);
                 glcontext.bindTexture(glcontext.TEXTURE_2D, null);
                 glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.DEPTH_ATTACHMENT, glcontext.TEXTURE_2D, texture, 0);
                 gltextures[glTextureIDCounter] = texture;
@@ -424,7 +424,7 @@ const imports = {
             for (let i = 0; i < count; i++) {
                 const texture = glcontext.createTexture();
                 glcontext.bindTexture(glcontext.TEXTURE_2D, texture);
-                glcontext.texImage2D(glcontext.TEXTURE_2D, 0, internal, w, h, 0, format, type, null);
+                glcontext.texStorage2D(glcontext.TEXTURE_2D, 1, internal, w, h);
                 glcontext.bindTexture(glcontext.TEXTURE_2D, null);
                 glcontext.framebufferTexture2D(glcontext.FRAMEBUFFER, glcontext.COLOR_ATTACHMENT0 + i, glcontext.TEXTURE_2D, texture, 0);
                 gltextures[glTextureIDCounter] = texture;
@@ -653,13 +653,13 @@ worker.onmessage = (msg) => {
         }
 
         glsamplers[0] = glcontext.createSampler();
-        glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MIN_FILTER, glcontext.NEAREST);
+        glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MIN_FILTER, glcontext.NEAREST_MIPMAP_NEAREST);
         glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_MAG_FILTER, glcontext.NEAREST);
         glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_S, glcontext.REPEAT);
         glcontext.samplerParameteri(glsamplers[0], glcontext.TEXTURE_WRAP_T, glcontext.REPEAT);
 
         glsamplers[1] = glcontext.createSampler();
-        glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MIN_FILTER, glcontext.LINEAR);
+        glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MIN_FILTER, glcontext.LINEAR_MIPMAP_LINEAR);
         glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_MAG_FILTER, glcontext.LINEAR);
         glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_S, glcontext.REPEAT);
         glcontext.samplerParameteri(glsamplers[1], glcontext.TEXTURE_WRAP_T, glcontext.REPEAT);
