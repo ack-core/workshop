@@ -432,7 +432,7 @@ namespace test {
 
             for (std::size_t i = 0; i < 4; i++) {
                 _particles[i] = api.scene->addParticles(texture, baker->getMap(api.rendering), baker->getDescription());
-                _particles[i]->setPosition({-9.0f + 6.0f * float(i), 0.0f, 0.0f});
+                _particles[i]->setPosition({-7.5f + 5.0f * float(i), 0.0f, 0.0f});
                 _particles[i]->setTimings(3.7f, fadingTimes[i], {});
             }
         }
