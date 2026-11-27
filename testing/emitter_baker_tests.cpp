@@ -414,6 +414,41 @@ namespace test {
     };
 }
 
+namespace test {
+    class emitter_baker_looped_fading_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<emitter_baker_looped_fading_test>();
+        }
+        void init(const API &api) override {
+            // Emitters in the fourth cycle with fading 0, 0.25, 0.75 and 1.5 seconds from left to right:
+            // full column, column without lower quarter, only upper quarter of column, nothing
+            //
+            const core::EmitterBakerPtr baker = makeRisingFromPointBaker();
+            const foundation::RenderTexturePtr texture = makeWhiteTexture(api);
+            const float fadingTimes[] = {0.0f, 0.25f, 0.75f, 1.5f};
+
+            api.scene->setCameraLookAt({0.0f, 5.0f, 30.0f}, {0.0f, 5.0f, 0.0f});
+
+            for (std::size_t i = 0; i < 4; i++) {
+                _particles[i] = api.scene->addParticles(texture, baker->getMap(api.rendering), baker->getDescription());
+                _particles[i]->setPosition({-7.5f + 5.0f * float(i), 0.0f, 0.0f});
+                _particles[i]->setTimings(3.7f, fadingTimes[i], {});
+            }
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 16;
+        }
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 128;
+        }
+
+    private:
+        core::SceneInterface::ParticlesPtr _particles[4];
+    };
+}
+
 // Screenshot tests are named by visual effect: emitter_baker_<motion>_from_<start shape>_test
 //
 namespace test {
@@ -425,5 +460,6 @@ namespace test {
         REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_expanding_from_disk_test);
         REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_trailing_from_point_test);
         REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_starting_fading_from_point_test);
+        REGISTER_SCREENSHOT_TEST("emitter_baker_tests", emitter_baker_looped_fading_test);
     }
 }
