@@ -19,6 +19,7 @@ namespace core {
         math::vector4f fogCenter = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
         math::vector4f fogColor = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
         math::vector4f fogRadius = math::vector4f(1000.0f, 2000.0f, 0.0f, 0.0f);
+        math::vector4f aoParams = math::vector4f(1.0f, 0.0f, 0.0f, 0.0f);
     };
 }
 
@@ -722,6 +723,7 @@ namespace core {
         void updateAndDraw(float dtSec) override;
         
         void setLinesDrawingEnabled(bool enabled) override;
+        void setAOEnabled(bool enabled) override;
         auto getStatistics() const -> StatInfo override;
 
     private:
@@ -1076,6 +1078,7 @@ namespace {
             fogCenter : float4
             fogColor : float4
             fogRadius : float4
+            aoParams : float4
         }
         inout {
             uv : float2
@@ -1100,20 +1103,25 @@ namespace {
             float3 color = _tex2d(0, float2(gbuffer.w, 0)).rgb;
             float3 wpos = getWPos(input_uv, gdepth);
             float3 wnpos = wpos + 0.05 * normal;
-            float  lit = 0.0;
-            int3   cell = int3(_floor(wpos * 32.0)) & 15;
-            int    offset = 12 * ((fixed_rndo[cell.x].x + fixed_rndo[cell.y].y + fixed_rndo[cell.z].z) % 24);
-            float  rscale = 0.015 / (gdepth * gdepth + 0.0000001);
+            float  lit = 1.0;
 
-            for (int i = 0; i < 12; i++) {
-                float3 rv = 3.5 * fixed_rndv[offset + i];
-                rv = _sign(_dot(normal, rv)) * rv;
-                float3 dpos = getDPos(wnpos + rv);
-                float  rdepth = _tex2d(2, dpos.xy).r;
-                lit += _step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z));
+            if (const_aoParams.x > 0.5) {
+                int3   cell = int3(_floor(wpos * 32.0)) & 15;
+                int    offset = 12 * ((fixed_rndo[cell.x].x + fixed_rndo[cell.y].y + fixed_rndo[cell.z].z) % 24);
+                float  rscale = 0.015 / (gdepth * gdepth + 0.0000001);
+                lit = 0.0;
+
+                for (int i = 0; i < 12; i++) {
+                    float3 rv = 3.5 * fixed_rndv[offset + i];
+                    rv = _sign(_dot(normal, rv)) * rv;
+                    float3 dpos = getDPos(wnpos + rv);
+                    float  rdepth = _tex2d(2, dpos.xy).r;
+                    lit += _step(rdepth, dpos.z) + _clamp(rscale * (rdepth - dpos.z));
+                }
+
+                lit = lit / 12.0;
             }
 
-            lit = lit / 12.0;
             float  t = _sat((_len(wpos - const_fogCenter.xyz) - const_fogRadius.x) / (const_fogRadius.y - const_fogRadius.x));
             float  fog = _select(t * (2.0 - t), 1.0, gdepth < 0.0000001);
             output_color[0] = float4(_lerp(lit * color * const_sunColor.rgb, const_fogColor.rgb, fog), 1);
@@ -1455,6 +1463,10 @@ namespace core {
 
     void SceneInterfaceImpl::setLinesDrawingEnabled(bool enabled) {
         _lineDrawingEnabled = enabled;
+    }
+
+    void SceneInterfaceImpl::setAOEnabled(bool enabled) {
+        _environment.aoParams.x = enabled ? 1.0f : 0.0f;
     }
 
     auto SceneInterfaceImpl::getStatistics() const -> StatInfo {

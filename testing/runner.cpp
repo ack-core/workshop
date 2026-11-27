@@ -44,7 +44,7 @@ namespace test {
     )
     : _api{platform, rendering, resourceProvider, fontAtlasProvider, scene, raycast, simulation, stage}
     {
-
+        scene->setAOEnabled(false);
     }
 
     TestRunner::~TestRunner() {

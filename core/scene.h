@@ -213,6 +213,10 @@ namespace core {
         //
         virtual void setLinesDrawingEnabled(bool enabled) = 0;
 
+        // Enable ambient occlusion in gbuffer lighting pass. Enabled by default
+        //
+        virtual void setAOEnabled(bool enabled) = 0;
+
         // Returns counters usable in statistics and testing. Released objects are counted until next updateAndDraw
         //
         virtual auto getStatistics() const -> StatInfo = 0;
