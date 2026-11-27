@@ -299,6 +299,37 @@ namespace test {
 }
 
 namespace test {
+    class stage_img9slice_rendering_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<stage_img9slice_rendering_test>();
+        }
+        void init(const API &api) override {
+            api.resourceProvider->getOrLoadTexture(TEXTURE, [this, stage = api.stage](const foundation::RenderTexturePtr &) {
+                _grown = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 16.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = SLICE_ARGS});
+                _grown->setSize({160.0f, 88.0f});
+                _clamped = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {200.0f, 16.0f}, .texture = TEXTURE, .sliceArgs = SLICE_ARGS});
+                _clamped->setSize({8.0f, 8.0f});
+                _hollow = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {16.0f, 128.0f}, .size = {96.0f, 96.0f}, .texture = TEXTURE, .sliceArgs = SLICE_ARGS, .fill = false});
+            });
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 0;
+        }
+
+    private:
+        static constexpr const char *TEXTURE = "stage_tests/stage_img9slice_rendering_test";
+        const math::vector3f SLICE_ARGS = {12.0f, 12.0f, 16.0f};
+        ui::Img9SlicePtr _grown, _clamped, _hollow;
+    };
+}
+
+namespace test {
     void registerStageTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(stage_statistics_test);
         REGISTER_UNIT_TEST(stage_named_element_test);
@@ -310,5 +341,6 @@ namespace test {
         REGISTER_STEP_TEST(stage_pivot_screen_world_position_test);
         REGISTER_STEP_TEST(stage_text_line_empty_size_test);
         REGISTER_STEP_TEST(stage_text_line_size_test);
+        REGISTER_SCREENSHOT_TEST("stage_tests", stage_img9slice_rendering_test);
     }
 }
