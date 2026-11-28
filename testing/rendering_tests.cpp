@@ -1081,6 +1081,123 @@ namespace test {
 }
 
 namespace test {
+    class rendering_target_no_clear_and_depth_override_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_target_no_clear_and_depth_override_test>();
+        }
+        void init(const API &api) override {
+            // First target: red top-left quad, then without color clear - near green bottom half
+            // Second target: far yellow fullscreen quad tested against first target's depth
+            // Targets are drawn on the left and right halves of the screen
+            //
+            const char *quadSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, -1.0][1.0, -1.0]
+                }
+                const {
+                    offset : float4
+                    color : float4
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] * const_offset.w + const_offset.xy, const_offset.z, 1.0);
+                }
+                fssrc {
+                    output_color[0] = const_color;
+                }
+            )";
+            const char *screenSrc = R"(
+                fixed {
+                    quad[4] : float2 = [0.0, 1.0][1.0, 1.0][0.0, -1.0][1.0, -1.0]
+                    uv[4] : float2 = [0.0, 0.0][1.0, 0.0][0.0, 1.0][1.0, 1.0]
+                }
+                const {
+                    offset : float4
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = float4(fixed_quad[repeat_ID] + const_offset.xy, 0.5, 1.0);
+                    output_uv = fixed_uv[repeat_ID];
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            _quadShader = api.rendering->createShader(quadSrc, foundation::InputLayout { .repeat = 4 });
+            _screenShader = api.rendering->createShader(screenSrc, foundation::InputLayout { .repeat = 4 });
+            _first = api.rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, 64, 64, true);
+            _second = api.rendering->createRenderTarget(foundation::RenderTextureFormat::RGBA8UN, 1, 64, 64, true);
+        }
+        void updateAndDraw(const API &api) override {
+            using foundation::DepthBehavior;
+
+            api.rendering->forTarget(_first, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                drawQuad(rendering, DepthBehavior::DISABLED, { -1.0f, 1.0f, 0.5f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f });
+            });
+            api.rendering->forTarget(_first, nullptr, std::nullopt, [&](foundation::RenderingInterface &rendering) {
+                drawQuad(rendering, DepthBehavior::TEST_AND_WRITE, { -1.0f, 0.0f, 0.8f, 2.0f }, { 0.0f, 1.0f, 0.0f, 1.0f });
+            });
+            api.rendering->forTarget(_second, _first->getDepth(), math::color{ 0.0f, 0.0f, 1.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                drawQuad(rendering, DepthBehavior::TEST_ONLY, { -1.0f, 1.0f, 0.5f, 2.0f }, { 1.0f, 1.0f, 0.0f, 1.0f });
+            });
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                drawScreen(rendering, _first, -1.0f);
+                drawScreen(rendering, _second, 0.0f);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_quadShader, nullptr);
+            EXPECT_NOT_EQ(_screenShader, nullptr);
+            EXPECT_NOT_EQ(_first, nullptr);
+            EXPECT_NOT_EQ(_second, nullptr);
+            EXPECT_NOT_EQ(_first->getDepth(), nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            const std::size_t w = foundation::TESTING_RENDER_WIDTH;
+            const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
+
+            EXPECT_TRUE(pixelIs(w / 8, h / 4, 255, 0, 0));          // first: red kept without clear
+            EXPECT_TRUE(pixelIs(w * 3 / 8, h / 4, 0, 0, 0));        // first: cleared at first pass
+            EXPECT_TRUE(pixelIs(w / 4, h * 3 / 4, 0, 255, 0));      // first: green drawn without clear
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h / 4, 255, 255, 0));    // second: yellow passes empty depth
+            EXPECT_TRUE(pixelIs(w * 3 / 4, h * 3 / 4, 0, 0, 255));  // second: yellow rejected by first's depth
+            return true;
+        }
+
+    private:
+        struct Constants {
+            math::vector4f offset;
+            math::vector4f color;
+        };
+
+        void drawQuad(foundation::RenderingInterface &rendering, foundation::DepthBehavior depthBehavior, const math::vector4f &offset, const math::vector4f &color) {
+            const Constants constants = { offset, color };
+            rendering.applyShader(_quadShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, depthBehavior);
+            rendering.applyShaderConstants(&constants);
+            rendering.draw(1);
+        }
+        void drawScreen(foundation::RenderingInterface &rendering, const foundation::RenderTargetPtr &target, float x) {
+            const math::vector4f offset = { x, 0.0f, 0.0f, 0.0f };
+            rendering.applyShader(_screenShader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+            rendering.applyShaderConstants(&offset);
+            rendering.applyTextures({ { target->getTexture(0), foundation::SamplerType::NEAREST } });
+            rendering.draw(1);
+        }
+
+        foundation::RenderShaderPtr _quadShader;
+        foundation::RenderShaderPtr _screenShader;
+        foundation::RenderTargetPtr _first;
+        foundation::RenderTargetPtr _second;
+    };
+}
+
+namespace test {
     class rendering_partial_data_test : public PixelTestInterface {
     public:
         static auto make() -> std::unique_ptr<PixelTestInterface> {
@@ -1811,6 +1928,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_blend_types_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_cube_texture_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_depth_behavior_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_target_no_clear_and_depth_override_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_partial_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_indexed_data_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_points_and_line_strip_test);
