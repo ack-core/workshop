@@ -256,10 +256,12 @@ namespace foundation {
             samplerDesc.tAddressMode = MTLSamplerAddressModeRepeat;
             samplerDesc.minFilter = MTLSamplerMinMagFilterNearest;
             samplerDesc.magFilter = MTLSamplerMinMagFilterNearest;
+            samplerDesc.mipFilter = MTLSamplerMipFilterNearest;
             _samplerStates[int(foundation::SamplerType::NEAREST)] = [_device newSamplerStateWithDescriptor:samplerDesc];
             
             samplerDesc.minFilter = MTLSamplerMinMagFilterLinear;
             samplerDesc.magFilter = MTLSamplerMinMagFilterLinear;
+            samplerDesc.mipFilter = MTLSamplerMipFilterLinear;
             _samplerStates[int(foundation::SamplerType::LINEAR)] = [_device newSamplerStateWithDescriptor:samplerDesc];
             
             MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
