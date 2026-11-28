@@ -122,13 +122,13 @@ namespace foundation {
         // @return   - data != nullptr and size != 0 if file opened successfully.
         // @completion called from the main thread
         //
-        virtual void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput = false) = 0;
+        virtual void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) = 0;
         
         // Save file in resources or writable directory. Usable in editors. If data is nullptr and size is 0 then file is deleted
         // @return   - true if file saved successfully.
         // @completion called from the main thread
         //
-        virtual void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput = false) = 0;
+        virtual void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) = 0;
         
         // Returns native screen size in pixels
         //
@@ -207,6 +207,10 @@ namespace foundation {
         // Breaks platform update cycle and exits the app
         //
         virtual void exit(int returnCode) = 0;
+
+        // Suppress logMsg/logError and file operations output. Usable in tests
+        //
+        virtual void setSuppressOutput(bool info, bool errors) = 0;
 
         virtual void logMsg(const char* fmt, ...) = 0;
         virtual void logError(const char* fmt, ...) = 0;

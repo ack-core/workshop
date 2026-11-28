@@ -16,6 +16,7 @@ namespace {
 
 namespace test {
     bool stage_statistics_test(const API &api) {
+        api.platform->setSuppressOutput(true, false);
         const char *STAGE_TEXTURE = "stage_tests/stage_texture";
         {
             ui::PivotPtr pivot = api.stage->addPivot(std::nullopt, nullptr, {});
@@ -136,6 +137,7 @@ namespace test {
     }
 
     bool stage_interactor_action_handler_test(const API &api) {
+        api.platform->setSuppressOutput(true, false);
         using EventType = foundation::PlatformPointerEventArgs::EventType;
         std::string calls, states;
         math::vector2f point = {0.0f, 0.0f};
@@ -189,6 +191,7 @@ namespace test {
     }
 
     bool stage_interactor_active_area_test(const API &api) {
+        api.platform->setSuppressOutput(true, false);
         using EventType = foundation::PlatformPointerEventArgs::EventType;
         const float u = 1.0f / api.platform->getScreenScale();
         std::string calls;

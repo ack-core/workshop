@@ -404,10 +404,10 @@ namespace foundation {
         return g_asyncWorkCount != 0;
     }
 
-    void WindowsPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
+    void WindowsPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
         backgroundThreadPush(g_io, std::make_unique<FileLoadTask>(_dataPath + filePath, std::move(completion)));
     }
-    void WindowsPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
+    void WindowsPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
         backgroundThreadPush(g_io, std::make_unique<FileSaveTask>(_dataPath + filePath, data, data ? size : 0, std::move(completion)));
     }
 
@@ -555,7 +555,16 @@ namespace foundation {
         g_returnCode = returnCode;
     }
 
+    void WindowsPlatform::setSuppressOutput(bool info, bool errors) {
+        _suppressInfo = info;
+        _suppressErrors = errors;
+    }
+
     void WindowsPlatform::logMsg(const char *fmt, ...) {
+        if (_suppressInfo) {
+            return;
+        }
+
         std::lock_guard<std::mutex> guard(_logMutex);
 
         va_list args;
@@ -570,6 +579,10 @@ namespace foundation {
     }
 
     void WindowsPlatform::logError(const char *fmt, ...) {
+        if (_suppressErrors) {
+            return;
+        }
+
         std::lock_guard<std::mutex> guard(_logMutex);
 
         va_list args;

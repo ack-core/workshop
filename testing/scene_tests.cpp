@@ -215,6 +215,7 @@ namespace test {
             return std::make_unique<scene_voxel_mesh_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             api.scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
             api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this, scene = api.scene](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
                 _mesh = scene->addVoxelMesh(frames, desc);
@@ -399,12 +400,13 @@ namespace test {
             return std::make_unique<scene_environment_fog_test>();
         }
         ~scene_environment_fog_test() override {
-            _scene->setEnvironment({0.5f, 1.0f, 0.3f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {9000.0f, 10000.0f});
+            _scene->setEnvironment({0.3f, 0.3f, 0.3f, 1.0f}, {0.5f, 1.0f, 0.3f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {9000.0f, 10000.0f});
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             _scene = api.scene;
             _scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
-            _scene->setEnvironment({1.0f, 1.0f, 0.0f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {10.0f, 50.0f});
+            _scene->setEnvironment({0.3f, 0.3f, 0.3f, 1.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 0.9f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.4f, 0.6f, 0.8f, 1.0f}, {10.0f, 50.0f});
             _addMesh(api, "scene_tests/scene_environment_fog_test_voxplane", {-32.0f, -1.0f, -32.0f});
             _addMesh(api, "scene_tests/scene_voxel_mesh_test", {-20.0f, 0.0f, -20.0f});
             _addMesh(api, "scene_tests/scene_environment_fog_test_debris", {5.0f, 0.0f, 5.0f});
@@ -551,6 +553,7 @@ namespace test {
             return std::make_unique<scene_ao_disabled_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             api.scene->setCameraLookAt({40.0f, 40.0f, 40.0f}, {0.0f, 0.0f, 0.0f});
             api.resourceProvider->getOrLoadVoxelMesh("scene_tests/scene_voxel_mesh_test", [this, scene = api.scene](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &desc) {
                 _mesh = scene->addVoxelMesh(frames, desc);

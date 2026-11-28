@@ -19,6 +19,7 @@ namespace test {
             return std::make_unique<fontatlas_provider_blur_precache_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 2, [this, provider = api.fontAtlasProvider]() {
                 _blurredTexture = provider->getTextFontAtlas(TEXT, FONT_SIZE, 2, _blurred);
                 _unblurredTexture = provider->getTextFontAtlas(TEXT, FONT_SIZE, 0, _unblurred);
@@ -49,6 +50,7 @@ namespace test {
             return std::make_unique<fontatlas_provider_atlas_test_base<BLUR>>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             // Fullscreen quad sampling the font atlas texture
             //
             const char *shaderSrc = R"(

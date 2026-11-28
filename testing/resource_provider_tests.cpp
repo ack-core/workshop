@@ -19,6 +19,7 @@ namespace test {
             return std::make_unique<resource_provider_texture_loading_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             const char *path = "resource_provider_tests/resource_provider_texture_loading_test";
             api.resourceProvider->getOrLoadTexture(path, [this](const foundation::RenderTexturePtr &texture) {
                 _first = texture;
@@ -49,6 +50,7 @@ namespace test {
             return std::make_unique<resource_provider_texture_info_and_remove_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             _info = api.resourceProvider->getTextureInfo(PATH);
             _unknownInfo = api.resourceProvider->getTextureInfo("resource_provider_tests/missing");
             api.resourceProvider->getOrLoadTexture(PATH, [this, provider = api.resourceProvider](const foundation::RenderTexturePtr &first) {
@@ -88,6 +90,7 @@ namespace test {
             return std::make_unique<resource_provider_cube_texture_loading_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, true);
             api.resourceProvider->getOrLoadCubeTexture(PATH, [this, provider = api.resourceProvider](const foundation::RenderTexturePtr &first) {
                 _first = first;
                 provider->getOrLoadCubeTexture(PATH, [this, provider](const foundation::RenderTexturePtr &second) {
@@ -134,6 +137,7 @@ namespace test {
             return std::make_unique<resource_provider_description_loading_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, true);
             const char *path = "resource_provider_tests/resource_provider_description_loading_test";
             api.resourceProvider->getOrLoadDescription(path, [this, provider = api.resourceProvider, path](const util::Description &first) {
                 _first = &first;
@@ -174,6 +178,7 @@ namespace test {
             return std::make_unique<resource_provider_description_reload_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             _save(api, "v : integer = 1", [this, api] {
                 api.resourceProvider->getOrLoadDescription(PATH, [this, api](const util::Description &) {
                     _save(api, "v : integer = 2", [this, api] {
@@ -182,7 +187,7 @@ namespace test {
                             api.resourceProvider->removeDescription(PATH);
                             api.resourceProvider->getOrLoadDescription(PATH, [this, api](const util::Description &reloaded) {
                                 _reloadedValue = reloaded.getInteger("v", 0);
-                                api.platform->saveFile(FILE, nullptr, 0, [](bool) {}, true);
+                                api.platform->saveFile(FILE, nullptr, 0, [](bool) {});
                             });
                         });
                     });
@@ -202,7 +207,7 @@ namespace test {
         static void _save(const API &api, const char *content, util::callback<void()> &&next) {
             api.platform->saveFile(FILE, reinterpret_cast<const std::uint8_t *>(content), std::strlen(content), [next = std::move(next)](bool) mutable {
                 next();
-            }, true);
+            });
         }
 
         std::int64_t _cachedValue = 0;
@@ -217,6 +222,7 @@ namespace test {
             return std::make_unique<resource_provider_voxel_mesh_loading_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, true);
             api.resourceProvider->getOrLoadVoxelMesh(PATH, [this, provider = api.resourceProvider](const std::vector<foundation::RenderDataPtr> &first, const util::Description &desc) {
                 _first = first;
                 _config = desc.getInteger("v", 0);
@@ -271,6 +277,7 @@ namespace test {
             return std::make_unique<resource_provider_voxel_mesh_scale_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             api.resourceProvider->getOrLoadVoxelMesh("resource_provider_tests/resource_provider_voxel_mesh_scale_test", [this](const std::vector<foundation::RenderDataPtr> &frames, const util::Description &) {
                 _frames = frames;
             });
@@ -294,6 +301,7 @@ namespace test {
             return std::make_unique<resource_provider_emitter_loading_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, true);
             using Texture = foundation::RenderTexturePtr;
             api.resourceProvider->getOrLoadEmitter(PATH, [this, provider = api.resourceProvider](const util::Description &desc, const Texture &map, const Texture &texture) {
                 _value = desc.getInteger("v", 0);
@@ -349,6 +357,7 @@ namespace test {
 namespace test {
     bool resource_provider_prefabs_test(const API &api) {
         const resource::ResourceProviderPtr provider = resource::ResourceProvider::instance(api.platform, api.rendering);
+        api.platform->setSuppressOutput(false, true);
         std::vector<std::uint8_t> data = {'P', 'R', 'E', 'F', 'A', 'B', 'S', '!', 2, 0, 0, 0};
 
         auto putString = [&data](const std::string &str) {

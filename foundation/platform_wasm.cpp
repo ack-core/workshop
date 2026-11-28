@@ -34,8 +34,8 @@ extern "C" {
     void js_log(const std::uint16_t *ptr, int length);
     void js_exit(int code);
     void js_task(const void *ptr);
-    void js_fetch(const void *ptr, int pathLen, bool suppressOutput);
-    void js_save(const void *path, int pathLen, const void *data, int dataLen, bool suppressOutput);
+    void js_fetch(const void *ptr, int pathLen, bool suppressInfo, bool suppressErrors);
+    void js_save(const void *path, int pathLen, const void *data, int dataLen, bool suppressInfo, bool suppressErrors);
     void js_editorMsg(const char *msg, int msglen, const char *data, int datalen);
 }
 
@@ -178,7 +178,7 @@ namespace foundation {
         return g_asyncWorkCount != 0;
     }
     
-    void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
+    void WASMPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
         using cbtype = util::callback<void(ByteDataPtr &&, std::size_t)>;
         const std::string fullPath = _dataPath + filePath;
         const std::size_t len = fullPath.length();
@@ -195,10 +195,10 @@ namespace foundation {
         cbtype *cb = reinterpret_cast<cbtype *>(block);
         new (cb) cbtype(std::move(completion));
         
-        js_fetch(path, len, suppressOutput);
+        js_fetch(path, len, _suppressInfo, _suppressErrors);
 
     }
-    void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
+    void WASMPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
         using cbtype = util::callback<void(bool)>;
         const std::size_t pathLen = std::strlen(filePath);
         g_asyncWorkCount++;
@@ -221,7 +221,7 @@ namespace foundation {
         cbtype *cb = reinterpret_cast<cbtype *>(block);
         new (cb) cbtype(std::move(completion));
         
-        js_save(path, pathLen, fileData, size, suppressOutput);
+        js_save(path, pathLen, fileData, size, _suppressInfo, _suppressErrors);
     }
     
     float WASMPlatform::getScreenWidth() const {
@@ -352,13 +352,25 @@ namespace foundation {
         return g_statistics;
     }
     
+    void WASMPlatform::setSuppressOutput(bool info, bool errors) {
+        _suppressInfo = info;
+        _suppressErrors = errors;
+    }
     void WASMPlatform::logMsg(const char *fmt, ...) {
+        if (_suppressInfo) {
+            return;
+        }
+
         va_list arglist;
         va_start(arglist, fmt);
         _output(false, fmt, arglist);
         va_end(arglist);
     }
     void WASMPlatform::logError(const char *fmt, ...) {
+        if (_suppressErrors) {
+            return;
+        }
+
         va_list arglist;
         va_start(arglist, fmt);
         _output(true, fmt, arglist);

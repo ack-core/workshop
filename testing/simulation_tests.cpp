@@ -206,6 +206,7 @@ namespace test {
     }
 
     bool simulationCirclesDistanceConstraint(const API &api) {
+        api.platform->setSuppressOutput(false, true);
         core::SimulationInterface::BodyPtr pushed = addTestCircle(api, {0, 0, 0}, {1, 0, 0});
         core::SimulationInterface::BodyPtr follower = addTestCircle(api, {2, 0, 0}, {0, 0, 0});
         core::SimulationInterface::ConstraintPtr constraint = api.simulation->addConstraint(pushed, follower, 2.0f);
@@ -223,6 +224,7 @@ namespace test {
     }
 
     bool simulationCircleObstacleDistanceConstraint(const API &api) {
+        api.platform->setSuppressOutput(false, true);
         core::SimulationInterface::BodyPtr wall = addTestWall(api);
         core::SimulationInterface::BodyPtr circle = addTestCircle(api, {-2, 0, 0}, {0, 0, 1});
         wall->setTransform(math::transform3f::identity());
@@ -266,6 +268,7 @@ namespace test {
     }
 
     bool simulationObstacleTransform(const API &api) {
+        api.platform->setSuppressOutput(false, true);
         core::SimulationInterface::BodyPtr moved = addTestWall(api);
         core::SimulationInterface::BodyPtr tiltedX = addTestWall(api);
         core::SimulationInterface::BodyPtr tiltedZ = addTestWall(api);

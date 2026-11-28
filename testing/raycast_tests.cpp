@@ -150,6 +150,7 @@ namespace test {
     }
 
     bool raycast_shape_lifetime_test(const API &api) {
+        api.platform->setSuppressOutput(false, true);
         util::Description desc;
         desc.setVector3f("points", math::vector3f(60.0f, 0.0f, 5.0f));
         desc.setNumber("radiuses", 1.0);

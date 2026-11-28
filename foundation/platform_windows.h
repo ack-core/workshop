@@ -1,6 +1,7 @@
 
 #include "platform.h"
 
+#include <atomic>
 #include <mutex>
 
 namespace foundation {
@@ -11,8 +12,8 @@ namespace foundation {
 
         void executeAsync(std::unique_ptr<AsyncTask> &&task) override;
         bool isAsyncWorkInProgress() const override;
-        void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) override;
-        void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) override;
+        void loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) override;
+        void saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) override;
 
         float getScreenWidth() const override;
         float getScreenHeight() const override;
@@ -44,6 +45,7 @@ namespace foundation {
         void setLoop(util::callback<void(float)> &&updateAndDraw) override;
         void exit(int returnCode) override;
 
+        void setSuppressOutput(bool info, bool errors) override;
         void logMsg(const char *fmt, ...) override;
         void logError(const char *fmt, ...) override;
 
@@ -51,6 +53,8 @@ namespace foundation {
 
     private:
         std::mutex _logMutex;
+        std::atomic<bool> _suppressInfo{false};
+        std::atomic<bool> _suppressErrors{false};
         std::string _dataPath;
 
         HINSTANCE _hinst;
