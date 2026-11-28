@@ -137,8 +137,11 @@ https.createServer({
         await page.waitForFunction(() => testing_visible('top_buttons') && uiEditor['engine.refresh'] != null);
         console.log("--- Test started: " + name + " ---");
         await test(page);
+        await page.screenshot({ path: path.join(__dirname, '..', 'screens', 'editor', name + '.png') });
     }
 
+	console.log("--- Tests finished ---");
+    console.log("Editor screenshots have been saved into 'screens/editor'");
     await page.waitForTimeout(2000);
     process.exit(0);
 
