@@ -299,6 +299,71 @@ namespace test {
 }
 
 namespace test {
+    class stage_img9slice_rendering_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<stage_img9slice_rendering_test>();
+        }
+        void init(const API &api) override {
+            // 48x48 texture of 16x16 cells, edge cells are 8 bright + 8 dark stripes along the repeat direction
+            //
+            api.resourceProvider->getOrLoadTexture(TEXTURE, [this, stage = api.stage](const foundation::RenderTexturePtr &) {
+                const math::vector3f sliceArgs = {12.0f, 12.0f, 16.0f};
+                _grown = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {8.0f, 8.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
+                _grown->setSize({136.0f, 72.0f});
+                _clamped = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {8.0f, 88.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs});
+                _clamped->setSize({8.0f, 8.0f});
+                _hollow = stage->addImg9Slice(std::nullopt, nullptr, {.anchorOffset = {56.0f, 88.0f}, .size = {64.0f, 64.0f}, .texture = TEXTURE, .sliceArgs = sliceArgs, .fill = false});
+            });
+        }
+        void updateAndDraw(const API &api) override {}
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            const float s = api.platform->getScreenScale();
+            const std::uint8_t *bg = frame + (foundation::TESTING_RENDER_WIDTH * foundation::TESTING_RENDER_HEIGHT - 1) * 4;
+            const std::uint8_t RED[] = {255, 0, 0}, GREEN[] = {0, 255, 0}, BLUE[] = {0, 0, 255}, YELLOW[] = {255, 255, 0}, ORANGE[] = {255, 128, 0};
+            const std::uint8_t WHITE[] = {255, 255, 255}, GRAY[] = {128, 128, 128}, CYAN[] = {0, 255, 255}, DARK_CYAN[] = {0, 128, 128};
+
+            auto is = [&](float x, float y, const std::uint8_t *color) {
+                const std::uint8_t *p = frame + (std::size_t(y * s) * foundation::TESTING_RENDER_WIDTH + std::size_t(x * s)) * 4;
+                return std::abs(p[0] - color[0]) <= 16 && std::abs(p[1] - color[1]) <= 16 && std::abs(p[2] - color[2]) <= 16;
+            };
+
+            EXPECT_TRUE(is(16.0f, 16.0f, RED));
+            EXPECT_TRUE(is(136.0f, 16.0f, GREEN));
+            EXPECT_TRUE(is(16.0f, 72.0f, BLUE));
+            EXPECT_TRUE(is(136.0f, 72.0f, YELLOW));
+            EXPECT_TRUE(is(76.0f, 44.0f, ORANGE));
+
+            EXPECT_TRUE(is(16.0f, 96.0f, RED));
+            EXPECT_TRUE(is(32.0f, 112.0f, YELLOW));
+            EXPECT_TRUE(is(44.0f, 96.0f, bg));
+            EXPECT_TRUE(is(16.0f, 124.0f, bg));
+
+            EXPECT_TRUE(is(64.0f, 96.0f, RED));
+            EXPECT_TRUE(is(88.0f, 120.0f, bg));
+
+            if (s >= 0.5f) {
+                EXPECT_TRUE(is(28.0f, 12.0f, WHITE));
+                EXPECT_TRUE(is(34.0f, 12.0f, GRAY));
+                EXPECT_TRUE(is(66.0f, 76.0f, WHITE));
+                EXPECT_TRUE(is(70.0f, 76.0f, GRAY));
+                EXPECT_TRUE(is(130.0f, 12.0f, GREEN));
+                EXPECT_TRUE(is(12.0f, 28.0f, CYAN));
+                EXPECT_TRUE(is(12.0f, 34.0f, DARK_CYAN));
+                EXPECT_TRUE(is(12.0f, 52.0f, CYAN));
+                EXPECT_TRUE(is(12.0f, 66.0f, BLUE));
+                EXPECT_TRUE(is(76.0f, 92.0f, WHITE));
+            }
+            return true;
+        }
+
+    private:
+        static constexpr const char *TEXTURE = "stage_tests/stage_img9slice_rendering_test";
+        ui::Img9SlicePtr _grown, _clamped, _hollow;
+    };
+}
+
+namespace test {
     void registerStageTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(stage_statistics_test);
         REGISTER_UNIT_TEST(stage_named_element_test);
@@ -310,5 +375,6 @@ namespace test {
         REGISTER_STEP_TEST(stage_pivot_screen_world_position_test);
         REGISTER_STEP_TEST(stage_text_line_empty_size_test);
         REGISTER_STEP_TEST(stage_text_line_size_test);
+        REGISTER_PIXEL_TEST("stage_tests", stage_img9slice_rendering_test);
     }
 }
