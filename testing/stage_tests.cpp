@@ -409,14 +409,19 @@ namespace test {
                 return result;
             };
 
-            const math::vector4f left1 = box(0.0f, 4.0f, 84.0f, 4.0f + F, 0);
-            const math::vector4f left2 = box(0.0f, 4.0f + F, 84.0f, 4.0f + 2.0f * F, 0);
-            const math::vector4f center2 = box(0.0f, 56.0f + F, 84.0f, 56.0f + 2.0f * F, 1);
-            const math::vector4f right2 = box(0.0f, 108.0f + F, 84.0f, 108.0f + 2.0f * F, 2);
-            const math::vector4f text = box(84.0f, 0.0f, 167.0f, 52.0f, -1);
-            const math::vector4f shadow = box(84.0f, 0.0f, 167.0f, 52.0f, 0);
-            const math::vector4f replaced1 = box(84.0f, 56.0f, 167.0f, 56.0f + F, 1);
-            const math::vector4f replaced2 = box(84.0f, 56.0f + F, 167.0f, 56.0f + 2.0f * F, 1);
+            auto line = [&](float x, float y, int index, int channel) {
+                const float top = y + 0.2f * F + float(index) * F;
+                return box(x, top, x + 80.0f, top + F, channel);
+            };
+
+            const math::vector4f left1 = line(4.0f, 4.0f, 0, 0);
+            const math::vector4f left2 = line(4.0f, 4.0f, 1, 0);
+            const math::vector4f center2 = line(4.0f, 56.0f, 1, 1);
+            const math::vector4f right2 = line(4.0f, 108.0f, 1, 2);
+            const math::vector4f text = box(84.0f, 0.0f, 164.0f, 108.0f, -1);
+            const math::vector4f shadow = box(84.0f, 0.0f, 164.0f, 108.0f, 0);
+            const math::vector4f replaced1 = line(84.0f, 56.0f, 0, 1);
+            const math::vector4f replaced2 = line(84.0f, 56.0f, 1, 1);
 
             EXPECT_LT(left1.x, left1.z);
             EXPECT_LT(left2.x, left2.z);
