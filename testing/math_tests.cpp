@@ -537,6 +537,37 @@ namespace test {
         return true;
     }
 
+    bool math_transform3f_scaled_rotated_test(const API &api) {
+        const math::transform3f a({1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16});
+        const math::transform3f as = a.scaled({2.0f, -1.0f, 0.5f});
+        EXPECT_TRUE(eq4(as.row0, 2.0f, -2.0f, 1.5f, 4.0f));
+        EXPECT_TRUE(eq4(as.row1, 10.0f, -6.0f, 3.5f, 8.0f));
+        EXPECT_TRUE(eq4(as.row2, 18.0f, -10.0f, 5.5f, 12.0f));
+        EXPECT_TRUE(eq4(as.row3, 26.0f, -14.0f, 7.5f, 16.0f));
+
+        const math::transform3f ts = math::transform3f::identity().translated({1.0f, 2.0f, 3.0f}).scaled({2.0f, 3.0f, 4.0f});
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 1.0f, 1.0f).transformed(ts, true), 4.0f, 9.0f, 16.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 1.0f, 1.0f).transformed(ts), 2.0f, 3.0f, 4.0f));
+
+        const math::transform3f tsr = ts.rotated({0, 0, 1}, MATH_PI * 0.5f);
+        EXPECT_TRUE(near4(tsr.row3, 6.0f, -2.0f, 12.0f, 1.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 1.0f, 1.0f).transformed(tsr, true), 9.0f, -4.0f, 16.0f));
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 1.0f, 1.0f).transformed(tsr), 3.0f, -2.0f, 4.0f));
+
+        const math::vector3f axis = math::vector3f(1.0f, -2.0f, 0.5f).normalized(1.0f);
+        const math::transform3f ar = ts.rotated(axis, 0.7f);
+        const math::transform3f expected = ts * math::transform3f(axis, 0.7f);
+        EXPECT_TRUE(near4(ar.row0, expected.row0[0], expected.row0[1], expected.row0[2], expected.row0[3]));
+        EXPECT_TRUE(near4(ar.row1, expected.row1[0], expected.row1[1], expected.row1[2], expected.row1[3]));
+        EXPECT_TRUE(near4(ar.row2, expected.row2[0], expected.row2[1], expected.row2[2], expected.row2[3]));
+        EXPECT_TRUE(near4(ar.row3, expected.row3[0], expected.row3[1], expected.row3[2], expected.row3[3]));
+
+        const math::vector3f p = math::vector3f(1.0f, 2.0f, 3.0f).transformed(ts, true).rotated(axis, 0.7f);
+        EXPECT_TRUE(near3(math::vector3f(1.0f, 2.0f, 3.0f).transformed(ar, true), p.x, p.y, p.z));
+
+        return true;
+    }
+
     bool math_transform2f_methods_test(const API &api) {
         const math::transform2f id(0.0f);
         EXPECT_TRUE(near3(id.row0, 1.0f, 0.0f, 0.0f));
@@ -870,6 +901,7 @@ namespace test {
         REGISTER_UNIT_TEST(math_transform3f_identity_multiply_test);
         REGISTER_UNIT_TEST(math_vector_transformed_test);
         REGISTER_UNIT_TEST(math_transform3f_translated_inverted_test);
+        REGISTER_UNIT_TEST(math_transform3f_scaled_rotated_test);
         REGISTER_UNIT_TEST(math_transform2f_methods_test);
         REGISTER_UNIT_TEST(math_vector_rotated_angle_test);
         REGISTER_UNIT_TEST(math_color_conversion_test);
