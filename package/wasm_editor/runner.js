@@ -119,8 +119,9 @@ https.createServer({
         res.end(data);
     });
 }).listen(9002, async () => {
-    const browser = await chromium.launch({ headless: false });
-    const page = await browser.newPage({ ignoreHTTPSErrors: true, viewport: null });
+    const ci = process.env.CI != null;
+    const browser = await chromium.launch({ headless: ci, args: ci ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [] });
+    const page = await browser.newPage({ ignoreHTTPSErrors: true, viewport: { width: 1024, height: 1024 } });
 
     page.on('close', () => process.exit(0));
     page.on('console', msg => console.log(msg.text()));

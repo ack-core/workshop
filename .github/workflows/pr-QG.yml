@@ -70,6 +70,31 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  editor:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: pip install pypng ninja
+      - name: Install emsdk
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk ..\emsdk || exit /b 1
+          cd ..\emsdk
+          call emsdk.bat install 6.0.0 || exit /b 1
+          call emsdk.bat activate 6.0.0 || exit /b 1
+          call emsdk_env.bat
+          embuilder build sysroot libc++-mt-noexcept libc++abi-mt-noexcept
+      - name: Install playwright
+        run: |
+          call npm install -g playwright || exit /b 1
+          call playwright install chromium
+      - run: build_and_run_editor_tests.bat
+
   ios:
     runs-on: macos-26
     timeout-minutes: 20
