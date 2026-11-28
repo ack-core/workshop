@@ -209,6 +209,91 @@ namespace test {
 }
 
 namespace test {
+    class scene_textured_custom_mesh_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<scene_textured_custom_mesh_test>();
+        }
+        void init(const API &api) override {
+            const char *gbufferShaderSrc = R"(
+                const {
+                    modelTransform : matrix4
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = _transform(float4(vertex_position.xyz, 1.0), _transform(const_modelTransform, frame_plmVPMatrix));
+                    output_uv = vertex_uv;
+                }
+                fssrc {
+                    output_color[0] = float4(0.5, 0.5, 1.0, _tex2d(0, input_uv).r);
+                }
+            )";
+            const char *screenShaderSrc = R"(
+                const {
+                    modelTransform : matrix4
+                }
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_position = _transform(float4(vertex_position.xyz, 1.0), _transform(const_modelTransform, frame_plmVPMatrix));
+                    output_uv = vertex_uv;
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .attributes = {
+                    {"position", foundation::InputAttributeFormat::FLOAT3},
+                    {"uv", foundation::InputAttributeFormat::FLOAT2},
+                }
+            };
+            const float vertexes[] = {
+                -0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
+                 0.5f, -0.5f, 0.0f, 1.0f, 1.0f,
+                -0.5f,  0.5f, 0.0f, 0.0f, 0.0f,
+                 0.5f,  0.5f, 0.0f, 1.0f, 0.0f,
+            };
+            const std::uint8_t indexes[] = { 10, 40, 57, 120 };
+            const std::uint32_t initialPixels[] = { 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff };
+            const std::uint32_t replacedPixels[] = { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xff00ffff };
+
+            api.scene->setCameraLookAt({0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, 0.0f});
+            _gbufferMesh = api.scene->addCustomMesh(layout, gbufferShaderSrc, true);
+            _gbufferMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
+            _gbufferMesh->setShaderConstants(math::transform3f::identity().translated({-1.0f, 0.0f, 0.0f}).flat);
+            _gbufferMesh->setTexture(api.rendering->createTexture(foundation::RenderTextureFormat::R8UN, 2, 2, {indexes}));
+            _screenMesh = api.scene->addCustomMesh(layout, screenShaderSrc, false);
+            _screenMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
+            _screenMesh->setShaderConstants(math::transform3f::identity().translated({1.0f, 0.0f, 0.0f}).flat);
+            _screenMesh->setTexture(api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 2, 2, {initialPixels}));
+            _screenMesh->setTexture(api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 2, 2, {replacedPixels}));
+            _hiddenMesh = api.scene->addCustomMesh(layout, screenShaderSrc, false);
+            _hiddenMesh->setGeometry(foundation::RenderTopology::TRIANGLESTRIP, vertexes, 4);
+            _hiddenMesh->setShaderConstants(math::transform3f::identity().translated({0.0f, 1.0f, 0.0f}).flat);
+            _hiddenMesh->setTexture(api.rendering->createTexture(foundation::RenderTextureFormat::RGBA8UN, 2, 2, {initialPixels}));
+            _hiddenMesh->setEnabled(false);
+        }
+        void updateAndDraw(const API &api) override {}
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            return outOfThresholdPixelCount <= 0;
+        }
+
+    private:
+        core::SceneInterface::CustomMeshPtr _gbufferMesh;
+        core::SceneInterface::CustomMeshPtr _screenMesh;
+        core::SceneInterface::CustomMeshPtr _hiddenMesh;
+    };
+}
+
+namespace test {
     class scene_voxel_mesh_test : public ScreenshotTestInterface {
     public:
         static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
@@ -653,6 +738,7 @@ namespace test {
         REGISTER_UNIT_TEST(scene_voxel_mesh_frames_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_line_square_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_custom_mesh_test);
+        REGISTER_SCREENSHOT_TEST("scene_tests", scene_textured_custom_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_scale_test);
         REGISTER_SCREENSHOT_TEST("scene_tests", scene_voxel_mesh_set_frame_test);
