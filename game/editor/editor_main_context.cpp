@@ -129,6 +129,27 @@ namespace game {
                 }
             }
         }
+
+        const core::SceneInterface::StatInfo info = _api.scene->getStatistics();
+        std::string stat = "{";
+        stat += "\"arrowsCount\":" + std::to_string(info.arrowsCount);
+        stat += ",\"lineSetsCount\":" + std::to_string(info.lineSetsCount);
+        stat += ",\"boundingSpheresCount\":" + std::to_string(info.boundingSpheresCount);
+        stat += ",\"boundingBoxesCount\":" + std::to_string(info.boundingBoxesCount);
+        stat += ",\"voxelMeshesCount\":" + std::to_string(info.voxelMeshesCount);
+        stat += ",\"groundMeshesCount\":" + std::to_string(info.groundMeshesCount);
+        stat += ",\"vegetationsCount\":" + std::to_string(info.vegetationsCount);
+        stat += ",\"particleEmittersCount\":" + std::to_string(info.particleEmittersCount);
+        stat += "}";
+        _api.platform->sendEditorMsg("engine.sceneStat", stat);
+
+        if (_movingTool) {
+            const math::vector3f &position = _movingTool->getPosition();
+            _api.platform->sendEditorMsg("engine.mtoolPosition", util::strstream::ftos(position.x) + " " + util::strstream::ftos(position.y) + " " + util::strstream::ftos(position.z));
+        }
+        else {
+            _api.platform->sendEditorMsg("engine.mtoolPosition", "");
+        }
     }
     
     std::unique_ptr<MovingTool> EditorMainContext::_makeMovingTool(math::vector3f &target) {

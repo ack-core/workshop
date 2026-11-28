@@ -233,7 +233,7 @@
                 }
 
                 texturesRoot = await dirBinaryData.getDirectoryHandle("textures");
-                utility.updateResourcesList();
+                await utility.updateResourcesList();
                 return true;
             },
             setElementValue: function(name, value) {
@@ -1217,6 +1217,11 @@
             registerRaycastShapeResource();
             registerCollisionShapeResource();
         }
+		
+		//--- testing functions ---
+
+        let testingSceneStat = {};
+        let testingMToolPosition = {};
 
         function testing_visible(id) {
             return document.getElementById(id)?.checkVisibility({ visibilityProperty: true }) ?? false;
@@ -1237,6 +1242,12 @@
             }
             return element.value;
         }
+        function testing_scene_stat() {
+            return testingSceneStat;
+        }
+        function testing_mtool_position() {
+            return testingMToolPosition;
+        }
         function testing_action(id, value) {
             const element = document.getElementById(id);
             if (element == null) {
@@ -1251,6 +1262,14 @@
             }
             return true;
         }
+
+        uiEditor["engine.sceneStat"] = data => testingSceneStat = JSON.parse(data);
+        uiEditor["engine.mtoolPosition"] = data => {
+            const [x, y, z] = data ? data.split(' ').map(parseFloat) : [];
+            testingMToolPosition = { x, y, z };
+        };
+		
+		//---
 
         uiBindings.initWorkingDirectory();
 

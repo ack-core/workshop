@@ -130,10 +130,10 @@ https.createServer({
     });
 
     await page.addInitScript(standInFileSystem, ROOT_URL);
-    await page.goto('https://127.0.0.1:9002/editor.html');
-    await page.waitForFunction(() => testing_visible('top_buttons') && uiEditor['engine.refresh'] != null);
 
     for (const [name, test] of Object.entries(require('./tests.js'))) {
+        await page.goto('https://127.0.0.1:9002/editor.html');
+        await page.waitForFunction(() => testing_visible('top_buttons') && uiEditor['engine.refresh'] != null);
         console.log("--- Test started: " + name + " ---");
         await test(page);
     }
