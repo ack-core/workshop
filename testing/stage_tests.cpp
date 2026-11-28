@@ -364,6 +364,92 @@ namespace test {
 }
 
 namespace test {
+    class stage_text_block_rendering_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<stage_text_block_rendering_test>();
+        }
+        void init(const API &api) override {
+            api.fontAtlasProvider->prepareFontAtlas(TEXT, FONT_SIZE, 0, [this, stage = api.stage, fonts = api.fontAtlasProvider]() {
+                _blockWidth = fonts->getTextWidth("Wide", FONT_SIZE).x + 2.0f;
+                _shortWidth = fonts->getTextWidth("Ab", FONT_SIZE).x;
+                const math::vector2f size = {_blockWidth, 2.0f * FONT_SIZE};
+                const math::color RED = {1.0f, 0.0f, 0.0f, 1.0f}, GREEN = {0.0f, 1.0f, 0.0f, 1.0f}, BLUE = {0.0f, 0.0f, 1.0f, 1.0f};
+
+                _blocks.push_back(stage->addTextBlock(std::nullopt, nullptr, {.anchorOffset = {8.0f, 4.0f}, .size = size, .fontSize = FONT_SIZE, .fontColor = RED}));
+                _blocks.push_back(stage->addTextBlock(std::nullopt, nullptr, {.anchorOffset = {8.0f, 56.0f}, .size = size, .textAlign = ui::TextAlign::CENTER, .fontSize = FONT_SIZE, .fontColor = GREEN}));
+                _blocks.push_back(stage->addTextBlock(std::nullopt, nullptr, {.anchorOffset = {8.0f, 108.0f}, .size = size, .textAlign = ui::TextAlign::RIGHT, .fontSize = FONT_SIZE, .fontColor = BLUE}));
+                _blocks.push_back(stage->addTextBlock(std::nullopt, nullptr, {.anchorOffset = {88.0f, 4.0f}, .size = size, .fontSize = FONT_SIZE, .shadowColor = RED, .shadowOffset = {3.0f, 3.0f}}));
+                _blocks.push_back(stage->addTextBlock(std::nullopt, nullptr, {.anchorOffset = {88.0f, 56.0f}, .size = size, .fontSize = FONT_SIZE, .fontColor = GREEN}));
+
+                for (const ui::TextBlockPtr &block : _blocks) {
+                    block->setText(TEXT);
+                }
+                _blocks.back()->setText("Ab");
+            });
+        }
+        void updateAndDraw(const API &api) override {}
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            const float s = api.platform->getScreenScale();
+            const float tolerance = 2.0f / s;
+            const float F = float(FONT_SIZE);
+
+            auto box = [&](float x0, float y0, float x1, float y1, int channel) {
+                math::vector4f result = {x1, y1, x0, y0};
+                for (std::size_t y = std::size_t(y0 * s); y < std::size_t(y1 * s); y++) {
+                    for (std::size_t x = std::size_t(x0 * s); x < std::size_t(x1 * s); x++) {
+                        const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                        const bool white = p[0] > 192 && p[1] > 192 && p[2] > 192;
+                        const bool pure = p[channel] > 128 && p[(channel + 1) % 3] < 64 && p[(channel + 2) % 3] < 64;
+                        if (channel < 0 ? white : pure) {
+                            result = {std::min(result.x, x / s), std::min(result.y, y / s), std::max(result.z, (x + 1) / s), std::max(result.w, (y + 1) / s)};
+                        }
+                    }
+                }
+                return result;
+            };
+
+            auto line = [&](float x, float y, int index, int channel) {
+                const float top = y + 0.2f * F + float(index) * F;
+                return box(x, top, x + 80.0f, top + F, channel);
+            };
+
+            const math::vector4f left1 = line(4.0f, 4.0f, 0, 0);
+            const math::vector4f left2 = line(4.0f, 4.0f, 1, 0);
+            const math::vector4f center2 = line(4.0f, 56.0f, 1, 1);
+            const math::vector4f right2 = line(4.0f, 108.0f, 1, 2);
+            const math::vector4f text = box(84.0f, 0.0f, 164.0f, 108.0f, -1);
+            const math::vector4f shadow = box(84.0f, 0.0f, 164.0f, 108.0f, 0);
+            const math::vector4f replaced1 = line(84.0f, 56.0f, 0, 1);
+            const math::vector4f replaced2 = line(84.0f, 56.0f, 1, 1);
+
+            EXPECT_LT(left1.x, left1.z);
+            EXPECT_LT(left2.x, left2.z);
+            EXPECT_LT(left2.z - left2.x, left1.z - left1.x);
+            EXPECT_LT(std::fabs(center2.x - left2.x - 0.5f * (_blockWidth - _shortWidth)), tolerance);
+            EXPECT_LT(std::fabs(center2.z - left2.z - 0.5f * (_blockWidth - _shortWidth)), tolerance);
+            EXPECT_LT(std::fabs(right2.x - left2.x - (_blockWidth - _shortWidth)), tolerance);
+            EXPECT_LT(std::fabs(right2.z - left2.z - (_blockWidth - _shortWidth)), tolerance);
+
+            EXPECT_LT(text.x, text.z);
+            EXPECT_LT(std::fabs(shadow.z - text.z - 3.0f), tolerance);
+            EXPECT_LT(std::fabs(shadow.w - text.w - 3.0f), tolerance);
+
+            EXPECT_LT(std::fabs((replaced1.z - replaced1.x) - (left2.z - left2.x)), tolerance);
+            EXPECT_FALSE(replaced2.x < replaced2.z);
+            return true;
+        }
+
+    private:
+        static constexpr const char *TEXT = "Wide Ab";
+        static constexpr std::uint8_t FONT_SIZE = 24;
+
+        float _blockWidth = 0.0f, _shortWidth = 0.0f;
+        std::vector<ui::TextBlockPtr> _blocks;
+    };
+}
+
+namespace test {
     void registerStageTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(stage_statistics_test);
         REGISTER_UNIT_TEST(stage_named_element_test);
@@ -376,5 +462,6 @@ namespace test {
         REGISTER_STEP_TEST(stage_text_line_empty_size_test);
         REGISTER_STEP_TEST(stage_text_line_size_test);
         REGISTER_PIXEL_TEST("stage_tests", stage_img9slice_rendering_test);
+        REGISTER_PIXEL_TEST("stage_tests", stage_text_block_rendering_test);
     }
 }
