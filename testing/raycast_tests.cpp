@@ -200,6 +200,61 @@ namespace test {
         EXPECT_EQ_F(back.point.z, 16.0f);
         return true;
     }
+
+    bool raycast_start_inside_sphere_test(const API &api) {
+        util::Description desc;
+        desc.setInteger("type", std::int64_t(core::RaycastInterface::ShapeType::SPHERES));
+        desc.setVector3f("points", math::vector3f(100.0f, 0.0f, 5.0f));
+        desc.setNumber("radiuses", 2.0);
+        const core::RaycastInterface::ShapePtr shape = api.raycast->addShape(desc, 51);
+        EXPECT_NOT_EQ(shape, nullptr);
+
+        const math::vector3f start = math::vector3f(101.0f, 0.0f, 5.0f);
+        const math::vector3f dir = math::vector3f(0.0f, 0.0f, 1.0f);
+        const float h = std::sqrt(3.0f);
+        const core::RaycastInterface::RaycastResult hit = api.raycast->rayCast(start, dir, 5.0f);
+        EXPECT_EQ(hit.uniqueId, 51u);
+        EXPECT_EQ_F(hit.point.x, 101.0f);
+        EXPECT_EQ_F(hit.point.y, 0.0f);
+        EXPECT_EQ_F(hit.point.z, 5.0f + h);
+        EXPECT_EQ_F(hit.normal.x, 0.5f);
+        EXPECT_EQ_F(hit.normal.y, 0.0f);
+        EXPECT_EQ_F(hit.normal.z, 0.5f * h);
+
+        const core::RaycastInterface::RaycastResult shortMiss = api.raycast->rayCast(start, dir, 1.5f);
+        EXPECT_EQ(shortMiss.uniqueId, core::RaycastInterface::INVALID_UNIQUE_ID);
+        return true;
+    }
+
+    bool raycast_start_inside_box_test(const API &api) {
+        util::Description desc;
+        desc.setInteger("type", std::int64_t(core::RaycastInterface::ShapeType::BOXES));
+        desc.setVector3f("points", math::vector3f(100.0f, 10.0f, 5.0f));
+        desc.setVector3f("sizes", math::vector3f(2.0f, 2.0f, 2.0f));
+        const core::RaycastInterface::ShapePtr shape = api.raycast->addShape(desc, 52);
+        EXPECT_NOT_EQ(shape, nullptr);
+
+        const math::vector3f start = math::vector3f(100.0f, 10.0f, 5.0f);
+        const core::RaycastInterface::RaycastResult left = api.raycast->rayCast(start, math::vector3f(-1.0f, 0.0f, 0.0f), 5.0f);
+        EXPECT_EQ(left.uniqueId, 52u);
+        EXPECT_EQ_F(left.point.x, 99.5f);
+        EXPECT_EQ_F(left.point.y, 10.0f);
+        EXPECT_EQ_F(left.point.z, 5.0f);
+        EXPECT_EQ_F(left.normal.x, -1.0f);
+        EXPECT_EQ_F(left.normal.y, 0.0f);
+        EXPECT_EQ_F(left.normal.z, 0.0f);
+
+        const core::RaycastInterface::RaycastResult up = api.raycast->rayCast(start, math::vector3f(0.0f, 1.0f, 0.0f), 5.0f);
+        EXPECT_EQ(up.uniqueId, 52u);
+        EXPECT_EQ_F(up.point.y, 11.5f);
+        EXPECT_EQ_F(up.normal.x, 0.0f);
+        EXPECT_EQ_F(up.normal.y, 1.0f);
+        EXPECT_EQ_F(up.normal.z, 0.0f);
+
+        const core::RaycastInterface::RaycastResult shortMiss = api.raycast->rayCast(start, math::vector3f(-1.0f, 0.0f, 0.0f), 0.4f);
+        EXPECT_EQ(shortMiss.uniqueId, core::RaycastInterface::INVALID_UNIQUE_ID);
+        return true;
+    }
 }
 
 namespace test {
@@ -211,5 +266,7 @@ namespace test {
         REGISTER_UNIT_TEST(raycast_compound_boxes_test);
         REGISTER_UNIT_TEST(raycast_shape_lifetime_test);
         REGISTER_UNIT_TEST(raycast_nearest_of_several_shapes_test);
+        REGISTER_UNIT_TEST(raycast_start_inside_sphere_test);
+        REGISTER_UNIT_TEST(raycast_start_inside_box_test);
     }
 }
