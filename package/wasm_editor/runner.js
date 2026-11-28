@@ -132,11 +132,11 @@ https.createServer({
 
     await page.addInitScript(standInFileSystem, ROOT_URL);
 
-    for (const [name, test] of Object.entries(require('./tests.js'))) {
+    for (const [name, scenario] of Object.entries(require('./scenarios.js'))) {
         await page.goto('https://127.0.0.1:9002/editor.html');
         await page.waitForFunction(() => testing_visible('top_buttons') && uiEditor['engine.refresh'] != null);
-        console.log("--- Test started: " + name + " ---");
-        await test(page);
+        console.log("--- Scenario started: " + name + " ---");
+        await scenario(page);
         await page.screenshot({ path: path.join(__dirname, '..', 'screens', 'editor', name + '.png') });
     }
 

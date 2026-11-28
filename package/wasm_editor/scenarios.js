@@ -37,14 +37,14 @@ async function ACTION(page, id, value) {
 }
 
 module.exports = {
-    test_node_menu_is_opened: async page => {
+    scenario_node_menu_is_opened: async page => {
         await EXPECT_VISIBLE(page, 'button_node_new');
         await ACTION(page, 'button_node_new');
         await EXPECT_VISIBLE(page, 'add_node_menu');
         await ACTION(page, 'node_tree');
         await EXPECT_HIDDEN(page, 'add_node_menu');
     },
-    test_voxel_mesh_is_moved: async page => {
+    scenario_voxel_mesh_is_moved: async page => {
         await ACTION(page, 'button_node_new');
         await EXPECT_VISIBLE(page, 'add_node_menu');
         await ACTION(page, 'new_node_10');

@@ -9,13 +9,17 @@ Code-first C++ 3D engine for small lowpoly/voxel games
 - providers : texture, model, font provides
 - core : mid level 3d engine interfaces and implementations
 - ui : 2d user interface components
+- game : state manager and game scenes
+- game/editor : editor cpp-side sources
 - package : platform specific prepared files
 - testing : tests suite
+- package/wasm_editor/scenarios.js : editor testing scenarios
 
 ## Shell scripts (run from the repo root)
 - `make_<platform>_<app>` : generate IDE projects 
 - `build_<platform>_<app>` : make and build executables
-- `build_and_run_<platform>_tests` : build and run tests
+- `build_and_run_<platform>_tests` : build and run engine tests
+- `build_and_run_editor_scenarios` : build and run editor tests
 
 generated folders:
 - `binary_<platform>_<app>` : built platform executables

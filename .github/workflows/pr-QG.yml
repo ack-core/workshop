@@ -93,7 +93,7 @@ jobs:
         run: |
           call npm install -g playwright || exit /b 1
           call playwright install chromium
-      - run: build_and_run_editor_tests.bat
+      - run: build_and_run_editor_scenarios.bat
 
   ios:
     runs-on: macos-26

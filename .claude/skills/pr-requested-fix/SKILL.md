@@ -17,6 +17,7 @@ Do these steps in exact order:
      - is there a simpler implementation? Simplify
 4. Commit the fixes
 5. Build and run ALL tests (`build_and_run_*_tests.*`) that could be performed on this platform. Check for exit code and `[FAILED * TEST]` in output.
-6. Fix the code if tests actually found a problem, fix tests if they are wrong
-7. Commit the fixes, go to step 5 if there were fixes
-8. Push new commits, using gh cli re-request review from the repo owner
+6. Build and run editor scenarios if you changed editor code or introduced a new testing scenario
+7. Fix the code if tests actually found a problem, fix tests if they are wrong
+8. Commit the fixes, go to step 5 if there were fixes
+9. Push new commits, using gh cli re-request review from the repo owner

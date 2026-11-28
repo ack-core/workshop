@@ -18,7 +18,7 @@ Do these steps in exact order:
      - is there a simpler implementation? Simplify
      - is it already tested somewhere or repeating itself? Test what aren’t covered yet
 4. Commit the implementation
-5. Build and run ALL tests (`build_and_run_*_tests.*`) that could be performed on this platform. Check for exit code and `[FAILED * TEST]` in output.
+5. Build and run tests (`build_and_run_*_tests.*`) that could be performed on this platform (wasm + current platform). Check for exit code and `[FAILED * TEST]` in output.
 6. Fix tests if the test is wrong, fix the code if the new tests actually found a problem.
 7. Commit the fixes, go to step 5 if there were fixes
 8. Push the branch to origin

@@ -23,8 +23,9 @@ Do these steps in exact order:
 7. Add a test if there is a testing suite for the changed interface/class/function. If there is a test but it does not cover changes - improve the test.
 8. Commit changes in the tests if there are any
 9. Build and run ALL tests (`build_and_run_*_tests.*`) that could be performed on this platform. Check for exit code and `[FAILED * TEST]` in output.
-10. Fix the code if tests actually found a problem
-11. Commit the fixes, go to step 9 if there were fixes
-12. Push the branch
-13. Using gh cli create a PR on github with a short description about what was implemented. Start the description with single line `Resolves #N` where N is THE_ISSUE number but don't put it in the title. 
-14. Request review from the repo owner
+10. Build and run editor scenarios if you changed editor code or introduced a new testing scenario
+11. Fix the code if tests actually found a problem
+12. Commit the fixes, go to step 9 if there were fixes
+13. Push the branch
+14. Using gh cli create a PR on github with a short description about what was implemented. Start the description with single line `Resolves #N` where N is THE_ISSUE number but don't put it in the title. 
+15. Request review from the repo owner
