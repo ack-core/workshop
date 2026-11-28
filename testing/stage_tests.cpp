@@ -364,9 +364,9 @@ namespace test {
 }
 
 namespace test {
-    class stage_img_custom_rendering_test : public PixelTestInterface {
+    class stage_img_custom_rendering_test : public ScreenshotTestInterface {
     public:
-        static auto make() -> std::unique_ptr<PixelTestInterface> {
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
             return std::make_unique<stage_img_custom_rendering_test>();
         }
         void init(const API &api) override {
@@ -405,21 +405,13 @@ namespace test {
             api.stage->updateAndDraw(0.0f);
             _drawnOnce = _drawCount == before + 1;
         }
-        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
-            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g) {
-                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
-                return std::abs(p[0] - r) <= 2 && std::abs(p[1] - g) <= 2;
-            };
-
-            const std::size_t w = foundation::TESTING_RENDER_WIDTH;
-            const std::size_t h = foundation::TESTING_RENDER_HEIGHT;
-
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
             EXPECT_EQ(_invalid, nullptr);
             EXPECT_TRUE(_drawnOnce);
-            EXPECT_TRUE(pixelIs(w / 8, h / 2, 255, 0));
-            EXPECT_TRUE(pixelIs(w * 3 / 8, h / 2, 0, 255));
-            EXPECT_TRUE(pixelIs(w * 3 / 4, h / 2, 0, 0));
-            return true;
+            return outOfThresholdPixelCount == 0;
         }
 
     private:
@@ -450,6 +442,6 @@ namespace test {
         REGISTER_STEP_TEST(stage_text_line_empty_size_test);
         REGISTER_STEP_TEST(stage_text_line_size_test);
         REGISTER_PIXEL_TEST("stage_tests", stage_img9slice_rendering_test);
-        REGISTER_PIXEL_TEST("stage_tests", stage_img_custom_rendering_test);
+        REGISTER_SCREENSHOT_TEST("stage_tests", stage_img_custom_rendering_test);
     }
 }
