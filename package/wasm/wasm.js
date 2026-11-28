@@ -183,7 +183,7 @@ const imports = {
         js_task: function(task) {
             worker.postMessage({type: EventType.BTASK, task: task});
         },
-        js_fetch: function(block, pathLen, suppressOutput) {
+        js_fetch: function(block, pathLen, suppressInfo, suppressErrors) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
 
@@ -196,12 +196,12 @@ const imports = {
                 const data = instance.exports.malloc(buffer.byteLength);
                 const u8data = new Uint8Array(memory.buffer, data, buffer.byteLength);
                 u8data.set(new Uint8Array(buffer));
-                if (!suppressOutput) {
+                if (!suppressInfo) {
                     print("[WASM] " + path + " loaded successfully " + buffer.byteLength);
                 }
                 return [data, buffer.byteLength];
             }, error => {
-                if (!suppressOutput) {
+                if (!suppressErrors) {
                     print("[WASM] " + path + " loading failed with " + error);
                 }
                 return [0, 0];
@@ -210,7 +210,7 @@ const imports = {
                 instance.exports.fileLoaded(block, pathLen, data, length);
             });
         },
-        js_save: function(block, pathLen, data, dataLen, suppressOutput) {
+        js_save: function(block, pathLen, data, dataLen, suppressInfo, suppressErrors) {
             const u16path = new Uint16Array(memory.buffer, block, pathLen);
             const path = String.fromCharCode(...u16path);
             
@@ -228,7 +228,7 @@ const imports = {
                                 await writable.write(u8data);
                                 await writable.truncate(dataLen);
                                 await writable.close();
-                                if (!suppressOutput) {
+                                if (!suppressInfo) {
                                     print("[WASM] " + path + " saved successfully");
                                 }
                                 instance.exports.fileSaved(block, pathLen, true);
@@ -245,7 +245,7 @@ const imports = {
                     }
                 })
                 .catch(error => {
-                    if (!suppressOutput) {
+                    if (!suppressErrors) {
                         print("[WASM] " + path + " saving failed with " + error);
                     }
                     instance.exports.fileSaved(block, pathLen, false);

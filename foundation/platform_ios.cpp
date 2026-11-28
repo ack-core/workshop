@@ -398,10 +398,10 @@ namespace foundation {
         return g_asyncWorkCount != 0;
     }
     
-    void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion, bool suppressOutput) {
+    void IOSPlatform::loadFile(const char *filePath, util::callback<void(ByteDataPtr &&data, std::size_t size)> &&completion) {
         backgroundThreadPush(g_io, std::make_unique<FileLoadTask>(_executableDirectoryPath + "/" + filePath, _documentsPath + "/" + filePath, std::move(completion)));
     }
-    void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion, bool suppressOutput) {
+    void IOSPlatform::saveFile(const char *filePath, const std::uint8_t *data, std::size_t size, util::callback<void(bool)> &&completion) {
         backgroundThreadPush(g_io, std::make_unique<FileSaveTask>(_documentsPath + "/" + filePath, data, data ? size : 0, std::move(completion)));
     }
     
@@ -533,7 +533,16 @@ namespace foundation {
         _exit(returnCode);
     }
     
+    void IOSPlatform::setSuppressOutput(bool info, bool errors) {
+        _suppressInfo = info;
+        _suppressErrors = errors;
+    }
+
     void IOSPlatform::logMsg(const char *fmt, ...) {
+        if (_suppressInfo) {
+            return;
+        }
+
         std::lock_guard<std::mutex> guard(_logMutex);
         
         va_list args;
@@ -545,6 +554,10 @@ namespace foundation {
     }
     
     void IOSPlatform::logError(const char *fmt, ...) {
+        if (_suppressErrors) {
+            return;
+        }
+
         std::lock_guard<std::mutex> guard(_logMutex);
         
         va_list args;

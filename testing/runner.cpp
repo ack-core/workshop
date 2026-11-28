@@ -79,12 +79,16 @@ namespace test {
             return;
         }
 
+        _api.platform->setSuppressOutput(false, false);
+
         // Unit tests
         if (_unitTestIndex < _unitTests.size()) {
             for (std::size_t i = 0; i < MAX_UNIT_TESTS_PER_FRAME && _unitTestIndex < _unitTests.size(); i++, _unitTestIndex++) {
                 const auto &test = _unitTests[_unitTestIndex];
+                const bool passed = test.second(_api);
+                _api.platform->setSuppressOutput(false, false);
 
-                if (test.second(_api)) {
+                if (passed) {
                     //_api.platform->logMsg("[PASSED UNIT TEST] '%s'", test.first.data());
                 }
                 else {
@@ -147,9 +151,9 @@ namespace test {
         }
         if (_pixelTestIndex < _pixelTests.size()) {
             const auto &test = _pixelTests[_pixelTestIndex];
+            loadScreenshotRef(test.first);
             _currentPixelTest = test.second();
             _currentPixelTest->init(_api);
-            loadScreenshotRef(test.first);
             return;
         }
 
@@ -197,9 +201,9 @@ namespace test {
         }
         if (_screenshotTestIndex < _screenshotTests.size()) {
             const auto &test = _screenshotTests[_screenshotTestIndex];
+            loadScreenshotRef(test.first);
             _currentScreenshotTest = test.second();
             _currentScreenshotTest->init(_api);
-            loadScreenshotRef(test.first);
             return;
         }
 
@@ -211,18 +215,22 @@ namespace test {
     }
 
     void TestRunner::loadScreenshotRef(const std::string &name) {
+        _api.platform->setSuppressOutput(true, true);
         _api.platform->loadFile((name + "_ref.png").data(), [this](ByteDataPtr &&data, std::size_t size) {
             _screenshotRef = decodeScreenshotPNG(data.get(), size);
-        }, true);
+        });
+        _api.platform->setSuppressOutput(false, false);
     }
 
     void TestRunner::saveScreenshot(const std::string &name, const std::uint8_t *frame, const char *suffix) {
         auto tga = util::writeTGA(frame, foundation::TESTING_RENDER_WIDTH, foundation::TESTING_RENDER_HEIGHT);
         const std::uint8_t *data = tga.first.get();
+        _api.platform->setSuppressOutput(true, true);
         _api.platform->saveFile((name + suffix + ".tga").data(), data, tga.second, [this, name, suffix, tga = std::move(tga.first)](bool saved) {
             if (saved == false) {
                 _api.platform->logMsg("[TEST] '%s' %s saving failed", name.data(), suffix);
             }
-        }, true);
+        });
+        _api.platform->setSuppressOutput(false, false);
     }
 }

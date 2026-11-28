@@ -237,11 +237,12 @@ namespace test {
             return std::make_unique<platform_file_loading_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             api.platform->loadFile("platform_tests/file_5.txt", [this](ByteDataPtr &&data, std::size_t size) {
                 if (data) {
                     _content.assign(reinterpret_cast<const char *>(data.get()), size);
                 }
-            }, true);
+            });
             _loadTasksCount = api.platform->getStatistics().fileLoadTasksCount;
         }
         bool testResult(const API &api) override {
@@ -265,6 +266,7 @@ namespace test {
             return std::make_unique<platform_file_save_and_loading_chain_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, false);
             const char *content = "write-read";
             api.platform->saveFile("platform_tests/file_saved.txt", reinterpret_cast<const std::uint8_t *>(content), 10, [this, platform = api.platform](bool result) {
                 _saved = result;
@@ -272,8 +274,8 @@ namespace test {
                     if (data) {
                         _content.assign(reinterpret_cast<const char *>(data.get()), size);
                     }
-                }, true);
-            }, true);
+                });
+            });
             _saveTasksCount = api.platform->getStatistics().fileSaveTasksCount;
         }
         bool testResult(const API &api) override {
@@ -300,13 +302,14 @@ namespace test {
             return std::make_unique<platform_file_delete_and_loading_fail_test>();
         }
         void init(const API &api) override {
+            api.platform->setSuppressOutput(true, true);
             api.platform->saveFile("platform_tests/file_saved.txt", nullptr, 0, [this, platform = api.platform](bool result) {
                 _deleted = result;
                 platform->loadFile("platform_tests/file_saved.txt", [this](ByteDataPtr &&data, std::size_t size) {
                     _loaded = true;
                     _failed = data == nullptr && size == 0;
-                }, true);
-            }, true);
+                });
+            });
         }
         bool testResult(const API &api) override {
             EXPECT_EQ(api.platform->getStatistics().fileSaveTasksCount, 0);
