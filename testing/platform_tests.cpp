@@ -138,6 +138,43 @@ namespace test {
         api.platform->removeEventHandler(receiver);
         return true;
     }
+    bool platform_pointer_hover_wheel_test(const API &api) {
+        using Args = foundation::PlatformPointerEventArgs;
+        Args received {};
+
+        const foundation::EventHandlerToken receiver = api.platform->addPointerEventHandler([&](const Args &args) {
+            received = args;
+            return false;
+        }, true);
+
+        Args args {};
+        args.type = Args::EventType::HOVER;
+        args.coordinateX = 10.0f;
+        args.coordinateY = 20.0f;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(received.type, Args::EventType::HOVER);
+        EXPECT_EQ(received.coordinateX, 10.0f);
+        EXPECT_EQ(received.coordinateY, 20.0f);
+        EXPECT_EQ(received.flags.isLeftButton, 0u);
+        EXPECT_EQ(received.flags.isRightButton, 0u);
+
+        args.type = Args::EventType::WHEEL;
+        args.coordinateX = 30.0f;
+        args.coordinateY = 40.0f;
+        args.flags.wheel = 1;
+        api.platform->sendPointerEvent(args);
+        EXPECT_EQ(received.type, Args::EventType::WHEEL);
+        EXPECT_EQ(received.coordinateX, 30.0f);
+        EXPECT_EQ(received.coordinateY, 40.0f);
+        EXPECT_LT(0, received.flags.wheel);
+
+        args.flags.wheel = -1;
+        api.platform->sendPointerEvent(args);
+        EXPECT_LT(received.flags.wheel, 0);
+
+        api.platform->removeEventHandler(receiver);
+        return true;
+    }
     bool platform_editor_event_handlers_test(const API &api) {
         std::string calls;
         bool consume = false;
@@ -404,6 +441,7 @@ namespace test {
         REGISTER_UNIT_TEST(platform_keyboard_event_handlers_test);
         REGISTER_UNIT_TEST(platform_pointer_event_handlers_test);
         REGISTER_UNIT_TEST(platform_pointer_coordinates_override_test);
+        REGISTER_UNIT_TEST(platform_pointer_hover_wheel_test);
         REGISTER_UNIT_TEST(platform_editor_event_handlers_test);
         REGISTER_UNIT_TEST(platform_handlers_bottom_order_test);
         REGISTER_UNIT_TEST(platform_event_handlers_count_test);
