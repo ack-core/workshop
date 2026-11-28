@@ -364,6 +364,72 @@ namespace test {
 }
 
 namespace test {
+    class stage_img_custom_rendering_test : public ScreenshotTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<ScreenshotTestInterface> {
+            return std::make_unique<stage_img_custom_rendering_test>();
+        }
+        void init(const API &api) override {
+            api.platform->setSuppressOutput(true, true);
+            // Quad on the left half of the screen sampling 2x1 texture: red, green
+            //
+            const char *shaderSrc = R"(
+                inout {
+                    uv : float2
+                }
+                vssrc {
+                    output_uv = vertex_uv;
+                    output_position = float4(vertex_position, 0.1, 1.0);
+                }
+                fssrc {
+                    output_color[0] = _tex2d(0, input_uv);
+                }
+            )";
+            const float vertexes[] = {
+                -1.0f, 1.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 1.0f, 0.0f,
+                -1.0f, -1.0f, 0.0f, 1.0f,
+                0.0f, -1.0f, 1.0f, 1.0f,
+            };
+            const std::uint32_t indexes[] = { 0, 1, 2, 2, 1, 3 };
+
+            _invalid = api.stage->addImgCustom(std::nullopt, nullptr, {.texture = TEXTURE, .layout = LAYOUT, .shaderSource = "invalid"});
+            _img = api.stage->addImgCustom(std::nullopt, nullptr, {.texture = TEXTURE, .layout = LAYOUT, .shaderSource = shaderSrc});
+            _img->setGeometry(foundation::RenderTopology::TRIANGLES, vertexes, 4, indexes, 6);
+            _img->setDrawHandler([this](ui::StageInterface::ImgCustom &) {
+                _drawCount++;
+            });
+        }
+        void updateAndDraw(const API &api) override {
+            const std::size_t before = _drawCount;
+            api.stage->updateAndDraw(0.0f);
+            _drawnOnce = _drawCount == before + 1;
+        }
+        std::uint8_t getThreshold() const override {
+            return 4;
+        }
+        bool testResult(const API &api, std::size_t outOfThresholdPixelCount) override {
+            EXPECT_EQ(_invalid, nullptr);
+            EXPECT_TRUE(_drawnOnce);
+            return outOfThresholdPixelCount == 0;
+        }
+
+    private:
+        static constexpr const char *TEXTURE = "stage_tests/stage_custom_texture";
+        const foundation::InputLayout LAYOUT = foundation::InputLayout {
+            .attributes = {
+                {"position", foundation::InputAttributeFormat::FLOAT2},
+                {"uv", foundation::InputAttributeFormat::FLOAT2},
+            }
+        };
+
+        std::shared_ptr<ui::StageInterface::ImgCustom> _invalid, _img;
+        std::size_t _drawCount = 0;
+        bool _drawnOnce = false;
+    };
+}
+
+namespace test {
     void registerStageTests(TestRunner &runner) {
         REGISTER_UNIT_TEST(stage_statistics_test);
         REGISTER_UNIT_TEST(stage_named_element_test);
@@ -376,5 +442,6 @@ namespace test {
         REGISTER_STEP_TEST(stage_text_line_empty_size_test);
         REGISTER_STEP_TEST(stage_text_line_size_test);
         REGISTER_PIXEL_TEST("stage_tests", stage_img9slice_rendering_test);
+        REGISTER_SCREENSHOT_TEST("stage_tests", stage_img_custom_rendering_test);
     }
 }
