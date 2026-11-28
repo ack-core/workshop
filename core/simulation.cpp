@@ -124,7 +124,7 @@ namespace core {
         void addImpulse(const math::vector3f &impulse, float timeSec) override {}
 
     private:
-        math::transform3f _transform;
+        math::transform3f _transform = math::transform3f::identity();
         std::vector<math::vector3f> _src;
         core::SceneInterface::LineSetPtr _visual;
     };
