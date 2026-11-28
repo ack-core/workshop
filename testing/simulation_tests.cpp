@@ -295,6 +295,42 @@ namespace test {
         EXPECT_TRUE(api.simulation->addBody(desc) == nullptr);
         return true;
     }
+
+    bool simulationBodyInitialState(const API &api) {
+        util::Description desc;
+        desc.setInteger("type", int(core::SimulationInterface::ShapeType::CircleXZ));
+        core::SimulationInterface::BodyPtr circle = api.simulation->addBody(desc);
+        core::SimulationInterface::BodyPtr wall = addTestWall(api);
+        const math::transform3f identity = math::transform3f::identity();
+
+        for (int i = 0; i < 16; i++) {
+            EXPECT_EQ_F(circle->getTransform().block.data[i], identity.block.data[i]);
+            EXPECT_EQ_F(wall->getTransform().block.data[i], identity.block.data[i]);
+        }
+
+        EXPECT_EQ_F(circle->getVelocity().length(), 0.0f);
+        circle->setVelocity({1, 0, 1});
+        circle->setTransform(identity.translated({0, 0, 50}));
+        EXPECT_EQ_F(circle->getVelocity().length(), 0.0f);
+        return true;
+    }
+
+    bool simulationReleasedConstraintAndBody(const API &api) {
+        core::SimulationInterface::BodyPtr pushed = addTestCircle(api, {0, 0, 60}, {1, 0, 0});
+        core::SimulationInterface::BodyPtr follower = addTestCircle(api, {-2, 0, 60}, {0, 0, 0});
+        core::SimulationInterface::ConstraintPtr constraint = api.simulation->addConstraint(pushed, follower, 2.0f);
+        core::SimulationInterface::BodyPtr staying = addTestCircle(api, {0, 0, 70}, {0, 0, 0});
+        core::SimulationInterface::BodyPtr released = addTestCircle(api, {0.6f, 0, 70}, {0, 0, 0});
+
+        constraint = nullptr;
+        released = nullptr;
+        api.simulation->update(1.0f);
+
+        EXPECT_EQ_F(pushed->getTransform().v3.x, 1.0f);
+        EXPECT_EQ_F(follower->getTransform().v3.x, -2.0f);
+        EXPECT_EQ_F(staying->getTransform().v3.x, 0.0f);
+        return true;
+    }
 }
 
 namespace test {
@@ -312,5 +348,7 @@ namespace test {
         REGISTER_UNIT_TEST(simulationCircleObstacleDistanceConstraint);
         REGISTER_UNIT_TEST(simulationBodyProperties);
         REGISTER_UNIT_TEST(simulationObstacleTransform);
+        REGISTER_UNIT_TEST(simulationBodyInitialState);
+        REGISTER_UNIT_TEST(simulationReleasedConstraintAndBody);
     }
 }
