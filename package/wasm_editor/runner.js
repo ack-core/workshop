@@ -134,8 +134,11 @@ https.createServer({
     await page.waitForFunction(() => testing_visible('top_buttons') && uiEditor['engine.refresh'] != null);
 
     for (const [name, test] of Object.entries(require('./tests.js'))) {
-        console.log(name);
+        console.log("--- Test started: " + name + " ---");
         await test(page);
     }
+
+    await page.waitForTimeout(2000);
+    process.exit(0);
 
 });
