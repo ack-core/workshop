@@ -494,6 +494,7 @@ namespace foundation {
             
             if (depth) {
                 renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+                renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
                 renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(depth.get())->getNativeTexture();
             }
             else {
@@ -517,7 +518,7 @@ namespace foundation {
                     renderPassDescriptor.colorAttachments[i].clearColor = colorClearValue;
                 }
                 
-                if (target->getDepth()) {
+                if (depth == nullptr && target->getDepth()) {
                     renderPassDescriptor.depthAttachment.texture = static_cast<const MetalTexBase *>(target->getDepth().get())->getNativeTexture();
                     renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
                 }
