@@ -1793,6 +1793,75 @@ namespace test {
 }
 
 namespace test {
+    class rendering_frame_constants_test : public PixelTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<PixelTestInterface> {
+            return std::make_unique<rendering_frame_constants_test>();
+        }
+        void init(const API &api) override {
+            // Same centered quad moved by each frame matrix: red by plm, green by std, blue by inv
+            //
+            const char *shaderSrc = R"(
+                fixed {
+                    quad[4] : float2 = [-0.2, 0.2][0.2, 0.2][-0.2, -0.2][0.2, -0.2]
+                    color[3] : float4 = [1.0, 0.0, 0.0, 1.0][0.0, 1.0, 0.0, 1.0][0.0, 0.0, 1.0, 1.0]
+                }
+                inout {
+                    color : float4
+                }
+                vssrc {
+                    float4 p = float4(fixed_quad[repeat_ID], 0.5, 1.0);
+                    float4 plmPos = _transform(p, frame_plmVPMatrix);
+                    float4 stdPos = _transform(p, frame_stdVPMatrix);
+                    float4 invPos = _transform(p, frame_invVPMatrix);
+                    output_position = _select(_select(plmPos, stdPos, vertex_ID == 1), invPos, vertex_ID == 2);
+                    output_color = fixed_color[vertex_ID];
+                }
+                fssrc {
+                    output_color[0] = input_color;
+                }
+            )";
+            const foundation::InputLayout layout = foundation::InputLayout {
+                .repeat = 4
+            };
+            _shader = api.rendering->createShader(shaderSrc, layout);
+        }
+        void updateAndDraw(const API &api) override {
+            const math::transform3f vp = math::transform3f::identity().translated({ -0.5f, 0.5f, 0.0f });
+            const math::transform3f ivp = math::transform3f::identity().translated({ 0.0f, -0.5f, 0.0f });
+            api.rendering->updateFrameConstants(vp, _svp, ivp, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f });
+            api.rendering->forTarget(nullptr, nullptr, math::color{ 0.0f, 0.0f, 0.0f, 1.0f }, [&](foundation::RenderingInterface &rendering) {
+                rendering.applyShader(_shader, foundation::RenderTopology::TRIANGLESTRIP, foundation::BlendType::DISABLED, foundation::DepthBehavior::DISABLED);
+                rendering.draw(3);
+            });
+        }
+        bool testResult(const API &api, const std::uint8_t *ref, const std::uint8_t *frame) override {
+            EXPECT_NOT_EQ(_shader, nullptr);
+
+            auto pixelIs = [frame](std::size_t x, std::size_t y, int r, int g, int b) {
+                const std::uint8_t *p = frame + (y * foundation::TESTING_RENDER_WIDTH + x) * 4;
+                return p[0] == r && p[1] == g && p[2] == b && p[3] == 255;
+            };
+
+            EXPECT_TRUE(pixelIs(128, 128, 255, 0, 0));  // plm: top-left
+            EXPECT_TRUE(pixelIs(384, 128, 0, 255, 0));  // std: top-right
+            EXPECT_TRUE(pixelIs(256, 384, 0, 0, 255));  // inv: bottom-center
+            EXPECT_TRUE(pixelIs(256, 256, 0, 0, 0));    // untransformed position
+            EXPECT_TRUE(pixelIs(256, 128, 0, 0, 0));    // between top quads
+
+            const math::transform3f svp = api.rendering->getStdVPMatrix();
+            EXPECT_EQ_F(svp.m41, _svp.m41);
+            EXPECT_EQ_F(svp.m42, _svp.m42);
+            return true;
+        }
+
+    private:
+        const math::transform3f _svp = math::transform3f::identity().translated({ 0.5f, 0.5f, 0.0f });
+        foundation::RenderShaderPtr _shader;
+    };
+}
+
+namespace test {
     void registerRenderingTests(TestRunner& runner) {
         REGISTER_UNIT_TEST(rendering_uniquty_test);
         REGISTER_UNIT_TEST(rendering_back_buffer_size_test);
@@ -1818,6 +1887,7 @@ namespace test {
         REGISTER_PIXEL_TEST("rendering_tests", rendering_multiple_render_targets_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_texture_formats_test);
         REGISTER_PIXEL_TEST("rendering_tests", rendering_mipmapped_texture_test);
+        REGISTER_PIXEL_TEST("rendering_tests", rendering_frame_constants_test);
         REGISTER_SCREENSHOT_TEST("rendering_tests", rendering_4x4_linear_texture_test);
     }
 }
