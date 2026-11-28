@@ -355,6 +355,84 @@ namespace test {
 }
 
 namespace test {
+    class resource_provider_ground_loading_test : public StepTestInterface {
+    public:
+        static auto make() -> std::unique_ptr<StepTestInterface> {
+            return std::make_unique<resource_provider_ground_loading_test>();
+        }
+        void init(const API &api) override {
+            using Mesh = foundation::RenderDataPtr;
+            using Texture = foundation::RenderTexturePtr;
+            _info = api.resourceProvider->getGroundInfo(PATH);
+            api.resourceProvider->getOrLoadGround(PATH, [this, provider = api.resourceProvider](const Mesh &mesh, const Texture &texture, const resource::GroundMapDescription &desc) {
+                _mesh = mesh;
+                _texture = texture;
+                _hasMap = desc.map != nullptr;
+                _vgCount = desc.vegetation.size();
+                if (_vgCount == 2 && desc.vegetation[1].voxmesh.size() == 1) {
+                    _rowSize = desc.vegetation[0].description.getInteger("textureRowSize", 0);
+                    _vgTexture = desc.vegetation[0].texture;
+                    _vgMapIndex = desc.vegetation[1].mapIndex;
+                    _vgVoxels = desc.vegetation[1].voxmesh[0].first;
+                }
+                provider->getOrLoadGround("resource_provider_tests/missing", [this, provider](const Mesh &mesh, const Texture &texture, const resource::GroundMapDescription &) {
+                    _missingLoaded = true;
+                    _missingMesh = mesh;
+                    _missingTexture = texture;
+                    provider->removeGround(PATH);
+                    provider->getOrLoadGround(PATH, [this](const Mesh &mesh, const Texture &, const resource::GroundMapDescription &) {
+                        _reloaded = mesh;
+                    });
+                });
+            });
+        }
+        bool testResult(const API &api) override {
+            EXPECT_NOT_EQ(_info, nullptr);
+            EXPECT_EQ(_info->sizeX, 2);
+            EXPECT_EQ(_info->sizeY, 1);
+            EXPECT_EQ(_info->sizeZ, 3);
+            EXPECT_EQ(api.resourceProvider->getGroundInfo("resource_provider_tests/missing"), nullptr);
+            EXPECT_NOT_EQ(_mesh, nullptr);
+            EXPECT_EQ(_mesh->getVertexCount(), 4);
+            EXPECT_NOT_EQ(_texture, nullptr);
+            EXPECT_EQ(_texture->getWidth(), 2);
+            EXPECT_EQ(_texture->getHeight(), 3);
+            EXPECT_EQ(_texture->getFormat(), foundation::RenderTextureFormat::R8UN);
+            EXPECT_TRUE(_hasMap);
+            EXPECT_EQ(_vgCount, 2);
+            EXPECT_EQ(_rowSize, 3);
+            EXPECT_NOT_EQ(_vgTexture, nullptr);
+            EXPECT_EQ(_vgTexture->getWidth(), 4);
+            EXPECT_EQ(_vgMapIndex, 1);
+            EXPECT_EQ(_vgVoxels, 1);
+            EXPECT_TRUE(_missingLoaded);
+            EXPECT_EQ(_missingMesh, nullptr);
+            EXPECT_EQ(_missingTexture, nullptr);
+            EXPECT_NOT_EQ(_reloaded, nullptr);
+            EXPECT_NOT_EQ(_reloaded, _mesh);
+            return true;
+        }
+
+    private:
+        static constexpr const char *PATH = "resource_provider_tests/resource_provider_ground_loading_test";
+
+        const resource::GroundInfo *_info = nullptr;
+        foundation::RenderDataPtr _mesh;
+        foundation::RenderDataPtr _missingMesh;
+        foundation::RenderDataPtr _reloaded;
+        foundation::RenderTexturePtr _texture;
+        foundation::RenderTexturePtr _vgTexture;
+        foundation::RenderTexturePtr _missingTexture;
+        std::size_t _vgCount = 0;
+        std::uint32_t _vgVoxels = 0;
+        std::int64_t _rowSize = 0;
+        std::uint8_t _vgMapIndex = 0;
+        bool _hasMap = false;
+        bool _missingLoaded = false;
+    };
+}
+
+namespace test {
     bool resource_provider_prefabs_test(const API &api) {
         const resource::ResourceProviderPtr provider = resource::ResourceProvider::instance(api.platform, api.rendering);
         api.platform->setSuppressOutput(false, true);
@@ -400,5 +478,6 @@ namespace test {
         REGISTER_STEP_TEST(resource_provider_voxel_mesh_loading_test);
         REGISTER_STEP_TEST(resource_provider_voxel_mesh_scale_test);
         REGISTER_STEP_TEST(resource_provider_emitter_loading_test);
+        REGISTER_STEP_TEST(resource_provider_ground_loading_test);
     }
 }
