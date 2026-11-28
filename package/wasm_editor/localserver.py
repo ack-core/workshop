@@ -2,24 +2,7 @@ import http.server
 from http.server import SimpleHTTPRequestHandler
 import socketserver
 import ssl
-import os
-import sys
-import shutil
-
-binaryRoot = os.path.dirname(os.path.abspath(__file__))
-resourcesRoot = os.path.normpath(binaryRoot + "/../resources")
-toolsRoot = os.path.normpath(binaryRoot + "/../tools")
-
-print("Binary Root: ", binaryRoot)
-print("Resources Root: ", resourcesRoot)
-print("Tools Root: ", toolsRoot)
-
-sys.path.insert(1, toolsRoot)
-
-import gen_meshes
-import gen_emitters
-import gen_grounds
-import gen_prefabs
+import update_resources
 
 class CustomRequestHandler (SimpleHTTPRequestHandler):
     def end_headers (self):
@@ -38,17 +21,7 @@ class CustomRequestHandler (SimpleHTTPRequestHandler):
     def do_GET(self):
         print("get  >>> ", self.path)
         if self.path == "/host_cmd_update":
-            # when it becomes critical make update for specific resources
-            print("Updating engine resources...")
-            gen_prefabs.main(resourcesRoot + "/prefabs", None, binaryRoot + "/data/prefabs.bin")
-            gen_meshes.main(resourcesRoot + "/meshes", binaryRoot + "/data/meshes", 1)
-            gen_emitters.main(resourcesRoot + "/emitters", binaryRoot + "/data/emitters")
-            gen_grounds.main(resourcesRoot + "/grounds", binaryRoot + "/data/grounds", resourcesRoot + "/palette.png")
-            print("Copying raycast dir")
-            shutil.copytree(resourcesRoot + "/raycast", binaryRoot + "/data/raycast", dirs_exist_ok = True)
-            print("Copying collision dir")
-            shutil.copytree(resourcesRoot + "/collision", binaryRoot + "/data/collision", dirs_exist_ok = True)
-            print("Finished")
+            update_resources.main()
 
             self.send_response(200)
             self.send_header("Content-type", "text/plain; charset=utf-8")
