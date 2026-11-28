@@ -14,7 +14,8 @@
 
 namespace core {
     struct Environment {
-        math::vector4f sunDirection = math::vector4f(math::vector3f(0.5f, 1.0f, 0.3f).normalized(), 0.0f);
+        math::vector4f darkColor = math::vector4f(0.75f, 0.75f, 0.75f, 1.0f);
+        math::vector4f sunDirection = math::vector4f(math::vector3f(0.6f, 1.0f, 0.3f).normalized(), 0.0f);
         math::vector4f sunColor = math::vector4f(1.0f, 1.0f, 1.0f, 1.0f);
         math::vector4f fogCenter = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
         math::vector4f fogColor = math::vector4f(0.0f, 0.0f, 0.0f, 1.0f);
@@ -703,7 +704,7 @@ namespace core {
         ~SceneInterfaceImpl() override;
         
         void setCameraLookAt(const math::vector3f &position, const math::vector3f &sceneCenter, const math::vector3f &shift = {0, 0, 0}) override;
-        void setEnvironment(const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) override;
+        void setEnvironment(const math::color &dark, const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) override;
         
         auto addArrows() -> ArrowsPtr override;
         auto addLineSet() -> LineSetPtr override;
@@ -790,7 +791,6 @@ namespace core {
 // TODO: shader evolution
 // + const {...} const {...} <- few 'const' blocks
 // + myOpenArray[] : float4 <- open arrays in constant block
-// + fssrc [tex2d tex3d cube] {...} <- types of samplers
 //
 namespace {
     const char *g_arrowShaderSrc = R"(
@@ -1075,6 +1075,7 @@ namespace {
             uv[4] : float2 = [0, 0][1, 0][0, 1][1, 1]
         }
         const {
+            darkColor : float4
             sunDirection : float4
             sunColor : float4
             fogCenter : float4
@@ -1124,9 +1125,12 @@ namespace {
                 lit = lit / 12.0;
             }
 
+            float  lambert = 0.5 + 0.5 * _dot(normal, const_sunDirection.xyz);
+            float3 dark = const_darkColor.rgb;
+            float3 light = dark * (0.5 + 0.5 * lit) + (float3(1.0, 1.0, 1.0) - dark) * lambert * const_sunColor.rgb * lit;
             float  t = _sat((_len(wpos - const_fogCenter.xyz) - const_fogRadius.x) / (const_fogRadius.y - const_fogRadius.x));
             float  fog = _select(t * (2.0 - t), 1.0, gdepth < 0.0000001);
-            output_color[0] = float4(_lerp(lit * color * const_sunColor.rgb, const_fogColor.rgb, fog), 1);
+            output_color[0] = float4(_lerp(light * color, const_fogColor.rgb, fog), 1);
 
         }
     )";
@@ -1192,7 +1196,8 @@ namespace core {
         _camera.invVPMatrix = _camera.stdVPMatrix.inverted();
     }
     
-    void SceneInterfaceImpl::setEnvironment(const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) {
+    void SceneInterfaceImpl::setEnvironment(const math::color &dark, const math::vector3f &sunDirection, const math::color &sunColor, const math::vector3f &fogCenter, const math::color &fogColor, const math::vector2f &fogRadius) {
+        _environment.darkColor = math::vector4f(dark.r, dark.g, dark.b, dark.a);
         _environment.sunDirection = math::vector4f(sunDirection.normalized(), 0.0f);
         _environment.sunColor = math::vector4f(sunColor.r, sunColor.g, sunColor.b, sunColor.a);
         _environment.fogCenter = math::vector4f(fogCenter, 1.0f);

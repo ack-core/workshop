@@ -52,7 +52,7 @@ namespace game {
             &makeContext<VegetationContext>
         }},
         {"particles", {
-            &makeContext<RenderDevContext>,
+            &makeContext<DebugContext>,
             &makeContext<ParticleDevContext>
         }},
         {"voxelmeshes", {

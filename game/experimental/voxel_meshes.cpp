@@ -3,6 +3,7 @@
 
 namespace game {
     VoxelMeshesContext::VoxelMeshesContext(API &&api) : _api(std::move(api)) {
+        _api.scene->setEnvironment({0.65f, 0.65f, 0.75f, 1.0f}, {0.6f, 1.0f, 0.3f}, {1.0f, 1.0f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {1000.0f, 2000.0f});
         _api.resources->getOrLoadVoxelMesh("meshes/voxplane", [this](const std::vector<foundation::RenderDataPtr> &data, const util::Description &desc) {
             _plane = _api.scene->addVoxelMesh(data, desc);
             _plane->setPosition({-32, 0, -32});
